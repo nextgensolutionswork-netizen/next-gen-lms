@@ -237,6 +237,14 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch }: SidebarP
                 >
                   Quizzes & Exams
                 </Link>
+                <Link
+                  href="/academics/sap-servers"
+                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    isActive('/academics/sap-servers') ? 'bg-slate-800 text-white font-bold text-amber-300' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  SAP Lab Servers
+                </Link>
               </div>
             )}
           </div>

@@ -18,12 +18,18 @@ import {
   ArrowLeft,
   Volume2,
   Video,
+  Server,
+  Key,
+  Copy,
+  Check,
+  Download,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { store } from '@/lib/services/data-store';
 import { updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
+import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
 export default function StudentPortalPage() {
@@ -44,6 +50,28 @@ export default function StudentPortalPage() {
   const [videoDuration, setVideoDuration] = React.useState(2700); // 45 mins
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [courseProgress, setCourseProgress] = React.useState(student.course_progress);
+  const sapAllocation = store.sapAllocations.find((a) => a.student_id === student.id && a.status === 'Active');
+  const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
+
+  const handleCopy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleDownloadShortcut = () => {
+    if (!sapAllocation) return;
+    const content = generateSapGuiShortcutContent(sapAllocation);
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${sapAllocation.sid}_${sapAllocation.sap_user_id}.sap`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleLessonSelect = (les: any) => {
     setActiveLesson(les);
@@ -322,6 +350,101 @@ export default function StudentPortalPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* SAP GUI Practice Sandbox Access */}
+        {sapAllocation && (
+          <Card className="border-2 border-[#0A6ED1]/40 shadow-sm overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center space-x-3">
+                  <div className="h-9 w-9 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center">
+                    <Server className="h-5 w-5 text-blue-300" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold text-white flex items-center space-x-2">
+                      <span>My Dedicated SAP GUI Sandbox Lab</span>
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
+                        ACTIVE
+                      </span>
+                    </CardTitle>
+                    <p className="text-[11px] text-blue-200 mt-0.5">{sapAllocation.system_name}</p>
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadShortcut}
+                  className="bg-white/10 text-white hover:bg-white/20 border-white/20 text-xs flex items-center space-x-1.5 self-start sm:self-auto"
+                >
+                  <Download className="h-3.5 w-3.5 text-blue-300" />
+                  <span>Download .sap GUI Shortcut</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Server Host / SID</p>
+                  <p className="font-mono font-bold text-slate-800 text-sm mt-0.5">{sapAllocation.sid}</p>
+                  <p className="font-mono text-[10px] text-slate-500 truncate">{sapAllocation.server_host}</p>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Client / Instance</p>
+                  <p className="font-mono font-bold text-slate-800 text-sm mt-0.5">Client {sapAllocation.client_number}</p>
+                  <p className="text-[10px] text-slate-500">Instance: {sapAllocation.instance_number}</p>
+                </div>
+
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                  <p className="text-[10px] uppercase font-bold text-blue-600">SAP User ID</p>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="font-mono font-bold text-blue-900 text-sm">{sapAllocation.sap_user_id}</span>
+                    <button
+                      onClick={() => handleCopy(sapAllocation.sap_user_id, 'portal-usr')}
+                      className="text-blue-500 hover:text-blue-700 p-1"
+                      title="Copy User ID"
+                    >
+                      {copiedKey === 'portal-usr' ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                  <p className="text-[10px] uppercase font-bold text-blue-600">SAP Password</p>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="font-mono font-bold text-blue-900 text-sm">{sapAllocation.sap_password}</span>
+                    <button
+                      onClick={() => handleCopy(sapAllocation.sap_password, 'portal-pwd')}
+                      className="text-blue-500 hover:text-blue-700 p-1"
+                      title="Copy Password"
+                    >
+                      {copiedKey === 'portal-pwd' ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-100 text-slate-500 text-[11px]">
+                <span>
+                  Access Window: <strong className="text-slate-700">{formatDate(sapAllocation.valid_from)}</strong> &rarr;{' '}
+                  <strong className="text-slate-700">{formatDate(sapAllocation.valid_to)}</strong>
+                </span>
+                <span className="text-blue-600">
+                  Tip: Download the <strong>.sap</strong> shortcut to log in directly via SAP GUI for Windows.
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Certificate Banner if Issued */}
         {certificate && (

@@ -29,6 +29,8 @@ import {
   NotificationItem,
   AuditLog,
   SystemSettings,
+  SapServerSystem,
+  SapServerAllocation,
 } from '@/types';
 
 // In-Memory initial seed data for immediate high-speed execution & testing
@@ -1142,6 +1144,55 @@ class InstituteDataStore {
       new_value: { amount: 75000, category: 'Rent', status: 'Approved' },
       ip_address: '192.168.1.10',
       created_at: '2026-02-01T10:05:00Z',
+    },
+  ];
+
+  public sapSystems: SapServerSystem[] = [
+    {
+      id: 'sap-sys-01',
+      system_name: 'SAP S/4HANA 2022 FPS02 Enterprise Sandbox',
+      sid: 'S4H',
+      instance_number: '00',
+      server_host: 's4h.lab.next-generpsolutions.com',
+      sap_router: '/H/103.212.120.45/S/3299',
+      default_client: '800',
+      description: 'Dedicated S/4HANA practice sandbox with full FICO, MM, SD, and ABAP customization tables.',
+      status: 'Online',
+    },
+    {
+      id: 'sap-sys-02',
+      system_name: 'SAP ECC 6.0 EHP8 Production Simulation',
+      sid: 'DEV',
+      instance_number: '01',
+      server_host: 'ecc.lab.next-generpsolutions.com',
+      default_client: '100',
+      description: 'Classic ECC environment for legacy interface, IDoc, and transaction code reference practice.',
+      status: 'Online',
+    },
+  ];
+
+  public sapAllocations: SapServerAllocation[] = [
+    {
+      id: 'alloc-01',
+      student_id: 'stu-01',
+      student_name: 'Amit Gupta',
+      admission_number: 'ADM-2026-0001',
+      course_id: 'crs-fico-01',
+      course_name: 'SAP S/4HANA Finance (FICO)',
+      system_id: 'sap-sys-01',
+      system_name: 'SAP S/4HANA 2022 FPS02 Enterprise Sandbox',
+      server_host: 's4h.lab.next-generpsolutions.com',
+      sid: 'S4H',
+      instance_number: '00',
+      client_number: '800',
+      sap_user_id: 'SAP_AMITG',
+      sap_password: 'InitialPass#2026',
+      valid_from: '2026-01-15',
+      valid_to: '2026-05-15',
+      status: 'Active',
+      allocated_by: 'usr-admin',
+      created_at: '2026-01-15T09:00:00Z',
+      updated_at: '2026-01-15T09:00:00Z',
     },
   ];
 }

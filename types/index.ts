@@ -657,3 +657,39 @@ export interface SystemSettings {
   enable_sms_notifications: boolean;
   enable_whatsapp_notifications: boolean;
 }
+
+export interface SapServerSystem {
+  id: string;
+  system_name: string;
+  sid: string;
+  instance_number: string;
+  server_host: string;
+  sap_router?: string;
+  default_client: string;
+  description: string;
+  status: 'Online' | 'Maintenance' | 'Offline';
+}
+
+export interface SapServerAllocation {
+  id: string;
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  course_id: string;
+  course_name: string;
+  system_id: string;
+  system_name: string;
+  server_host: string;
+  sid: string;
+  instance_number: string;
+  client_number: string;
+  sap_user_id: string;
+  sap_password: string;
+  valid_from: string;
+  valid_to: string;
+  status: 'Active' | 'Expired' | 'Revoked';
+  allocated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+

@@ -6,6 +6,12 @@ import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { markAttendance } from '@/lib/services/academics-service';
 import { verifyAndGenerateCertificate } from '@/lib/services/certificate-service';
+import {
+  provisionSapAccess,
+  extendSapAccess,
+  revokeSapAccess,
+  generateSapGuiShortcutContent,
+} from '@/lib/services/sap-lab-service';
 
 describe('1. RBAC & Permission Tests', () => {
   const superAdminUser: UserProfile = {
@@ -233,3 +239,64 @@ describe('5. Certificate Criteria Verification', () => {
     expect(result.reasons[0]).toContain('Attendance is 60%, minimum 80% required');
   });
 });
+
+describe('6. SAP Lab Servers & Sandbox Access Provisioning', () => {
+  it('Provisions SAP GUI Sandbox access and generates official .sap shortcut', async () => {
+    // Pick enrolled student Sneha Kulkarni (stu-02) without an active allocation on ECC
+    const student = store.students.find((s) => s.id === 'stu-02')!;
+    const system = store.sapSystems.find((sys) => sys.sid === 'DEV')!; // SAP ECC 6.0
+
+    const allocation = await provisionSapAccess(
+      {
+        student_id: student.id,
+        system_id: system.id,
+        client_number: '100',
+        valid_months: 3,
+      },
+      'usr-admin'
+    );
+
+    expect(allocation.status).toBe('Active');
+    expect(allocation.client_number).toBe('100');
+    expect(allocation.sid).toBe(system.sid);
+    expect(allocation.sap_user_id).toContain('SAP_SNEHA');
+
+    // Test SAP GUI Shortcut content generation
+    const shortcut = generateSapGuiShortcutContent(allocation);
+    expect(shortcut).toContain(`Name=${system.sid}`);
+    expect(shortcut).toContain(`Client=100`);
+    expect(shortcut).toContain(`Name=${allocation.sap_user_id}`);
+    expect(shortcut).toContain(`GuiParm=/M/${system.server_host}/S/36${system.instance_number}/G/SPACE`);
+  });
+
+  it('Prevents duplicate active allocations on the same system for the same student', async () => {
+    const student = store.students.find((s) => s.id === 'stu-01')!; // Amit Gupta (already has S4H allocation)
+    const system = store.sapSystems.find((sys) => sys.sid === 'S4H')!; // S4H
+
+    await expect(
+      provisionSapAccess(
+        {
+          student_id: student.id,
+          system_id: system.id,
+        },
+        'usr-admin'
+      )
+    ).rejects.toThrow(/already has an active SAP sandbox allocation/);
+  });
+
+  it('Allows extending and revoking SAP sandbox access', async () => {
+    const student = store.students.find((s) => s.id === 'stu-02')!;
+    const alloc = store.sapAllocations.find((a) => a.student_id === student.id && a.status === 'Active')!;
+
+    // Extend
+    const extended = await extendSapAccess(alloc.id, '2026-12-31', 'usr-admin');
+    expect(extended.valid_to).toBe('2026-12-31');
+    expect(extended.status).toBe('Active');
+
+    // Revoke
+    const revoked = await revokeSapAccess(alloc.id, 'usr-admin');
+    expect(revoked.status).toBe('Revoked');
+  });
+});
+
+
