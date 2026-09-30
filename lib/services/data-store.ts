@@ -35,9 +35,68 @@ import {
   DoubtMessage,
   MeetingParticipantLog,
 } from '@/types';
+import { persistentStorage } from './persistent-storage-adapter';
 
-// In-Memory initial seed data for immediate high-speed execution & testing
+// In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
+  constructor() {
+    this.hydrateFromDisk();
+  }
+
+  public hydrateFromDisk(): boolean {
+    try {
+      const snapshot = persistentStorage.loadState();
+      if (snapshot) {
+        if (snapshot.settings) this.settings = snapshot.settings;
+        if (snapshot.users?.length) this.users = snapshot.users;
+        if (snapshot.admissions?.length) this.admissions = snapshot.admissions;
+        if (snapshot.students?.length) this.students = snapshot.students;
+        if (snapshot.leads?.length) this.leads = snapshot.leads;
+        if (snapshot.courses?.length) this.courses = snapshot.courses;
+        if (snapshot.modules?.length) this.modules = snapshot.modules;
+        if (snapshot.lessons?.length) this.lessons = snapshot.lessons;
+        if (snapshot.lessonProgress?.length) this.lessonProgress = snapshot.lessonProgress;
+        if (snapshot.batches?.length) this.batches = snapshot.batches;
+        if (snapshot.batchTransferAudits?.length) this.batchTransferAudits = snapshot.batchTransferAudits;
+        if (snapshot.classSessions?.length) this.classSessions = snapshot.classSessions;
+        if (snapshot.attendanceRecords?.length) this.attendanceRecords = snapshot.attendanceRecords;
+        if (snapshot.assignments?.length) this.assignments = snapshot.assignments;
+        if (snapshot.submissions?.length) this.submissions = snapshot.submissions;
+        if (snapshot.quizzes?.length) this.quizzes = snapshot.quizzes;
+        if (snapshot.quizQuestions?.length) this.quizQuestions = snapshot.quizQuestions;
+        if (snapshot.quizAttempts?.length) this.quizAttempts = snapshot.quizAttempts;
+        if (snapshot.feeAccounts?.length) this.feeAccounts = snapshot.feeAccounts;
+        if (snapshot.installments?.length) this.installments = snapshot.installments;
+        if (snapshot.payments?.length) this.payments = snapshot.payments;
+        if (snapshot.receipts?.length) this.receipts = snapshot.receipts;
+        if (snapshot.expenses?.length) this.expenses = snapshot.expenses;
+        if (snapshot.vendors?.length) this.vendors = snapshot.vendors;
+        if (snapshot.placementProfiles?.length) this.placementProfiles = snapshot.placementProfiles;
+        if (snapshot.jobOpenings?.length) this.jobOpenings = snapshot.jobOpenings;
+        if (snapshot.jobApplications?.length) this.jobApplications = snapshot.jobApplications;
+        if (snapshot.certificates?.length) this.certificates = snapshot.certificates;
+        if (snapshot.notifications?.length) this.notifications = snapshot.notifications;
+        if (snapshot.auditLogs?.length) this.auditLogs = snapshot.auditLogs;
+        if (snapshot.sapSystems?.length) this.sapSystems = snapshot.sapSystems;
+        else if (snapshot.sapServers?.length) this.sapSystems = snapshot.sapServers;
+        if (snapshot.sapAllocations?.length) this.sapAllocations = snapshot.sapAllocations;
+        if (snapshot.doubts?.length) this.doubts = snapshot.doubts;
+        if (snapshot.meetingLogs?.length) this.meetingLogs = snapshot.meetingLogs;
+        return true;
+      }
+    } catch (err) {
+      console.warn('[InstituteDataStore] Error hydrating from disk, using seed defaults:', err);
+    }
+    return false;
+  }
+
+  public persist(): void {
+    persistentStorage.scheduleSave(this);
+  }
+
+  public persistSync(): boolean {
+    return persistentStorage.saveState(this);
+  }
   public settings: SystemSettings = {
     id: 'sys-01',
     institute_name: 'Next-Gen ERP Solutions',

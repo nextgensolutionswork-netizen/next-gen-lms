@@ -29,3 +29,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local persistent storage backups
+data/backups/*
+!data/backups/.gitkeep
+data/*.tmp*

@@ -217,6 +217,7 @@ export async function recordPaymentAtomic(
   // 5. Commit to Store
   store.payments.unshift(newPayment);
   store.receipts.unshift(newReceipt);
+  store.persist();
 
   if (isLiveSupabaseEnabled()) {
     try {

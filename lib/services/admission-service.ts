@@ -204,6 +204,9 @@ export async function createAdmissionWorkflow(
     }
   }
 
+  // Persist state to disk
+  store.persist();
+
   // Persist to Supabase if live database is enabled
   if (isLiveSupabaseEnabled()) {
     try {
