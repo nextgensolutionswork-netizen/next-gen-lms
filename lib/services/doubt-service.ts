@@ -1,6 +1,13 @@
 import { store } from './data-store';
 import { StudentDoubt, DoubtMessage, DoubtStatus, DoubtPriority, DoubtCategory, UserRole } from '@/types';
 import { recordAuditLog } from './audit-service';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import {
+  dbGetDoubts,
+  dbCreateDoubt,
+  dbReplyToDoubt,
+  dbResolveDoubt,
+} from '@/lib/supabase/db-service';
 
 export async function getDoubts(filters?: {
   student_id?: string;
@@ -9,6 +16,15 @@ export async function getDoubts(filters?: {
   category?: DoubtCategory | 'All';
   search?: string;
 }): Promise<StudentDoubt[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const dbList = await dbGetDoubts(filters);
+      if (dbList && dbList.length > 0) return dbList;
+    } catch (err) {
+      console.warn('Supabase doubts query error, falling back to local store:', err);
+    }
+  }
+
   let list = [...store.doubts];
 
   if (filters?.student_id) {
@@ -109,6 +125,14 @@ export async function createStudentDoubt(
 
   store.doubts.unshift(newDoubt);
 
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbCreateDoubt(newDoubt, input.description, studentUserId, student.full_name);
+    } catch (err) {
+      console.warn('Supabase doubt insert error, saved locally:', err);
+    }
+  }
+
   await recordAuditLog({
     user_id: studentUserId,
     user_name: student.full_name,
@@ -156,6 +180,14 @@ export async function replyToDoubt(
 
   doubt.messages.push(newMessage);
   doubt.updated_at = now;
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbReplyToDoubt(doubt.id, newMessage);
+    } catch (err) {
+      console.warn('Supabase reply insert error, saved locally:', err);
+    }
+  }
 
   // If support or trainer replies, transition from Open/Assigned to In Progress
   if ((senderRole === 'support' || senderRole === 'trainer' || senderRole === 'admin') && doubt.status !== 'Resolved') {
@@ -220,6 +252,14 @@ export async function resolveDoubt(
   doubt.status = 'Resolved';
   doubt.resolved_at = now;
   doubt.updated_at = now;
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbResolveDoubt(doubt.id, resolvedByUserId, resolutionNotes);
+    } catch (err) {
+      console.warn('Supabase resolve error, saved locally:', err);
+    }
+  }
 
   const actor = store.users.find((u) => u.id === resolvedByUserId);
 

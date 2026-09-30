@@ -9,16 +9,44 @@ import {
   Bell,
   Clock,
   IndianRupee,
+  Database,
+  RefreshCw,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { store } from '@/lib/services/data-store';
 import { SystemSettings } from '@/types';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { syncStoreToSupabase, SeedSyncResult } from '@/lib/supabase/seeder';
 
 export default function SettingsPage() {
   const [settings, setSettings] = React.useState<SystemSettings>(store.settings);
   const [saved, setSaved] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [syncResult, setSyncResult] = React.useState<SeedSyncResult | null>(null);
+  const isSupabaseLive = isLiveSupabaseEnabled();
+
+  const handleSyncToDb = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await syncStoreToSupabase();
+      setSyncResult(res);
+    } catch (err: any) {
+      setSyncResult({
+        success: false,
+        message: err.message || 'Sync failed',
+        syncedTables: [],
+        errors: [err.message],
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +210,92 @@ export default function SettingsPage() {
               />
               <span className="font-medium text-slate-800">Enable SMS Gateways for Overdue Reminders</span>
             </label>
+          </CardContent>
+        </Card>
+
+        {/* Supabase Database Connection & PostgreSQL Sync */}
+        <Card className="border border-slate-200">
+          <CardHeader className="pb-3 bg-gradient-to-r from-slate-900 to-slate-950 text-white rounded-t-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300">
+                  <Database className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-bold text-white flex items-center space-x-2">
+                    <span>Supabase PostgreSQL Engine</span>
+                    <Badge variant={isSupabaseLive ? 'success' : 'warning'} className="text-[10px]">
+                      {isSupabaseLive ? 'Live PostgreSQL Connected' : 'In-Memory State (Offline)'}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Cloud database persistence layer for student rosters, fee ledger, and doubt tickets.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5 space-y-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Database Engine</p>
+                <p className="font-semibold text-slate-900">PostgreSQL 15 (Supabase Cloud)</p>
+                <p className="text-[10px] text-slate-500">Row-Level Security (RLS) & Foreign Keys active</p>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Persistence Mode</p>
+                <p className="font-semibold text-slate-900">
+                  {isSupabaseLive ? 'Direct PostgreSQL Database Queries' : 'Hybrid Dual-Layer Cache'}
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Project: <strong className="font-mono text-slate-700">yutulwbkkvmryaxqjbfp</strong>
+                </p>
+              </div>
+            </div>
+
+            {syncResult && (
+              <div
+                className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                  syncResult.success
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50 border-amber-200 text-amber-900'
+                }`}
+              >
+                <div className="flex items-center space-x-2 font-bold">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span>{syncResult.message}</span>
+                </div>
+                {syncResult.syncedTables.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {syncResult.syncedTables.map((t) => (
+                      <span key={t.table} className="bg-white/80 border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-medium">
+                        {t.table}: {t.count} records
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {syncResult.errors.length > 0 && (
+                  <p className="text-[10px] text-rose-600">{syncResult.errors.join('; ')}</p>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-500">
+                Click below to push all institute seed data (courses, staff, students, fees) directly into your Supabase database.
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSyncToDb}
+                disabled={isSyncing}
+                className="text-xs flex items-center space-x-1.5 self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-800"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Syncing to Database...' : 'Sync Store to Supabase DB'}</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

@@ -2,8 +2,19 @@ import { store } from './data-store';
 import { Admission, Student, StudentFeeAccount, Installment } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { generateAdmissionNumber } from '@/lib/utils/formatters';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { dbGetAdmissions, dbCreateAdmission } from '@/lib/supabase/db-service';
 
 export async function getAdmissions(): Promise<Admission[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const dbList = await dbGetAdmissions();
+      if (dbList && dbList.length > 0) return dbList;
+    } catch (err) {
+      console.warn('Supabase admissions query error, falling back to local store:', err);
+    }
+  }
+
   return [...store.admissions].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -190,6 +201,15 @@ export async function createAdmissionWorkflow(
       lead.stage = 'Converted';
       lead.notes = `${lead.notes || ''}\nConverted to Admission: ${admission_number}`;
       lead.updated_at = new Date().toISOString();
+    }
+  }
+
+  // Persist to Supabase if live database is enabled
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbCreateAdmission(newAdmission, newStudent, newFeeAccount);
+    } catch (err) {
+      console.warn('Supabase admission insert error, saved locally:', err);
     }
   }
 

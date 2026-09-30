@@ -1,6 +1,8 @@
 import { store } from './data-store';
 import { Lead, LeadFollowup, LeadStage } from '@/types';
 import { recordAuditLog } from './audit-service';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { dbGetLeads, dbCreateLead } from '@/lib/supabase/db-service';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
@@ -8,6 +10,15 @@ export async function getLeads(filters?: {
   course_id?: string;
   search?: string;
 }): Promise<Lead[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const dbList = await dbGetLeads();
+      if (dbList && dbList.length > 0) return dbList;
+    } catch (err) {
+      console.warn('Supabase leads query error, falling back to local store:', err);
+    }
+  }
+
   let list = [...store.leads];
 
   if (filters?.stage && filters.stage !== 'All') {
@@ -54,6 +65,14 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
   };
 
   store.leads.unshift(newLead);
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbCreateLead(newLead);
+    } catch (err) {
+      console.warn('Supabase lead insert error, saved locally:', err);
+    }
+  }
 
   await recordAuditLog({
     user_id: data.counsellor_id || 'system',

@@ -12,6 +12,8 @@ import {
 } from '@/types';
 import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { dbGetPayments, dbGetReceipts, dbRecordPayment } from '@/lib/supabase/db-service';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -29,12 +31,30 @@ export async function getInstallmentsForAccount(feeAccountId: string): Promise<I
 }
 
 export async function getPayments(): Promise<Payment[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const dbList = await dbGetPayments();
+      if (dbList && dbList.length > 0) return dbList;
+    } catch (err) {
+      console.warn('Supabase payments query error, falling back to local store:', err);
+    }
+  }
+
   return [...store.payments].sort(
     (a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
   );
 }
 
 export async function getReceipts(): Promise<Receipt[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const dbList = await dbGetReceipts();
+      if (dbList && dbList.length > 0) return dbList;
+    } catch (err) {
+      console.warn('Supabase receipts query error, falling back to local store:', err);
+    }
+  }
+
   return [...store.receipts].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -187,6 +207,21 @@ export async function recordPaymentAtomic(
   // 5. Commit to Store
   store.payments.unshift(newPayment);
   store.receipts.unshift(newReceipt);
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbRecordPayment(
+        newPayment,
+        newReceipt,
+        feeAccount.id,
+        newPaidAmount,
+        newOutstandingAmount,
+        feeAccount.status
+      );
+    } catch (err) {
+      console.warn('Supabase payment insert error, saved locally:', err);
+    }
+  }
 
   // 6. Record Tamper-Evident Audit Log
   await recordAuditLog({

@@ -1,5 +1,7 @@
 import { store } from './data-store';
 import { AuditLog } from '@/types';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { dbRecordAuditLog } from '@/lib/supabase/db-service';
 
 export async function getAuditLogs(): Promise<AuditLog[]> {
   return [...store.auditLogs].sort(
@@ -17,5 +19,14 @@ export async function recordAuditLog(
   };
 
   store.auditLogs.unshift(log);
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      await dbRecordAuditLog(log);
+    } catch (err) {
+      console.warn('Supabase audit log insert error, saved locally:', err);
+    }
+  }
+
   return log;
 }
