@@ -32,12 +32,14 @@ import {
   Send,
   PlusCircle,
   ChevronDown,
+  LogOut,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
 import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
@@ -47,7 +49,16 @@ import { StudentDoubt, DoubtCategory, DoubtPriority } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
 export default function StudentPortalPage() {
-  const student = store.students[0]; // Active student Amit Gupta
+  const { user, logout } = useAuth();
+  const student =
+    (user &&
+      store.students.find(
+        (s) =>
+          s.email?.toLowerCase() === user.email?.toLowerCase() ||
+          s.id === user.id ||
+          s.user_id === user.id
+      )) ||
+    store.students[0];
   const course = store.courses.find((c) => c.id === student.course_id);
   const modules = store.modules.filter((m) => m.course_id === student.course_id);
   const lessons = store.lessons.filter((l) => l.course_id === student.course_id && l.is_published);
@@ -224,9 +235,11 @@ export default function StudentPortalPage() {
       <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Link href="/dashboard" className="text-slate-400 hover:text-white mr-2">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+            {user?.role && user.role !== 'student' && (
+              <Link href="/dashboard" className="text-slate-400 hover:text-white mr-2" title="Return to Admin Panel">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            )}
             <div className="h-9 w-9 rounded-lg bg-[#0A6ED1] flex items-center justify-center font-bold text-white text-base shadow">
               SAP
             </div>
@@ -240,11 +253,23 @@ export default function StudentPortalPage() {
             <span className="hidden sm:inline-block text-slate-300">
               Welcome back, <strong className="text-white">{student.full_name}</strong> ({student.student_code})
             </span>
-            <Link href="/dashboard">
-              <Button variant="outline" size="sm" className="text-xs bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">
-                Staff Admin Panel
-              </Button>
-            </Link>
+            {user?.role && user.role !== 'student' && (
+              <Link href="/dashboard">
+                <Button variant="outline" size="sm" className="text-xs bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">
+                  Staff Admin Panel
+                </Button>
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logout()}
+              className="text-xs bg-slate-800 text-red-300 border-slate-700 hover:bg-red-950/60 hover:text-red-200 hover:border-red-800 flex items-center space-x-1.5"
+              title="Sign out of student account"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sign Out</span>
+            </Button>
           </div>
         </div>
       </header>

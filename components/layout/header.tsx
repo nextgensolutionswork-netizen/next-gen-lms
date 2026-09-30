@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Bell, Search, ExternalLink, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Bell, Search, ExternalLink, ShieldCheck, CheckCircle2, LogOut } from 'lucide-react';
 import { UserRole } from '@/types';
+import { useAuth } from '@/components/providers/auth-provider';
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -11,6 +12,7 @@ interface HeaderProps {
 }
 
 export function Header({ currentRole, currentUserName }: HeaderProps) {
+  const { logout } = useAuth();
   const [showNotifications, setShowNotifications] = React.useState(false);
 
   return (
@@ -92,6 +94,16 @@ export function Header({ currentRole, currentUserName }: HeaderProps) {
             <p className="text-[10px] font-medium text-slate-500 capitalize">{currentRole.replace('_', ' ')}</p>
           </div>
         </div>
+
+        {/* Sign Out Action */}
+        <button
+          onClick={() => logout()}
+          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 text-xs font-medium transition-colors"
+          title="Sign out of account"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">Sign Out</span>
+        </button>
       </div>
     </header>
   );

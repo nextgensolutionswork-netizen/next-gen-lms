@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, BookOpen, Eye, EyeOff, GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/components/providers/auth-provider';
 
 const DEMO_ACCOUNTS = [
   {
@@ -83,6 +84,7 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -98,10 +100,17 @@ export default function LoginPage() {
     setError('');
   };
 
-  const directLogin = (account: typeof DEMO_ACCOUNTS[0]) => {
+  const directLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
     selectAccount(account);
-    router.replace(account.route);
-    router.refresh();
+    setError('');
+    setBusy(true);
+    try {
+      await login(account.email, account.password);
+    } catch (err: any) {
+      setError(err?.message || 'Unable to sign in. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -109,42 +118,13 @@ export default function LoginPage() {
     setError('');
     setBusy(true);
 
-    const targetAccount = DEMO_ACCOUNTS.find(
-      (a) => a.email.toLowerCase() === email.trim().toLowerCase()
-    );
-
     try {
-      const { error: authError } = await createClient().auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
-      });
-
-      if (!authError) {
-        if (targetAccount) {
-          router.replace(targetAccount.route);
-        } else {
-          router.replace('/dashboard');
-        }
-        router.refresh();
-        return;
+      const ok = await login(email, password);
+      if (!ok) {
+        setError('Unable to sign in. Check your email and password and try again.');
       }
-
-      // If Supabase returned error or mock, check local account credentials
-      if (targetAccount && password === targetAccount.password) {
-        router.replace(targetAccount.route);
-        router.refresh();
-        return;
-      }
-
-      setError('Unable to sign in. Check your email and password and try again.');
-    } catch {
-      // Local fallback for demo or offline mode
-      if (targetAccount && password === targetAccount.password) {
-        router.replace(targetAccount.route);
-        router.refresh();
-        return;
-      }
-      setError('Unable to connect to sign-in. Please select one of the 8 accounts below.');
+    } catch (err: any) {
+      setError(err?.message || 'Unable to sign in. Check your email and password and try again.');
     } finally {
       setBusy(false);
     }
