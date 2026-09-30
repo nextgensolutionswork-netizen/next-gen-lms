@@ -1,13 +1,7 @@
 import { store } from './data-store';
 import { StudentDoubt, DoubtMessage, DoubtStatus, DoubtPriority, DoubtCategory, UserRole } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
-import {
-  dbGetDoubts,
-  dbCreateDoubt,
-  dbReplyToDoubt,
-  dbResolveDoubt,
-} from '@/lib/supabase/db-service';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { publishRealtimeEvent } from './realtime-service';
 import {
   dispatchMultiChannelNotification,
@@ -23,10 +17,35 @@ export async function getDoubts(filters?: {
 }): Promise<StudentDoubt[]> {
   if (isLiveSupabaseEnabled()) {
     try {
-      const dbList = await dbGetDoubts(filters);
-      if (dbList && dbList.length > 0) return dbList;
+      const supabase = createClient();
+      let query = supabase
+        .from('student_doubts')
+        .select('*, messages:doubt_messages(*)')
+        .order('updated_at', { ascending: false });
+
+      if (filters?.student_id) {
+        query = query.eq('student_id', filters.student_id);
+      }
+      if (filters?.assigned_to_id) {
+        query = query.eq('assigned_to_id', filters.assigned_to_id);
+      }
+      if (filters?.status && filters.status !== 'All') {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.category && filters.category !== 'All') {
+        query = query.eq('category', filters.category);
+      }
+      if (filters?.search && filters.search.trim()) {
+        query = query.ilike('title', `%${filters.search.trim()}%`);
+      }
+
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        store.doubts = data as StudentDoubt[];
+        return data as StudentDoubt[];
+      }
     } catch (err) {
-      console.warn('Supabase doubts query error, falling back to local store:', err);
+      console.warn('Supabase doubts direct query error, falling back to local persistent store:', err);
     }
   }
 
@@ -63,6 +82,23 @@ export async function getDoubts(filters?: {
 }
 
 export async function getDoubtById(id: string): Promise<StudentDoubt | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('student_doubts')
+        .select('*, messages:doubt_messages(*)')
+        .or(`id.eq.${id},ticket_number.eq.${id}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as StudentDoubt;
+      }
+    } catch (err) {
+      console.warn('Supabase getDoubtById error, checking local store:', err);
+    }
+  }
+
   return store.doubts.find((d) => d.id === id || d.ticket_number === id);
 }
 
@@ -131,12 +167,46 @@ export async function createStudentDoubt(
   };
 
   store.doubts.unshift(newDoubt);
+  store.persist();
 
   if (isLiveSupabaseEnabled()) {
     try {
-      await dbCreateDoubt(newDoubt, input.description, studentUserId, student.full_name);
+      const supabase = createClient();
+      await supabase.from('student_doubts').insert({
+        id: newDoubt.id,
+        ticket_number: newDoubt.ticket_number,
+        student_id: newDoubt.student_id,
+        student_name: newDoubt.student_name,
+        admission_number: newDoubt.admission_number,
+        course_id: newDoubt.course_id,
+        course_name: newDoubt.course_name,
+        batch_id: newDoubt.batch_id,
+        batch_name: newDoubt.batch_name,
+        assigned_to_id: newDoubt.assigned_to_id,
+        assigned_to_name: newDoubt.assigned_to_name,
+        assigned_to_role: newDoubt.assigned_to_role,
+        title: newDoubt.title,
+        description: newDoubt.description,
+        category: newDoubt.category,
+        priority: newDoubt.priority,
+        status: newDoubt.status,
+        sap_tcode: newDoubt.sap_tcode,
+        created_at: newDoubt.created_at,
+        updated_at: newDoubt.updated_at,
+      });
+
+      await supabase.from('doubt_messages').insert({
+        id: initialMessage.id,
+        doubt_id: newDoubt.id,
+        sender_id: initialMessage.sender_id,
+        sender_name: initialMessage.sender_name,
+        sender_role: initialMessage.sender_role,
+        message: initialMessage.message,
+        attachment_url: initialMessage.attachment_url,
+        created_at: initialMessage.created_at,
+      });
     } catch (err) {
-      console.warn('Supabase doubt insert error, saved locally:', err);
+      console.warn('Supabase direct student_doubts insert warning, preserved locally:', err);
     }
   }
 
@@ -206,17 +276,36 @@ export async function replyToDoubt(
   doubt.messages.push(newMessage);
   doubt.updated_at = now;
 
-  if (isLiveSupabaseEnabled()) {
-    try {
-      await dbReplyToDoubt(doubt.id, newMessage);
-    } catch (err) {
-      console.warn('Supabase reply insert error, saved locally:', err);
-    }
-  }
-
   // If support or trainer replies, transition from Open/Assigned to In Progress
   if ((senderRole === 'support' || senderRole === 'trainer' || senderRole === 'admin') && doubt.status !== 'Resolved') {
     doubt.status = 'In Progress';
+  }
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('doubt_messages').insert({
+        id: newMessage.id,
+        doubt_id: doubt.id,
+        sender_id: newMessage.sender_id,
+        sender_name: newMessage.sender_name,
+        sender_role: newMessage.sender_role,
+        message: newMessage.message,
+        attachment_url: newMessage.attachment_url,
+        created_at: newMessage.created_at,
+      });
+
+      await supabase
+        .from('student_doubts')
+        .update({
+          status: doubt.status,
+          updated_at: now,
+        })
+        .eq('id', doubt.id);
+    } catch (err) {
+      console.warn('Supabase direct doubt reply warning, preserved locally:', err);
+    }
   }
 
   await recordAuditLog({
@@ -307,6 +396,25 @@ export async function assignDoubt(
     doubt.status = 'Assigned';
   }
   doubt.updated_at = new Date().toISOString();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('student_doubts')
+        .update({
+          assigned_to_id: mentor.id,
+          assigned_to_name: mentor.full_name,
+          assigned_to_role: doubt.assigned_to_role,
+          status: doubt.status,
+          updated_at: doubt.updated_at,
+        })
+        .eq('id', doubt.id);
+    } catch (err) {
+      console.warn('Supabase assignDoubt direct query warning, preserved locally:', err);
+    }
+  }
 
   const actor = store.users.find((u) => u.id === assignedByUserId);
   await recordAuditLog({
@@ -343,18 +451,11 @@ export async function resolveDoubt(
   doubt.resolved_at = now;
   doubt.updated_at = now;
 
-  if (isLiveSupabaseEnabled()) {
-    try {
-      await dbResolveDoubt(doubt.id, resolvedByUserId, resolutionNotes);
-    } catch (err) {
-      console.warn('Supabase resolve error, saved locally:', err);
-    }
-  }
-
   const actor = store.users.find((u) => u.id === resolvedByUserId);
 
+  let resolutionMsg: DoubtMessage | undefined;
   if (resolutionNotes && resolutionNotes.trim()) {
-    doubt.messages.push({
+    resolutionMsg = {
       id: `msg-${Date.now()}`,
       doubt_id: doubt.id,
       sender_id: resolvedByUserId,
@@ -362,7 +463,37 @@ export async function resolveDoubt(
       sender_role: (actor?.role as UserRole) || 'support',
       message: `[Resolution Note]: ${resolutionNotes.trim()}`,
       created_at: now,
-    });
+    };
+    doubt.messages.push(resolutionMsg);
+  }
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('student_doubts')
+        .update({
+          status: 'Resolved',
+          resolved_at: now,
+          updated_at: now,
+        })
+        .eq('id', doubt.id);
+
+      if (resolutionMsg) {
+        await supabase.from('doubt_messages').insert({
+          id: resolutionMsg.id,
+          doubt_id: doubt.id,
+          sender_id: resolutionMsg.sender_id,
+          sender_name: resolutionMsg.sender_name,
+          sender_role: resolutionMsg.sender_role,
+          message: resolutionMsg.message,
+          created_at: resolutionMsg.created_at,
+        });
+      }
+    } catch (err) {
+      console.warn('Supabase resolveDoubt direct query warning, preserved locally:', err);
+    }
   }
 
   await recordAuditLog({

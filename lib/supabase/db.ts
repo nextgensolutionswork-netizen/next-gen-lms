@@ -36,3 +36,6 @@ export function getDb() {
     },
   });
 }
+
+export const createClient = getDb;
+

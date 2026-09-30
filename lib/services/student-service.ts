@@ -1,5 +1,6 @@
 import { store } from './data-store';
 import { Student } from '@/types';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export async function getStudents(filters?: {
   course_id?: string;
@@ -7,6 +8,31 @@ export async function getStudents(filters?: {
   status?: string;
   search?: string;
 }): Promise<Student[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      let query = supabase.from('students').select('*').order('created_at', { ascending: false });
+
+      if (filters?.course_id) {
+        query = query.eq('course_id', filters.course_id);
+      }
+      if (filters?.batch_id) {
+        query = query.eq('batch_id', filters.batch_id);
+      }
+      if (filters?.status && filters.status !== 'All') {
+        query = query.eq('status', filters.status);
+      }
+
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        store.students = data as Student[];
+        return data as Student[];
+      }
+    } catch (err) {
+      console.warn('Supabase students query error, falling back to local persistent store:', err);
+    }
+  }
+
   let list = [...store.students];
 
   if (filters?.course_id) {
@@ -33,6 +59,23 @@ export async function getStudents(filters?: {
 }
 
 export async function getStudentById(id: string): Promise<Student | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .or(`id.eq.${id},student_code.eq.${id}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as Student;
+      }
+    } catch (err) {
+      console.warn('Supabase getStudentById error, checking local store:', err);
+    }
+  }
+
   return store.students.find((s) => s.id === id || s.student_code === id);
 }
 

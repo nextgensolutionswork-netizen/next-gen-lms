@@ -1,8 +1,7 @@
 import { store } from './data-store';
 import { Lead, LeadFollowup, LeadStage } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
-import { dbGetLeads, dbCreateLead } from '@/lib/supabase/db-service';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
@@ -12,10 +11,26 @@ export async function getLeads(filters?: {
 }): Promise<Lead[]> {
   if (isLiveSupabaseEnabled()) {
     try {
-      const dbList = await dbGetLeads();
-      if (dbList && dbList.length > 0) return dbList;
+      const supabase = createClient();
+      let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
+
+      if (filters?.stage && filters.stage !== 'All') {
+        query = query.eq('stage', filters.stage);
+      }
+      if (filters?.counsellor_id) {
+        query = query.eq('counsellor_id', filters.counsellor_id);
+      }
+      if (filters?.course_id) {
+        query = query.eq('interested_course_id', filters.course_id);
+      }
+
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        store.leads = data as Lead[];
+        return data as Lead[];
+      }
     } catch (err) {
-      console.warn('Supabase leads query error, falling back to local store:', err);
+      console.warn('Supabase leads query error, falling back to local persistent store:', err);
     }
   }
 
@@ -45,6 +60,18 @@ export async function getLeads(filters?: {
 }
 
 export async function getLeadById(id: string): Promise<Lead | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.from('leads').select('*').eq('id', id).maybeSingle();
+      if (!error && data) {
+        return data as Lead;
+      }
+    } catch (err) {
+      console.warn('Supabase getLeadById error, checking local store:', err);
+    }
+  }
+
   return store.leads.find((l) => l.id === id);
 }
 
@@ -65,12 +92,34 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
   };
 
   store.leads.unshift(newLead);
+  store.persist();
 
   if (isLiveSupabaseEnabled()) {
     try {
-      await dbCreateLead(newLead);
+      const supabase = createClient();
+      await supabase.from('leads').insert({
+        id: newLead.id,
+        lead_code: newLead.lead_code,
+        full_name: newLead.full_name,
+        phone: newLead.phone,
+        email: newLead.email,
+        interested_course_id: newLead.interested_course_id,
+        current_status: newLead.current_status,
+        experience_years: newLead.experience_years,
+        training_preference: newLead.training_preference,
+        lead_source: newLead.lead_source,
+        campaign: newLead.campaign,
+        counsellor_id: newLead.counsellor_id,
+        demo_preference: newLead.demo_preference,
+        demo_date: newLead.demo_date,
+        follow_up_date: newLead.follow_up_date,
+        notes: newLead.notes,
+        stage: newLead.stage,
+        created_at: newLead.created_at,
+        updated_at: newLead.updated_at,
+      });
     } catch (err) {
-      console.warn('Supabase lead insert error, saved locally:', err);
+      console.warn('Supabase createLead direct query warning, preserved locally:', err);
     }
   }
 
@@ -101,6 +150,32 @@ export async function updateLeadStage(
   lead.updated_at = new Date().toISOString();
   if (notes) {
     lead.notes = `${lead.notes ? lead.notes + '\n' : ''}[${new Date().toLocaleDateString('en-IN')}] ${notes}`;
+  }
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('leads')
+        .update({
+          stage,
+          notes: lead.notes,
+          updated_at: lead.updated_at,
+        })
+        .eq('id', leadId);
+
+      // Insert audit record into lead_followups table matching migration 001
+      await supabase.from('lead_followups').insert({
+        lead_id: leadId,
+        counsellor_id: counsellorId,
+        stage_before: oldStage,
+        stage_after: stage,
+        notes: notes || 'Stage updated',
+      });
+    } catch (err) {
+      console.warn('Supabase updateLeadStage direct query warning, preserved locally:', err);
+    }
   }
 
   const counsellor = store.users.find((u) => u.id === counsellorId);

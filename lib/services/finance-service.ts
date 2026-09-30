@@ -12,19 +12,66 @@ import {
 } from '@/types';
 import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
-import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
-import { dbGetPayments, dbGetReceipts, dbRecordPayment } from '@/lib/supabase/db-service';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('student_fee_accounts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.feeAccounts = data as StudentFeeAccount[];
+        return data as StudentFeeAccount[];
+      }
+    } catch (err) {
+      console.warn('Supabase fee accounts query error, falling back to local persistent store:', err);
+    }
+  }
   return [...store.feeAccounts];
 }
 
 export async function getFeeAccountForStudent(studentId: string): Promise<StudentFeeAccount | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('student_fee_accounts')
+        .select('*')
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as StudentFeeAccount;
+      }
+    } catch (err) {
+      console.warn('Supabase fee account for student query error, checking local store:', err);
+    }
+  }
   return store.feeAccounts.find((f) => f.student_id === studentId);
 }
 
 export async function getInstallmentsForAccount(feeAccountId: string): Promise<Installment[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('installments')
+        .select('*')
+        .eq('fee_account_id', feeAccountId)
+        .order('installment_number', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data as Installment[];
+      }
+    } catch (err) {
+      console.warn('Supabase installments query error, checking local store:', err);
+    }
+  }
   return store.installments
     .filter((i) => i.fee_account_id === feeAccountId)
     .sort((a, b) => a.installment_number - b.installment_number);
@@ -33,10 +80,18 @@ export async function getInstallmentsForAccount(feeAccountId: string): Promise<I
 export async function getPayments(): Promise<Payment[]> {
   if (isLiveSupabaseEnabled()) {
     try {
-      const dbList = await dbGetPayments();
-      if (dbList && dbList.length > 0) return dbList;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .order('payment_date', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.payments = data as Payment[];
+        return data as Payment[];
+      }
     } catch (err) {
-      console.warn('Supabase payments query error, falling back to local store:', err);
+      console.warn('Supabase payments query error, falling back to local persistent store:', err);
     }
   }
 
@@ -48,10 +103,18 @@ export async function getPayments(): Promise<Payment[]> {
 export async function getReceipts(): Promise<Receipt[]> {
   if (isLiveSupabaseEnabled()) {
     try {
-      const dbList = await dbGetReceipts();
-      if (dbList && dbList.length > 0) return dbList;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.receipts = data as Receipt[];
+        return data as Receipt[];
+      }
     } catch (err) {
-      console.warn('Supabase receipts query error, falling back to local store:', err);
+      console.warn('Supabase receipts query error, falling back to local persistent store:', err);
     }
   }
 
@@ -61,6 +124,23 @@ export async function getReceipts(): Promise<Receipt[]> {
 }
 
 export async function getReceiptById(receiptId: string): Promise<Receipt | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .or(`id.eq.${receiptId},receipt_number.eq.${receiptId}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as Receipt;
+      }
+    } catch (err) {
+      console.warn('Supabase getReceiptById error, checking local persistent store:', err);
+    }
+  }
+
   return store.receipts.find((r) => r.id === receiptId || r.receipt_number === receiptId);
 }
 
@@ -214,23 +294,69 @@ export async function recordPaymentAtomic(
     created_at: new Date().toISOString(),
   };
 
-  // 5. Commit to Store
+  // 5. Commit to Store & schedule persistence
   store.payments.unshift(newPayment);
   store.receipts.unshift(newReceipt);
   store.persist();
 
+  // Direct Supabase queries utilizing PostgreSQL schema migrations
   if (isLiveSupabaseEnabled()) {
     try {
-      await dbRecordPayment(
-        newPayment,
-        newReceipt,
-        feeAccount.id,
-        newPaidAmount,
-        newOutstandingAmount,
-        feeAccount.status
-      );
+      const supabase = createClient();
+
+      // 1. Direct insert to payments table
+      await supabase.from('payments').insert({
+        id: newPayment.id,
+        receipt_number: newPayment.receipt_number,
+        student_id: newPayment.student_id,
+        fee_account_id: newPayment.fee_account_id,
+        installment_id: newPayment.installment_id,
+        course_id: newPayment.course_id,
+        amount: newPayment.amount,
+        payment_date: newPayment.payment_date,
+        payment_mode: newPayment.payment_mode,
+        transaction_reference: newPayment.transaction_reference,
+        collected_by: newPayment.collected_by,
+        notes: newPayment.notes,
+      });
+
+      // 2. Direct insert to receipts table
+      await supabase.from('receipts').insert({
+        id: newReceipt.id,
+        receipt_number: newReceipt.receipt_number,
+        payment_id: newReceipt.payment_id,
+        student_id: newReceipt.student_id,
+        student_name: newReceipt.student_name,
+        admission_number: newReceipt.admission_number,
+        course_name: newReceipt.course_name,
+        payment_amount: newReceipt.payment_amount,
+        payment_mode: newReceipt.payment_mode,
+        transaction_reference: newReceipt.transaction_reference,
+        payment_date: newReceipt.payment_date,
+        remaining_balance: newReceipt.remaining_balance,
+        authorized_by: newReceipt.authorized_by,
+        institute_name: newReceipt.institute_name,
+        institute_address: newReceipt.institute_address,
+        institute_phone: newReceipt.institute_phone,
+        institute_gst: newReceipt.institute_gst,
+      });
+
+      // 3. Direct update to student_fee_accounts table
+      await supabase.from('student_fee_accounts').update({
+        paid_amount: newPaidAmount,
+        outstanding_amount: newOutstandingAmount,
+        status: feeAccount.status,
+        updated_at: new Date().toISOString(),
+      }).eq('id', feeAccount.id);
+
+      // 4. Direct update to students table
+      await supabase.from('students').update({
+        paid_amount: newPaidAmount,
+        outstanding_amount: newOutstandingAmount,
+        updated_at: new Date().toISOString(),
+      }).eq('id', student.id);
     } catch (err) {
-      console.warn('Supabase payment insert error, saved locally:', err);
+      console.warn('Supabase direct payment execution warning, preserved in local persistent storage:', err);
     }
   }
 
@@ -256,6 +382,23 @@ export async function recordPaymentAtomic(
 
 // --- Expenses & Vendors ---
 export async function getExpenses(): Promise<Expense[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('expense_date', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.expenses = data as Expense[];
+        return data as Expense[];
+      }
+    } catch (err) {
+      console.warn('Supabase expenses query error, falling back to local persistent store:', err);
+    }
+  }
+
   return [...store.expenses].sort(
     (a, b) => new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime()
   );
@@ -285,6 +428,29 @@ export async function createExpense(
   if (vendor && data.status === 'Paid') {
     vendor.total_paid = (vendor.total_paid || 0) + data.amount;
   }
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('expenses').insert({
+        id: newExpense.id,
+        expense_code: newExpense.expense_code,
+        expense_date: newExpense.expense_date,
+        category: newExpense.category,
+        vendor_id: newExpense.vendor_id,
+        description: newExpense.description,
+        amount: newExpense.amount,
+        payment_mode: newExpense.payment_mode,
+        reference: newExpense.reference,
+        attachment_url: newExpense.attachment_url,
+        paid_by: newExpense.paid_by,
+        status: newExpense.status,
+      });
+    } catch (err) {
+      console.warn('Supabase expense direct query warning, preserved locally:', err);
+    }
+  }
 
   await recordAuditLog({
     user_id: userId,
@@ -311,6 +477,23 @@ export async function approveExpense(
   exp.approved_by = approverUserId;
   exp.approved_by_name = approver?.full_name;
   exp.updated_at = new Date().toISOString();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('expenses')
+        .update({
+          status: 'Approved',
+          approved_by: approverUserId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', expenseId);
+    } catch (err) {
+      console.warn('Supabase approveExpense warning, preserved locally:', err);
+    }
+  }
 
   await recordAuditLog({
     user_id: approverUserId,
@@ -326,6 +509,23 @@ export async function approveExpense(
 }
 
 export async function getVendors(): Promise<Vendor[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .order('vendor_name', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        store.vendors = data as Vendor[];
+        return data as Vendor[];
+      }
+    } catch (err) {
+      console.warn('Supabase vendors query error, falling back to local persistent store:', err);
+    }
+  }
+
   return [...store.vendors];
 }
 
@@ -337,6 +537,29 @@ export async function createVendor(data: Omit<Vendor, 'id' | 'total_paid' | 'cre
     created_at: new Date().toISOString(),
   };
   store.vendors.push(vendor);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('vendors').insert({
+        id: vendor.id,
+        vendor_name: vendor.vendor_name,
+        contact_person: vendor.contact_person,
+        phone: vendor.phone,
+        email: vendor.email,
+        address: vendor.address,
+        gst_number: vendor.gst_number,
+        bank_name: vendor.bank_name,
+        bank_account_number: vendor.bank_account_number,
+        bank_ifsc: vendor.bank_ifsc,
+        notes: vendor.notes,
+      });
+    } catch (err) {
+      console.warn('Supabase vendor direct insert warning, preserved locally:', err);
+    }
+  }
+
   return vendor;
 }
 

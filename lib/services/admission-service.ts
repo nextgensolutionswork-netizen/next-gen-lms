@@ -2,16 +2,24 @@ import { store } from './data-store';
 import { Admission, Student, StudentFeeAccount, Installment } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { generateAdmissionNumber } from '@/lib/utils/formatters';
-import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
-import { dbGetAdmissions, dbCreateAdmission } from '@/lib/supabase/db-service';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export async function getAdmissions(): Promise<Admission[]> {
   if (isLiveSupabaseEnabled()) {
     try {
-      const dbList = await dbGetAdmissions();
-      if (dbList && dbList.length > 0) return dbList;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('admissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        // Synchronize in-memory cache with database
+        store.admissions = data as Admission[];
+        return data as Admission[];
+      }
     } catch (err) {
-      console.warn('Supabase admissions query error, falling back to local store:', err);
+      console.warn('Supabase admissions direct query error, falling back to local persistent store:', err);
     }
   }
 
@@ -21,6 +29,23 @@ export async function getAdmissions(): Promise<Admission[]> {
 }
 
 export async function getAdmissionById(id: string): Promise<Admission | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('admissions')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as Admission;
+      }
+    } catch (err) {
+      console.warn('Supabase getAdmissionById error, checking local persistent store:', err);
+    }
+  }
+
   return store.admissions.find((a) => a.id === id);
 }
 
@@ -175,6 +200,7 @@ export async function createAdmissionWorkflow(
   const installmentAmount = Math.round(net_payable / numInstallments);
   const baseDate = new Date(input.admission_date);
 
+  const newInstallments: Installment[] = [];
   for (let i = 1; i <= numInstallments; i++) {
     const dueDate = new Date(baseDate);
     dueDate.setMonth(dueDate.getMonth() + (i - 1));
@@ -182,7 +208,7 @@ export async function createAdmissionWorkflow(
     const isLast = i === numInstallments;
     const finalAmount = isLast ? net_payable - installmentAmount * (numInstallments - 1) : installmentAmount;
 
-    store.installments.push({
+    const inst: Installment = {
       id: `inst-${newFeeAccount.id}-${i}`,
       fee_account_id: newFeeAccount.id,
       student_id: newStudent.id,
@@ -191,7 +217,9 @@ export async function createAdmissionWorkflow(
       due_date: dueDate.toISOString().slice(0, 10),
       paid_amount: 0,
       status: i === 1 ? 'Due' : 'Upcoming',
-    });
+    };
+    newInstallments.push(inst);
+    store.installments.push(inst);
   }
 
   // 6. If converted from CRM lead, mark lead as converted
@@ -204,15 +232,111 @@ export async function createAdmissionWorkflow(
     }
   }
 
-  // Persist state to disk
+  // Persist state to disk (ensures no data loss on restarts/cold starts)
   store.persist();
 
-  // Persist to Supabase if live database is enabled
+  // Direct Supabase queries utilizing PostgreSQL schema migrations
   if (isLiveSupabaseEnabled()) {
     try {
-      await dbCreateAdmission(newAdmission, newStudent, newFeeAccount);
+      const supabase = createClient();
+
+    // 1. Direct insert to admissions table
+    await supabase.from('admissions').insert({
+      id: newAdmission.id,
+      admission_number: newAdmission.admission_number,
+      student_name: newAdmission.student_name,
+      phone: newAdmission.phone,
+      email: newAdmission.email,
+      dob: newAdmission.dob,
+      gender: newAdmission.gender,
+      address: newAdmission.address,
+      city: newAdmission.city,
+      education: newAdmission.education,
+      experience_years: newAdmission.experience_years,
+      current_employment_status: newAdmission.current_employment_status,
+      course_id: newAdmission.course_id,
+      training_mode: newAdmission.training_mode,
+      batch_id: newAdmission.batch_id,
+      trainer_id: newAdmission.trainer_id,
+      admission_date: newAdmission.admission_date,
+      course_fee: newAdmission.course_fee,
+      discount: newAdmission.discount,
+      discount_reason: newAdmission.discount_reason,
+      net_payable: newAdmission.net_payable,
+      payment_plan: newAdmission.payment_plan,
+      counsellor_id: newAdmission.counsellor_id,
+      status: newAdmission.status,
+    });
+
+    // 2. Direct insert to students table
+    await supabase.from('students').insert({
+      id: newStudent.id,
+      user_id: newStudent.user_id,
+      admission_id: newAdmission.id,
+      student_code: newStudent.student_code,
+      admission_number: newStudent.admission_number,
+      full_name: newStudent.full_name,
+      email: newStudent.email,
+      phone: newStudent.phone,
+      address: newStudent.address,
+      course_id: newStudent.course_id,
+      batch_id: newStudent.batch_id,
+      trainer_id: newStudent.trainer_id,
+      joining_date: newStudent.joining_date,
+      status: newStudent.status,
+      total_fee: newStudent.total_fee,
+      paid_amount: newStudent.paid_amount,
+      outstanding_amount: newStudent.outstanding_amount,
+      attendance_percentage: newStudent.attendance_percentage,
+      course_progress: newStudent.course_progress,
+      placement_status: newStudent.placement_status,
+    });
+
+    // 3. Direct insert to student_fee_accounts table
+    await supabase.from('student_fee_accounts').insert({
+      id: newFeeAccount.id,
+      student_id: newStudent.id,
+      admission_id: newAdmission.id,
+      course_id: newFeeAccount.course_id,
+      original_fee: newFeeAccount.original_fee,
+      discount: newFeeAccount.discount,
+      discount_reason: newFeeAccount.discount_reason,
+      net_payable: newFeeAccount.net_payable,
+      paid_amount: newFeeAccount.paid_amount,
+      outstanding_amount: newFeeAccount.outstanding_amount,
+      payment_plan: newFeeAccount.payment_plan,
+      status: newFeeAccount.status,
+    });
+
+    // 4. Direct insert to installments table
+    if (newInstallments.length > 0) {
+      await supabase.from('installments').insert(
+        newInstallments.map((inst) => ({
+          id: inst.id,
+          fee_account_id: inst.fee_account_id,
+          student_id: inst.student_id,
+          installment_number: inst.installment_number,
+          amount: inst.amount,
+          due_date: inst.due_date,
+          paid_amount: inst.paid_amount,
+          status: inst.status,
+        }))
+      );
+    }
+
+    // 5. Direct update to leads table if converted
+    if (input.lead_id) {
+      await supabase
+        .from('leads')
+        .update({
+          stage: 'Converted',
+          notes: `Converted to Admission: ${admission_number}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.lead_id);
+    }
     } catch (err) {
-      console.warn('Supabase admission insert error, saved locally:', err);
+      console.warn('Supabase direct admission insert warning, preserved in local persistent storage:', err);
     }
   }
 

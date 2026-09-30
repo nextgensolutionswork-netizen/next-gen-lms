@@ -15,13 +15,46 @@ import {
   QuizAttempt,
 } from '@/types';
 import { recordAuditLog } from './audit-service';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 // --- Courses, Modules & Lessons ---
 export async function getCourses(): Promise<Course[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.courses = data as Course[];
+        return data as Course[];
+      }
+    } catch (err) {
+      console.warn('Supabase courses query error, fallback to local persistent store:', err);
+    }
+  }
   return [...store.courses];
 }
 
 export async function getCourseById(id: string): Promise<Course | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as Course;
+      }
+    } catch (err) {
+      console.warn('Supabase getCourseById error, checking local store:', err);
+    }
+  }
   return store.courses.find((c) => c.id === id);
 }
 
@@ -35,6 +68,30 @@ export async function createCourse(data: Omit<Course, 'id' | 'created_at' | 'upd
     updated_at: new Date().toISOString(),
   };
   store.courses.unshift(newCourse);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('courses').insert({
+        id: newCourse.id,
+        course_name: newCourse.course_name,
+        course_code: newCourse.course_code,
+        description: newCourse.description,
+        duration_weeks: newCourse.duration_weeks,
+        category: newCourse.category,
+        trainer_id: newCourse.trainer_id,
+        thumbnail_url: newCourse.thumbnail_url,
+        price: newCourse.price,
+        status: newCourse.status,
+        created_at: newCourse.created_at,
+        updated_at: newCourse.updated_at,
+      });
+    } catch (err) {
+      console.warn('Supabase createCourse direct query warning, preserved locally:', err);
+    }
+  }
+
   return newCourse;
 }
 
@@ -164,6 +221,22 @@ export async function updateVideoProgress(
 
 // --- Batches & Student Transfer ---
 export async function getBatches(): Promise<Batch[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('batches')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.batches = data as Batch[];
+        return data as Batch[];
+      }
+    } catch (err) {
+      console.warn('Supabase batches query error, fallback to local persistent store:', err);
+    }
+  }
   return [...store.batches];
 }
 
@@ -182,6 +255,33 @@ export async function createBatch(data: Omit<Batch, 'id' | 'current_enrolled' | 
   };
 
   store.batches.unshift(newBatch);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('batches').insert({
+        id: newBatch.id,
+        batch_code: newBatch.batch_code,
+        batch_name: newBatch.batch_name,
+        course_id: newBatch.course_id,
+        trainer_id: newBatch.trainer_id,
+        training_mode: newBatch.training_mode,
+        start_date: newBatch.start_date,
+        end_date: newBatch.end_date,
+        start_time: newBatch.start_time,
+        end_time: newBatch.end_time,
+        days: newBatch.days,
+        maximum_capacity: newBatch.maximum_capacity,
+        status: newBatch.status,
+        created_at: newBatch.created_at,
+        updated_at: newBatch.updated_at,
+      });
+    } catch (err) {
+      console.warn('Supabase createBatch direct query warning, preserved locally:', err);
+    }
+  }
+
   return newBatch;
 }
 
@@ -225,6 +325,28 @@ export async function transferStudentBatch(
   student.batch_id = toBatch.id;
   student.batch_name = toBatch.batch_name;
   student.updated_at = new Date().toISOString();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('batch_transfer_audits').insert({
+        id: auditEntry.id,
+        student_id: auditEntry.student_id,
+        from_batch_id: fromBatch?.id,
+        to_batch_id: toBatch.id,
+        reason,
+        transferred_by: transferredByUserId,
+        transferred_at: auditEntry.transferred_at,
+      });
+      await supabase.from('students').update({
+        batch_id: toBatch.id,
+        updated_at: student.updated_at,
+      }).eq('id', student.id);
+    } catch (err) {
+      console.warn('Supabase batch transfer direct query warning, preserved locally:', err);
+    }
+  }
 
   await recordAuditLog({
     user_id: transferredByUserId,
@@ -242,6 +364,22 @@ export async function transferStudentBatch(
 
 // --- Class Schedule & Attendance ---
 export async function getClassSessions(batchId?: string): Promise<ClassSession[]> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      let query = supabase.from('class_sessions').select('*').order('session_date', { ascending: true });
+      if (batchId) {
+        query = query.eq('batch_id', batchId);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        return data as ClassSession[];
+      }
+    } catch (err) {
+      console.warn('Supabase class_sessions query error, falling back to local persistent store:', err);
+    }
+  }
+
   let list = [...store.classSessions];
   if (batchId) {
     list = list.filter((s) => s.batch_id === batchId);
@@ -264,6 +402,32 @@ export async function createClassSession(data: Omit<ClassSession, 'id' | 'create
   };
 
   store.classSessions.push(session);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('class_sessions').insert({
+        id: session.id,
+        course_id: session.course_id,
+        batch_id: session.batch_id,
+        trainer_id: session.trainer_id,
+        topic: session.topic,
+        session_date: session.session_date,
+        start_time: session.start_time,
+        end_time: session.end_time,
+        mode: session.mode,
+        meeting_link: session.meeting_link,
+        classroom: session.classroom,
+        notes: session.notes,
+        status: session.status,
+        created_at: session.created_at,
+      });
+    } catch (err) {
+      console.warn('Supabase createClassSession direct query warning, preserved locally:', err);
+    }
+  }
+
   return session;
 }
 
@@ -318,6 +482,29 @@ export async function markAttendance(
   }
 
   session.status = 'Completed';
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('attendance_records').upsert(
+        updatedRecords.map((r) => ({
+          id: r.id,
+          student_id: r.student_id,
+          batch_id: r.batch_id,
+          session_id: r.session_id,
+          attendance_date: r.attendance_date,
+          status: r.status,
+          notes: r.notes,
+          marked_by: r.marked_by,
+          marked_at: r.marked_at,
+        }))
+      );
+    } catch (err) {
+      console.warn('Supabase markAttendance direct query warning, preserved locally:', err);
+    }
+  }
+
   return updatedRecords;
 }
 

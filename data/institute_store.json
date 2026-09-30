@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-09-30T14:10:19.176Z",
+  "timestamp": "2026-09-30T15:08:10.396Z",
   "settings": {
     "id": "sys-01",
     "institute_name": "Next-Gen ERP Solutions",
@@ -127,6 +127,56 @@
     }
   ],
   "admissions": [
+    {
+      "id": "adm-test-1790780890181",
+      "admission_number": "ADM-2026-TEST-1790780890181",
+      "student_name": "Database Persistence Test Student",
+      "phone": "+91 99999 88888",
+      "email": "persistence.test.1790780890181@example.com",
+      "dob": "2000-01-01",
+      "gender": "Male",
+      "address": "Hitec City, Hyderabad",
+      "city": "Hyderabad",
+      "education": "B.Tech",
+      "experience_years": 2,
+      "current_employment_status": "Employed",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "training_mode": "Online",
+      "admission_date": "2026-09-30",
+      "course_fee": 40000,
+      "discount": 0,
+      "net_payable": 40000,
+      "payment_plan": "Full Payment",
+      "status": "Active",
+      "created_at": "2026-09-30T15:08:10.181Z",
+      "updated_at": "2026-09-30T15:08:10.181Z"
+    },
+    {
+      "id": "adm-test-1790779316068",
+      "admission_number": "ADM-2026-TEST-1790779316068",
+      "student_name": "Database Persistence Test Student",
+      "phone": "+91 99999 88888",
+      "email": "persistence.test.1790779316068@example.com",
+      "dob": "2000-01-01",
+      "gender": "Male",
+      "address": "Hitec City, Hyderabad",
+      "city": "Hyderabad",
+      "education": "B.Tech",
+      "experience_years": 2,
+      "current_employment_status": "Employed",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "training_mode": "Online",
+      "admission_date": "2026-09-30",
+      "course_fee": 40000,
+      "discount": 0,
+      "net_payable": 40000,
+      "payment_plan": "Full Payment",
+      "status": "Active",
+      "created_at": "2026-09-30T14:41:56.068Z",
+      "updated_at": "2026-09-30T14:41:56.068Z"
+    },
     {
       "id": "adm-test-1790777419107",
       "admission_number": "ADM-2026-TEST-1790777419107",
@@ -292,7 +342,7 @@
       "course_progress": 68,
       "placement_status": "Resume Preparation",
       "created_at": "2026-01-25T10:00:00Z",
-      "updated_at": "2026-09-30T14:10:19.108Z"
+      "updated_at": "2026-09-30T15:08:10.182Z"
     },
     {
       "id": "stu-02",
@@ -323,6 +373,36 @@
     }
   ],
   "leads": [
+    {
+      "id": "lead-repo-test-1790780890183",
+      "lead_code": "LD-2026-TEST-1790780890183",
+      "full_name": "Postgres Lead Test",
+      "phone": "+91 98888 77777",
+      "email": "lead.pg.1790780890183@example.com",
+      "interested_course_id": "crs-fico-01",
+      "current_status": "Professional",
+      "experience_years": 3,
+      "training_preference": "Hybrid",
+      "lead_source": "Website",
+      "stage": "New",
+      "created_at": "2026-09-30T15:08:10.183Z",
+      "updated_at": "2026-09-30T15:08:10.183Z"
+    },
+    {
+      "id": "lead-repo-test-1790779316071",
+      "lead_code": "LD-2026-TEST-1790779316071",
+      "full_name": "Postgres Lead Test",
+      "phone": "+91 98888 77777",
+      "email": "lead.pg.1790779316071@example.com",
+      "interested_course_id": "crs-fico-01",
+      "current_status": "Professional",
+      "experience_years": 3,
+      "training_preference": "Hybrid",
+      "lead_source": "Website",
+      "stage": "New",
+      "created_at": "2026-09-30T14:41:56.071Z",
+      "updated_at": "2026-09-30T14:41:56.071Z"
+    },
     {
       "id": "lead-repo-test-1790777419111",
       "lead_code": "LD-2026-TEST-1790777419111",
@@ -715,7 +795,7 @@
   ],
   "attendanceRecords": [
     {
-      "id": "att-repo-test-1790777419109",
+      "id": "att-repo-test-1790780890183",
       "student_id": "stu-01",
       "session_id": "sess-01",
       "batch_id": "batch-fico-01",
@@ -724,7 +804,7 @@
       "source": "Manual",
       "duration_minutes": 90,
       "marked_by": "usr-admin",
-      "marked_at": "2026-09-30T14:10:19.109Z"
+      "marked_at": "2026-09-30T15:08:10.183Z"
     }
   ],
   "assignments": [
@@ -941,6 +1021,32 @@
   ],
   "payments": [
     {
+      "id": "pay-repo-test-1790780890183",
+      "receipt_number": "REC-2026-TEST-1790780890183",
+      "student_id": "stu-01",
+      "course_id": "crs-fico-01",
+      "fee_account_id": "fa-01",
+      "amount": 5000,
+      "payment_date": "2026-09-30",
+      "payment_mode": "UPI",
+      "status": "Success",
+      "collected_by": "usr-admin",
+      "created_at": "2026-09-30T15:08:10.183Z"
+    },
+    {
+      "id": "pay-repo-test-1790779316070",
+      "receipt_number": "REC-2026-TEST-1790779316070",
+      "student_id": "stu-01",
+      "course_id": "crs-fico-01",
+      "fee_account_id": "fa-01",
+      "amount": 5000,
+      "payment_date": "2026-09-30",
+      "payment_mode": "UPI",
+      "status": "Success",
+      "collected_by": "usr-admin",
+      "created_at": "2026-09-30T14:41:56.071Z"
+    },
+    {
       "id": "pay-repo-test-1790777419110",
       "receipt_number": "REC-2026-TEST-1790777419110",
       "student_id": "stu-01",
@@ -1038,6 +1144,44 @@
     }
   ],
   "receipts": [
+    {
+      "id": "rcpt-repo-test-1790780890183",
+      "receipt_number": "REC-2026-TEST-1790780890183",
+      "payment_id": "pay-repo-test-1790780890183",
+      "student_id": "stu-01",
+      "student_name": "Amit Gupta",
+      "admission_number": "ADM-2026-0001",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "payment_amount": 5000,
+      "payment_mode": "UPI",
+      "payment_date": "2026-09-30",
+      "remaining_balance": 10000,
+      "authorized_by": "Finance Department",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hyderabad",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-09-30T15:08:10.183Z"
+    },
+    {
+      "id": "rcpt-repo-test-1790779316071",
+      "receipt_number": "REC-2026-TEST-1790779316070",
+      "payment_id": "pay-repo-test-1790779316070",
+      "student_id": "stu-01",
+      "student_name": "Amit Gupta",
+      "admission_number": "ADM-2026-0001",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "payment_amount": 5000,
+      "payment_mode": "UPI",
+      "payment_date": "2026-09-30",
+      "remaining_balance": 10000,
+      "authorized_by": "Finance Department",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hyderabad",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-09-30T14:41:56.071Z"
+    },
     {
       "id": "rcpt-repo-test-1790777419110",
       "receipt_number": "REC-2026-TEST-1790777419110",
