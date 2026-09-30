@@ -15,12 +15,14 @@ import {
   UserCheck,
   ChevronRight,
   MessageSquare,
+  Upload,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { BulkImportModal } from '@/components/bulk-import-modal';
 import { store } from '@/lib/services/data-store';
 import { Lead, LeadStage } from '@/types';
 import { createLead, updateLeadStage } from '@/lib/services/crm-service';
@@ -34,6 +36,7 @@ export default function LeadsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
   const [isConvertModalOpen, setIsConvertModalOpen] = React.useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
 
   // New Lead Form state
   const [fullName, setFullName] = React.useState('');
@@ -178,10 +181,21 @@ export default function LeadsPage() {
             Capture prospective SAP students, track demos, manage counselling follow-ups, and convert to admissions.
           </p>
         </div>
-        <Button variant="sap" size="sm" onClick={() => setIsAddModalOpen(true)} className="flex items-center space-x-1 text-xs">
-          <Plus className="h-4 w-4" />
-          <span>New Lead</span>
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center space-x-1.5 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span>Bulk Import Leads</span>
+          </Button>
+          <Button variant="sap" size="sm" onClick={() => setIsAddModalOpen(true)} className="flex items-center space-x-1 text-xs">
+            <Plus className="h-4 w-4" />
+            <span>New Lead</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -533,6 +547,13 @@ export default function LeadsPage() {
           </div>
         </Modal>
       )}
+
+      <BulkImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        defaultEntity="leads"
+        onSuccess={refreshLeads}
+      />
     </div>
   );
 }

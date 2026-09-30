@@ -13,10 +13,12 @@ import {
   ExternalLink,
   Phone,
   Mail,
+  Upload,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { BulkImportModal } from '@/components/bulk-import-modal';
 import { store } from '@/lib/services/data-store';
 import { Student } from '@/types';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
@@ -26,6 +28,7 @@ export default function StudentsListPage() {
   const [search, setSearch] = React.useState('');
   const [courseFilter, setCourseFilter] = React.useState('All');
   const [statusFilter, setStatusFilter] = React.useState('All');
+  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
 
   const refreshList = () => {
     let list = [...store.students];
@@ -67,6 +70,15 @@ export default function StudentsListPage() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsImportModalOpen(true)}
+            className="text-xs flex items-center space-x-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span>Bulk Import</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExportCSV} className="text-xs flex items-center space-x-1">
             <Download className="h-3.5 w-3.5" />
             <span>Export CSV</span>
@@ -203,6 +215,13 @@ export default function StudentsListPage() {
           </div>
         </CardContent>
       </Card>
+
+      <BulkImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        defaultEntity="students"
+        onSuccess={refreshList}
+      />
     </div>
   );
 }
