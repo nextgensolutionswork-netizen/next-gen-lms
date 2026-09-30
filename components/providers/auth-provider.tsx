@@ -4,12 +4,15 @@ import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UserProfile, UserRole, Permission } from '@/types';
 import { store } from '@/lib/services/data-store';
-import { hasPermission as checkRbacPermission } from '@/lib/auth/rbac';
+import { ROLE_PERMISSIONS, hasPermission as checkRbacPermission } from '@/lib/auth/rbac';
 import { getDb, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export interface AuthContextType {
   user: UserProfile | null;
   role: UserRole;
+  avatar: string;
+  permissions: Permission[];
+  permissionMatrix: Record<Permission, boolean>;
   isLoading: boolean;
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -21,45 +24,80 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_COOKIE_NAME = 'next_gen_auth_user';
 
-function setAuthCookie(user: UserProfile) {
-  if (typeof document === 'undefined') return;
+let memoryCookieStorage = '';
+
+export function getAvatarUrl(user: UserProfile | null): string {
+  if (user?.avatar_url) return user.avatar_url;
+  const name = user?.full_name || user?.email || 'User';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0A6ED1&color=fff&bold=true`;
+}
+
+export function setAuthCookie(user: UserProfile) {
   const val = encodeURIComponent(
     JSON.stringify({
       id: user.id,
       email: user.email,
       full_name: user.full_name,
       role: user.role,
+      avatar_url: user.avatar_url,
+      is_active: user.is_active,
     })
   );
-  document.cookie = `${AUTH_COOKIE_NAME}=${val}; path=/; max-age=604800; SameSite=Lax`;
+
+  memoryCookieStorage = `${AUTH_COOKIE_NAME}=${val}`;
+
+  if (typeof document !== 'undefined') {
+    document.cookie = `${AUTH_COOKIE_NAME}=${val}; path=/; max-age=604800; SameSite=Lax`;
+  }
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(user));
+    } catch {}
+  }
 }
 
-function clearAuthCookie() {
-  if (typeof document === 'undefined') return;
-  document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+export function clearAuthCookie() {
+  memoryCookieStorage = '';
+  if (typeof document !== 'undefined') {
+    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  }
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.removeItem(AUTH_COOKIE_NAME);
+    } catch {}
+  }
 }
 
-function getStoredUser(): UserProfile | null {
-  if (typeof document === 'undefined') return null;
-
+export function getStoredUser(): UserProfile | null {
   try {
-    const cookies = document.cookie.split('; ');
-    const authCookie = cookies.find((c) => c.startsWith(`${AUTH_COOKIE_NAME}=`));
-    if (authCookie) {
-      const raw = decodeURIComponent(authCookie.split('=')[1]);
-      const parsed = JSON.parse(raw);
-      // Match full record from store
-      const full = store.users.find((u) => u.email.toLowerCase() === parsed.email?.toLowerCase());
-      if (full) return full;
-      return parsed as UserProfile;
+    let cookieStr = '';
+    if (typeof document !== 'undefined') {
+      cookieStr = document.cookie;
+    } else if (memoryCookieStorage) {
+      cookieStr = memoryCookieStorage;
     }
 
-    const local = localStorage.getItem(AUTH_COOKIE_NAME);
-    if (local) {
-      const parsed = JSON.parse(local);
-      const full = store.users.find((u) => u.email.toLowerCase() === parsed.email?.toLowerCase());
-      if (full) return full;
-      return parsed as UserProfile;
+    if (cookieStr) {
+      const cookies = cookieStr.split('; ');
+      const authCookie = cookies.find((c) => c.startsWith(`${AUTH_COOKIE_NAME}=`));
+      if (authCookie) {
+        const raw = decodeURIComponent(authCookie.split('=')[1]);
+        const parsed = JSON.parse(raw);
+        // Match full record from store
+        const full = store.users.find((u) => u.email.toLowerCase() === parsed.email?.toLowerCase());
+        if (full) return full;
+        return parsed as UserProfile;
+      }
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      const local = localStorage.getItem(AUTH_COOKIE_NAME);
+      if (local) {
+        const parsed = JSON.parse(local);
+        const full = store.users.find((u) => u.email.toLowerCase() === parsed.email?.toLowerCase());
+        if (full) return full;
+        return parsed as UserProfile;
+      }
     }
   } catch {}
 
@@ -70,47 +108,160 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [user, setUser] = React.useState<UserProfile | null>(null);
-  const [role, setRole] = React.useState<UserRole>('super_admin');
+  // Lazily initialize user and role from persistent cookies/localStorage to avoid defaulting to super_admin
+  const [user, setUser] = React.useState<UserProfile | null>(() => getStoredUser());
+  const [role, setRole] = React.useState<UserRole>(() => getStoredUser()?.role || 'super_admin');
   const [isLoading, setIsLoading] = React.useState(true);
 
-  // Initialize auth state on mount
+  // Read supabase.auth.getUser() on mount and sync global auth state
   React.useEffect(() => {
-    const initializeAuth = async () => {
-      // 1. Try local cookie / localStorage
-      const cached = getStoredUser();
-      if (cached) {
-        setUser(cached);
-        setRole(cached.role);
-      } else {
-        setUser(null);
-      }
+    let isMounted = true;
 
-      // 2. If live Supabase enabled, verify active session
-      if (isLiveSupabaseEnabled()) {
-        try {
-          const db = getDb();
-          const { data } = await db.auth.getUser();
-          if (data.user?.email) {
-            const matched = store.users.find(
-              (u) => u.email.toLowerCase() === data.user?.email?.toLowerCase()
-            );
-            if (matched) {
-              setUser(matched);
-              setRole(matched.role);
-              setAuthCookie(matched);
+    const initializeAuth = async () => {
+      try {
+        const db = getDb();
+        const { data, error } = await db.auth.getUser();
+
+        if (data?.user && !error) {
+          const authUser = data.user;
+          const userRole = (authUser.app_metadata?.role ||
+            authUser.user_metadata?.role ||
+            'student') as UserRole;
+
+          const matched = store.users.find(
+            (u) =>
+              u.id === authUser.id ||
+              u.email.toLowerCase() === authUser.email?.toLowerCase()
+          );
+
+          const profile: UserProfile = matched || {
+            id: authUser.id,
+            email: authUser.email || '',
+            full_name:
+              authUser.user_metadata?.full_name ||
+              authUser.user_metadata?.name ||
+              authUser.email?.split('@')[0] ||
+              'User',
+            role: userRole,
+            avatar_url: authUser.user_metadata?.avatar_url,
+            is_active: true,
+            created_at: authUser.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          if (isMounted) {
+            setUser(profile);
+            setRole(profile.role);
+            setAuthCookie(profile);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
             }
           }
-        } catch (err) {
-          console.warn('Supabase auth session check failed:', err);
+        } else {
+          // If no active session from Supabase, fall back to cached user or null
+          const cached = getStoredUser();
+          if (cached && isMounted) {
+            setUser(cached);
+            setRole(cached.role);
+          } else if (isMounted) {
+            setUser(null);
+            setRole('super_admin');
+          }
+        }
+      } catch (err) {
+        console.warn('[AuthProvider] supabase.auth.getUser() error:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
-
-      setIsLoading(false);
     };
 
     initializeAuth();
+
+    // Listen to Supabase auth state change events if available
+    try {
+      const db = getDb();
+      if (db?.auth?.onAuthStateChange) {
+        const { data: authListener } = db.auth.onAuthStateChange(async (_event: string, session: any) => {
+          if (session?.user) {
+            const authUser = session.user;
+            const userRole = (authUser.app_metadata?.role ||
+              authUser.user_metadata?.role ||
+              'student') as UserRole;
+            const matched = store.users.find(
+              (u) =>
+                u.id === authUser.id ||
+                u.email.toLowerCase() === authUser.email?.toLowerCase()
+            );
+            const profile: UserProfile = matched || {
+              id: authUser.id,
+              email: authUser.email || '',
+              full_name:
+                authUser.user_metadata?.full_name ||
+                authUser.email?.split('@')[0] ||
+                'User',
+              role: userRole,
+              avatar_url: authUser.user_metadata?.avatar_url,
+              is_active: true,
+              created_at: authUser.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            if (isMounted) {
+              setUser(profile);
+              setRole(profile.role);
+              setAuthCookie(profile);
+            }
+          } else if (_event === 'SIGNED_OUT') {
+            if (isMounted) {
+              setUser(null);
+              setRole('super_admin');
+              clearAuthCookie();
+            }
+          }
+        });
+        return () => {
+          isMounted = false;
+          authListener?.subscription?.unsubscribe();
+        };
+      }
+    } catch {}
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // Compute avatar URL globally
+  const avatar = React.useMemo(() => getAvatarUrl(user), [user]);
+
+  // Compute active permissions array globally based on current role
+  const permissions: Permission[] = React.useMemo(() => {
+    if (!user || !user.is_active) return [];
+    if (role === 'super_admin') {
+      return Array.from(new Set(Object.values(ROLE_PERMISSIONS).flat())) as Permission[];
+    }
+    return ROLE_PERMISSIONS[role] || [];
+  }, [user, role]);
+
+  // Compute boolean permission matrix globally
+  const permissionMatrix: Record<Permission, boolean> = React.useMemo(() => {
+    const allPerms = Array.from(new Set(Object.values(ROLE_PERMISSIONS).flat())) as Permission[];
+    const map: Partial<Record<Permission, boolean>> = {};
+    for (const perm of allPerms) {
+      map[perm] = role === 'super_admin' ? true : permissions.includes(perm);
+    }
+    return map as Record<Permission, boolean>;
+  }, [role, permissions]);
+
+  const hasPermission = React.useCallback(
+    (permission: Permission): boolean => {
+      if (!user || !user.is_active) return false;
+      if (role === 'super_admin') return true;
+      return Boolean(permissionMatrix[permission]);
+    },
+    [user, role, permissionMatrix]
+  );
 
   const login = async (email: string, password?: string): Promise<boolean> => {
     setIsLoading(true);
@@ -137,7 +288,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(matched);
       setRole(matched.role);
       setAuthCookie(matched);
-      localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(matched));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(matched));
+      }
 
       // 3. Smart routing based on role
       if (matched.role === 'student') {
@@ -205,16 +358,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const hasPermission = (permission: Permission): boolean => {
-    if (!user) return false;
-    return checkRbacPermission(user, permission);
-  };
-
   return (
     <AuthContext.Provider
       value={{
         user,
         role,
+        avatar,
+        permissions,
+        permissionMatrix,
         isLoading,
         login,
         logout,

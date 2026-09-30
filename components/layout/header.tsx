@@ -9,9 +9,10 @@ import { useAuth } from '@/components/providers/auth-provider';
 interface HeaderProps {
   currentRole: UserRole;
   currentUserName: string;
+  avatar?: string;
 }
 
-export function Header({ currentRole, currentUserName }: HeaderProps) {
+export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
   const { logout } = useAuth();
   const [showNotifications, setShowNotifications] = React.useState(false);
 
@@ -86,9 +87,17 @@ export function Header({ currentRole, currentUserName }: HeaderProps) {
 
         {/* User Badge */}
         <div className="flex items-center space-x-2 pl-2 border-l border-slate-200">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#0A6ED1] to-blue-500 flex items-center justify-center font-bold text-white text-xs shadow-sm">
-            {currentUserName.charAt(0)}
-          </div>
+          {avatar ? (
+            <img
+              src={avatar}
+              alt={currentUserName}
+              className="h-8 w-8 rounded-full object-cover shadow-sm border border-slate-200"
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#0A6ED1] to-blue-500 flex items-center justify-center font-bold text-white text-xs shadow-sm">
+              {currentUserName.charAt(0)}
+            </div>
+          )}
           <div className="hidden sm:block text-left">
             <p className="text-xs font-bold text-slate-800 leading-tight">{currentUserName}</p>
             <p className="text-[10px] font-medium text-slate-500 capitalize">{currentRole.replace('_', ' ')}</p>

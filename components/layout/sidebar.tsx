@@ -31,9 +31,10 @@ interface SidebarProps {
   currentRole: UserRole;
   currentUserName: string;
   onRoleSwitch?: (role: UserRole) => void;
+  avatar?: string;
 }
 
-export function Sidebar({ currentRole, currentUserName, onRoleSwitch }: SidebarProps) {
+export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: SidebarProps) {
   const pathname = usePathname();
   const [openSection, setOpenSection] = React.useState<string | null>('academics');
 
@@ -414,9 +415,17 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch }: SidebarP
 
       {/* User Footer Profile */}
       <div className="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center space-x-3">
-        <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-white text-xs border border-slate-600">
-          {currentUserName.charAt(0)}
-        </div>
+        {avatar ? (
+          <img
+            src={avatar}
+            alt={currentUserName}
+            className="h-8 w-8 rounded-full object-cover border border-slate-700"
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-white text-xs border border-slate-600">
+            {currentUserName.charAt(0)}
+          </div>
+        )}
         <div className="overflow-hidden flex-1">
           <p className="text-xs font-semibold text-white truncate">{currentUserName}</p>
           <p className="text-[10px] text-slate-400 capitalize truncate">{currentRole.replace('_', ' ')}</p>
