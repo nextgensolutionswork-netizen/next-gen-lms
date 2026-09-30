@@ -13,6 +13,7 @@ import {
 import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { calculateGstBreakdown } from './gst-service';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -272,7 +273,16 @@ export async function recordPaymentAtomic(
     }
   }
 
-  // 4. Generate Official Receipt
+  // 4. Calculate GST Tax Breakdown & Generate Official Receipt
+  const admission = store.admissions.find(
+    (a) => a.id === student.admission_id || a.admission_number === student.admission_number
+  );
+  const studentLoc = admission?.city || admission?.address || student.address || 'Telangana';
+  const gstDetails = calculateGstBreakdown(input.amount, studentLoc, {
+    customDocNumber: receiptNumber,
+    customDocDate: input.payment_date,
+  });
+
   const newReceipt: Receipt = {
     id: `rcpt-${Date.now()}`,
     receipt_number: receiptNumber,
@@ -292,6 +302,24 @@ export async function recordPaymentAtomic(
     institute_phone: store.settings.phone,
     institute_gst: store.settings.gst_number,
     created_at: new Date().toISOString(),
+
+    // GST & e-Invoice Compliance
+    supply_type: gstDetails.supply_type,
+    place_of_supply: gstDetails.place_of_supply,
+    place_of_supply_code: gstDetails.place_of_supply_code,
+    sac_code: gstDetails.sac_code,
+    taxable_amount: gstDetails.taxable_amount,
+    cgst_rate: gstDetails.cgst_rate,
+    cgst_amount: gstDetails.cgst_amount,
+    sgst_rate: gstDetails.sgst_rate,
+    sgst_amount: gstDetails.sgst_amount,
+    igst_rate: gstDetails.igst_rate,
+    igst_amount: gstDetails.igst_amount,
+    total_tax: gstDetails.total_tax,
+    is_reverse_charge: gstDetails.is_reverse_charge,
+    irn: gstDetails.irn,
+    ack_no: gstDetails.ack_no,
+    ack_date: gstDetails.ack_date,
   };
 
   // 5. Commit to Store & schedule persistence

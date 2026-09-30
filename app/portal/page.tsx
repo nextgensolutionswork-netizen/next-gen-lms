@@ -203,6 +203,52 @@ export default function StudentPortalPage() {
     }
   };
 
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined') return resolve(false);
+      if ((window as any).Razorpay) return resolve(true);
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const verifyAndCompletePayment = async (payload: {
+    order_id: string;
+    payment_id: string;
+    signature: string;
+    student_id: string;
+    course_id: string;
+    fee_account_id: string;
+    amount: number;
+  }) => {
+    setIsProcessing(true);
+    try {
+      const verifyRes = await fetch('/api/payments/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyData.success) {
+        throw new Error(verifyData.error || 'Payment signature verification failed');
+      }
+
+      setOutstandingAmount(verifyData.feeAccount.outstanding_amount);
+      setPaidAmount(verifyData.feeAccount.paid_amount);
+      setPaymentsList([...store.payments.filter((p) => p.student_id === student.id)]);
+      setSuccessReceipt(verifyData.receipt);
+    } catch (err: any) {
+      alert(err.message || 'Payment verification failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleOnlinePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feeAccount || payAmount <= 0) return;
@@ -210,7 +256,7 @@ export default function StudentPortalPage() {
     try {
       const chargeAmount = Math.min(payAmount, outstandingAmount);
 
-      // 1. Create order on Gateway
+      // 1. Create order on Payment Gateway API
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,12 +280,56 @@ export default function StudentPortalPage() {
         throw new Error(orderData.error || 'Failed to initialize payment gateway order');
       }
 
-      // 2. Verify payment & record settlement
-      const txRef = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const verifyRes = await fetch('/api/payments/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // 2. Load Razorpay Checkout Script and open modal
+      const isLoaded = await loadRazorpayScript();
+      if (isLoaded && typeof (window as any).Razorpay !== 'undefined') {
+        const options = {
+          key: orderData.order.key_id,
+          amount: orderData.order.amount,
+          currency: orderData.order.currency || 'INR',
+          name: 'Next-Gen ERP Solutions',
+          description: `Tuition Fee Payment — ${student.course_name}`,
+          order_id: orderData.order.order_id,
+          prefill: {
+            name: student.full_name,
+            email: student.email,
+            contact: student.phone,
+          },
+          theme: {
+            color: '#0A6ED1',
+          },
+          modal: {
+            ondismiss: () => {
+              setIsProcessing(false);
+            },
+          },
+          handler: async function (response: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) {
+            await verifyAndCompletePayment({
+              order_id: response.razorpay_order_id || orderData.order.order_id,
+              payment_id: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+              student_id: student.id,
+              course_id: student.course_id,
+              fee_account_id: feeAccount.id,
+              amount: chargeAmount,
+            });
+          },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (resp: any) {
+          alert(`Payment Failed: ${resp.error?.description || 'Gateway transaction declined'}`);
+          setIsProcessing(false);
+        });
+        rzp.open();
+      } else {
+        // Fallback for sandboxed / offline test environment without internet CDN script
+        const txRef = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        await verifyAndCompletePayment({
           order_id: orderData.order.order_id,
           payment_id: txRef,
           signature: 'test_signature',
@@ -247,21 +337,10 @@ export default function StudentPortalPage() {
           course_id: student.course_id,
           fee_account_id: feeAccount.id,
           amount: chargeAmount,
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-      if (!verifyData.success) {
-        throw new Error(verifyData.error || 'Payment signature verification failed');
+        });
       }
-
-      setOutstandingAmount(verifyData.feeAccount.outstanding_amount);
-      setPaidAmount(verifyData.feeAccount.paid_amount);
-      setPaymentsList([...store.payments.filter((p) => p.student_id === student.id)]);
-      setSuccessReceipt(verifyData.receipt);
     } catch (err: any) {
       alert(err.message || 'Payment processing error');
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -1051,6 +1130,20 @@ export default function StudentPortalPage() {
                   <span className="text-slate-500">Transaction Ref:</span>
                   <span className="font-mono text-slate-700">{successReceipt.transaction_reference}</span>
                 </div>
+                {successReceipt.place_of_supply && (
+                  <div className="flex justify-between border-t border-slate-200 pt-1 text-[11px]">
+                    <span className="text-slate-500">Place of Supply (GST):</span>
+                    <span className="font-bold text-slate-800">{successReceipt.place_of_supply}</span>
+                  </div>
+                )}
+                {successReceipt.total_tax !== undefined && (
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-500">GST Tax (18%):</span>
+                    <span className="font-medium text-emerald-700">
+                      {formatINR(successReceipt.total_tax)} ({successReceipt.supply_type === 'INTER_STATE' ? 'IGST 18%' : 'CGST 9% + SGST 9%'})
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap justify-center gap-2 pt-2">

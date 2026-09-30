@@ -525,6 +525,24 @@ export interface Receipt {
   institute_phone: string;
   institute_gst: string;
   created_at: string;
+
+  // GST & e-Invoice Compliance Fields
+  supply_type?: 'INTRA_STATE' | 'INTER_STATE';
+  place_of_supply?: string;
+  place_of_supply_code?: string;
+  sac_code?: string;
+  taxable_amount?: number;
+  cgst_rate?: number;
+  cgst_amount?: number;
+  sgst_rate?: number;
+  sgst_amount?: number;
+  igst_rate?: number;
+  igst_amount?: number;
+  total_tax?: number;
+  is_reverse_charge?: boolean;
+  irn?: string;
+  ack_no?: string;
+  ack_date?: string;
 }
 
 export type ExpenseCategory =
