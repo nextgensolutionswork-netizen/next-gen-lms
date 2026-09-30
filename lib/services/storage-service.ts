@@ -245,7 +245,7 @@ export async function ensureStorageBuckets(): Promise<void> {
     const { data: existingBuckets, error: listError } = await db.storage.listBuckets();
     if (listError) throw listError;
 
-    const existingNames = (existingBuckets || []).map((b) => b.name);
+    const existingNames = (existingBuckets || []).map((b: any) => b.name);
 
     for (const bucketKey of Object.keys(STORAGE_BUCKETS) as StorageBucket[]) {
       if (!existingNames.includes(bucketKey)) {

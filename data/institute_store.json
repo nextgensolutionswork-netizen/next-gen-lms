@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-09-30T15:08:10.396Z",
+  "timestamp": "2026-09-30T15:37:20.663Z",
   "settings": {
     "id": "sys-01",
     "institute_name": "Next-Gen ERP Solutions",
@@ -127,6 +127,31 @@
     }
   ],
   "admissions": [
+    {
+      "id": "adm-test-1790782640436",
+      "admission_number": "ADM-2026-TEST-1790782640436",
+      "student_name": "Database Persistence Test Student",
+      "phone": "+91 99999 88888",
+      "email": "persistence.test.1790782640436@example.com",
+      "dob": "2000-01-01",
+      "gender": "Male",
+      "address": "Hitec City, Hyderabad",
+      "city": "Hyderabad",
+      "education": "B.Tech",
+      "experience_years": 2,
+      "current_employment_status": "Employed",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "training_mode": "Online",
+      "admission_date": "2026-09-30",
+      "course_fee": 40000,
+      "discount": 0,
+      "net_payable": 40000,
+      "payment_plan": "Full Payment",
+      "status": "Active",
+      "created_at": "2026-09-30T15:37:20.436Z",
+      "updated_at": "2026-09-30T15:37:20.436Z"
+    },
     {
       "id": "adm-test-1790780890181",
       "admission_number": "ADM-2026-TEST-1790780890181",
@@ -342,7 +367,7 @@
       "course_progress": 68,
       "placement_status": "Resume Preparation",
       "created_at": "2026-01-25T10:00:00Z",
-      "updated_at": "2026-09-30T15:08:10.182Z"
+      "updated_at": "2026-09-30T15:37:20.438Z"
     },
     {
       "id": "stu-02",
@@ -373,6 +398,21 @@
     }
   ],
   "leads": [
+    {
+      "id": "lead-repo-test-1790782640442",
+      "lead_code": "LD-2026-TEST-1790782640442",
+      "full_name": "Postgres Lead Test",
+      "phone": "+91 98888 77777",
+      "email": "lead.pg.1790782640442@example.com",
+      "interested_course_id": "crs-fico-01",
+      "current_status": "Professional",
+      "experience_years": 3,
+      "training_preference": "Hybrid",
+      "lead_source": "Website",
+      "stage": "New",
+      "created_at": "2026-09-30T15:37:20.442Z",
+      "updated_at": "2026-09-30T15:37:20.442Z"
+    },
     {
       "id": "lead-repo-test-1790780890183",
       "lead_code": "LD-2026-TEST-1790780890183",
@@ -795,7 +835,7 @@
   ],
   "attendanceRecords": [
     {
-      "id": "att-repo-test-1790780890183",
+      "id": "att-repo-test-1790782640439",
       "student_id": "stu-01",
       "session_id": "sess-01",
       "batch_id": "batch-fico-01",
@@ -804,7 +844,7 @@
       "source": "Manual",
       "duration_minutes": 90,
       "marked_by": "usr-admin",
-      "marked_at": "2026-09-30T15:08:10.183Z"
+      "marked_at": "2026-09-30T15:37:20.439Z"
     }
   ],
   "assignments": [
@@ -1021,6 +1061,19 @@
   ],
   "payments": [
     {
+      "id": "pay-repo-test-1790782640441",
+      "receipt_number": "REC-2026-TEST-1790782640441",
+      "student_id": "stu-01",
+      "course_id": "crs-fico-01",
+      "fee_account_id": "fa-01",
+      "amount": 5000,
+      "payment_date": "2026-09-30",
+      "payment_mode": "UPI",
+      "status": "Success",
+      "collected_by": "usr-admin",
+      "created_at": "2026-09-30T15:37:20.441Z"
+    },
+    {
       "id": "pay-repo-test-1790780890183",
       "receipt_number": "REC-2026-TEST-1790780890183",
       "student_id": "stu-01",
@@ -1144,6 +1197,25 @@
     }
   ],
   "receipts": [
+    {
+      "id": "rcpt-repo-test-1790782640441",
+      "receipt_number": "REC-2026-TEST-1790782640441",
+      "payment_id": "pay-repo-test-1790782640441",
+      "student_id": "stu-01",
+      "student_name": "Amit Gupta",
+      "admission_number": "ADM-2026-0001",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "payment_amount": 5000,
+      "payment_mode": "UPI",
+      "payment_date": "2026-09-30",
+      "remaining_balance": 10000,
+      "authorized_by": "Finance Department",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hyderabad",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-09-30T15:37:20.441Z"
+    },
     {
       "id": "rcpt-repo-test-1790780890183",
       "receipt_number": "REC-2026-TEST-1790780890183",
