@@ -5,6 +5,7 @@ export type UserRole =
   | 'counsellor'
   | 'trainer'
   | 'placement_coordinator'
+  | 'support'
   | 'student';
 
 export interface UserProfile {
@@ -67,7 +68,11 @@ export type Permission =
   | 'certificates:generate'
   | 'reports:read'
   | 'audit:read'
-  | 'settings:manage';
+  | 'settings:manage'
+  | 'doubts:read'
+  | 'doubts:write'
+  | 'doubts:assign'
+  | 'doubts:resolve';
 
 export type LeadStage =
   | 'New'
@@ -692,4 +697,50 @@ export interface SapServerAllocation {
   created_at: string;
   updated_at: string;
 }
+
+export type DoubtStatus = 'Open' | 'Assigned' | 'In Progress' | 'Resolved' | 'Closed';
+export type DoubtPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+export type DoubtCategory =
+  | 'Academic Concept'
+  | 'SAP Configuration'
+  | 'Lab / Server Error'
+  | 'Assignment Doubt'
+  | 'General Query';
+
+export interface DoubtMessage {
+  id: string;
+  doubt_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: UserRole;
+  message: string;
+  attachment_url?: string;
+  created_at: string;
+}
+
+export interface StudentDoubt {
+  id: string;
+  ticket_number: string;
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  course_id: string;
+  course_name: string;
+  batch_id?: string;
+  batch_name?: string;
+  assigned_to_id?: string;
+  assigned_to_name?: string;
+  assigned_to_role?: 'support' | 'trainer';
+  title: string;
+  description: string;
+  category: DoubtCategory;
+  priority: DoubtPriority;
+  status: DoubtStatus;
+  sap_tcode?: string;
+  messages: DoubtMessage[];
+  resolved_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 

@@ -21,6 +21,7 @@ export default function DashboardLayout({
       accountant: 'Suresh Kumar (Chief Accountant)',
       counsellor: 'Ananya Desai (Senior Counsellor)',
       trainer: 'Vikram Rao (SAP FICO Lead)',
+      support: 'Ananya Deshmukh (SAP Support Lead)',
       placement_coordinator: 'Sunita Reddy (Placement Head)',
       student: 'Amit Gupta (Student)',
     };

@@ -12,6 +12,14 @@ import {
   revokeSapAccess,
   generateSapGuiShortcutContent,
 } from '@/lib/services/sap-lab-service';
+import {
+  getDoubts,
+  getDoubtById,
+  createStudentDoubt,
+  replyToDoubt,
+  assignDoubt,
+  resolveDoubt,
+} from '@/lib/services/doubt-service';
 
 describe('1. RBAC & Permission Tests', () => {
   const superAdminUser: UserProfile = {
@@ -296,6 +304,105 @@ describe('6. SAP Lab Servers & Sandbox Access Provisioning', () => {
     // Revoke
     const revoked = await revokeSapAccess(alloc.id, 'usr-admin');
     expect(revoked.status).toBe('Revoked');
+  });
+});
+
+describe('7. Student Doubts & Academic Support Desk', () => {
+  it('Allows a student to submit a doubt and assigns it to support mentor', async () => {
+    const student = store.students.find((s) => s.id === 'stu-01')!; // Amit Gupta
+    const title = 'Document splitting error during customer payment posting';
+    const description = 'When running transaction F-28, document splitting rule fails for zero-balance clearing.';
+
+    const doubt = await createStudentDoubt(
+      {
+        student_id: student.id,
+        title,
+        description,
+        category: 'SAP Configuration',
+        priority: 'High',
+        sap_tcode: 'F-28',
+      },
+      student.user_id
+    );
+
+    expect(doubt.id).toBeDefined();
+    expect(doubt.ticket_number).toMatch(/^DBT-2026-\d{3}$/);
+    expect(doubt.student_id).toBe(student.id);
+    expect(doubt.student_name).toBe(student.full_name);
+    expect(doubt.sap_tcode).toBe('F-28');
+    expect(doubt.status).toBe('Assigned');
+    expect(doubt.assigned_to_role).toBe('support');
+    expect(doubt.messages.length).toBe(1);
+    expect(doubt.messages[0].message).toBe(description);
+    expect(doubt.messages[0].sender_role).toBe('student');
+  });
+
+  it('Enforces student isolation: querying with student_id returns only tickets belonging to that student', async () => {
+    const amitDoubts = await getDoubts({ student_id: 'stu-01' });
+    expect(amitDoubts.length).toBeGreaterThan(0);
+    // Every single doubt returned must belong to stu-01
+    expect(amitDoubts.every((d) => d.student_id === 'stu-01')).toBe(true);
+    // None should belong to Sneha (stu-02)
+    expect(amitDoubts.some((d) => d.student_id === 'stu-02')).toBe(false);
+
+    const snehaDoubts = await getDoubts({ student_id: 'stu-02' });
+    expect(snehaDoubts.length).toBeGreaterThan(0);
+    expect(snehaDoubts.every((d) => d.student_id === 'stu-02')).toBe(true);
+    expect(snehaDoubts.some((d) => d.student_id === 'stu-01')).toBe(false);
+  });
+
+  it('Supports two-way threaded replies between mentor and student', async () => {
+    const doubt = store.doubts[0];
+    const initialMessageCount = doubt.messages.length;
+
+    // Support mentor replies
+    const mentorReply = await replyToDoubt(
+      doubt.id,
+      'Please check your document splitting characteristics in IMG > Financial Accounting > General Ledger > Business Transactions.',
+      'usr-support-01',
+      'support',
+      'Ananya Deshmukh (Support)'
+    );
+
+    expect(mentorReply.doubt_id).toBe(doubt.id);
+    expect(mentorReply.sender_role).toBe('support');
+    expect(doubt.messages.length).toBe(initialMessageCount + 1);
+    expect(doubt.status).toBe('In Progress');
+
+    // Student replies with follow-up
+    const studentReply = await replyToDoubt(
+      doubt.id,
+      'Thank you Ananya! That fixed the business transaction variant. Now testing posting.',
+      'usr-student-01',
+      'student',
+      'Amit Gupta'
+    );
+
+    expect(studentReply.sender_role).toBe('student');
+    expect(doubt.messages.length).toBe(initialMessageCount + 2);
+  });
+
+  it('Allows support mentor or trainer to resolve ticket with resolution summary', async () => {
+    const doubt = store.doubts[0];
+
+    const resolved = await resolveDoubt(
+      doubt.id,
+      'usr-support-01',
+      'Issue resolved. Verified that document splitting characteristics are properly assigned to chart of accounts.'
+    );
+
+    expect(resolved.status).toBe('Resolved');
+    expect(resolved.resolved_at).toBeDefined();
+    // Last message is the resolution note
+    const lastMsg = resolved.messages[resolved.messages.length - 1];
+    expect(lastMsg.message).toContain('[Resolution Note]');
+  });
+
+  it('Rejects empty replies with an error', async () => {
+    const doubt = store.doubts[0];
+    await expect(
+      replyToDoubt(doubt.id, '   ', 'usr-student-01', 'student', 'Amit Gupta')
+    ).rejects.toThrow(/Reply message cannot be empty/);
   });
 });
 

@@ -48,6 +48,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'reports:read',
     'audit:read',
     'settings:manage',
+    'doubts:read',
+    'doubts:write',
+    'doubts:assign',
+    'doubts:resolve',
   ],
   admin: [
     'users:read',
@@ -76,6 +80,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'reports:read',
     'certificates:read',
     'certificates:generate',
+    'doubts:read',
+    'doubts:write',
+    'doubts:assign',
+    'doubts:resolve',
   ],
   accountant: [
     'accounts:read',
@@ -113,12 +121,25 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'assessments:write',
     'assessments:grade',
     'students:read',
+    'doubts:read',
+    'doubts:write',
+    'doubts:resolve',
   ],
   placement_coordinator: [
     'placements:read',
     'placements:write',
     'students:read',
     'certificates:read',
+  ],
+  support: [
+    'doubts:read',
+    'doubts:write',
+    'doubts:assign',
+    'doubts:resolve',
+    'students:read',
+    'courses:read',
+    'batches:read',
+    'schedule:read',
   ],
   student: [
     'courses:read',
@@ -129,6 +150,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'receipts:read',
     'certificates:read',
     'placements:read',
+    'doubts:read',
+    'doubts:write',
   ],
 };
 

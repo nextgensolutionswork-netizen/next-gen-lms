@@ -50,6 +50,7 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch }: SidebarP
   const isCounsellor = isSuperAdmin || isAdmin || currentRole === 'counsellor';
   const isTrainer = isSuperAdmin || isAdmin || currentRole === 'trainer';
   const isPlacement = isSuperAdmin || isAdmin || currentRole === 'placement_coordinator';
+  const isSupport = isSuperAdmin || isAdmin || currentRole === 'support' || currentRole === 'trainer';
 
   return (
     <aside className="w-64 flex-shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col h-screen sticky top-0">
@@ -82,6 +83,7 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch }: SidebarP
           <option value="accountant">Accountant</option>
           <option value="counsellor">Counsellor</option>
           <option value="trainer">Trainer</option>
+          <option value="support">Support Mentor</option>
           <option value="placement_coordinator">Placement Coord</option>
           <option value="student">Student</option>
         </select>
@@ -328,6 +330,22 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch }: SidebarP
           >
             <Briefcase className="h-4 w-4 text-purple-400" />
             <span>Placement Support</span>
+          </Link>
+        )}
+
+        {/* Academic Support Helpdesk (Support, Trainer, Admin, Super Admin) */}
+        {isSupport && (
+          <Link
+            href="/support"
+            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/support') ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <BadgeHelp className="h-4 w-4 text-cyan-400" />
+            <div className="flex-1 flex items-center justify-between">
+              <span>Academic Support</span>
+              <span className="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800 font-semibold">Helpdesk</span>
+            </div>
           </Link>
         )}
 

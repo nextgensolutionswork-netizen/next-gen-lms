@@ -27,6 +27,11 @@ import {
   CheckCircle2,
   Building,
   ShieldCheck,
+  HelpCircle,
+  MessageSquare,
+  Send,
+  PlusCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +42,8 @@ import { store } from '@/lib/services/data-store';
 import { updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
 import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
+import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
+import { StudentDoubt, DoubtCategory, DoubtPriority } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
 export default function StudentPortalPage() {
@@ -66,6 +73,80 @@ export default function StudentPortalPage() {
   const [upiId, setUpiId] = React.useState('amit.gupta@okaxis');
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [successReceipt, setSuccessReceipt] = React.useState<any>(null);
+
+  // Student Doubts & Academic Support
+  const [doubtsList, setDoubtsList] = React.useState<StudentDoubt[]>([]);
+  const [expandedDoubtId, setExpandedDoubtId] = React.useState<string | null>('dbt-01');
+  const [isAskModalOpen, setIsAskModalOpen] = React.useState(false);
+  const [doubtTitle, setDoubtTitle] = React.useState('');
+  const [doubtCategory, setDoubtCategory] = React.useState<DoubtCategory>('SAP Configuration');
+  const [doubtPriority, setDoubtPriority] = React.useState<DoubtPriority>('Medium');
+  const [doubtSapTcode, setDoubtSapTcode] = React.useState('');
+  const [doubtDescription, setDoubtDescription] = React.useState('');
+  const [isSubmittingDoubt, setIsSubmittingDoubt] = React.useState(false);
+  const [replyText, setReplyText] = React.useState('');
+  const [isReplying, setIsReplying] = React.useState(false);
+
+  const fetchStudentDoubts = async () => {
+    const list = await getDoubts({ student_id: student.id });
+    setDoubtsList(list);
+    if (!expandedDoubtId && list.length > 0) {
+      setExpandedDoubtId(list[0].id);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchStudentDoubts();
+  }, [student.id]);
+
+  const handleAskDoubtSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!doubtTitle.trim() || !doubtDescription.trim()) return;
+    setIsSubmittingDoubt(true);
+    try {
+      const created = await createStudentDoubt(
+        {
+          student_id: student.id,
+          title: doubtTitle.trim(),
+          description: doubtDescription.trim(),
+          category: doubtCategory,
+          priority: doubtPriority,
+          sap_tcode: doubtSapTcode.trim() ? doubtSapTcode.trim() : undefined,
+        },
+        student.user_id
+      );
+      setDoubtTitle('');
+      setDoubtDescription('');
+      setDoubtSapTcode('');
+      setIsAskModalOpen(false);
+      await fetchStudentDoubts();
+      setExpandedDoubtId(created.id);
+    } catch (err: any) {
+      alert(err.message || 'Error submitting doubt ticket');
+    } finally {
+      setIsSubmittingDoubt(false);
+    }
+  };
+
+  const handleSendStudentReply = async (doubtId: string) => {
+    if (!replyText.trim()) return;
+    setIsReplying(true);
+    try {
+      await replyToDoubt(
+        doubtId,
+        replyText.trim(),
+        student.user_id,
+        'student',
+        student.full_name
+      );
+      setReplyText('');
+      await fetchStudentDoubts();
+    } catch (err: any) {
+      alert(err.message || 'Error posting reply');
+    } finally {
+      setIsReplying(false);
+    }
+  };
 
   const handleOnlinePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -508,6 +589,200 @@ export default function StudentPortalPage() {
           </Card>
         )}
 
+        {/* Academic Doubts & 1-on-1 Support Desk */}
+        <Card className="border border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="h-9 w-9 rounded-lg bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+                  <HelpCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-bold text-white flex items-center space-x-2">
+                    <span>My Academic Doubts & Mentor Helpdesk</span>
+                    <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 px-2 py-0.5 rounded-full font-semibold">
+                      Student Direct Support
+                    </span>
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Ask questions directly to your assigned faculty and SAP support mentors
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="sap"
+                size="sm"
+                onClick={() => setIsAskModalOpen(true)}
+                className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs flex items-center space-x-1.5 self-start sm:self-auto shadow"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span>Ask a Doubt</span>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
+            {doubtsList.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                <HelpCircle className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">No doubt tickets submitted yet</p>
+                <p className="text-slate-400 mt-1">
+                  Encountering an issue in SAP GUI, transaction configuration, or lecture concepts?
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAskModalOpen(true)}
+                  className="mt-3 text-xs"
+                >
+                  Create Your First Doubt Ticket
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Tickets list */}
+                <div className="space-y-3">
+                  {doubtsList.map((d) => {
+                    const isExpanded = expandedDoubtId === d.id;
+                    return (
+                      <div
+                        key={d.id}
+                        className={`border rounded-xl transition-all ${
+                          isExpanded ? 'border-cyan-300 bg-cyan-50/20 shadow-xs' : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Header bar */}
+                        <div
+                          onClick={() => setExpandedDoubtId(isExpanded ? null : d.id)}
+                          className="p-4 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-slate-700">{d.ticket_number}</span>
+                              <Badge
+                                variant={
+                                  d.status === 'Resolved'
+                                    ? 'success'
+                                    : d.status === 'In Progress'
+                                    ? 'info'
+                                    : d.status === 'Assigned'
+                                    ? 'warning'
+                                    : 'secondary'
+                                }
+                              >
+                                {d.status}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] text-slate-600">
+                                {d.category}
+                              </Badge>
+                              {d.sap_tcode && (
+                                <span className="font-mono text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded">
+                                  T-Code: {d.sap_tcode}
+                                </span>
+                              )}
+                              <span
+                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                  d.priority === 'Urgent'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : d.priority === 'High'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {d.priority} Priority
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 leading-snug">{d.title}</h4>
+                            <p className="text-[11px] text-slate-500">
+                              Assigned Mentor: <strong className="text-slate-700">{d.assigned_to_name || 'SAP Support Desk'}</strong> · Created {formatDateTime(d.created_at)}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center space-x-3 text-xs text-slate-500 self-end sm:self-center">
+                            <span className="flex items-center space-x-1">
+                              <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
+                              <span>{d.messages.length} replies</span>
+                            </span>
+                            <ChevronDown
+                              className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Thread Expanded View */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-200 bg-white p-4 rounded-b-xl space-y-4">
+                            {/* Messages */}
+                            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                              {d.messages.map((m) => {
+                                const isFromStudent = m.sender_role === 'student';
+                                return (
+                                  <div
+                                    key={m.id}
+                                    className={`flex flex-col ${isFromStudent ? 'items-end' : 'items-start'}`}
+                                  >
+                                    <div
+                                      className={`max-w-[85%] rounded-2xl p-3 text-xs space-y-1 shadow-2xs ${
+                                        isFromStudent
+                                          ? 'bg-blue-600 text-white rounded-br-xs'
+                                          : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-bl-xs'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-4 text-[10px] opacity-80">
+                                        <span className="font-semibold">{m.sender_name}</span>
+                                        <span>{formatDateTime(m.created_at)}</span>
+                                      </div>
+                                      <p className="leading-relaxed whitespace-pre-wrap">{m.message}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Reply Input Form */}
+                            {d.status !== 'Resolved' && d.status !== 'Closed' ? (
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  handleSendStudentReply(d.id);
+                                }}
+                                className="flex gap-2 pt-2 border-t border-slate-100"
+                              >
+                                <input
+                                  type="text"
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder="Type your follow-up reply or query..."
+                                  className="flex-1 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                                />
+                                <Button
+                                  type="submit"
+                                  variant="sap"
+                                  size="sm"
+                                  disabled={isReplying || !replyText.trim()}
+                                  className="text-xs px-3 h-8 flex items-center space-x-1"
+                                >
+                                  <Send className="h-3 w-3" />
+                                  <span>{isReplying ? 'Sending...' : 'Reply'}</span>
+                                </Button>
+                              </form>
+                            ) : (
+                              <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2">
+                                <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                                <span>This doubt has been marked as <strong>Resolved</strong> by the mentor. If you have a new question, please open a new ticket.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Certificate Banner if Issued */}
         {certificate && (
           <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -705,6 +980,106 @@ export default function StudentPortalPage() {
               </div>
             </form>
           )}
+        </Modal>
+
+        {/* Ask a Doubt Modal */}
+        <Modal
+          isOpen={isAskModalOpen}
+          onClose={() => setIsAskModalOpen(false)}
+          title="Submit Academic or Technical Doubt"
+          description="Your ticket will be assigned directly to our SAP faculty and support mentors."
+        >
+          <form onSubmit={handleAskDoubtSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Doubt Title / Subject *
+              </label>
+              <input
+                type="text"
+                value={doubtTitle}
+                onChange={(e) => setDoubtTitle(e.target.value)}
+                placeholder="e.g. Error in T-Code FB50 during GL Posting"
+                required
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={doubtCategory}
+                  onChange={(e) => setDoubtCategory(e.target.value as DoubtCategory)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+                >
+                  <option value="SAP Configuration">SAP Configuration</option>
+                  <option value="Academic Concept">Academic Concept</option>
+                  <option value="Lab / Server Error">Lab / Server Error</option>
+                  <option value="Assignment Doubt">Assignment Doubt</option>
+                  <option value="General Query">General Query</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  SAP T-Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={doubtSapTcode}
+                  onChange={(e) => setDoubtSapTcode(e.target.value.toUpperCase())}
+                  placeholder="e.g. FB50, MIRO, OX02"
+                  className="w-full text-xs font-mono uppercase bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Priority *
+                </label>
+                <select
+                  value={doubtPriority}
+                  onChange={(e) => setDoubtPriority(e.target.value as DoubtPriority)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Detailed Description & Error Message *
+              </label>
+              <textarea
+                value={doubtDescription}
+                onChange={(e) => setDoubtDescription(e.target.value)}
+                rows={4}
+                placeholder="Describe what steps you performed, the exact error number (e.g. F5151), and what expected result you are trying to achieve..."
+                required
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+              />
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-[11px] text-blue-900">
+              <span>Program: <strong>{course?.course_name}</strong></span>
+              <span>Mentor Lead: <strong>Ananya Deshmukh (Support)</strong></span>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsAskModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="sap" size="sm" disabled={isSubmittingDoubt}>
+                {isSubmittingDoubt ? 'Submitting...' : 'Submit Doubt Ticket'}
+              </Button>
+            </div>
+          </form>
         </Modal>
       </main>
     </div>
