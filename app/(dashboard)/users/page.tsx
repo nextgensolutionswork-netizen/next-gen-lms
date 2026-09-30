@@ -119,9 +119,17 @@ export default function UsersPage() {
                             <span className="text-rose-600 italic">No courses assigned (Zero access)</span>
                           )
                         ) : u.role === 'accountant' ? (
-                          <span className="text-slate-500 italic">Financial ledger & reports only</span>
+                          <span className="text-slate-500 italic">Financial ledger & receipts only</span>
+                        ) : u.role === 'support' ? (
+                          <span className="text-cyan-700 font-medium">Academic Doubts & Helpdesk Lead</span>
+                        ) : u.role === 'placement_coordinator' ? (
+                          <span className="text-purple-700 font-medium">Job Openings & Placements</span>
+                        ) : u.role === 'counsellor' ? (
+                          <span className="text-amber-700 font-medium">CRM Leads & Admissions</span>
+                        ) : u.role === 'student' ? (
+                          <span className="text-emerald-700 font-medium">Student Learning Portal</span>
                         ) : (
-                          <span className="text-slate-500 italic">System Scope</span>
+                          <span className="text-slate-500 italic">Full Enterprise Scope</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -179,11 +187,14 @@ export default function UsersPage() {
               onChange={(e) => setRole(e.target.value as UserRole)}
               className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
             >
+              <option value="super_admin">Super Admin / Director</option>
+              <option value="admin">Operations Admin</option>
               <option value="trainer">Trainer (Assigned Courses Only)</option>
+              <option value="support">Academic Support Mentor</option>
               <option value="accountant">Accountant (Financial Ledgers Only)</option>
               <option value="counsellor">Counsellor (CRM & Admissions)</option>
               <option value="placement_coordinator">Placement Coordinator</option>
-              <option value="admin">Operations Admin</option>
+              <option value="student">Student Account</option>
             </select>
           </div>
 
