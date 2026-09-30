@@ -307,6 +307,8 @@ export interface ClassSession {
   end_time: string;
   mode: 'Online' | 'Classroom' | 'Hybrid';
   meeting_link?: string;
+  meeting_id?: string;
+  meeting_provider?: 'Zoom' | 'Google Meet';
   classroom?: string;
   notes?: string;
   status: 'Scheduled' | 'Completed' | 'Cancelled' | 'Rescheduled';
@@ -314,6 +316,7 @@ export interface ClassSession {
 }
 
 export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Excused';
+export type AttendanceSource = 'Manual' | 'Zoom' | 'Google Meet';
 
 export interface AttendanceRecord {
   id: string;
@@ -327,6 +330,33 @@ export interface AttendanceRecord {
   marked_by: string;
   marked_by_name?: string;
   marked_at: string;
+  source?: AttendanceSource;
+  meeting_id?: string;
+  duration_minutes?: number;
+  join_time?: string;
+  leave_time?: string;
+}
+
+export interface MeetingParticipantLog {
+  id: string;
+  meeting_id: string;
+  provider: 'Zoom' | 'Google Meet';
+  participant_email: string;
+  participant_name: string;
+  join_time: string;
+  leave_time?: string;
+  duration_seconds: number;
+  created_at: string;
+}
+
+export interface MeetingAttendanceSyncResult {
+  session_id: string;
+  meeting_id: string;
+  provider: 'Zoom' | 'Google Meet';
+  total_meeting_minutes: number;
+  synced_records_count: number;
+  records: AttendanceRecord[];
+  alerts_dispatched: number;
 }
 
 export interface Assignment {

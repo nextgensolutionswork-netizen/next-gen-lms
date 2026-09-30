@@ -33,6 +33,7 @@ import {
   SapServerAllocation,
   StudentDoubt,
   DoubtMessage,
+  MeetingParticipantLog,
 } from '@/types';
 
 // In-Memory initial seed data for immediate high-speed execution & testing
@@ -882,6 +883,8 @@ class InstituteDataStore {
       end_time: '10:00',
       mode: 'Hybrid',
       meeting_link: 'https://meet.google.com/xyz-fico-sap',
+      meeting_id: 'xyz-fico-sap',
+      meeting_provider: 'Google Meet',
       classroom: 'Lab 2 (SAP S/4HANA Server Lab)',
       notes: 'Bring previous assignment blueprint printouts',
       status: 'Scheduled',
@@ -900,11 +903,15 @@ class InstituteDataStore {
       start_time: '10:00',
       end_time: '13:00',
       mode: 'Online',
-      meeting_link: 'https://meet.google.com/abc-mm-live',
+      meeting_link: 'https://zoom.us/j/9876543210',
+      meeting_id: '9876543210',
+      meeting_provider: 'Zoom',
       status: 'Scheduled',
       created_at: '2026-02-25T10:00:00Z',
     },
   ];
+
+  public meetingLogs: MeetingParticipantLog[] = [];
 
   public attendanceRecords: AttendanceRecord[] = [
     {
@@ -915,6 +922,9 @@ class InstituteDataStore {
       session_id: 'sess-01',
       attendance_date: '2026-02-27',
       status: 'Present',
+      source: 'Google Meet',
+      meeting_id: 'xyz-fico-sap',
+      duration_minutes: 115,
       marked_by: 'usr-trainer-fico',
       marked_by_name: 'Vikram Rao',
       marked_at: '2026-02-27T08:15:00Z',
