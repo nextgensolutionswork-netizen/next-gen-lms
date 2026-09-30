@@ -8,6 +8,11 @@ import {
   dbReplyToDoubt,
   dbResolveDoubt,
 } from '@/lib/supabase/db-service';
+import { publishRealtimeEvent } from './realtime-service';
+import {
+  dispatchMultiChannelNotification,
+  buildDoubtReplyEmailHtml,
+} from './notification-service';
 
 export async function getDoubts(filters?: {
   student_id?: string;
@@ -150,6 +155,24 @@ export async function createStudentDoubt(
     },
   });
 
+  // 1. Broadcast real-time event to staff support desk
+  publishRealtimeEvent('doubts', 'doubt_created', newDoubt);
+
+  // 2. Dispatch notification to assigned support mentor
+  if (supportUser) {
+    dispatchMultiChannelNotification({
+      userId: supportUser.id,
+      recipientName: supportUser.full_name,
+      recipientEmail: supportUser.email,
+      title: `New Doubt Ticket #${ticket_number}`,
+      message: `${student.full_name} submitted a query: "${input.title}" (${input.category})`,
+      category: 'support',
+      type: 'info',
+      channels: ['in_app'],
+      actionUrl: '/support',
+    }).catch((err) => console.warn('Failed to dispatch mentor notification:', err));
+  }
+
   return newDoubt;
 }
 
@@ -206,6 +229,63 @@ export async function replyToDoubt(
     new_value: { ticket_number: doubt.ticket_number, reply_by: senderName },
   });
 
+  // 1. Broadcast real-time message to general doubts topic and specific doubt thread
+  publishRealtimeEvent('doubts', 'doubt_reply', {
+    doubtId: doubt.id,
+    message: newMessage,
+    status: doubt.status,
+  });
+  publishRealtimeEvent(`doubt:${doubt.id}`, 'doubt_reply', {
+    doubtId: doubt.id,
+    message: newMessage,
+    status: doubt.status,
+  });
+
+  // 2. Dispatch multi-channel notifications
+  if (senderRole !== 'student') {
+    // Mentor replied -> Notify student via in-app, Resend email, and WhatsApp
+    const student = store.students.find((s) => s.id === doubt.student_id);
+    const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/portal`;
+    const emailHtml = buildDoubtReplyEmailHtml({
+      studentName: doubt.student_name,
+      ticketNumber: doubt.ticket_number,
+      doubtTitle: doubt.title,
+      mentorName: senderName,
+      replyMessage: message.trim(),
+      portalUrl,
+    });
+
+    dispatchMultiChannelNotification({
+      userId: student?.user_id || doubt.student_id,
+      recipientName: doubt.student_name,
+      recipientEmail: student?.email,
+      recipientPhone: student?.phone,
+      title: `Mentor Reply on Doubt #${doubt.ticket_number}`,
+      message: `${senderName}: "${message.trim().slice(0, 120)}${message.trim().length > 120 ? '...' : ''}"`,
+      category: 'support',
+      type: 'info',
+      channels: ['in_app', 'email', 'whatsapp'],
+      actionUrl: '/portal',
+      metadata: { htmlTemplate: emailHtml },
+    }).catch((err) => console.warn('Failed to dispatch student notification:', err));
+  } else {
+    // Student replied -> Notify assigned support mentor
+    if (doubt.assigned_to_id) {
+      const mentor = store.users.find((u) => u.id === doubt.assigned_to_id);
+      dispatchMultiChannelNotification({
+        userId: doubt.assigned_to_id,
+        recipientName: mentor?.full_name || 'Support Mentor',
+        recipientEmail: mentor?.email,
+        title: `Student Reply on Ticket #${doubt.ticket_number}`,
+        message: `${senderName}: "${message.trim().slice(0, 120)}"`,
+        category: 'support',
+        type: 'info',
+        channels: ['in_app'],
+        actionUrl: '/support',
+      }).catch((err) => console.warn('Failed to dispatch mentor notification:', err));
+    }
+  }
+
   return newMessage;
 }
 
@@ -237,6 +317,14 @@ export async function assignDoubt(
     module: 'SUPPORT',
     record_id: doubt.id,
     new_value: { ticket_number: doubt.ticket_number, mentor: mentor.full_name },
+  });
+
+  // Broadcast real-time assignment update
+  publishRealtimeEvent('doubts', 'doubt_assigned', {
+    doubtId: doubt.id,
+    assignedToId: mentor.id,
+    assignedToName: mentor.full_name,
+    status: doubt.status,
   });
 
   return doubt;
@@ -286,6 +374,33 @@ export async function resolveDoubt(
     record_id: doubt.id,
     new_value: { ticket_number: doubt.ticket_number, resolved_by: actor?.full_name },
   });
+
+  // 1. Broadcast real-time resolution event
+  publishRealtimeEvent('doubts', 'doubt_resolved', {
+    doubtId: doubt.id,
+    status: 'Resolved',
+    resolvedBy: actor?.full_name,
+  });
+  publishRealtimeEvent(`doubt:${doubt.id}`, 'doubt_resolved', {
+    doubtId: doubt.id,
+    status: 'Resolved',
+    resolvedBy: actor?.full_name,
+  });
+
+  // 2. Dispatch notification to student
+  const student = store.students.find((s) => s.id === doubt.student_id);
+  dispatchMultiChannelNotification({
+    userId: student?.user_id || doubt.student_id,
+    recipientName: doubt.student_name,
+    recipientEmail: student?.email,
+    recipientPhone: student?.phone,
+    title: `Doubt Ticket Resolved: #${doubt.ticket_number}`,
+    message: `Your query "${doubt.title}" has been marked as resolved by ${actor?.full_name || 'Academic Mentor'}.`,
+    category: 'support',
+    type: 'success',
+    channels: ['in_app', 'whatsapp'],
+    actionUrl: '/portal',
+  }).catch((err) => console.warn('Failed to dispatch resolution notification:', err));
 
   return doubt;
 }

@@ -2,6 +2,10 @@ import { store } from './data-store';
 import { Certificate } from '@/types';
 import { generateCertificateId } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
+import {
+  dispatchMultiChannelNotification,
+  buildCertificateEmailHtml,
+} from './notification-service';
 
 export async function getCertificates(): Promise<Certificate[]> {
   return [...store.certificates];
@@ -85,6 +89,31 @@ export async function verifyAndGenerateCertificate(
     record_id: cert.id,
     new_value: { certificate_id, student: student.full_name, course: course.course_name },
   });
+
+  // Dispatch multi-channel notification (in-app, email with PDF, WhatsApp)
+  const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/api/certificates/${cert.certificate_id}/pdf?download=true`;
+  const emailHtml = buildCertificateEmailHtml({
+    studentName: student.full_name,
+    courseName: course.course_name,
+    certificateId: cert.certificate_id,
+    grade: cert.grade,
+    verificationUrl: cert.verification_url,
+    pdfUrl,
+  });
+
+  dispatchMultiChannelNotification({
+    userId: student.user_id || student.id,
+    recipientName: student.full_name,
+    recipientEmail: student.email,
+    recipientPhone: student.phone,
+    title: `SAP Certificate Awarded: ${course.course_name}`,
+    message: `Congratulations ${student.full_name}! Your course certificate (${cert.certificate_id}) has been issued with grade ${cert.grade}.`,
+    category: 'certificate',
+    type: 'success',
+    channels: ['in_app', 'email', 'whatsapp'],
+    actionUrl: `/certificate/verify/${cert.certificate_id}`,
+    metadata: { htmlTemplate: emailHtml, pdfUrl },
+  }).catch((err) => console.warn('Certificate notification dispatch error:', err));
 
   return { eligible: true, reasons: [], certificate: cert };
 }

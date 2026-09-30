@@ -623,16 +623,52 @@ export interface Certificate {
   created_at: string;
 }
 
+export type NotificationCategory =
+  | 'admission'
+  | 'payment'
+  | 'fee'
+  | 'class'
+  | 'assignment'
+  | 'exam'
+  | 'certificate'
+  | 'placement'
+  | 'support'
+  | 'general';
+
+export type NotificationChannel = 'in_app' | 'email' | 'whatsapp';
+
 export interface NotificationItem {
   id: string;
   user_id: string;
   title: string;
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
-  category: 'admission' | 'payment' | 'fee' | 'class' | 'assignment' | 'exam' | 'certificate' | 'placement';
+  category: NotificationCategory;
   is_read: boolean;
   action_url?: string;
   created_at: string;
+}
+
+export interface MultiChannelDispatchPayload {
+  userId: string;
+  recipientName: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  title: string;
+  message: string;
+  category: NotificationCategory;
+  type?: 'info' | 'success' | 'warning' | 'error';
+  channels?: NotificationChannel[];
+  actionUrl?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface RealtimeMessageEvent {
+  id: string;
+  topic: string;
+  event: string;
+  payload: any;
+  timestamp: string;
 }
 
 export interface AuditLog {

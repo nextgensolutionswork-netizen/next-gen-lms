@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
+import { useRealtime } from '@/lib/hooks/use-realtime';
 import {
   getDoubts,
   replyToDoubt,
@@ -82,6 +83,67 @@ export default function SupportDeskPage() {
   React.useEffect(() => {
     refreshList();
   }, [statusFilter, assignedFilter, search]);
+
+  // Real-Time WebSocket / SSE Subscription
+  const { isConnected } = useRealtime({
+    topics: ['doubts', selectedDoubt ? `doubt:${selectedDoubt.id}` : ''],
+    onEvent: (event) => {
+      if (event.event === 'doubt_reply') {
+        const { doubtId, message, status } = event.payload;
+        setSelectedDoubt((prev) => {
+          if (prev && prev.id === doubtId) {
+            const exists = prev.messages.some((m) => m.id === message.id);
+            if (!exists) {
+              return {
+                ...prev,
+                status: status || prev.status,
+                messages: [...prev.messages, message],
+              };
+            }
+          }
+          return prev;
+        });
+
+        setDoubts((prevList) =>
+          prevList.map((d) =>
+            d.id === doubtId
+              ? {
+                  ...d,
+                  status: status || d.status,
+                  messages: d.messages.some((m) => m.id === message.id)
+                    ? d.messages
+                    : [...d.messages, message],
+                }
+              : d
+          )
+        );
+      } else if (event.event === 'doubt_created') {
+        const newTicket: StudentDoubt = event.payload;
+        setDoubts((prev) => {
+          if (prev.some((d) => d.id === newTicket.id)) return prev;
+          return [newTicket, ...prev];
+        });
+      } else if (event.event === 'doubt_resolved') {
+        const { doubtId } = event.payload;
+        setSelectedDoubt((prev) => (prev && prev.id === doubtId ? { ...prev, status: 'Resolved' } : prev));
+        setDoubts((prev) => prev.map((d) => (d.id === doubtId ? { ...d, status: 'Resolved' } : d)));
+      } else if (event.event === 'doubt_assigned') {
+        const { doubtId, assignedToId, assignedToName } = event.payload;
+        setSelectedDoubt((prev) =>
+          prev && prev.id === doubtId
+            ? { ...prev, assigned_to_id: assignedToId, assigned_to_name: assignedToName, status: 'Assigned' }
+            : prev
+        );
+        setDoubts((prev) =>
+          prev.map((d) =>
+            d.id === doubtId
+              ? { ...d, assigned_to_id: assignedToId, assigned_to_name: assignedToName, status: 'Assigned' }
+              : d
+          )
+        );
+      }
+    },
+  });
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,10 +205,27 @@ export default function SupportDeskPage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs">
-          <UserCheck className="h-4 w-4 text-[#0A6ED1]" />
-          <span className="text-slate-600">Active Mentor:</span>
-          <strong className="text-slate-900">{currentStaff.full_name}</strong>
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+              isConnected
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <span>{isConnected ? 'Realtime Connected' : 'Connecting Stream...'}</span>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs">
+            <UserCheck className="h-4 w-4 text-[#0A6ED1]" />
+            <span className="text-slate-600">Active Mentor:</span>
+            <strong className="text-slate-900">{currentStaff.full_name}</strong>
+          </div>
         </div>
       </div>
 

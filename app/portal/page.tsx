@@ -48,6 +48,7 @@ import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/se
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
 import { uploadStudentResume } from '@/lib/services/placement-service';
+import { useRealtime } from '@/lib/hooks/use-realtime';
 import { StudentDoubt, DoubtCategory, DoubtPriority } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
@@ -119,6 +120,34 @@ export default function StudentPortalPage() {
   React.useEffect(() => {
     fetchStudentDoubts();
   }, [student.id]);
+
+  // Realtime Live Stream for Student Helpdesk
+  const { isConnected: isRealtimeConnected } = useRealtime({
+    topics: ['doubts', `doubt:${expandedDoubtId || ''}`, `notifications:${student.user_id || student.id}`],
+    onEvent: (event) => {
+      if (event.event === 'doubt_reply') {
+        const { doubtId, message, status } = event.payload;
+        setDoubtsList((prevList) =>
+          prevList.map((d) =>
+            d.id === doubtId
+              ? {
+                  ...d,
+                  status: status || d.status,
+                  messages: d.messages.some((m) => m.id === message.id)
+                    ? d.messages
+                    : [...d.messages, message],
+                }
+              : d
+          )
+        );
+      } else if (event.event === 'doubt_resolved') {
+        const { doubtId } = event.payload;
+        setDoubtsList((prevList) =>
+          prevList.map((d) => (d.id === doubtId ? { ...d, status: 'Resolved' } : d))
+        );
+      }
+    },
+  });
 
   const handleAskDoubtSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -707,15 +736,32 @@ export default function StudentPortalPage() {
                 </div>
               </div>
 
-              <Button
-                variant="sap"
-                size="sm"
-                onClick={() => setIsAskModalOpen(true)}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs flex items-center space-x-1.5 self-start sm:self-auto shadow"
-              >
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span>Ask a Doubt</span>
-              </Button>
+              <div className="flex items-center space-x-2 self-start sm:self-auto">
+                <div
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                    isRealtimeConnected
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      isRealtimeConnected ? 'bg-cyan-400 animate-pulse' : 'bg-amber-400'
+                    }`}
+                  />
+                  <span>{isRealtimeConnected ? 'Live Realtime' : 'Connecting...'}</span>
+                </div>
+
+                <Button
+                  variant="sap"
+                  size="sm"
+                  onClick={() => setIsAskModalOpen(true)}
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs flex items-center space-x-1.5 shadow"
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span>Ask a Doubt</span>
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-5">
