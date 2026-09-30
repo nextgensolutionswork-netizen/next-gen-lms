@@ -17,6 +17,9 @@ function createMockRequest(url: string, cookieValue?: string) {
 }
 
 describe('8. Middleware & Session Verification Tests', () => {
+  // =========================================================================
+  // 1. UNAUTHENTICATED ROUTE PROTECTION (/dashboard, /support, /portal)
+  // =========================================================================
   it('redirects unauthenticated user from protected /dashboard to /login with redirectTo', async () => {
     const req = createMockRequest('http://localhost:3000/dashboard');
     const res = await middleware(req);
@@ -25,6 +28,16 @@ describe('8. Middleware & Session Verification Tests', () => {
     const location = res.headers.get('location');
     expect(location).toContain('/login');
     expect(location).toContain('redirectTo=%2Fdashboard');
+  });
+
+  it('redirects unauthenticated user from protected /support to /login with redirectTo', async () => {
+    const req = createMockRequest('http://localhost:3000/support');
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+    expect(location).toContain('redirectTo=%2Fsupport');
   });
 
   it('redirects unauthenticated user from protected /portal to /login with redirectTo', async () => {
@@ -37,6 +50,30 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(location).toContain('redirectTo=%2Fportal');
   });
 
+  it('redirects unauthenticated user from root / to /login', async () => {
+    const req = createMockRequest('http://localhost:3000/');
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+  });
+
+  it('redirects unauthenticated user from academic and accounts subroutes to /login', async () => {
+    const req1 = createMockRequest('http://localhost:3000/academics/courses');
+    const res1 = await middleware(req1);
+    expect(res1.status).toBe(307);
+    expect(res1.headers.get('location')).toContain('redirectTo=%2Facademics%2Fcourses');
+
+    const req2 = createMockRequest('http://localhost:3000/accounts/fees');
+    const res2 = await middleware(req2);
+    expect(res2.status).toBe(307);
+    expect(res2.headers.get('location')).toContain('redirectTo=%2Faccounts%2Ffees');
+  });
+
+  // =========================================================================
+  // 2. PUBLIC ROUTES ACCESS
+  // =========================================================================
   it('allows unauthenticated visitor to access public /login page', async () => {
     const req = createMockRequest('http://localhost:3000/login');
     const res = await middleware(req);
@@ -52,6 +89,36 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(res.status).toBe(200);
   });
 
+  // =========================================================================
+  // 3. INVALID & CORRUPT COOKIE HANDLING
+  // =========================================================================
+  it('rejects corrupted JSON auth cookie and redirects to /login', async () => {
+    const req = createMockRequest('http://localhost:3000/dashboard', 'not-valid-json-cookie');
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/login');
+  });
+
+  it('rejects inactive user session cookie and redirects to /login', async () => {
+    const inactiveCookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-inactive',
+        email: 'inactive@next-generpsolutions.com',
+        role: 'student',
+        is_active: false,
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/portal', inactiveCookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/login');
+  });
+
+  // =========================================================================
+  // 4. AUTHENTICATED ACCESS & ROLE ISOLATION
+  // =========================================================================
   it('allows authenticated super_admin to access /dashboard', async () => {
     const cookie = encodeURIComponent(
       JSON.stringify({
@@ -61,6 +128,20 @@ describe('8. Middleware & Session Verification Tests', () => {
       })
     );
     const req = createMockRequest('http://localhost:3000/dashboard', cookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(200);
+  });
+
+  it('allows authenticated support mentor to access /support', async () => {
+    const cookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-support-01',
+        email: 'support@next-generpsolutions.com',
+        role: 'support',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/support', cookie);
     const res = await middleware(req);
 
     expect(res.status).toBe(200);
@@ -80,7 +161,39 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(res.status).toBe(200);
   });
 
-  it('redirects authenticated student attempting to access staff /settings route to /portal', async () => {
+  it('redirects authenticated student attempting to access /dashboard to /portal', async () => {
+    const cookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-student-01',
+        email: 'amit.gupta@student.next-gen.com',
+        role: 'student',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/dashboard', cookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/portal');
+  });
+
+  it('redirects authenticated student attempting to access /support to /portal', async () => {
+    const cookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-student-01',
+        email: 'amit.gupta@student.next-gen.com',
+        role: 'student',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/support', cookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/portal');
+  });
+
+  it('redirects authenticated student attempting to access staff routes to /portal', async () => {
     const cookie = encodeURIComponent(
       JSON.stringify({
         id: 'usr-student-01',
@@ -96,22 +209,25 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(location).toContain('/portal');
   });
 
-  it('redirects authenticated student attempting to access staff /users route to /portal', async () => {
+  it('redirects authenticated support staff attempting to access sensitive admin settings to /support', async () => {
     const cookie = encodeURIComponent(
       JSON.stringify({
-        id: 'usr-student-01',
-        email: 'amit.gupta@student.next-gen.com',
-        role: 'student',
+        id: 'usr-support-01',
+        email: 'support@next-generpsolutions.com',
+        role: 'support',
       })
     );
-    const req = createMockRequest('http://localhost:3000/users', cookie);
+    const req = createMockRequest('http://localhost:3000/settings', cookie);
     const res = await middleware(req);
 
     expect(res.status).toBe(307);
     const location = res.headers.get('location');
-    expect(location).toContain('/portal');
+    expect(location).toContain('/support');
   });
 
+  // =========================================================================
+  // 5. AUTHENTICATED REDIRECT FROM /login AND /
+  // =========================================================================
   it('redirects authenticated visitor visiting /login to their appropriate dashboard/portal', async () => {
     const studentCookie = encodeURIComponent(
       JSON.stringify({
@@ -136,5 +252,28 @@ describe('8. Middleware & Session Verification Tests', () => {
     const res2 = await middleware(req2);
     expect(res2.status).toBe(307);
     expect(res2.headers.get('location')).toContain('/dashboard');
+  });
+
+  it('redirects authenticated visitor visiting / to their appropriate dashboard/portal', async () => {
+    const supportCookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-support-01',
+        email: 'support@next-generpsolutions.com',
+        role: 'support',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/', supportCookie);
+    const res = await middleware(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/support');
+  });
+
+  // =========================================================================
+  // 6. API ROUTES PASS-THROUGH
+  // =========================================================================
+  it('allows API requests to pass through without HTML redirect', async () => {
+    const req = createMockRequest('http://localhost:3000/api/database/health');
+    const res = await middleware(req);
+    expect(res.status).toBe(200);
   });
 });
