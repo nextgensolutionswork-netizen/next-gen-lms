@@ -1,6 +1,13 @@
+import crypto from 'crypto';
 import { getDb, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
-export type StorageBucket = 'resumes' | 'screenshots' | 'assignments' | 'avatars';
+export type StorageBucket =
+  | 'resumes'
+  | 'assignments'
+  | 'doubt-attachments'
+  | 'receipts'
+  | 'screenshots'
+  | 'avatars';
 
 export interface BucketConfig {
   name: StorageBucket;
@@ -24,10 +31,25 @@ export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
     allowedExtensions: ['.pdf', '.doc', '.docx'],
     description: 'Student resumes and curriculum vitae for placement and profile review',
   },
-  screenshots: {
-    name: 'screenshots',
+  assignments: {
+    name: 'assignments',
     public: true,
-    maxSizeBytes: 10 * 1024 * 1024, // 10MB
+    maxSizeBytes: 25 * 1024 * 1024, // 25MB
+    allowedMimes: [
+      'application/pdf',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/x-rar-compressed',
+    ],
+    allowedExtensions: ['.pdf', '.zip', '.docx', '.xlsx', '.rar'],
+    description: 'Student homework submissions, assignment PDFs, SAP configuration workbooks, and blueprints',
+  },
+  'doubt-attachments': {
+    name: 'doubt-attachments',
+    public: true,
+    maxSizeBytes: 15 * 1024 * 1024, // 15MB
     allowedMimes: [
       'image/png',
       'image/jpeg',
@@ -37,21 +59,35 @@ export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
       'application/pdf',
     ],
     allowedExtensions: ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf'],
-    description: 'Academic doubts screenshots, SAP GUI error captures, and mentor replies',
+    description: 'Academic doubts screenshots, SAP GUI error captures, and faculty feedback notes',
   },
-  assignments: {
-    name: 'assignments',
+  receipts: {
+    name: 'receipts',
     public: true,
-    maxSizeBytes: 20 * 1024 * 1024, // 20MB
+    maxSizeBytes: 10 * 1024 * 1024, // 10MB
     allowedMimes: [
       'application/pdf',
-      'application/zip',
-      'application/x-zip-compressed',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
     ],
-    allowedExtensions: ['.pdf', '.zip', '.docx', '.xlsx'],
-    description: 'Student assignment submissions, SAP configuration workbooks, and handouts',
+    allowedExtensions: ['.pdf', '.png', '.jpg', '.jpeg'],
+    description: 'Tuition fee receipts, payment proof screenshots, and tax invoices',
+  },
+  screenshots: {
+    name: 'screenshots',
+    public: true,
+    maxSizeBytes: 15 * 1024 * 1024, // 15MB
+    allowedMimes: [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+      'image/gif',
+      'application/pdf',
+    ],
+    allowedExtensions: ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf'],
+    description: 'Academic doubts screenshots and GUI error captures (legacy alias for doubt-attachments)',
   },
   avatars: {
     name: 'avatars',
@@ -134,6 +170,7 @@ export interface UploadResult {
   size: number;
   mimeType: string;
   isMock: boolean;
+  signedUrl?: string;
 }
 
 /**
@@ -169,9 +206,11 @@ export async function uploadFile(options: UploadOptions): Promise<UploadResult> 
       }
 
       const { data: publicUrlData } = db.storage.from(bucket).getPublicUrl(data.path);
+      const signedRes = await createSignedUrl(bucket, data.path, 86400);
 
       return {
         url: publicUrlData.publicUrl,
+        signedUrl: signedRes.signedUrl,
         path: data.path,
         fileName,
         size,
@@ -194,8 +233,11 @@ export async function uploadFile(options: UploadOptions): Promise<UploadResult> 
     } catch {}
   }
 
+  const mockSignedRes = await createSignedUrl(bucket, storagePath, 86400);
+
   return {
     url: mockUrl,
+    signedUrl: mockSignedRes.signedUrl,
     path: storagePath,
     fileName,
     size,
@@ -232,6 +274,74 @@ export function getStoragePublicUrl(bucket: StorageBucket, path: string): string
     return data.publicUrl;
   }
   return `/api/storage/${bucket}/${path}`;
+}
+
+/**
+ * Generates a time-limited cryptographically signed URL for secure download access.
+ * Supported for buckets: resumes, assignments, doubt-attachments, receipts.
+ */
+export async function createSignedUrl(
+  bucket: StorageBucket,
+  path: string,
+  expiresInSeconds: number = 3600
+): Promise<{ signedUrl: string; token?: string; expiresAt?: number; error?: string }> {
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const db = getDb();
+      const { data, error } = await db.storage
+        .from(bucket)
+        .createSignedUrl(path, expiresInSeconds);
+
+      if (error) throw error;
+      if (data?.signedUrl) {
+        return {
+          signedUrl: data.signedUrl,
+          token: data.signedUrl.split('token=').pop() || '',
+          expiresAt: Math.floor(Date.now() / 1000) + expiresInSeconds,
+        };
+      }
+    } catch (err: any) {
+      console.warn(`Supabase createSignedUrl error for [${bucket}/${path}]:`, err?.message || err);
+    }
+  }
+
+  // Cryptographically signed URL with HMAC-SHA256 signature and timestamp expiry
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  const secret = process.env.STORAGE_SIGNING_SECRET || 'erp_lms_secure_storage_token_2026';
+  const cleanPath = path.replace(/^\/+/, '');
+  const payload = `${bucket}:${cleanPath}:${expiresAt}`;
+  const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+  const signedUrl = `/api/storage/signed?bucket=${encodeURIComponent(bucket)}&path=${encodeURIComponent(cleanPath)}&expires=${expiresAt}&signature=${signature}`;
+  return { signedUrl, token: signature, expiresAt };
+}
+
+/**
+ * Validates a signed storage URL token signature and expiration timestamp.
+ */
+export function verifySignedUrlToken(
+  bucket: string,
+  path: string,
+  expires: number,
+  signature: string
+): boolean {
+  if (!bucket || !path || !expires || !signature) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (now > expires) return false; // Token expired
+
+  const secret = process.env.STORAGE_SIGNING_SECRET || 'erp_lms_secure_storage_token_2026';
+  const cleanPath = path.replace(/^\/+/, '');
+  const payload = `${bucket}:${cleanPath}:${expires}`;
+  const expectedSig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+  try {
+    const a = Buffer.from(signature, 'utf8');
+    const b = Buffer.from(expectedSig, 'utf8');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 /**

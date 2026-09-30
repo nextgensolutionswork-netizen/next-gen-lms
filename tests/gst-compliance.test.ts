@@ -162,6 +162,7 @@ describe('Automated Invoicing & GST Compliance Engine', () => {
     it('automatically calculates intra-state GST when recording payment for Telangana student', async () => {
       const student = store.students.find((s) => s.id === 'stu-01')!;
       const feeAccount = store.feeAccounts.find((f) => f.student_id === student.id)!;
+      feeAccount.outstanding_amount = 25000;
 
       const result = await recordPaymentAtomic(
         {
@@ -192,6 +193,7 @@ describe('Automated Invoicing & GST Compliance Engine', () => {
     it('automatically calculates inter-state 18% IGST when recording payment for out-of-state student', async () => {
       const student = store.students.find((s) => s.id === 'stu-02')!; // Sneha Kulkarni in Pune, Maharashtra
       const feeAccount = store.feeAccounts.find((f) => f.student_id === student.id)!;
+      feeAccount.outstanding_amount = 25000;
 
       const result = await recordPaymentAtomic(
         {

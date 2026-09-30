@@ -469,6 +469,7 @@ export default function SupportDeskPage() {
                             >
                               {msg.attachment_url.match(/\.(jpeg|jpg|png|webp|gif)($|\?)/i) ||
                               msg.attachment_url.startsWith('data:image/') ||
+                              msg.attachment_url.includes('doubt-attachments') ||
                               msg.attachment_url.includes('screenshots') ? (
                                 <img
                                   src={msg.attachment_url}
@@ -515,7 +516,7 @@ export default function SupportDeskPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <FileUpload
-                      bucket="screenshots"
+                      bucket="doubt-attachments"
                       compact
                       value={replyAttachmentUrl}
                       onChange={(url) => setReplyAttachmentUrl(url)}

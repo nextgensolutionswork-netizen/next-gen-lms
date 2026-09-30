@@ -34,6 +34,8 @@ import {
   ChevronDown,
   LogOut,
   Paperclip,
+  FileCheck,
+  UploadCloud,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,13 +46,13 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { HlsVideoPlayer } from '@/components/ui/hls-video-player';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
-import { updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
+import { updateVideoProgress, getStudentCourseProgress, submitAssignment } from '@/lib/services/academics-service';
 import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
 import { uploadStudentResume } from '@/lib/services/placement-service';
 import { useRealtime } from '@/lib/hooks/use-realtime';
-import { StudentDoubt, DoubtCategory, DoubtPriority } from '@/types';
+import { StudentDoubt, DoubtCategory, DoubtPriority, Assignment, AssignmentSubmission } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
 export default function StudentPortalPage() {
@@ -109,6 +111,40 @@ export default function StudentPortalPage() {
   const [replyText, setReplyText] = React.useState('');
   const [replyAttachmentUrl, setReplyAttachmentUrl] = React.useState('');
   const [isReplying, setIsReplying] = React.useState(false);
+
+  // Homework Submissions Desk
+  const [submissionsList, setSubmissionsList] = React.useState<AssignmentSubmission[]>(
+    store.submissions.filter((s) => s.student_id === student.id)
+  );
+  const [activeAssignmentToSubmit, setActiveAssignmentToSubmit] = React.useState<Assignment | null>(null);
+  const [homeworkText, setHomeworkText] = React.useState('');
+  const [homeworkFileUrl, setHomeworkFileUrl] = React.useState('');
+  const [isSubmittingHomework, setIsSubmittingHomework] = React.useState(false);
+
+  const handleSubmitHomework = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeAssignmentToSubmit) return;
+    setIsSubmittingHomework(true);
+    try {
+      const sub = await submitAssignment(
+        activeAssignmentToSubmit.id,
+        student.id,
+        homeworkText.trim() || 'Attached homework file submission',
+        homeworkFileUrl || undefined
+      );
+      setSubmissionsList((prev) => {
+        const filtered = prev.filter((s) => s.assignment_id !== activeAssignmentToSubmit.id);
+        return [sub, ...filtered];
+      });
+      setActiveAssignmentToSubmit(null);
+      setHomeworkText('');
+      setHomeworkFileUrl('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit homework');
+    } finally {
+      setIsSubmittingHomework(false);
+    }
+  };
 
   const fetchStudentDoubts = async () => {
     const list = await getDoubts({ student_id: student.id });
@@ -468,7 +504,7 @@ export default function StudentPortalPage() {
 
           <Card className="p-4 border-l-4 border-l-emerald-600">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Assignments Graded</p>
-            <h3 className="text-xl font-bold text-slate-800 mt-1">{submissions.length} / {assignments.length}</h3>
+            <h3 className="text-xl font-bold text-slate-800 mt-1">{submissionsList.length} / {assignments.length}</h3>
             <p className="text-[11px] text-slate-500 font-medium">Avg Score: 95/100</p>
           </Card>
 
@@ -981,6 +1017,7 @@ export default function StudentPortalPage() {
                                           >
                                             {m.attachment_url.match(/\.(jpeg|jpg|png|webp|gif)($|\?)/i) ||
                                             m.attachment_url.startsWith('data:image/') ||
+                                            m.attachment_url.includes('doubt-attachments') ||
                                             m.attachment_url.includes('screenshots') ? (
                                               <img
                                                 src={m.attachment_url}
@@ -1033,7 +1070,7 @@ export default function StudentPortalPage() {
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <FileUpload
-                                    bucket="screenshots"
+                                    bucket="doubt-attachments"
                                     compact
                                     value={replyAttachmentUrl}
                                     onChange={(url) => setReplyAttachmentUrl(url)}
@@ -1056,6 +1093,164 @@ export default function StudentPortalPage() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* My Assignments & Homework Desk */}
+        <Card className="border border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="h-9 w-9 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300">
+                  <FileCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-bold text-white flex items-center space-x-2">
+                    <span>My Assignments & Homework Desk</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded-full font-semibold">
+                      Hands-on Practice
+                    </span>
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Download faculty blueprints, submit your homework files, and review configuration evaluation grades.
+                  </p>
+                </div>
+              </div>
+              <div className="text-xs text-blue-200 font-medium">
+                Submitted: <span className="font-bold text-white">{submissionsList.length}</span> / {assignments.length} Challenges
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
+            {assignments.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                <FileCheck className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">No course assignments posted yet</p>
+                <p className="text-slate-400 mt-1">
+                  Your batch trainer has not published any homework challenges yet.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {assignments.map((asg) => {
+                  const sub = submissionsList.find((s) => s.assignment_id === asg.id);
+                  const isGraded = sub?.status === 'Graded';
+                  const isSubmitted = !!sub;
+
+                  return (
+                    <div
+                      key={asg.id}
+                      className="border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-all bg-white"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-bold text-slate-900 text-sm">{asg.title}</h4>
+                            <Badge
+                              variant={
+                                isGraded
+                                  ? 'success'
+                                  : isSubmitted
+                                  ? 'warning'
+                                  : 'outline'
+                              }
+                            >
+                              {isGraded ? 'Graded' : isSubmitted ? 'Submitted' : 'Pending Submission'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-600 leading-relaxed">{asg.description}</p>
+                          <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-500">
+                            <span className="flex items-center space-x-1">
+                              <Calendar className="h-3 w-3 text-slate-400" />
+                              <span>Due: {formatDate(asg.due_date)}</span>
+                            </span>
+                            <span>&bull;</span>
+                            <span className="font-medium text-slate-700">Max Marks: {asg.maximum_marks}</span>
+                            {asg.attachment_url && (
+                              <>
+                                <span>&bull;</span>
+                                <a
+                                  href={asg.attachment_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold"
+                                >
+                                  <Paperclip className="h-3 w-3 text-blue-500" />
+                                  <span>Download Blueprint / Material</span>
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
+                          {isGraded && (
+                            <div className="text-right">
+                              <span className="text-xs text-slate-400 font-medium">Score:</span>{' '}
+                              <span className="text-sm font-black text-emerald-700">
+                                {sub.marks_obtained} / {asg.maximum_marks}
+                              </span>
+                            </div>
+                          )}
+                          <Button
+                            variant={isSubmitted ? 'outline' : 'sap'}
+                            size="sm"
+                            onClick={() => {
+                              setActiveAssignmentToSubmit(asg);
+                              setHomeworkText(sub?.submission_text || '');
+                              setHomeworkFileUrl(sub?.attachment_url || '');
+                            }}
+                            className="text-xs flex items-center space-x-1.5"
+                          >
+                            <UploadCloud className="h-3.5 w-3.5" />
+                            <span>{isSubmitted ? 'Update Submission' : 'Submit Homework'}</span>
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* If Submitted or Graded, display submission details */}
+                      {sub && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/70 -mx-4 -mb-4 p-4 rounded-b-xl space-y-2 text-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-slate-500 text-[11px] gap-1">
+                            <span>
+                              Submitted on: <strong className="text-slate-700">{formatDateTime(sub.submitted_at)}</strong>
+                            </span>
+                            {sub.attachment_url && (
+                              <a
+                                href={sub.attachment_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold"
+                              >
+                                <Download className="h-3 w-3 text-blue-500" />
+                                <span>View Your Submitted File</span>
+                                <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            )}
+                          </div>
+
+                          {sub.submission_text && (
+                            <p className="text-slate-700 italic bg-white p-2 rounded border border-slate-200">
+                              &ldquo;{sub.submission_text}&rdquo;
+                            </p>
+                          )}
+
+                          {isGraded && sub.feedback && (
+                            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+                              <p className="font-bold text-[11px] uppercase tracking-wider text-emerald-800">
+                                Faculty Evaluation & Feedback:
+                              </p>
+                              <p className="mt-0.5 text-xs text-emerald-950 font-medium">{sub.feedback}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -1418,13 +1613,13 @@ export default function StudentPortalPage() {
 
             <div>
               <FileUpload
-                bucket="screenshots"
+                bucket="doubt-attachments"
                 entityId={student.id}
                 value={doubtAttachmentUrl}
                 onChange={(url) => setDoubtAttachmentUrl(url)}
                 onRemove={() => setDoubtAttachmentUrl('')}
-                label="Error Screenshot / Attachment (Optional)"
-                description="Upload screenshot of your SAP GUI screen, error dialog, or log (PNG, JPG, max 10MB)"
+                label="Error Screenshot / Image Attachment (Optional)"
+                description="Upload screenshot of your SAP GUI screen, error dialog, or log (PNG, JPG, PDF, max 15MB)"
               />
             </div>
 
@@ -1443,6 +1638,72 @@ export default function StudentPortalPage() {
             </div>
           </form>
         </Modal>
+
+        {/* Submit Homework Modal */}
+        {activeAssignmentToSubmit && (
+          <Modal
+            isOpen={!!activeAssignmentToSubmit}
+            onClose={() => setActiveAssignmentToSubmit(null)}
+            title={`Submit Homework: ${activeAssignmentToSubmit.title}`}
+            description="Upload your SAP configuration blueprint, solution PDF, or practice files."
+          >
+            <form onSubmit={handleSubmitHomework} className="space-y-4 text-xs">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1 text-blue-950">
+                <p className="font-semibold text-xs">{activeAssignmentToSubmit.title}</p>
+                <p className="text-[11px] text-blue-700 leading-relaxed">{activeAssignmentToSubmit.description}</p>
+                <div className="flex items-center gap-3 pt-1 text-[10px] text-blue-800 font-medium">
+                  <span>Due: {formatDate(activeAssignmentToSubmit.due_date)}</span>
+                  <span>&bull;</span>
+                  <span>Maximum Marks: {activeAssignmentToSubmit.maximum_marks}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Submission Notes / Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={homeworkText}
+                  onChange={(e) => setHomeworkText(e.target.value)}
+                  placeholder="Outline the steps you completed, test accounts configured, or any remarks for the faculty..."
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <FileUpload
+                  bucket="assignments"
+                  entityId={student.id}
+                  value={homeworkFileUrl}
+                  onChange={(url) => setHomeworkFileUrl(url)}
+                  onRemove={() => setHomeworkFileUrl('')}
+                  label="Homework Solution Document (PDF, ZIP, DOCX, XLSX)"
+                  description="Upload your solution document or archive (Max 25MB). Supported: PDF, DOCX, ZIP, XLSX, RAR."
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveAssignmentToSubmit(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="sap"
+                  size="sm"
+                  disabled={isSubmittingHomework || (!homeworkText.trim() && !homeworkFileUrl)}
+                >
+                  {isSubmittingHomework ? 'Submitting...' : 'Upload & Submit Assignment'}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        )}
       </main>
     </div>
   );

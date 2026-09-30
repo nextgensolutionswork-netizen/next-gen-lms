@@ -10,12 +10,16 @@ import {
   UserCheck,
   MessageSquare,
   Award,
+  Download,
+  Paperclip,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import { Assignment, AssignmentSubmission } from '@/types';
 import { createAssignment, gradeAssignmentSubmission } from '@/lib/services/academics-service';
@@ -34,6 +38,7 @@ export default function AssignmentsPage() {
   const [batchId, setBatchId] = React.useState(store.batches[0]?.id || '');
   const [dueDate, setDueDate] = React.useState('2026-03-15T23:59');
   const [maxMarks, setMaxMarks] = React.useState(100);
+  const [assignmentFileUrl, setAssignmentFileUrl] = React.useState('');
 
   // Grading form state
   const [gradeScore, setGradeScore] = React.useState(90);
@@ -54,11 +59,13 @@ export default function AssignmentsPage() {
       batch_id: batchId,
       due_date: dueDate,
       maximum_marks: maxMarks,
+      attachment_url: assignmentFileUrl || undefined,
       created_by: 'usr-trainer-fico',
     });
     setIsAddModal(false);
     setTitle('');
     setDescription('');
+    setAssignmentFileUrl('');
     refreshList();
   };
 
@@ -106,6 +113,21 @@ export default function AssignmentsPage() {
 
               <p className="text-xs text-slate-600 leading-relaxed">{asg.description}</p>
 
+              {asg.attachment_url && (
+                <div className="pt-1">
+                  <a
+                    href={asg.attachment_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-1 text-[11px] text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded font-medium border border-blue-100"
+                  >
+                    <Paperclip className="h-3 w-3 text-blue-500" />
+                    <span>Reference Material</span>
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
                 <span className="flex items-center space-x-1">
                   <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -143,7 +165,21 @@ export default function AssignmentsPage() {
                 {submissions.map((sub) => (
                   <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-semibold text-slate-800">{sub.student_name}</td>
-                    <td className="px-4 py-3 text-slate-600 max-w-[220px] truncate">{sub.submission_text}</td>
+                    <td className="px-4 py-3 text-slate-600 max-w-[220px]">
+                      <p className="truncate">{sub.submission_text}</p>
+                      {sub.attachment_url && (
+                        <a
+                          href={sub.attachment_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center space-x-1 text-[11px] text-blue-600 hover:text-blue-800 hover:underline mt-1 font-medium"
+                        >
+                          <Paperclip className="h-3 w-3 text-blue-500" />
+                          <span>View Homework File</span>
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-500">{formatDateTime(sub.submitted_at)}</td>
                     <td className="px-4 py-3">
                       <Badge variant={sub.status === 'Graded' ? 'success' : 'warning'}>{sub.status}</Badge>
@@ -253,6 +289,13 @@ export default function AssignmentsPage() {
             />
           </div>
 
+          <FileUpload
+            bucket="assignments"
+            value={assignmentFileUrl}
+            onChange={(url) => setAssignmentFileUrl(url || '')}
+            label="Assignment Specification / Blueprint Document (PDF, ZIP, DOCX, XLSX)"
+          />
+
           <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModal(false)}>
               Cancel
@@ -273,9 +316,27 @@ export default function AssignmentsPage() {
           description="Evaluate accuracy, configuration quality, and assign marks."
         >
           <form onSubmit={handleGradeSubmission} className="space-y-4 text-xs">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
-              <p className="font-bold text-slate-700">Student Solution Text:</p>
-              <p className="text-slate-800">{selectedSub.submission_text}</p>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <div>
+                <p className="font-bold text-slate-700">Student Solution Text:</p>
+                <p className="text-slate-800 mt-0.5">{selectedSub.submission_text || 'No description text provided.'}</p>
+              </div>
+
+              {selectedSub.attachment_url && (
+                <div className="pt-2 border-t border-slate-200">
+                  <p className="font-bold text-slate-700 mb-1.5">Submitted Homework Document:</p>
+                  <a
+                    href={selectedSub.attachment_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5 text-blue-600" />
+                    <span>Download / Open Homework File</span>
+                    <ExternalLink className="h-3 w-3 text-slate-400" />
+                  </a>
+                </div>
+              )}
             </div>
 
             <Input

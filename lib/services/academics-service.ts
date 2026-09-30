@@ -530,6 +530,28 @@ export async function createAssignment(data: Omit<Assignment, 'id' | 'submission
   };
 
   store.assignments.unshift(asg);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('assignments').insert({
+        id: asg.id,
+        course_id: asg.course_id,
+        batch_id: asg.batch_id,
+        title: asg.title,
+        description: asg.description,
+        due_date: asg.due_date,
+        maximum_marks: asg.maximum_marks,
+        attachment_url: asg.attachment_url,
+        created_by: asg.created_by,
+        created_at: asg.created_at,
+      });
+    } catch (err) {
+      console.warn('Supabase createAssignment warning:', err);
+    }
+  }
+
   return asg;
 }
 
@@ -567,6 +589,25 @@ export async function submitAssignment(
     asg.submissions_count = (asg.submissions_count || 0) + 1;
   }
 
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('assignment_submissions').upsert({
+        id: sub.id,
+        assignment_id: sub.assignment_id,
+        student_id: sub.student_id,
+        submission_text: sub.submission_text,
+        attachment_url: sub.attachment_url,
+        submitted_at: sub.submitted_at,
+        status: sub.status,
+      });
+    } catch (err) {
+      console.warn('Supabase submitAssignment warning:', err);
+    }
+  }
+
   return sub;
 }
 
@@ -586,6 +627,7 @@ export async function gradeAssignmentSubmission(
   sub.graded_by = grader?.full_name;
   sub.graded_at = new Date().toISOString();
   sub.status = 'Graded';
+  store.persist();
 
   return sub;
 }

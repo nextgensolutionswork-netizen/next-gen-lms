@@ -5,11 +5,16 @@ import {
   uploadFile,
   STORAGE_BUCKETS,
   getStoragePublicUrl,
+  createSignedUrl,
+  verifySignedUrlToken,
 } from '@/lib/services/storage-service';
 import { uploadStudentResume, getPlacementProfileForStudent } from '@/lib/services/placement-service';
+import { createAssignment, submitAssignment } from '@/lib/services/academics-service';
 import { store } from '@/lib/services/data-store';
 import { NextRequest } from 'next/server';
 import { POST as uploadRouteHandler } from '@/app/api/upload/route';
+import { POST as createSignedUrlHandler } from '@/app/api/storage/signed-url/route';
+import { GET as getSignedFileHandler } from '@/app/api/storage/signed/route';
 
 describe('9. Storage & File Upload Tests (Resumes, Screenshots, Assignments)', () => {
   beforeEach(() => {
@@ -81,6 +86,40 @@ describe('9. Storage & File Upload Tests (Resumes, Screenshots, Assignments)', (
       };
       const res = validateFile(file, 'assignments');
       expect(res.valid).toBe(true);
+    });
+
+    it('approves PDF and PNG attachments for doubt-attachments bucket', () => {
+      const imgFile = {
+        name: 'sap_gl_error_dump.png',
+        size: 1.5 * 1024 * 1024,
+        type: 'image/png',
+      };
+      expect(validateFile(imgFile, 'doubt-attachments').valid).toBe(true);
+
+      const pdfFile = {
+        name: 'configuration_steps.pdf',
+        size: 3 * 1024 * 1024,
+        type: 'application/pdf',
+      };
+      expect(validateFile(pdfFile, 'doubt-attachments').valid).toBe(true);
+    });
+
+    it('approves PDF receipt and rejects executable files in receipts bucket', () => {
+      const receiptPdf = {
+        name: 'fee_receipt_INV-9921.pdf',
+        size: 500 * 1024,
+        type: 'application/pdf',
+      };
+      expect(validateFile(receiptPdf, 'receipts').valid).toBe(true);
+
+      const invalidFile = {
+        name: 'script.sh',
+        size: 10 * 1024,
+        type: 'application/x-sh',
+      };
+      const res = validateFile(invalidFile, 'receipts');
+      expect(res.valid).toBe(false);
+      expect(res.error).toContain('Invalid file format');
     });
   });
 
@@ -184,6 +223,162 @@ describe('9. Storage & File Upload Tests (Resumes, Screenshots, Assignments)', (
       const json = await res.json();
       expect(json.success).toBe(false);
       expect(json.error).toContain('Invalid bucket');
+    });
+  });
+
+  describe('Signed URL Generation & HMAC Verification', () => {
+    it('generates cryptographic signed URL with expiration and signature token', async () => {
+      const signedResult = await createSignedUrl('resumes', 'std-001/resume.pdf', 3600);
+      expect(signedResult.signedUrl).toBeTruthy();
+      expect(signedResult.token).toBeTruthy();
+      expect(signedResult.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
+      expect(signedResult.signedUrl).toContain('bucket=resumes');
+      expect(signedResult.signedUrl).toContain('signature=');
+    });
+
+    it('verifies valid signed URL token successfully within expiration window', () => {
+      const path = 'std-001/resume.pdf';
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const crypto = require('crypto');
+      const secret = process.env.STORAGE_SIGNING_SECRET || 'erp_lms_secure_storage_token_2026';
+      const sig = crypto.createHmac('sha256', secret).update(`resumes:${path}:${expires}`).digest('hex');
+
+      const isValid = verifySignedUrlToken('resumes', path, expires, sig);
+      expect(isValid).toBe(true);
+    });
+
+    it('rejects tampered signed URL tokens', () => {
+      const path = 'std-001/resume.pdf';
+      const expires = Math.floor(Date.now() / 1000) + 3600;
+      const fakeSig = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+      const isValid = verifySignedUrlToken('resumes', path, expires, fakeSig);
+      expect(isValid).toBe(false);
+    });
+
+    it('rejects expired signed URL tokens', () => {
+      const path = 'std-001/resume.pdf';
+      const expiredTime = Math.floor(Date.now() / 1000) - 5; // expired 5 seconds ago
+      const crypto = require('crypto');
+      const secret = process.env.STORAGE_SIGNING_SECRET || 'erp_lms_secure_storage_token_2026';
+      const sig = crypto.createHmac('sha256', secret).update(`resumes:${path}:${expiredTime}`).digest('hex');
+
+      const isValid = verifySignedUrlToken('resumes', path, expiredTime, sig);
+      expect(isValid).toBe(false);
+    });
+  });
+
+  describe('API Routes for Signed URLs (/api/storage/signed-url and /api/storage/signed)', () => {
+    it('creates signed URL via POST /api/storage/signed-url', async () => {
+      const req = new NextRequest('http://localhost:3000/api/storage/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket: 'assignments',
+          path: 'batch-01/assignment-spec.pdf',
+          expiresInSeconds: 1800,
+        }),
+      });
+
+      const res = await createSignedUrlHandler(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.signedUrl).toContain('bucket=assignments');
+      expect(data.token).toBeTruthy();
+    });
+
+    it('rejects request with missing bucket or path', async () => {
+      const req = new NextRequest('http://localhost:3000/api/storage/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket: 'assignments',
+        }),
+      });
+
+      const res = await createSignedUrlHandler(req);
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+    });
+
+    it('rejects GET /api/storage/signed without signature (400 Bad Request)', async () => {
+      const req = new NextRequest('http://localhost:3000/api/storage/signed?bucket=resumes&path=std-001/cv.pdf', {
+        method: 'GET',
+      });
+
+      const res = await getSignedFileHandler(req);
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('missing security parameters');
+    });
+
+    it('rejects GET /api/storage/signed with invalid signature (403 Forbidden)', async () => {
+      const req = new NextRequest(
+        'http://localhost:3000/api/storage/signed?bucket=resumes&path=std-001/cv.pdf&expires=' +
+          (Math.floor(Date.now() / 1000) + 60) +
+          '&signature=bad_signature',
+        {
+          method: 'GET',
+        }
+      );
+
+      const res = await getSignedFileHandler(req);
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Invalid or forged signed storage URL signature');
+    });
+
+    it('verifies and serves signed URL access via GET /api/storage/signed with valid signature', async () => {
+      const signedRes = await createSignedUrl('resumes', 'std-001/resume.pdf', 3600);
+      const req = new NextRequest(`http://localhost:3000${signedRes.signedUrl}`, {
+        method: 'GET',
+      });
+
+      const res = await getSignedFileHandler(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.verified).toBe(true);
+    });
+  });
+
+  describe('Homework Submission with File Upload Integration', () => {
+    it('creates an assignment with reference attachment and allows student homework submission with attachment', async () => {
+      const asg = await createAssignment({
+        title: 'F110 Automatic Payment Program Blueprint',
+        description: 'Configure APP run and post bank transactions.',
+        course_id: store.courses[0].id,
+        batch_id: store.batches[0].id,
+        due_date: '2026-04-15T23:59',
+        maximum_marks: 100,
+        attachment_url: 'https://supabase.co/storage/v1/object/public/assignments/batch-01/f110_spec.pdf',
+        created_by: 'usr-trainer',
+      });
+
+      expect(asg.id).toBeTruthy();
+      expect(asg.attachment_url).toContain('f110_spec.pdf');
+
+      const studentId = store.students[0].id;
+      const homeworkAttachment = 'https://supabase.co/storage/v1/object/public/assignments/std-001/my_f110_solution.zip';
+
+      const submission = await submitAssignment(
+        asg.id,
+        studentId,
+        'Completed configuration of company code and payment methods in F110.',
+        homeworkAttachment
+      );
+
+      expect(submission.assignment_id).toBe(asg.id);
+      expect(submission.student_id).toBe(studentId);
+      expect(submission.attachment_url).toBe(homeworkAttachment);
+      expect(submission.status).toBe('Submitted');
+
+      const storedSub = store.submissions.find((s) => s.assignment_id === asg.id && s.student_id === studentId);
+      expect(storedSub?.attachment_url).toBe(homeworkAttachment);
     });
   });
 });
