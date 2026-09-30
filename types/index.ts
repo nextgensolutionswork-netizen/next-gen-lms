@@ -465,6 +465,11 @@ export interface Payment {
   payment_date: string;
   payment_mode: PaymentMethod;
   transaction_reference?: string;
+  gateway_order_id?: string;
+  gateway_payment_id?: string;
+  gateway_signature?: string;
+  gateway_name?: 'Razorpay' | 'Cashfree';
+  status?: 'Success' | 'Pending' | 'Failed' | 'Refunded';
   collected_by: string;
   collected_by_name?: string;
   notes?: string;

@@ -74,6 +74,11 @@ export interface RecordPaymentInput {
   payment_date: string;
   payment_mode: PaymentMethod;
   transaction_reference?: string;
+  gateway_order_id?: string;
+  gateway_payment_id?: string;
+  gateway_signature?: string;
+  gateway_name?: 'Razorpay' | 'Cashfree';
+  status?: 'Success' | 'Pending' | 'Failed' | 'Refunded';
   notes?: string;
 }
 
@@ -129,6 +134,11 @@ export async function recordPaymentAtomic(
     payment_date: input.payment_date,
     payment_mode: input.payment_mode,
     transaction_reference: input.transaction_reference,
+    gateway_order_id: input.gateway_order_id,
+    gateway_payment_id: input.gateway_payment_id,
+    gateway_signature: input.gateway_signature,
+    gateway_name: input.gateway_name,
+    status: input.status || 'Success',
     collected_by: collectorUserId,
     collected_by_name: collector?.full_name || 'Staff',
     notes: input.notes,

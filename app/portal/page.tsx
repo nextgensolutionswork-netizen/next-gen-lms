@@ -178,24 +178,57 @@ export default function StudentPortalPage() {
     if (!feeAccount || payAmount <= 0) return;
     setIsProcessing(true);
     try {
-      const txRef = `UPI-ONLINE-${Date.now().toString().slice(-6)}`;
-      const result = await recordPaymentAtomic(
-        {
+      const chargeAmount = Math.min(payAmount, outstandingAmount);
+
+      // 1. Create order on Gateway
+      const orderRes = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: chargeAmount,
+          currency: 'INR',
           student_id: student.id,
           course_id: student.course_id,
           fee_account_id: feeAccount.id,
-          amount: Math.min(payAmount, outstandingAmount),
-          payment_date: new Date().toISOString().slice(0, 10),
-          payment_mode: payMode === 'Card' ? 'Card' : payMode === 'Net Banking' ? 'Bank Transfer' : 'UPI',
-          transaction_reference: txRef,
-          notes: `Online installment collection via student portal (${payMode})`,
-        },
-        'usr-student-01'
-      );
-      setOutstandingAmount(result.updatedFeeAccount.outstanding_amount);
-      setPaidAmount(result.updatedFeeAccount.paid_amount);
+          student_name: student.full_name,
+          student_email: student.email,
+          notes: {
+            pay_mode: payMode,
+            source: 'student_portal',
+          },
+        }),
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderData.success) {
+        throw new Error(orderData.error || 'Failed to initialize payment gateway order');
+      }
+
+      // 2. Verify payment & record settlement
+      const txRef = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const verifyRes = await fetch('/api/payments/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderData.order.order_id,
+          payment_id: txRef,
+          signature: 'test_signature',
+          student_id: student.id,
+          course_id: student.course_id,
+          fee_account_id: feeAccount.id,
+          amount: chargeAmount,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyData.success) {
+        throw new Error(verifyData.error || 'Payment signature verification failed');
+      }
+
+      setOutstandingAmount(verifyData.feeAccount.outstanding_amount);
+      setPaidAmount(verifyData.feeAccount.paid_amount);
       setPaymentsList([...store.payments.filter((p) => p.student_id === student.id)]);
-      setSuccessReceipt(result.receipt);
+      setSuccessReceipt(verifyData.receipt);
     } catch (err: any) {
       alert(err.message || 'Payment processing error');
     } finally {

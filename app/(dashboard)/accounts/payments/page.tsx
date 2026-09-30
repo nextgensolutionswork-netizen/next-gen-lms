@@ -184,9 +184,27 @@ export default function PaymentsPage() {
                       <td className="px-4 py-3 text-slate-600 truncate max-w-[140px]">{p.course_name}</td>
                       <td className="px-4 py-3 font-bold text-emerald-600">{formatINR(p.amount)}</td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline">{p.payment_mode}</Badge>
+                        <div className="flex items-center space-x-1.5">
+                          <Badge variant={p.payment_mode === 'Payment Gateway' ? 'default' : 'outline'}>
+                            {p.payment_mode}
+                          </Badge>
+                          {p.gateway_name && (
+                            <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                              {p.gateway_name}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-slate-600">{p.transaction_reference || '—'}</td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
+                        <span className="block truncate max-w-[140px]" title={p.transaction_reference}>
+                          {p.transaction_reference || '—'}
+                        </span>
+                        {p.gateway_order_id && (
+                          <span className="text-[9px] text-slate-400 block truncate max-w-[140px]" title={p.gateway_order_id}>
+                            {p.gateway_order_id}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-500">{formatDate(p.payment_date)}</td>
                       <td className="px-4 py-3 text-slate-500">{p.collected_by_name || 'Accounts Staff'}</td>
                       <td className="px-4 py-3 text-right">
