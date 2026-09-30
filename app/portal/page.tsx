@@ -566,11 +566,23 @@ export default function StudentPortalPage() {
                         <p className="text-slate-500 mt-0.5">Date: {formatDate(p.payment_date)} | Mode: {p.payment_mode}</p>
                         <p className="font-bold text-emerald-600 mt-0.5">{formatINR(p.amount)}</p>
                       </div>
-                      <Link href={`/accounts/receipts/${r?.id || p.id}`}>
-                        <Button variant="outline" size="sm" className="text-xs px-2.5 py-1">
-                          Download PDF
-                        </Button>
-                      </Link>
+                      <div className="flex items-center space-x-1.5">
+                        <a
+                          href={`/api/receipts/${r?.id || p.id}/pdf?download=true`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1 shadow-xs">
+                            <Download className="h-3 w-3" />
+                            <span>Download PDF</span>
+                          </Button>
+                        </a>
+                        <Link href={`/accounts/receipts/${r?.id || p.id}`}>
+                          <Button variant="outline" size="sm" className="text-xs px-2 py-1">
+                            View
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   );
                 })}
@@ -922,11 +934,23 @@ export default function StudentPortalPage() {
                 </p>
               </div>
             </div>
-            <Link href={`/certificate/verify/${certificate.certificate_id}`} target="_blank">
-              <Button variant="sap" size="sm" className="text-xs">
-                View & Verify Certificate
-              </Button>
-            </Link>
+            <div className="flex items-center space-x-2">
+              <a
+                href={`/api/certificates/${certificate.certificate_id}/pdf?download=true`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1 shadow-xs">
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Download PDF Certificate</span>
+                </Button>
+              </a>
+              <Link href={`/certificate/verify/${certificate.certificate_id}`} target="_blank">
+                <Button variant="outline" size="sm" className="text-xs bg-white text-slate-800 hover:bg-slate-50">
+                  View & Verify
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
         {/* Online Payment Modal */}
@@ -967,11 +991,20 @@ export default function StudentPortalPage() {
                 </div>
               </div>
 
-              <div className="flex justify-center space-x-3 pt-2">
-                <Link href={`/accounts/receipts/${successReceipt.id}`} target="_blank">
-                  <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1">
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                <a
+                  href={`/api/receipts/${successReceipt.id}/pdf?download=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1 shadow-xs">
                     <Download className="h-3.5 w-3.5" />
-                    <span>View / Print Official Receipt</span>
+                    <span>Download Official PDF</span>
+                  </Button>
+                </a>
+                <Link href={`/accounts/receipts/${successReceipt.id}`} target="_blank">
+                  <Button variant="outline" size="sm" className="text-xs">
+                    View Receipt
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={() => setIsPayModalOpen(false)}>

@@ -10,6 +10,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Calendar,
+  Download,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -113,12 +114,25 @@ export default function CertificatesPage() {
                     /certificate/verify/{cert.certificate_id}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link href={`/certificate/verify/${cert.certificate_id}`} target="_blank">
-                      <Button variant="outline" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
-                        <ExternalLink className="h-3 w-3" />
-                        <span>Verify</span>
-                      </Button>
-                    </Link>
+                    <div className="flex items-center justify-end space-x-1.5">
+                      <a
+                        href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Download Verified PDF Certificate"
+                      >
+                        <Button variant="outline" size="sm" className="text-xs px-2 py-1 flex items-center space-x-1">
+                          <Download className="h-3 w-3 text-[#0A6ED1]" />
+                          <span>PDF</span>
+                        </Button>
+                      </a>
+                      <Link href={`/certificate/verify/${cert.certificate_id}`} target="_blank">
+                        <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Verify</span>
+                        </Button>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

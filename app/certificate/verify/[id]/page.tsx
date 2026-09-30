@@ -13,6 +13,7 @@ import {
   Building,
   Printer,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { store } from '@/lib/services/data-store';
@@ -40,11 +41,25 @@ export default function CertificateVerifyPage() {
           </div>
         </div>
 
-        <Link href="/dashboard">
-          <Button variant="outline" size="sm" className="text-xs">
-            Institute Portal
-          </Button>
-        </Link>
+        <div className="flex items-center space-x-2">
+          {cert && (
+            <a
+              href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1.5 shadow-sm">
+                <Download className="h-4 w-4" />
+                <span>Download Verified PDF</span>
+              </Button>
+            </a>
+          )}
+          <Link href="/dashboard">
+            <Button variant="outline" size="sm" className="text-xs">
+              Institute Portal
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Main Certificate Verification View */}
@@ -62,9 +77,9 @@ export default function CertificateVerifyPage() {
         ) : (
           <div className="space-y-4">
             {/* Authenticity Banner */}
-            <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-sm flex items-center justify-between">
+            <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center space-x-3">
-                <ShieldCheck className="h-6 w-6 text-white" />
+                <ShieldCheck className="h-6 w-6 text-white shrink-0" />
                 <div>
                   <h3 className="font-bold text-sm">Authentic & Verified Certificate</h3>
                   <p className="text-xs text-emerald-100">
@@ -72,9 +87,25 @@ export default function CertificateVerifyPage() {
                   </p>
                 </div>
               </div>
-              <span className="bg-emerald-700/60 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider">
-                VALID
-              </span>
+              <div className="flex items-center space-x-2 self-end sm:self-center">
+                <a
+                  href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs bg-white/10 hover:bg-white/20 text-white border-white/30 flex items-center space-x-1"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download PDF</span>
+                  </Button>
+                </a>
+                <span className="bg-emerald-700/60 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider">
+                  VALID
+                </span>
+              </div>
             </div>
 
             {/* Certificate Canvas / Card */}

@@ -95,12 +95,25 @@ export default function ReceiptsListPage() {
                     <td className="px-4 py-3 font-bold text-amber-700">{formatINR(r.remaining_balance)}</td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(r.payment_date)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/accounts/receipts/${r.id}`}>
-                        <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
-                          <Printer className="h-3 w-3" />
-                          <span>View PDF</span>
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <a
+                          href={`/api/receipts/${r.id}/pdf?download=true`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Download PDF Receipt"
+                        >
+                          <Button variant="outline" size="sm" className="text-xs px-2 py-1 flex items-center space-x-1">
+                            <Download className="h-3 w-3 text-blue-600" />
+                            <span>PDF</span>
+                          </Button>
+                        </a>
+                        <Link href={`/accounts/receipts/${r.id}`}>
+                          <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
+                            <Printer className="h-3 w-3" />
+                            <span>View</span>
+                          </Button>
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

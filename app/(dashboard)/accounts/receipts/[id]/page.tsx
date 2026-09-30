@@ -53,9 +53,19 @@ export default function ReceiptPrintPage() {
             <Share2 className="h-3.5 w-3.5" />
             <span>Share on WhatsApp</span>
           </Button>
-          <Button variant="sap" size="sm" onClick={handlePrint} className="text-xs flex items-center space-x-1">
+          <a
+            href={`/api/receipts/${receipt.id}/pdf?download=true`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1 shadow-xs">
+              <Download className="h-4 w-4" />
+              <span>Download Official PDF</span>
+            </Button>
+          </a>
+          <Button variant="outline" size="sm" onClick={handlePrint} className="text-xs flex items-center space-x-1">
             <Printer className="h-4 w-4" />
-            <span>Print / Save as PDF</span>
+            <span>Print View</span>
           </Button>
         </div>
       </div>
