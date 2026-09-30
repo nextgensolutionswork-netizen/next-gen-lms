@@ -16,12 +16,16 @@ import {
   ChevronRight,
   ShieldCheck,
   UserCheck,
+  Paperclip,
+  ExternalLink,
+  ImageIcon,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import {
   getDoubts,
@@ -39,6 +43,7 @@ export default function SupportDeskPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>('All');
   const [assignedFilter, setAssignedFilter] = React.useState<'All' | 'Mine' | 'Unassigned'>('All');
   const [replyText, setReplyText] = React.useState('');
+  const [replyAttachmentUrl, setReplyAttachmentUrl] = React.useState('');
   const [isResolving, setIsResolving] = React.useState(false);
   const [resolutionNotes, setResolutionNotes] = React.useState('');
   const [isSubmittingReply, setIsSubmittingReply] = React.useState(false);
@@ -80,17 +85,19 @@ export default function SupportDeskPage() {
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDoubt || !replyText.trim()) return;
+    if (!selectedDoubt || (!replyText.trim() && !replyAttachmentUrl)) return;
     setIsSubmittingReply(true);
     try {
       await replyToDoubt(
         selectedDoubt.id,
-        replyText,
+        replyText.trim() || 'Attachment shared:',
         currentStaff.id,
         currentStaff.role,
-        `${currentStaff.full_name} (${currentStaff.role === 'support' ? 'Support Mentor' : 'Faculty'})`
+        `${currentStaff.full_name} (${currentStaff.role === 'support' ? 'Support Mentor' : 'Faculty'})`,
+        replyAttachmentUrl || undefined
       );
       setReplyText('');
+      setReplyAttachmentUrl('');
       await refreshList();
     } catch (err: any) {
       alert(err.message || 'Error posting reply');
@@ -373,6 +380,32 @@ export default function SupportDeskPage() {
                         }`}
                       >
                         <p className="whitespace-pre-wrap">{msg.message}</p>
+                        {msg.attachment_url && (
+                          <div className={`mt-2 pt-2 border-t ${isStaff ? 'border-white/20' : 'border-slate-200'}`}>
+                            <a
+                              href={msg.attachment_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block group overflow-hidden rounded-lg border border-slate-200/50 bg-black/5 hover:bg-black/10 transition-all p-1"
+                            >
+                              {msg.attachment_url.match(/\.(jpeg|jpg|png|webp|gif)($|\?)/i) ||
+                              msg.attachment_url.startsWith('data:image/') ||
+                              msg.attachment_url.includes('screenshots') ? (
+                                <img
+                                  src={msg.attachment_url}
+                                  alt="Attachment Screenshot"
+                                  className="max-h-48 rounded object-contain mx-auto"
+                                />
+                              ) : (
+                                <div className="flex items-center space-x-1.5 text-[11px] p-1 text-blue-600 font-medium">
+                                  <Paperclip className="h-3.5 w-3.5" />
+                                  <span>View Attached File</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </div>
+                              )}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -381,25 +414,38 @@ export default function SupportDeskPage() {
 
               {/* Reply Box */}
               <div className="p-3 bg-white border-t border-slate-200">
-                <form onSubmit={handleSendReply} className="flex gap-2">
-                  <textarea
-                    rows={2}
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder="Type technical advice, configuration steps, or resolution instructions..."
-                    className="flex-1 text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    variant="sap"
-                    size="sm"
-                    disabled={isSubmittingReply || !replyText.trim()}
-                    className="self-end text-xs flex items-center space-x-1 px-3 py-2"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    <span>Reply</span>
-                  </Button>
+                <form onSubmit={handleSendReply} className="space-y-2">
+                  <div className="flex gap-2">
+                    <textarea
+                      rows={2}
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Type technical advice, configuration steps, or resolution instructions..."
+                      className="flex-1 text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                    />
+                    <Button
+                      type="submit"
+                      variant="sap"
+                      size="sm"
+                      disabled={isSubmittingReply || (!replyText.trim() && !replyAttachmentUrl)}
+                      className="self-end text-xs flex items-center space-x-1 px-3 py-2"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Reply</span>
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <FileUpload
+                      bucket="screenshots"
+                      compact
+                      value={replyAttachmentUrl}
+                      onChange={(url) => setReplyAttachmentUrl(url)}
+                      onRemove={() => setReplyAttachmentUrl('')}
+                    />
+                    <span className="text-[10px] text-slate-400">
+                      Attach solution screenshot or SAP configuration reference (PNG, JPG, PDF)
+                    </span>
+                  </div>
                 </form>
               </div>
             </Card>

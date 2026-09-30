@@ -33,18 +33,21 @@ import {
   PlusCircle,
   ChevronDown,
   LogOut,
+  Paperclip,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
+import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
 import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
+import { uploadStudentResume } from '@/lib/services/placement-service';
 import { StudentDoubt, DoubtCategory, DoubtPriority } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 
@@ -68,6 +71,11 @@ export default function StudentPortalPage() {
   const submissions = store.submissions.filter((s) => s.student_id === student.id);
   const certificate = store.certificates.find((c) => c.student_id === student.id);
   const sessions = store.classSessions.filter((cs) => cs.course_id === student.course_id);
+  const placementProfile = store.placementProfiles.find((p) => p.student_id === student.id);
+  const [studentResumeUrl, setStudentResumeUrl] = React.useState<string>(
+    placementProfile?.resume_url || (student as any).resume_url || ''
+  );
+  const [isResumeModalOpen, setIsResumeModalOpen] = React.useState(false);
 
   // Active Lesson for Video Player
   const [activeLesson, setActiveLesson] = React.useState(lessons[0]);
@@ -94,8 +102,10 @@ export default function StudentPortalPage() {
   const [doubtPriority, setDoubtPriority] = React.useState<DoubtPriority>('Medium');
   const [doubtSapTcode, setDoubtSapTcode] = React.useState('');
   const [doubtDescription, setDoubtDescription] = React.useState('');
+  const [doubtAttachmentUrl, setDoubtAttachmentUrl] = React.useState('');
   const [isSubmittingDoubt, setIsSubmittingDoubt] = React.useState(false);
   const [replyText, setReplyText] = React.useState('');
+  const [replyAttachmentUrl, setReplyAttachmentUrl] = React.useState('');
   const [isReplying, setIsReplying] = React.useState(false);
 
   const fetchStudentDoubts = async () => {
@@ -123,12 +133,14 @@ export default function StudentPortalPage() {
           category: doubtCategory,
           priority: doubtPriority,
           sap_tcode: doubtSapTcode.trim() ? doubtSapTcode.trim() : undefined,
+          attachment_url: doubtAttachmentUrl || undefined,
         },
         student.user_id
       );
       setDoubtTitle('');
       setDoubtDescription('');
       setDoubtSapTcode('');
+      setDoubtAttachmentUrl('');
       setIsAskModalOpen(false);
       await fetchStudentDoubts();
       setExpandedDoubtId(created.id);
@@ -140,17 +152,19 @@ export default function StudentPortalPage() {
   };
 
   const handleSendStudentReply = async (doubtId: string) => {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() && !replyAttachmentUrl) return;
     setIsReplying(true);
     try {
       await replyToDoubt(
         doubtId,
-        replyText.trim(),
+        replyText.trim() || 'Attachment shared:',
         student.user_id,
         'student',
-        student.full_name
+        student.full_name,
+        replyAttachmentUrl || undefined
       );
       setReplyText('');
+      setReplyAttachmentUrl('');
       await fetchStudentDoubts();
     } catch (err: any) {
       alert(err.message || 'Error posting reply');
@@ -337,10 +351,23 @@ export default function StudentPortalPage() {
             )}
           </Card>
 
-          <Card className="p-4 border-l-4 border-l-purple-600">
-            <p className="text-[10px] font-bold text-slate-400 uppercase">Placement Status</p>
-            <h3 className="text-xl font-bold text-purple-900 mt-1">{student.placement_status}</h3>
-            <p className="text-[11px] text-purple-600 font-medium">Mock Interview Cleared</p>
+          <Card className="p-4 border-l-4 border-l-purple-600 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Placement & Career</p>
+              <h3 className="text-xl font-bold text-purple-900 mt-1">{student.placement_status}</h3>
+              <p className="text-[11px] text-purple-600 font-medium">
+                Resume: {placementProfile?.resume_status || 'Pending Upload'}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsResumeModalOpen(true)}
+              className="mt-2 text-[11px] py-1 h-7 border-purple-200 text-purple-700 hover:bg-purple-50 w-full flex items-center justify-center space-x-1"
+            >
+              <FileText className="h-3 w-3" />
+              <span>Manage Resume</span>
+            </Button>
           </Card>
         </div>
 
@@ -758,6 +785,32 @@ export default function StudentPortalPage() {
                                         <span>{formatDateTime(m.created_at)}</span>
                                       </div>
                                       <p className="leading-relaxed whitespace-pre-wrap">{m.message}</p>
+                                      {m.attachment_url && (
+                                        <div className={`mt-2 pt-2 border-t ${isFromStudent ? 'border-white/20' : 'border-slate-200'}`}>
+                                          <a
+                                            href={m.attachment_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="block group overflow-hidden rounded-lg border border-slate-200/50 bg-black/10 hover:bg-black/20 transition-all p-1"
+                                          >
+                                            {m.attachment_url.match(/\.(jpeg|jpg|png|webp|gif)($|\?)/i) ||
+                                            m.attachment_url.startsWith('data:image/') ||
+                                            m.attachment_url.includes('screenshots') ? (
+                                              <img
+                                                src={m.attachment_url}
+                                                alt="Attached Screenshot"
+                                                className="max-h-48 rounded object-contain mx-auto"
+                                              />
+                                            ) : (
+                                              <div className="flex items-center space-x-1.5 text-[11px] p-1 font-medium">
+                                                <Paperclip className="h-3.5 w-3.5" />
+                                                <span>View Attached File</span>
+                                                <ExternalLink className="h-3 w-3" />
+                                              </div>
+                                            )}
+                                          </a>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -771,25 +824,39 @@ export default function StudentPortalPage() {
                                   e.preventDefault();
                                   handleSendStudentReply(d.id);
                                 }}
-                                className="flex gap-2 pt-2 border-t border-slate-100"
+                                className="space-y-2 pt-2 border-t border-slate-100"
                               >
-                                <input
-                                  type="text"
-                                  value={replyText}
-                                  onChange={(e) => setReplyText(e.target.value)}
-                                  placeholder="Type your follow-up reply or query..."
-                                  className="flex-1 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                                />
-                                <Button
-                                  type="submit"
-                                  variant="sap"
-                                  size="sm"
-                                  disabled={isReplying || !replyText.trim()}
-                                  className="text-xs px-3 h-8 flex items-center space-x-1"
-                                >
-                                  <Send className="h-3 w-3" />
-                                  <span>{isReplying ? 'Sending...' : 'Reply'}</span>
-                                </Button>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    placeholder="Type your follow-up reply or query..."
+                                    className="flex-1 text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                                  />
+                                  <Button
+                                    type="submit"
+                                    variant="sap"
+                                    size="sm"
+                                    disabled={isReplying || (!replyText.trim() && !replyAttachmentUrl)}
+                                    className="text-xs px-3 h-8 flex items-center space-x-1"
+                                  >
+                                    <Send className="h-3 w-3" />
+                                    <span>{isReplying ? 'Sending...' : 'Reply'}</span>
+                                  </Button>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <FileUpload
+                                    bucket="screenshots"
+                                    compact
+                                    value={replyAttachmentUrl}
+                                    onChange={(url) => setReplyAttachmentUrl(url)}
+                                    onRemove={() => setReplyAttachmentUrl('')}
+                                  />
+                                  <span className="text-[10px] text-slate-400">
+                                    Attach SAP error screenshot (PNG, JPG, max 10MB)
+                                  </span>
+                                </div>
                               </form>
                             ) : (
                               <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2">
@@ -1007,6 +1074,43 @@ export default function StudentPortalPage() {
           )}
         </Modal>
 
+        {/* Manage Resume Modal */}
+        <Modal
+          isOpen={isResumeModalOpen}
+          onClose={() => setIsResumeModalOpen(false)}
+          title="Student Placement Resume / CV"
+          description="Upload your updated resume for corporate interview drives and employer vetting."
+        >
+          <div className="space-y-4 text-xs">
+            <FileUpload
+              bucket="resumes"
+              entityId={student.id}
+              value={studentResumeUrl}
+              onChange={async (url) => {
+                setStudentResumeUrl(url);
+                await uploadStudentResume(student.id, url, student.user_id);
+              }}
+              onRemove={async () => {
+                setStudentResumeUrl('');
+                await uploadStudentResume(student.id, '', student.user_id);
+              }}
+              label="Official Student Resume (PDF or DOCX)"
+              description="Your resume is automatically reviewed by Sunita Reddy (Placement Head) for corporate referrals."
+            />
+
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-1 text-purple-900">
+              <p className="font-semibold text-xs">Placement Status: {student.placement_status}</p>
+              <p className="text-[11px] text-purple-700">Preferred Locations: Bengaluru, Hyderabad, Pune, Mumbai</p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <Button type="button" variant="sap" size="sm" onClick={() => setIsResumeModalOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
         {/* Ask a Doubt Modal */}
         <Modal
           isOpen={isAskModalOpen}
@@ -1088,6 +1192,18 @@ export default function StudentPortalPage() {
                 placeholder="Describe what steps you performed, the exact error number (e.g. F5151), and what expected result you are trying to achieve..."
                 required
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+              />
+            </div>
+
+            <div>
+              <FileUpload
+                bucket="screenshots"
+                entityId={student.id}
+                value={doubtAttachmentUrl}
+                onChange={(url) => setDoubtAttachmentUrl(url)}
+                onRemove={() => setDoubtAttachmentUrl('')}
+                label="Error Screenshot / Attachment (Optional)"
+                description="Upload screenshot of your SAP GUI screen, error dialog, or log (PNG, JPG, max 10MB)"
               />
             </div>
 

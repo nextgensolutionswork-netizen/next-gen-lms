@@ -62,6 +62,36 @@ export async function updatePlacementProfile(
   return profile;
 }
 
+export async function uploadStudentResume(
+  studentId: string,
+  resumeUrl: string,
+  uploadedByUserId?: string
+): Promise<PlacementProfile> {
+  const profile = await getPlacementProfileForStudent(studentId);
+  if (!profile) throw new Error('Placement profile not found');
+
+  profile.resume_url = resumeUrl;
+  profile.resume_status = 'Pending Review';
+  profile.updated_at = new Date().toISOString();
+
+  const student = store.students.find((s) => s.id === studentId);
+  if (student) {
+    (student as any).resume_url = resumeUrl;
+  }
+
+  await recordAuditLog({
+    user_id: uploadedByUserId || studentId,
+    user_name: student?.full_name || 'Student',
+    user_role: uploadedByUserId ? 'placement_coordinator' : 'student',
+    action: 'RESUME_UPLOADED',
+    module: 'PLACEMENT',
+    record_id: profile.id,
+    new_value: { resume_url: resumeUrl, resume_status: 'Pending Review' },
+  });
+
+  return profile;
+}
+
 export async function getJobOpenings(): Promise<JobOpening[]> {
   return [...store.jobOpenings];
 }

@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import { JobOpening, PlacementProfile, JobApplication } from '@/types';
 import { createJobOpening, updatePlacementProfile, applyForJob } from '@/lib/services/placement-service';
@@ -30,6 +31,7 @@ export default function PlacementPage() {
   const [applications, setApplications] = React.useState<JobApplication[]>(store.jobApplications);
   const [isJobModalOpen, setIsJobModalOpen] = React.useState(false);
   const [selectedStudentForProfile, setSelectedStudentForProfile] = React.useState<PlacementProfile | null>(null);
+  const [resumeUrl, setResumeUrl] = React.useState('');
 
   // New Job form state
   const [company, setCompany] = React.useState('');
@@ -80,6 +82,7 @@ export default function PlacementPage() {
     await updatePlacementProfile(
       selectedStudentForProfile.student_id,
       {
+        resume_url: resumeUrl || undefined,
         resume_status: resumeStatus,
         mock_interview_status: mockStatus,
         technical_interview_score: techScore,
@@ -174,9 +177,22 @@ export default function PlacementPage() {
                 <tr key={pp.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-semibold text-slate-800">{pp.student_name}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={pp.resume_status === 'Reviewed & Approved' ? 'success' : 'warning'}>
-                      {pp.resume_status}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={pp.resume_status === 'Reviewed & Approved' ? 'success' : 'warning'}>
+                        {pp.resume_status}
+                      </Badge>
+                      {pp.resume_url && (
+                        <a
+                          href={pp.resume_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                          title="Open student resume"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={pp.mock_interview_status === 'Completed' ? 'success' : 'outline'}>
@@ -194,6 +210,7 @@ export default function PlacementPage() {
                       size="sm"
                       onClick={() => {
                         setSelectedStudentForProfile(pp);
+                        setResumeUrl(pp.resume_url || '');
                         setResumeStatus(pp.resume_status);
                         setMockStatus(pp.mock_interview_status);
                         setTechScore(pp.technical_interview_score || 90);
@@ -202,7 +219,7 @@ export default function PlacementPage() {
                       }}
                       className="text-xs px-2.5 py-1"
                     >
-                      Update Scores
+                      Update Profile
                     </Button>
                   </td>
                 </tr>
@@ -342,6 +359,26 @@ export default function PlacementPage() {
                   <option value="Needs Retake">Needs Retake</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <FileUpload
+                bucket="resumes"
+                entityId={selectedStudentForProfile.student_id}
+                value={resumeUrl}
+                onChange={(url) => {
+                  setResumeUrl(url);
+                  if (resumeStatus === 'Not Uploaded') {
+                    setResumeStatus('Pending Review');
+                  }
+                }}
+                onRemove={() => {
+                  setResumeUrl('');
+                  setResumeStatus('Not Uploaded');
+                }}
+                label="Candidate Resume / CV File"
+                description="Upload student's latest CV for hiring partners (PDF or Word, max 10MB)"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

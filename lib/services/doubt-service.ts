@@ -69,6 +69,7 @@ export interface CreateDoubtInput {
   priority?: DoubtPriority;
   sap_tcode?: string;
   assigned_to_id?: string;
+  attachment_url?: string;
 }
 
 export async function createStudentDoubt(
@@ -96,6 +97,7 @@ export async function createStudentDoubt(
     sender_name: student.full_name,
     sender_role: 'student',
     message: input.description,
+    attachment_url: input.attachment_url,
     created_at: now,
   };
 
