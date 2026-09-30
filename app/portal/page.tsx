@@ -41,6 +41,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { FileUpload } from '@/components/ui/file-upload';
+import { HlsVideoPlayer } from '@/components/ui/hls-video-player';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
@@ -438,45 +439,49 @@ export default function StudentPortalPage() {
           {/* Video Player Column */}
           <div className="lg:col-span-2 space-y-4">
             <Card className="overflow-hidden shadow-md border-slate-200">
-              {/* Fake Video Player Canvas */}
-              <div className="bg-black aspect-video relative flex flex-col justify-between p-4 text-white">
-                <div className="flex items-center justify-between text-xs bg-black/60 p-2 rounded backdrop-blur-xs">
-                  <div className="flex items-center space-x-2">
-                    <Video className="h-4 w-4 text-blue-400" />
-                    <span className="font-semibold truncate max-w-sm">{activeLesson?.title}</span>
-                  </div>
-                  <span className="text-[10px] bg-red-600 px-2 py-0.5 rounded font-bold">SECURE STREAM</span>
-                </div>
-
-                <div className="flex items-center justify-center my-auto">
-                  <PlayCircle className="h-16 w-16 text-white/80 hover:text-white cursor-pointer transition-all hover:scale-105" />
-                </div>
-
-                {/* Video Controls Bar */}
-                <div className="bg-black/80 p-3 rounded-lg backdrop-blur-xs space-y-2">
-                  {/* Scrubber */}
-                  <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-[#0A6ED1] h-full"
-                      style={{ width: `${Math.round((videoPosition / videoDuration) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-300">
-                    <span>
-                      {Math.floor(videoPosition / 60)}:
-                      {String(videoPosition % 60).padStart(2, '0')} / {Math.floor(videoDuration / 60)}:00
-                    </span>
-                    <Button
-                      variant="sap"
-                      size="sm"
-                      onClick={handleSimulateWatch}
-                      className="text-[11px] py-1 px-3 h-7 bg-blue-600 hover:bg-blue-700"
-                    >
-                      Simulate Progress (+25%)
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              {/* Dynamic Watermarked HLS Video Player */}
+              <HlsVideoPlayer
+                src={
+                  activeLesson?.content_url ||
+                  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                }
+                title={activeLesson?.title}
+                student={{
+                  id: student.id,
+                  full_name: student.full_name,
+                  admission_number: student.admission_number,
+                  student_code: student.student_code,
+                  email: student.email,
+                  phone: student.phone,
+                }}
+                initialPosition={videoPosition}
+                onProgress={async (currTime, dur, pct) => {
+                  setVideoPosition(currTime);
+                  setVideoDuration(dur);
+                  if (Math.floor(currTime) % 5 === 0 || pct >= 90) {
+                    await updateVideoProgress(
+                      student.id,
+                      activeLesson.id,
+                      student.course_id,
+                      Math.floor(currTime),
+                      Math.floor(dur)
+                    );
+                    const updated = await getStudentCourseProgress(student.id, student.course_id);
+                    setCourseProgress(updated.overallProgress);
+                  }
+                }}
+                onComplete={async () => {
+                  await updateVideoProgress(
+                    student.id,
+                    activeLesson.id,
+                    student.course_id,
+                    Math.floor(videoDuration),
+                    Math.floor(videoDuration)
+                  );
+                  const updated = await getStudentCourseProgress(student.id, student.course_id);
+                  setCourseProgress(updated.overallProgress);
+                }}
+              />
 
               <CardContent className="p-5 space-y-3">
                 <div className="flex items-center justify-between">
@@ -486,7 +491,18 @@ export default function StudentPortalPage() {
                       Duration: {activeLesson?.duration_minutes} Minutes | Module: Enterprise Structure
                     </p>
                   </div>
-                  <Badge variant="success">Published</Badge>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSimulateWatch}
+                      className="text-[11px] py-1 px-2.5 h-7 border-blue-200 text-blue-700 hover:bg-blue-50"
+                      title="Quick Testing / Progress Advancement"
+                    >
+                      Simulate +25%
+                    </Button>
+                    <Badge variant="success">Published</Badge>
+                  </div>
                 </div>
                 {activeLesson?.text_content && (
                   <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed border border-slate-100">
