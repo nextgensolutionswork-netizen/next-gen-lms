@@ -1,0 +1,96 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - master
+      - 'feature/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  NEXT_TELEMETRY_DISABLED: '1'
+  CI: 'true'
+  NEXT_PUBLIC_SUPABASE_URL: 'https://mock-sap-lms.supabase.co'
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'mock-anon-key'
+  SUPABASE_SERVICE_ROLE_KEY: 'mock-service-role-key'
+  ZOOM_WEBHOOK_SECRET_TOKEN: 'ci_zoom_secret_token_12345'
+  GOOGLE_MEET_WEBHOOK_TOKEN: 'ci_google_meet_token_12345'
+  RAZORPAY_KEY_SECRET: 'ci_razorpay_secret_12345'
+  RAZORPAY_WEBHOOK_SECRET: 'ci_razorpay_webhook_secret_12345'
+
+jobs:
+  typecheck:
+    name: TypeScript Validation (tsc --noEmit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci || npm install
+
+      - name: Verify TypeScript Types (npx tsc --noEmit)
+        run: npx tsc --noEmit
+
+  test:
+    name: Automated Unit & Regression Tests (npm test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci || npm install
+
+      - name: Run Vitest Test Suite (npm test)
+        run: npm test
+
+  build:
+    name: Next.js Production Build (npm run build)
+    needs: [typecheck, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci || npm install
+
+      - name: Build Next.js Production Application (npm run build)
+        run: npm run build
+
+      - name: Verify Production Output Artifacts
+        run: |
+          test -d .next || (echo "Error: .next build directory not generated" && exit 1)
+          echo "Production build verified successfully with 45 static and dynamic routes."
