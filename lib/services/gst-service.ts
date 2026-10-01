@@ -166,6 +166,7 @@ export interface GstCalculationOptions {
   isInclusive?: boolean; // Default true for student tuition fee receipts
   sacCode?: string; // Default '999293'
   instituteStateCode?: string; // Default '36' (Telangana)
+  instituteGstin?: string; // Default '36AAACN1234F1Z8'
   customDocNumber?: string;
   customDocDate?: string;
 }
@@ -383,7 +384,10 @@ export function calculateGstBreakdown(
   }
 
   // Generate cryptographic e-Invoice IRN
-  const supplierGstin = store.settings.gst_number || '36AAACN1234F1Z8';
+  const supplierGstin =
+    options.instituteGstin ||
+    (typeof store !== 'undefined' && store?.settings?.gst_number) ||
+    '36AAACN1234F1Z8';
   const irn = generateIrn(supplierGstin, customDocNumber, customDocDate);
 
   // Generate e-Invoice Acknowledgement details

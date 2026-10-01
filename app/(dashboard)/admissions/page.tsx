@@ -11,9 +11,9 @@ import {
   Calendar,
   CheckCircle2,
   FileText,
-  CreditCard,
   Building,
   GraduationCap,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus } from '@/types';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
+import { calculateGstBreakdown, resolveState, GST_STATE_CODES } from '@/lib/services/gst-service';
 
 export default function AdmissionsPage() {
   const [admissions, setAdmissions] = React.useState<Admission[]>(store.admissions);
@@ -39,6 +40,8 @@ export default function AdmissionsPage() {
   const [gender, setGender] = React.useState<'Male' | 'Female' | 'Other'>('Male');
   const [address, setAddress] = React.useState('');
   const [city, setCity] = React.useState('Hyderabad');
+  const [stateCode, setStateCode] = React.useState('36');
+  const [studentGstin, setStudentGstin] = React.useState('');
   const [education, setEducation] = React.useState('B.Tech / MBA / B.Com');
   const [experienceYears, setExperienceYears] = React.useState(1);
   const [employmentStatus, setEmploymentStatus] = React.useState<'Employed' | 'Unemployed' | 'Student' | 'Career Gap'>('Employed');
@@ -52,6 +55,10 @@ export default function AdmissionsPage() {
   const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];
   const courseFee = selectedCourse?.price || 45000;
   const netPayable = Math.max(0, courseFee - discount);
+
+  const gstPreview = React.useMemo(() => {
+    return calculateGstBreakdown(netPayable, stateCode);
+  }, [netPayable, stateCode]);
 
   const refreshList = () => {
     let list = [...store.admissions];
@@ -88,6 +95,9 @@ export default function AdmissionsPage() {
         gender,
         address,
         city,
+        state: GST_STATE_CODES[stateCode] || 'Telangana',
+        state_code: stateCode,
+        gstin: studentGstin,
         education,
         experience_years: experienceYears,
         current_employment_status: employmentStatus,
@@ -109,6 +119,7 @@ export default function AdmissionsPage() {
     setPhone('');
     setEmail('');
     setAddress('');
+    setStudentGstin('');
     setDiscount(0);
     refreshList();
   };
@@ -171,6 +182,7 @@ export default function AdmissionsPage() {
                   <th className="px-4 py-3">Adm #</th>
                   <th className="px-4 py-3">Student Name</th>
                   <th className="px-4 py-3">Course & Mode</th>
+                  <th className="px-4 py-3">Place of Supply</th>
                   <th className="px-4 py-3">Batch</th>
                   <th className="px-4 py-3">Fee Structure</th>
                   <th className="px-4 py-3">Plan</th>
@@ -180,18 +192,34 @@ export default function AdmissionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {admissions.map((adm) => (
-                  <tr key={adm.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-blue-600">{adm.admission_number}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800">{adm.student_name}</p>
-                      <p className="text-[10px] text-slate-400">{adm.phone}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-800">{adm.course_name}</p>
-                      <Badge variant="outline" className="text-[10px] mt-0.5">{adm.training_mode}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{adm.batch_name || 'Assigned Batch'}</td>
+                {admissions.map((adm) => {
+                  const resolved = resolveState(adm.state_code || adm.state || adm.city || adm.address);
+                  const isIntra = resolved.code === '36';
+                  return (
+                    <tr key={adm.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-blue-600">{adm.admission_number}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-800">{adm.student_name}</p>
+                        <p className="text-[10px] text-slate-400">{adm.phone}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-800">{adm.course_name}</p>
+                        <Badge variant="outline" className="text-[10px] mt-0.5">{adm.training_mode}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-800">{adm.state || resolved.name}</p>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] mt-0.5 ${
+                            isIntra
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {isIntra ? 'Intra-State (9%+9%)' : 'Inter-State (18% IGST)'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{adm.batch_name || 'Assigned Batch'}</td>
                     <td className="px-4 py-3">
                       <p className="font-bold text-slate-900">{formatINR(adm.net_payable)}</p>
                       {adm.discount > 0 && (
@@ -211,7 +239,8 @@ export default function AdmissionsPage() {
                       </Link>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
@@ -276,7 +305,7 @@ export default function AdmissionsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input
               label="Residential Address *"
               placeholder="House #, Street, Locality"
@@ -288,12 +317,50 @@ export default function AdmissionsPage() {
               label="City *"
               placeholder="e.g. Hyderabad / Pune / Bengaluru"
               value={city}
-              onChange={(e) => setCity(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCity(val);
+                const resolved = resolveState(val);
+                if (resolved && resolved.code) {
+                  setStateCode(resolved.code);
+                }
+              }}
               required
             />
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                State & Place of Supply *
+              </label>
+              <select
+                value={stateCode}
+                onChange={(e) => setStateCode(e.target.value)}
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+              >
+                {Object.entries(GST_STATE_CODES).map(([code, stateName]) => (
+                  <option key={code} value={code}>
+                    {stateName} ({code}) {code === '36' ? '— Intra-State (TS)' : '— Inter-State'}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Student/Sponsor GSTIN (Optional B2B)"
+              placeholder="e.g. 36AABCU9603R1ZX"
+              value={studentGstin}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase();
+                setStudentGstin(val);
+                if (val.length >= 2 && /^\d{2}/.test(val)) {
+                  const prefix = val.substring(0, 2);
+                  if (GST_STATE_CODES[prefix]) {
+                    setStateCode(prefix);
+                  }
+                }
+              }}
+            />
             <Input
               label="Education Qualification *"
               placeholder="B.Tech / MBA / B.Com"
@@ -301,6 +368,9 @@ export default function AdmissionsPage() {
               onChange={(e) => setEducation(e.target.value)}
               required
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input
               label="Experience (Years)"
               type="number"
@@ -423,6 +493,56 @@ export default function AdmissionsPage() {
               <span className="text-xl font-extrabold text-emerald-800">
                 {formatINR(netPayable)}
               </span>
+            </div>
+
+            {/* Live Automated GST Invoicing Engine Breakdown */}
+            <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2 mt-3">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2">
+                  <ShieldCheck className="h-4 w-4 text-blue-600" />
+                  <span className="font-bold text-slate-800">
+                    Automated GST Invoicing Engine (SAC: 999293)
+                  </span>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={
+                    gstPreview.supply_type === 'INTRA_STATE'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]'
+                      : 'bg-amber-100 text-amber-800 border-amber-300 text-[10px]'
+                  }
+                >
+                  {gstPreview.supply_type === 'INTRA_STATE'
+                    ? 'Intra-State: 9% CGST + 9% SGST'
+                    : 'Inter-State: 18% IGST'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs pt-1.5 border-t border-blue-100">
+                <div>
+                  <span className="text-slate-500 text-[10px] block">Base Taxable Value:</span>
+                  <span className="font-semibold text-slate-800">{formatINR(gstPreview.taxable_amount)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block">
+                    {gstPreview.supply_type === 'INTRA_STATE' ? 'CGST (9%) + SGST (9%):' : 'IGST (18%):'}
+                  </span>
+                  <span className="font-semibold text-slate-800">
+                    {gstPreview.supply_type === 'INTRA_STATE'
+                      ? `${formatINR(gstPreview.cgst_amount)} + ${formatINR(gstPreview.sgst_amount)}`
+                      : formatINR(gstPreview.igst_amount)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block">Total Tax Liability:</span>
+                  <span className="font-bold text-emerald-700">{formatINR(gstPreview.total_tax)}</span>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1 border-t border-blue-100/60">
+                <span>Place of Supply: <strong>{gstPreview.place_of_supply}</strong></span>
+                <span>SHA-256 e-Invoice IRN signing automated on payment receipt</span>
+              </div>
             </div>
           </div>
 

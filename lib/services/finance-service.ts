@@ -279,7 +279,15 @@ export async function recordPaymentAtomic(
   const admission = store.admissions.find(
     (a) => a.id === student.admission_id || a.admission_number === student.admission_number
   );
-  const studentLoc = admission?.city || admission?.address || student.address || 'Telangana';
+  const studentLoc =
+    student.state_code ||
+    student.state ||
+    admission?.state_code ||
+    admission?.state ||
+    admission?.city ||
+    admission?.address ||
+    student.address ||
+    'Telangana';
   const gstDetails = calculateGstBreakdown(input.amount, studentLoc, {
     customDocNumber: receiptNumber,
     customDocDate: input.payment_date,

@@ -139,6 +139,9 @@ export interface Admission {
   gender: 'Male' | 'Female' | 'Other';
   address: string;
   city: string;
+  state?: string;
+  state_code?: string;
+  gstin?: string;
   education: string;
   experience_years: number;
   current_employment_status: 'Employed' | 'Unemployed' | 'Student' | 'Career Gap';
@@ -173,6 +176,10 @@ export interface Student {
   phone: string;
   profile_photo?: string;
   address?: string;
+  city?: string;
+  state?: string;
+  state_code?: string;
+  gstin?: string;
   course_id: string;
   course_name?: string;
   batch_id?: string;

@@ -36,6 +36,7 @@ import {
   MeetingParticipantLog,
 } from '@/types';
 import { persistentStorage } from './persistent-storage-adapter';
+import { calculateGstBreakdown } from './gst-service';
 
 // In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
@@ -107,6 +108,64 @@ class InstituteDataStore {
               ack_date: '2026-02-02T11:20:00Z',
               created_at: '2026-02-02T11:20:00Z',
             });
+          }
+
+          // Self-healing auto-enrichment: ensure all receipts maintain full GST breakdown & e-invoice IRN
+          for (let i = 0; i < this.receipts.length; i++) {
+            const r = this.receipts[i];
+            if (!r.supply_type || r.taxable_amount === undefined || !r.irn) {
+              const stu = (this.students || []).find((s) => s.id === r.student_id);
+              const adm = (this.admissions || []).find(
+                (a) => a.admission_number === r.admission_number || (stu && a.id === stu.admission_id)
+              );
+              const studentLoc =
+                stu?.state_code ||
+                stu?.state ||
+                adm?.state_code ||
+                adm?.state ||
+                r.place_of_supply_code ||
+                r.place_of_supply ||
+                stu?.address ||
+                adm?.city ||
+                adm?.address;
+
+              const breakdown = calculateGstBreakdown(r.payment_amount, studentLoc, {
+                customDocNumber: r.receipt_number || `REC-${r.id}`,
+                customDocDate:
+                  r.payment_date ||
+                  r.created_at?.split('T')[0] ||
+                  new Date().toISOString().split('T')[0],
+                instituteGstin: this.settings?.gst_number || '36AAACN1234F1Z8',
+                instituteStateCode: '36',
+              });
+
+              this.receipts[i] = {
+                ...r,
+                institute_name: r.institute_name || this.settings?.institute_name || 'Next-Gen ERP Solutions',
+                institute_address:
+                  r.institute_address ||
+                  this.settings?.address ||
+                  'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
+                institute_phone: r.institute_phone || this.settings?.phone || '+91 98765 43210',
+                institute_gst: r.institute_gst || this.settings?.gst_number || '36AAACN1234F1Z8',
+                supply_type: r.supply_type || breakdown.supply_type,
+                place_of_supply: r.place_of_supply || breakdown.place_of_supply,
+                place_of_supply_code: r.place_of_supply_code || breakdown.place_of_supply_code,
+                sac_code: r.sac_code || breakdown.sac_code,
+                taxable_amount: r.taxable_amount ?? breakdown.taxable_amount,
+                cgst_rate: r.cgst_rate ?? breakdown.cgst_rate,
+                cgst_amount: r.cgst_amount ?? breakdown.cgst_amount,
+                sgst_rate: r.sgst_rate ?? breakdown.sgst_rate,
+                sgst_amount: r.sgst_amount ?? breakdown.sgst_amount,
+                igst_rate: r.igst_rate ?? breakdown.igst_rate,
+                igst_amount: r.igst_amount ?? breakdown.igst_amount,
+                total_tax: r.total_tax ?? breakdown.total_tax,
+                is_reverse_charge: r.is_reverse_charge ?? false,
+                irn: r.irn || breakdown.irn,
+                ack_no: r.ack_no || breakdown.ack_no,
+                ack_date: r.ack_date || breakdown.ack_date,
+              };
+            }
           }
         }
         if (snapshot.expenses?.length) this.expenses = snapshot.expenses;

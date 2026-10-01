@@ -57,6 +57,9 @@ export interface CreateAdmissionInput {
   gender: 'Male' | 'Female' | 'Other';
   address: string;
   city: string;
+  state?: string;
+  state_code?: string;
+  gstin?: string;
   education: string;
   experience_years: number;
   current_employment_status: 'Employed' | 'Unemployed' | 'Student' | 'Career Gap';
@@ -88,6 +91,10 @@ export async function createAdmissionWorkflow(
 
   const net_payable = Math.max(0, input.course_fee - (input.discount || 0));
 
+  // Resolve State and GST metadata
+  const stateVal = input.state || (input.city?.toLowerCase().includes('pune') || input.city?.toLowerCase().includes('mumbai') ? 'Maharashtra' : input.city?.toLowerCase().includes('bengaluru') || input.city?.toLowerCase().includes('bangalore') ? 'Karnataka' : 'Telangana');
+  const stateCodeVal = input.state_code || (stateVal === 'Maharashtra' ? '27' : stateVal === 'Karnataka' ? '29' : '36');
+
   // 1. Create Admission Record
   const newAdmission: Admission = {
     id: `adm-${Date.now()}`,
@@ -99,6 +106,9 @@ export async function createAdmissionWorkflow(
     gender: input.gender,
     address: input.address,
     city: input.city,
+    state: stateVal,
+    state_code: stateCodeVal,
+    gstin: input.gstin,
     education: input.education,
     experience_years: input.experience_years,
     current_employment_status: input.current_employment_status,
@@ -148,7 +158,11 @@ export async function createAdmissionWorkflow(
     full_name: input.student_name,
     email: input.email,
     phone: input.phone,
-    address: `${input.address}, ${input.city}`,
+    address: `${input.address}, ${input.city}, ${stateVal}`,
+    city: input.city,
+    state: stateVal,
+    state_code: stateCodeVal,
+    gstin: input.gstin,
     course_id: input.course_id,
     course_name: course?.course_name,
     batch_id: input.batch_id,
