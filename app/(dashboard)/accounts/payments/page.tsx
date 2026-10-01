@@ -11,6 +11,7 @@ import {
   CheckCircle,
   AlertCircle,
   ExternalLink,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ import { store } from '@/lib/services/data-store';
 import { Payment, PaymentMethod } from '@/types';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
+import { exportCollectionsToExcel } from '@/lib/utils/excel-export';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = React.useState<Payment[]>(store.payments);
@@ -99,6 +101,10 @@ export default function PaymentsPage() {
     exportToCSV('payments_collections_log', payments);
   };
 
+  const handleExportExcel = () => {
+    exportCollectionsToExcel(payments);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -112,6 +118,15 @@ export default function PaymentsPage() {
           <Button variant="outline" size="sm" onClick={handleExport} className="text-xs flex items-center space-x-1">
             <Download className="h-3.5 w-3.5" />
             <span>Export CSV</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="text-xs flex items-center space-x-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Export to Excel</span>
           </Button>
           <Button
             variant="sap"

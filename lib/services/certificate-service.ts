@@ -6,6 +6,7 @@ import {
   dispatchMultiChannelNotification,
   buildCertificateEmailHtml,
 } from './notification-service';
+import { generateAndSaveCertificatePdf } from './pdf-service';
 
 export async function getCertificates(): Promise<Certificate[]> {
   return [...store.certificates];
@@ -73,9 +74,20 @@ export async function verifyAndGenerateCertificate(
     assignment_completion_rate: 90.0,
     exam_score_percentage: 88.0,
     verification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/certificate/verify/${certificate_id}`,
+    pdf_url: `/api/certificates/${certificate_id}/pdf`,
     is_valid: true,
     created_at: new Date().toISOString(),
   };
+
+  // Generate and persist official binary vector PDF
+  try {
+    const pdfRes = await generateAndSaveCertificatePdf(cert);
+    if (pdfRes.pdfUrl) {
+      cert.pdf_url = pdfRes.pdfUrl;
+    }
+  } catch (pdfErr) {
+    console.warn('Certificate PDF generation warning, falling back to direct API route:', pdfErr);
+  }
 
   store.certificates.push(cert);
 
@@ -87,11 +99,11 @@ export async function verifyAndGenerateCertificate(
     action: 'CERTIFICATE_GENERATED',
     module: 'CERTIFICATES',
     record_id: cert.id,
-    new_value: { certificate_id, student: student.full_name, course: course.course_name },
+    new_value: { certificate_id, student: student.full_name, course: course.course_name, pdf_url: cert.pdf_url },
   });
 
   // Dispatch multi-channel notification (in-app, email with PDF, WhatsApp)
-  const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/api/certificates/${cert.certificate_id}/pdf?download=true`;
+  const pdfUrl = cert.pdf_url || `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/api/certificates/${cert.certificate_id}/pdf?download=true`;
   const emailHtml = buildCertificateEmailHtml({
     studentName: student.full_name,
     courseName: course.course_name,

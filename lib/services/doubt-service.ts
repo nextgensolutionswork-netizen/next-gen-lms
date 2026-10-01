@@ -225,8 +225,20 @@ export async function createStudentDoubt(
     },
   });
 
-  // 1. Broadcast real-time event to staff support desk
+  // 1. Broadcast real-time event to staff support desk and Supabase doubt_messages channel
   publishRealtimeEvent('doubts', 'doubt_created', newDoubt);
+  try {
+    const supabase = createClient();
+    if (supabase && typeof supabase.channel === 'function') {
+      supabase.channel('doubt_messages').send({
+        type: 'broadcast',
+        event: 'doubt_created',
+        payload: newDoubt,
+      });
+    }
+  } catch (err) {
+    // ignore
+  }
 
   // 2. Dispatch notification to assigned support mentor
   if (supportUser) {
@@ -329,6 +341,22 @@ export async function replyToDoubt(
     message: newMessage,
     status: doubt.status,
   });
+  try {
+    const supabase = createClient();
+    if (supabase && typeof supabase.channel === 'function') {
+      supabase.channel('doubt_messages').send({
+        type: 'broadcast',
+        event: 'doubt_reply',
+        payload: {
+          doubtId: doubt.id,
+          message: newMessage,
+          status: doubt.status,
+        },
+      });
+    }
+  } catch (err) {
+    // ignore
+  }
 
   // 2. Dispatch multi-channel notifications
   if (senderRole !== 'student') {

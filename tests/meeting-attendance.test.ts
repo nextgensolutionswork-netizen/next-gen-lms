@@ -311,6 +311,9 @@ describe('11. Zoom / Google Meet Automated Webhook Attendance Tracking Tests', (
       // Check certificate eligibility: if attendance percentage falls below 80%, certificate must be blocked
       const student2 = store.students[1];
       student2.attendance_percentage = 72; // simulated low attendance
+      store.certificates = store.certificates.filter(
+        (c) => !(c.student_id === student2.id && c.course_id === student2.course_id)
+      );
       const eligibility = await verifyAndGenerateCertificate(student2.id, student2.course_id, 'usr-admin');
       expect(eligibility.eligible).toBe(false);
       expect(eligibility.reasons.some((r) => r.includes('minimum 80% required'))).toBe(true);
@@ -365,7 +368,8 @@ describe('11. Zoom / Google Meet Automated Webhook Attendance Tracking Tests', (
 
     it('syncs meeting attendance from external participant array', async () => {
       const session = store.classSessions[0];
-      const student1 = store.students[0];
+      const student1 = store.students.find((s) => s.batch_id === session.batch_id) || store.students[0];
+      student1.batch_id = session.batch_id;
 
       const syncResult = await syncMeetingAttendance({
         meetingId: session.meeting_id || 'xyz-fico-sap',

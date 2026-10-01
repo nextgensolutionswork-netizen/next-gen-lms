@@ -10,13 +10,22 @@ import {
   PieChart,
   BarChart,
   Layers,
+  FileSpreadsheet,
+  ShieldCheck,
+  Receipt,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { store } from '@/lib/services/data-store';
 import { getFinanceDashboardMetrics } from '@/lib/services/finance-service';
+import { calculateGstBreakdown } from '@/lib/services/gst-service';
 import { formatINR, exportToCSV } from '@/lib/utils/formatters';
+import {
+  exportGstReportToExcel,
+  exportCollectionsToExcel,
+  exportExpensesToExcel,
+} from '@/lib/utils/excel-export';
 
 export default function FinanceReportsPage() {
   const [metrics, setMetrics] = React.useState<any>(null);
@@ -27,6 +36,36 @@ export default function FinanceReportsPage() {
       setMetrics(data);
     }
     load();
+  }, []);
+
+  const gstBreakdowns = React.useMemo(() => {
+    let intraTax = 0;
+    let interTax = 0;
+    let totalTaxable = 0;
+    let totalTax = 0;
+
+    for (const p of store.payments) {
+      const student = store.students.find((s) => s.id === p.student_id);
+      const gst = calculateGstBreakdown(
+        p.amount,
+        student ? { city: student.address, state: student.address } : null
+      );
+      totalTaxable += gst.taxable_amount;
+      totalTax += gst.total_tax;
+      if (gst.supply_type === 'INTRA_STATE') {
+        intraTax += gst.total_tax;
+      } else {
+        interTax += gst.total_tax;
+      }
+    }
+
+    return {
+      intraTax,
+      interTax,
+      totalTaxable,
+      totalTax,
+      totalGross: totalTaxable + totalTax,
+    };
   }, []);
 
   if (!metrics) return <div className="p-8 text-center text-xs text-slate-500">Loading financial reports...</div>;
@@ -44,6 +83,10 @@ export default function FinanceReportsPage() {
     exportToCSV('finance_collections_report', rows);
   };
 
+  const handleExportCollectionsExcel = () => {
+    exportCollectionsToExcel(store.payments);
+  };
+
   const handleExportExpenses = () => {
     const rows = store.expenses.map((e) => ({
       Code: e.expense_code,
@@ -58,6 +101,14 @@ export default function FinanceReportsPage() {
     exportToCSV('finance_expenses_report', rows);
   };
 
+  const handleExportExpensesExcel = () => {
+    exportExpensesToExcel(store.expenses);
+  };
+
+  const handleExportGstExcel = () => {
+    exportGstReportToExcel(store.payments);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -67,14 +118,37 @@ export default function FinanceReportsPage() {
             Real-time cash flow, course revenue contributions, payment method distributions, and exportable reconciliation reports.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleExportCollections} className="text-xs flex items-center space-x-1">
             <Download className="h-3.5 w-3.5" />
-            <span>Export Collections</span>
+            <span>CSV</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportExpenses} className="text-xs flex items-center space-x-1">
-            <Download className="h-3.5 w-3.5" />
-            <span>Export Expenses</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCollectionsExcel}
+            className="text-xs flex items-center space-x-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Collections (Excel)</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExpensesExcel}
+            className="text-xs flex items-center space-x-1.5 border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-slate-500" />
+            <span>Expenses (Excel)</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportGstExcel}
+            className="text-xs flex items-center space-x-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-blue-600" />
+            <span>GST Report (Excel)</span>
           </Button>
         </div>
       </div>
@@ -162,6 +236,84 @@ export default function FinanceReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* GST Compliance & e-Invoice Reconciliation Card */}
+      <Card className="border-blue-200 bg-linear-to-r from-blue-50/50 to-indigo-50/30">
+        <CardHeader className="pb-3 border-b border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <ShieldCheck className="h-5 w-5 text-blue-600" />
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-900">
+                GST Tax Compliance & GSTR-1 Audit Engine
+              </CardTitle>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Automated 18% GST calculation (9% CGST + 9% SGST within state, 18% IGST inter-state) with SHA-256 e-Invoice IRN signing.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-[10px]">
+              SAC: 999293 (Coaching)
+            </Badge>
+            <Button
+              variant="sap"
+              size="sm"
+              onClick={handleExportGstExcel}
+              className="text-xs flex items-center space-x-1.5"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Export GSTR-1 Excel (.xlsx)</span>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 bg-white rounded-lg border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Institute GSTIN</span>
+              <span className="font-mono font-bold text-slate-800 text-xs">
+                {store.settings.gst_number || '36AAACN1234F1Z8'}
+              </span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">State: Telangana (36)</span>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Taxable Base Turnover</span>
+              <span className="font-bold text-slate-900 text-sm block mt-0.5">
+                {formatINR(gstBreakdowns.totalTaxable)}
+              </span>
+              <span className="text-[10px] text-slate-500">Excluding 18% tax</span>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Intra-State GST (CGST+SGST)</span>
+              <span className="font-bold text-emerald-700 text-sm block mt-0.5">
+                {formatINR(gstBreakdowns.intraTax)}
+              </span>
+              <span className="text-[10px] text-emerald-600">9% CGST + 9% SGST</span>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Inter-State GST (IGST)</span>
+              <span className="font-bold text-blue-700 text-sm block mt-0.5">
+                {formatINR(gstBreakdowns.interTax)}
+              </span>
+              <span className="text-[10px] text-blue-600">18% IGST (Out of state)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-blue-100">
+            <div className="flex items-center space-x-1.5 text-slate-600">
+              <Receipt className="h-4 w-4 text-blue-600" />
+              <span>
+                Total Output Tax Liability: <strong className="text-slate-900 font-bold">{formatINR(gstBreakdowns.totalTax)}</strong> on gross collections of <strong>{formatINR(gstBreakdowns.totalGross)}</strong>
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400">
+              Ready for GSTR-1, GSTR-3B & e-Invoice JSON Filing
+            </span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

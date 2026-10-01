@@ -27,6 +27,7 @@ export interface WatermarkStudentInfo {
   student_code?: string;
   email?: string;
   phone?: string;
+  ip?: string;
 }
 
 export interface HlsVideoPlayerProps {
@@ -50,6 +51,7 @@ export function HlsVideoPlayer({
 }: HlsVideoPlayerProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const watermarkRef = React.useRef<HTMLDivElement>(null);
   const hlsRef = React.useRef<Hls | null>(null);
 
@@ -158,7 +160,136 @@ export function HlsVideoPlayer({
     };
   }, [src]);
 
-  // 2. Dynamic Floating Watermark Positioning & Clock
+  // 2. Dynamic HTML5 Canvas Anti-Piracy Watermarking (Bouncing Email, IP & UTC Timestamp)
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let animationFrameId: number;
+    const pos = {
+      x: 35,
+      y: 45,
+      vx: 1.1,
+      vy: 0.85,
+    };
+
+    const studentNameStr = student?.full_name || 'Authorized Student';
+    const studentIdStr = student?.admission_number || student?.student_code || student?.id || 'SAP-STD-2026';
+    const studentEmailStr = student?.email || 'student@erp-lms.com';
+    const studentIpStr = student?.ip || '103.24.120.45';
+
+    const render = () => {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const displayWidth = Math.round(rect.width) || 640;
+      const displayHeight = Math.round(rect.height) || 360;
+
+      if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
+      }
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+      // 1. Subtle background diagonal watermark grid
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+      ctx.font = '10px monospace';
+      ctx.rotate(-0.15);
+      const stepX = 240;
+      const stepY = 120;
+      for (let x = -100; x < displayWidth + 240; x += stepX) {
+        for (let y = -60; y < displayHeight + 200; y += stepY) {
+          ctx.fillText(`${studentEmailStr} · ${studentIpStr}`, x, y);
+        }
+      }
+      ctx.restore();
+
+      // 2. Bouncing Primary Canvas Watermark Badge
+      const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+      const badgeWidth = 270;
+      const badgeHeight = 64;
+
+      // Update position with velocity
+      pos.x += pos.vx;
+      pos.y += pos.vy;
+
+      // Bounce against canvas borders
+      if (pos.x <= 10) {
+        pos.x = 10;
+        pos.vx = Math.abs(pos.vx);
+      } else if (pos.x + badgeWidth >= displayWidth - 10) {
+        pos.x = Math.max(10, displayWidth - 10 - badgeWidth);
+        pos.vx = -Math.abs(pos.vx);
+      }
+
+      if (pos.y <= 15) {
+        pos.y = 15;
+        pos.vy = Math.abs(pos.vy);
+      } else if (pos.y + badgeHeight >= displayHeight - 20) {
+        pos.y = Math.max(15, displayHeight - 20 - badgeHeight);
+        pos.vy = -Math.abs(pos.vy);
+      }
+
+      // Draw rounded translucent badge background
+      ctx.save();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = 1;
+
+      // Rounded rect
+      const r = 8;
+      const bx = pos.x;
+      const by = pos.y;
+      ctx.beginPath();
+      ctx.moveTo(bx + r, by);
+      ctx.lineTo(bx + badgeWidth - r, by);
+      ctx.quadraticCurveTo(bx + badgeWidth, by, bx + badgeWidth, by + r);
+      ctx.lineTo(bx + badgeWidth, by + badgeHeight - r);
+      ctx.quadraticCurveTo(bx + badgeWidth, by + badgeHeight, bx + badgeWidth - r, by + badgeHeight);
+      ctx.lineTo(bx + r, by + badgeHeight);
+      ctx.quadraticCurveTo(bx, by + badgeHeight, bx, by + badgeHeight - r);
+      ctx.lineTo(bx, by + r);
+      ctx.quadraticCurveTo(bx, by, bx + r, by);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Text 1: Student Name & ID
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`${studentNameStr} (${studentIdStr})`, bx + 12, by + 18);
+
+      // Text 2: Student Email & IP
+      ctx.fillStyle = 'rgba(147, 197, 253, 0.95)';
+      ctx.font = '10px monospace';
+      ctx.fillText(`${studentEmailStr} · IP: ${studentIpStr}`, bx + 12, by + 35);
+
+      // Text 3: UTC Timestamp & License
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.8)';
+      ctx.font = '9px monospace';
+      ctx.fillText(`${nowStr} · STRICT CONFIDENTIAL`, bx + 12, by + 51);
+
+      ctx.restore();
+      ctx.restore();
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [student]);
+
+  // 3. Dynamic Floating Watermark Positioning & Clock
   React.useEffect(() => {
     const updateWatermark = () => {
       // Random coordinates keeping inside canvas bounds (10% to 70% range)
@@ -442,7 +573,13 @@ export function HlsVideoPlayer({
         className="w-full h-full object-contain cursor-pointer"
       />
 
-      {/* 2. Top Stream Security Header */}
+      {/* 2. Dynamic HTML5 Anti-Piracy Watermark Canvas Overlay */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none z-15 w-full h-full"
+      />
+
+      {/* 3. Top Stream Security Header */}
       <div
         className={`absolute top-0 inset-x-0 p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between text-white transition-opacity duration-300 z-20 pointer-events-none ${
           showControls ? 'opacity-100' : 'opacity-0'

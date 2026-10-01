@@ -5,7 +5,7 @@ import { store } from '@/lib/services/data-store';
 describe('HLS Video Player & Anti-Piracy Watermarking Engine', () => {
   describe('1. Anti-Piracy Watermark Generation & Payload Integrity', () => {
     it('constructs multi-layer security payload containing student identifiers', () => {
-      const student = store.students[0];
+      const student = store.students.find((s) => s.id === 'stu-01') || store.students[0];
       expect(student).toBeDefined();
 
       const watermarkPayload = {
@@ -16,7 +16,7 @@ describe('HLS Video Player & Anti-Piracy Watermarking Engine', () => {
         securityTag: 'SAP-SEC-STREAM-VERIFIED',
       };
 
-      expect(watermarkPayload.name).toBe('Amit Gupta');
+      expect(watermarkPayload.name).toBe(student.full_name);
       expect(watermarkPayload.code).toMatch(/ADM-|STD-/);
       expect(watermarkPayload.email).toContain('@');
       expect(watermarkPayload.securityTag).toBe('SAP-SEC-STREAM-VERIFIED');

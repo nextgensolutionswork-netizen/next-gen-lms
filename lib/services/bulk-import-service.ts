@@ -227,10 +227,17 @@ export function validateStudentRows(
     const rowErrors: string[] = [];
     const rowWarnings: string[] = [];
 
-    const fullName = data.full_name || data.student_name || data.name || '';
-    const email = (data.email || '').toLowerCase().trim();
-    const phone = data.phone || data.mobile || '';
-    const courseIdentifier = data.course_code || data.course_id || data.course_name || data.course || '';
+    const fullName = (
+      data.full_name ||
+      data.student_name ||
+      data.name ||
+      data.user_name ||
+      (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : '') ||
+      ''
+    ).trim();
+    const email = (data.email || data.user_email || data.email_address || '').toLowerCase().trim();
+    const phone = (data.phone || data.mobile || data.phone_number || data.user_phone || data.user_phone_number || '').trim();
+    const courseIdentifier = data.course_code || data.course_id || data.course_name || data.course || data.sap_module || '';
     const batchIdentifier = data.batch_code || data.batch_id || data.batch_name || data.batch || '';
     const courseFeeRaw = data.course_fee || data.fee || data.total_fee || '40000';
     const paidAmountRaw = data.paid_amount || data.paid || '0';
@@ -370,13 +377,65 @@ export function validateLeadRows(
     const rowErrors: string[] = [];
     const rowWarnings: string[] = [];
 
-    const fullName = data.full_name || data.lead_name || data.name || '';
-    const email = (data.email || '').toLowerCase().trim();
-    const phone = data.phone || data.mobile || '';
-    const courseIdentifier = data.course_code || data.course_name || data.course || '';
-    const leadSource = data.lead_source || data.source || 'Website Bulk Import';
+    const fullName = (
+      data.full_name ||
+      data.lead_name ||
+      data.name ||
+      data.user_name ||
+      (data.first_name ? `${data.first_name} ${data.last_name || ''}`.trim() : '') ||
+      ''
+    ).trim();
+
+    const email = (
+      data.email ||
+      data.user_email ||
+      data.email_address ||
+      ''
+    ).toLowerCase().trim();
+
+    const phone = (
+      data.phone ||
+      data.mobile ||
+      data.phone_number ||
+      data.user_phone ||
+      data.user_phone_number ||
+      ''
+    ).trim();
+
+    const courseIdentifier =
+      data.course_code ||
+      data.course_name ||
+      data.course ||
+      data.sap_module ||
+      data.interested_course ||
+      data.interested_course_name ||
+      '';
+
+    let leadSource = data.lead_source || data.source;
+    if (!leadSource) {
+      if (data.campaign_name) {
+        const platform = data.platform ? `${data.platform.toUpperCase()} ` : '';
+        leadSource = `${platform}Ads (${data.campaign_name})`;
+      } else if (data.platform) {
+        leadSource = `Meta Ads (${data.platform})`;
+      } else {
+        leadSource = 'Meta/Google Ads Bulk Import';
+      }
+    }
+
     const stageInput = (data.stage || 'New') as LeadStage;
-    const experienceRaw = data.experience_years || data.experience || '0';
+    const experienceRaw = data.experience_years || data.experience || data.work_experience || '0';
+
+    let rowNotes = data.notes;
+    if (!rowNotes) {
+      const metaDetails: string[] = [];
+      if (data.campaign_name) metaDetails.push(`Campaign: ${data.campaign_name}`);
+      if (data.ad_name) metaDetails.push(`Ad: ${data.ad_name}`);
+      if (data.adset_name) metaDetails.push(`AdSet: ${data.adset_name}`);
+      if (data.form_name) metaDetails.push(`Form: ${data.form_name}`);
+      if (data.platform) metaDetails.push(`Platform: ${data.platform}`);
+      rowNotes = metaDetails.length > 0 ? metaDetails.join(' | ') : `Imported via Bulk CSV at ${new Date().toISOString()}`;
+    }
 
     // 1. Full name validation
     if (!fullName || fullName.trim().length < 2) {
@@ -453,7 +512,7 @@ export function validateLeadRows(
         lead_source: leadSource,
         stage: matchedStage,
         experience_years: expYears,
-        notes: data.notes || `Imported via Bulk CSV at ${new Date().toISOString()}`,
+        notes: rowNotes,
       },
       isValid,
       errors: rowErrors,

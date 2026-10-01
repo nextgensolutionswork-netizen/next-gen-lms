@@ -32,8 +32,41 @@ export default function SchedulePage() {
   const [startTime, setStartTime] = React.useState('08:00');
   const [endTime, setEndTime] = React.useState('10:00');
   const [mode, setMode] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Hybrid');
-  const [meetingLink, setMeetingLink] = React.useState('https://meet.google.com/live-sap-lab');
+  const [provider, setProvider] = React.useState<'Zoom' | 'Google Meet' | 'Manual'>('Zoom');
+  const [meetingId, setMeetingId] = React.useState('');
+  const [meetingLink, setMeetingLink] = React.useState('');
   const [classroom, setClassroom] = React.useState('Lab 2 (SAP Enterprise Server Lab)');
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const handleGenerateConference = async (chosenProvider: 'Zoom' | 'Google Meet') => {
+    if (!topic.trim()) {
+      alert('Please enter a session topic first before generating the conference link.');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/conference/create-meeting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          sessionDate: date,
+          startTime,
+          endTime,
+          provider: chosenProvider,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.meeting) {
+        setMeetingLink(data.meeting.meetingLink);
+        setMeetingId(data.meeting.meetingId);
+      }
+    } catch (err) {
+      console.error('Failed to generate conference link:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,11 +82,15 @@ export default function SchedulePage() {
       end_time: endTime,
       mode,
       meeting_link: meetingLink,
+      meeting_id: meetingId || undefined,
+      meeting_provider: provider === 'Manual' ? undefined : provider,
       classroom,
       status: 'Scheduled',
     });
     setIsAddModal(false);
     setTopic('');
+    setMeetingLink('');
+    setMeetingId('');
     setSessions([...store.classSessions]);
   };
 
@@ -140,11 +177,19 @@ export default function SchedulePage() {
                   </div>
                 )}
                 {sess.meeting_link && (
-                  <div className="flex items-center space-x-1.5 text-blue-600">
-                    <Video className="h-3.5 w-3.5 text-blue-500" />
-                    <a href={sess.meeting_link} target="_blank" rel="noreferrer" className="hover:underline truncate">
-                      {sess.meeting_link}
-                    </a>
+                  <div className="flex items-center justify-between bg-blue-50/70 p-2 rounded-lg border border-blue-100 text-slate-700">
+                    <div className="flex items-center space-x-1.5 truncate pr-2">
+                      <Video className="h-3.5 w-3.5 text-[#0A6ED1] shrink-0" />
+                      <span className="font-semibold text-[11px] text-slate-900">
+                        {sess.meeting_provider || (sess.meeting_link.includes('zoom') ? 'Zoom Live' : 'Google Meet')}
+                      </span>
+                      {sess.meeting_id && (
+                        <span className="text-[10px] font-mono text-slate-500">({sess.meeting_id})</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded shrink-0">
+                      Webhook Auto-Tracked
+                    </span>
                   </div>
                 )}
               </div>
@@ -241,9 +286,93 @@ export default function SchedulePage() {
             />
           </div>
 
+          {/* Automated Conference Integration Options */}
+          {(mode === 'Online' || mode === 'Hybrid') && (
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-800 text-[11px] uppercase tracking-wider flex items-center space-x-1.5">
+                  <Video className="h-3.5 w-3.5 text-[#0A6ED1]" />
+                  <span>Automated Conference Integration</span>
+                </span>
+                <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full">
+                  Webhook Auto-Sync
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProvider('Zoom');
+                    handleGenerateConference('Zoom');
+                  }}
+                  disabled={isGenerating}
+                  className={`p-2 rounded-lg border text-center transition-all ${
+                    provider === 'Zoom'
+                      ? 'bg-white border-[#0A6ED1] shadow-xs font-bold text-[#0A6ED1]'
+                      : 'bg-white/50 border-slate-200 text-slate-600 hover:bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-xs">Zoom API</div>
+                  <div className="text-[9px] text-slate-500">Auto OAuth</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProvider('Google Meet');
+                    handleGenerateConference('Google Meet');
+                  }}
+                  disabled={isGenerating}
+                  className={`p-2 rounded-lg border text-center transition-all ${
+                    provider === 'Google Meet'
+                      ? 'bg-white border-[#0A6ED1] shadow-xs font-bold text-[#0A6ED1]'
+                      : 'bg-white/50 border-slate-200 text-slate-600 hover:bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-xs">Google Meet</div>
+                  <div className="text-[9px] text-slate-500">Calendar API</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setProvider('Manual')}
+                  className={`p-2 rounded-lg border text-center transition-all ${
+                    provider === 'Manual'
+                      ? 'bg-white border-[#0A6ED1] shadow-xs font-bold text-[#0A6ED1]'
+                      : 'bg-white/50 border-slate-200 text-slate-600 hover:bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-xs">Manual Link</div>
+                  <div className="text-[9px] text-slate-500">Custom URL</div>
+                </button>
+              </div>
+
+              {provider !== 'Manual' && (
+                <div className="pt-1 flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isGenerating || !topic.trim()}
+                    onClick={() => handleGenerateConference(provider as 'Zoom' | 'Google Meet')}
+                    className="text-[11px] h-7 px-2.5 bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
+                  >
+                    {isGenerating ? 'Generating Meeting...' : `Regenerate ${provider} Link`}
+                  </Button>
+                  {meetingId && (
+                    <span className="text-[10px] font-mono text-slate-600">
+                      ID: <strong>{meetingId}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <Input
-            label="Google Meet / Zoom Live Link"
-            placeholder="https://meet.google.com/..."
+            label={provider !== 'Manual' ? `${provider} Live Session Link` : 'Custom Meeting Link'}
+            placeholder="https://meet.google.com/... or https://zoom.us/..."
             value={meetingLink}
             onChange={(e) => setMeetingLink(e.target.value)}
           />

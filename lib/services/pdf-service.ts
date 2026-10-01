@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { Receipt, Certificate } from '@/types';
 import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { amountToWordsINR, calculateGstBreakdown } from './gst-service';
+import { uploadFile } from './storage-service';
 
 /**
  * Server-Side PDF Generation Service
@@ -422,3 +423,74 @@ export async function generateCertificatePdfBuffer(cert: Certificate): Promise<B
     }
   });
 }
+
+/**
+ * Generates an official vector PDF for a receipt, persists it to storage,
+ * and attaches the permanent URL.
+ */
+export async function generateAndSaveReceiptPdf(receipt: Receipt): Promise<{
+  buffer: Buffer;
+  pdfUrl: string;
+  signedPdfUrl?: string;
+}> {
+  const buffer = await generateReceiptPdfBuffer(receipt);
+  const cleanNum = receipt.receipt_number.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const path = `${receipt.student_id}/receipt-${cleanNum}.pdf`;
+
+  let pdfUrl = `/api/receipts/${receipt.id}/pdf`;
+  let signedPdfUrl: string | undefined;
+
+  try {
+    const uploadRes = await uploadFile({
+      bucket: 'receipts',
+      file: buffer,
+      fileName: `receipt-${cleanNum}.pdf`,
+      contentType: 'application/pdf',
+      entityId: receipt.student_id,
+      path,
+    });
+    pdfUrl = uploadRes.url;
+    signedPdfUrl = uploadRes.signedUrl;
+  } catch (err) {
+    console.warn(`Receipt PDF storage upload notice for [${receipt.receipt_number}], using direct API route:`, err);
+  }
+
+  receipt.pdf_url = pdfUrl;
+  return { buffer, pdfUrl, signedPdfUrl };
+}
+
+/**
+ * Generates an official vector PDF for a course completion certificate,
+ * persists it to storage, and attaches the permanent URL.
+ */
+export async function generateAndSaveCertificatePdf(cert: Certificate): Promise<{
+  buffer: Buffer;
+  pdfUrl: string;
+  signedPdfUrl?: string;
+}> {
+  const buffer = await generateCertificatePdfBuffer(cert);
+  const cleanId = cert.certificate_id.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const path = `certificates/${cleanId}.pdf`;
+
+  let pdfUrl = `/api/certificates/${cert.certificate_id}/pdf`;
+  let signedPdfUrl: string | undefined;
+
+  try {
+    const uploadRes = await uploadFile({
+      bucket: 'receipts',
+      file: buffer,
+      fileName: `certificate-${cleanId}.pdf`,
+      contentType: 'application/pdf',
+      entityId: cert.student_id,
+      path,
+    });
+    pdfUrl = uploadRes.url;
+    signedPdfUrl = uploadRes.signedUrl;
+  } catch (err) {
+    console.warn(`Certificate PDF storage upload notice for [${cert.certificate_id}], using direct API route:`, err);
+  }
+
+  cert.pdf_url = pdfUrl;
+  return { buffer, pdfUrl, signedPdfUrl };
+}
+

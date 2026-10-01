@@ -14,6 +14,8 @@ import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { calculateGstBreakdown } from './gst-service';
+import { generateAndSaveReceiptPdf } from './pdf-service';
+import { dispatchMultiChannelNotification, buildReceiptEmailHtml } from './notification-service';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -320,9 +322,20 @@ export async function recordPaymentAtomic(
     irn: gstDetails.irn,
     ack_no: gstDetails.ack_no,
     ack_date: gstDetails.ack_date,
+    pdf_url: `/api/receipts/${receiptNumber}/pdf`,
   };
 
-  // 5. Commit to Store & schedule persistence
+  // 5. Generate and persist binary vector PDF
+  try {
+    const pdfRes = await generateAndSaveReceiptPdf(newReceipt);
+    if (pdfRes.pdfUrl) {
+      newReceipt.pdf_url = pdfRes.pdfUrl;
+    }
+  } catch (pdfErr) {
+    console.warn('Receipt PDF generation warning, falling back to direct API route:', pdfErr);
+  }
+
+  // 6. Commit to Store & schedule persistence
   store.payments.unshift(newPayment);
   store.receipts.unshift(newReceipt);
   store.persist();
@@ -367,6 +380,7 @@ export async function recordPaymentAtomic(
         institute_address: newReceipt.institute_address,
         institute_phone: newReceipt.institute_phone,
         institute_gst: newReceipt.institute_gst,
+        pdf_url: newReceipt.pdf_url,
       });
 
       // 3. Direct update to student_fee_accounts table
@@ -388,7 +402,7 @@ export async function recordPaymentAtomic(
     }
   }
 
-  // 6. Record Tamper-Evident Audit Log
+  // 7. Record Tamper-Evident Audit Log
   await recordAuditLog({
     user_id: collectorUserId,
     user_name: collector?.full_name || 'Staff',
@@ -402,8 +416,44 @@ export async function recordPaymentAtomic(
       receipt: receiptNumber,
       mode: input.payment_mode,
       remaining_balance: newOutstandingAmount,
+      pdf_url: newReceipt.pdf_url,
     },
   });
+
+  // 8. Multi-Channel Notification Dispatch (In-App, Email with PDF download, WhatsApp link)
+  try {
+    const recipientPhone = student.phone || admission?.phone;
+    const recipientEmail = student.email || admission?.email;
+    const downloadPdfUrl = newReceipt.pdf_url || `/api/receipts/${newReceipt.id}/pdf?download=true`;
+
+    await dispatchMultiChannelNotification({
+      userId: student.id,
+      recipientName: student.full_name,
+      recipientEmail,
+      recipientPhone,
+      title: `Fee Payment Received: ₹${input.amount.toLocaleString('en-IN')}`,
+      message: `Tuition fee payment of ₹${input.amount.toLocaleString('en-IN')} for ${newReceipt.course_name} recorded successfully. Receipt No: ${newReceipt.receipt_number}. Remaining Balance: ₹${newOutstandingAmount.toLocaleString('en-IN')}. Download PDF: ${downloadPdfUrl}`,
+      type: 'success',
+      category: 'payment',
+      actionUrl: downloadPdfUrl,
+      channels: ['in_app', 'email', 'whatsapp'],
+      metadata: {
+        receiptId: newReceipt.id,
+        receiptNumber: newReceipt.receipt_number,
+        pdfUrl: downloadPdfUrl,
+        htmlTemplate: buildReceiptEmailHtml({
+          studentName: student.full_name,
+          receiptNumber: newReceipt.receipt_number,
+          amount: input.amount,
+          remainingBalance: newOutstandingAmount,
+          courseName: newReceipt.course_name,
+          pdfUrl: downloadPdfUrl,
+        }),
+      },
+    });
+  } catch (notifErr) {
+    console.warn('Payment notification dispatch warning:', notifErr);
+  }
 
   return { payment: newPayment, receipt: newReceipt, updatedFeeAccount: feeAccount };
 }

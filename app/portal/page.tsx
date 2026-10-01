@@ -412,15 +412,6 @@ export default function StudentPortalPage() {
     setVideoPosition(existingProgress?.last_watched_seconds || 0);
   };
 
-  const handleSimulateWatch = async () => {
-    // Advance progress by 25%
-    const nextPos = Math.min(videoDuration, videoPosition + Math.round(videoDuration * 0.25));
-    setVideoPosition(nextPos);
-    await updateVideoProgress(student.id, activeLesson.id, student.course_id, nextPos, videoDuration);
-    const updated = await getStudentCourseProgress(student.id, student.course_id);
-    setCourseProgress(updated.overallProgress);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-12">
       {/* Student Portal Navigation Bar */}
@@ -558,7 +549,7 @@ export default function StudentPortalPage() {
               <HlsVideoPlayer
                 src={
                   activeLesson?.content_url ||
-                  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                  'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
                 }
                 title={activeLesson?.title}
                 student={{
@@ -568,6 +559,7 @@ export default function StudentPortalPage() {
                   student_code: student.student_code,
                   email: student.email,
                   phone: student.phone,
+                  ip: '103.24.120.45',
                 }}
                 initialPosition={videoPosition}
                 onProgress={async (currTime, dur, pct) => {
@@ -607,15 +599,6 @@ export default function StudentPortalPage() {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSimulateWatch}
-                      className="text-[11px] py-1 px-2.5 h-7 border-blue-200 text-blue-700 hover:bg-blue-50"
-                      title="Quick Testing / Progress Advancement"
-                    >
-                      Simulate +25%
-                    </Button>
                     <Badge variant="success">Published</Badge>
                   </div>
                 </div>

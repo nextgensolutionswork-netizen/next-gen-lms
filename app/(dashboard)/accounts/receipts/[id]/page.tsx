@@ -49,13 +49,22 @@ export default function ReceiptPrintPage() {
 
   const isInterState = gstInfo.supply_type === 'INTER_STATE';
 
+  const pdfUrl = receipt.pdf_url || `/api/receipts/${receipt.id}/pdf`;
+
   const handlePrint = () => {
-    window.print();
+    // Open server-side vector PDF directly to guarantee exact print margins across all devices
+    window.open(pdfUrl, '_blank');
   };
 
   const handleShareWhatsApp = () => {
+    const fullPdfUrl = pdfUrl.startsWith('http')
+      ? pdfUrl
+      : typeof window !== 'undefined'
+      ? `${window.location.origin}${pdfUrl}?download=true`
+      : pdfUrl;
+
     const text = encodeURIComponent(
-      `Official GST Tax Invoice: ${receipt.receipt_number}\nInstitute: ${receipt.institute_name}\nStudent: ${receipt.student_name}\nAmount Paid: ${formatINR(receipt.payment_amount)}\nPlace of Supply: ${gstInfo.place_of_supply}\nDate: ${formatDate(receipt.payment_date)}`
+      `Official GST Tax Invoice: ${receipt.receipt_number}\nInstitute: ${receipt.institute_name}\nStudent: ${receipt.student_name}\nAmount Paid: ${formatINR(receipt.payment_amount)}\nPlace of Supply: ${gstInfo.place_of_supply}\nDate: ${formatDate(receipt.payment_date)}\n\nDownload Official PDF Receipt:\n${fullPdfUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };

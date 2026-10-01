@@ -543,6 +543,7 @@ export interface Receipt {
   irn?: string;
   ack_no?: string;
   ack_date?: string;
+  pdf_url?: string;
 }
 
 export type ExpenseCategory =
@@ -667,6 +668,7 @@ export interface Certificate {
   assignment_completion_rate: number;
   exam_score_percentage: number;
   verification_url: string;
+  pdf_url?: string;
   is_valid: boolean;
   created_at: string;
 }

@@ -15,6 +15,7 @@ import {
   RefreshCw,
   BellRing,
   ExternalLink,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,7 @@ import { store } from '@/lib/services/data-store';
 import { AttendanceStatus, AttendanceSource, AttendanceRecord, MeetingParticipantLog } from '@/types';
 import { markAttendance } from '@/lib/services/academics-service';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
+import { exportAttendanceToExcel } from '@/lib/utils/excel-export';
 import { subscribeRealtimeTopic } from '@/lib/services/realtime-service';
 
 export default function AttendancePage() {
@@ -117,6 +119,16 @@ export default function AttendancePage() {
     exportToCSV('attendance_register_report', rows);
   };
 
+  const handleExportAttendanceExcel = () => {
+    const currentRecords = store.attendanceRecords.filter(
+      (r) => r.batch_id === selectedBatchId || r.attendance_date === selectedDate
+    );
+    exportAttendanceToExcel(
+      currentRecords.length > 0 ? currentRecords : store.attendanceRecords,
+      batch?.batch_name
+    );
+  };
+
   const handleTriggerMeetingSync = async () => {
     if (!syncMeetingId) return;
     setIsSyncing(true);
@@ -204,7 +216,17 @@ export default function AttendancePage() {
 
           <Button variant="outline" size="sm" onClick={handleExportAttendance} className="text-xs flex items-center space-x-1">
             <Download className="h-3.5 w-3.5" />
-            <span>Export Register</span>
+            <span>Export CSV</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportAttendanceExcel}
+            className="text-xs flex items-center space-x-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Export to Excel</span>
           </Button>
 
           <Button variant="sap" size="sm" onClick={handleSaveAttendance} className="text-xs flex items-center space-x-1">
