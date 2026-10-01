@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { generateReceiptPdfBuffer, generateCertificatePdfBuffer } from '@/lib/services/pdf-service';
+import {
+  generateReceiptPdfBuffer,
+  generateCertificatePdfBuffer,
+  generateAndSaveReceiptPdf,
+  generateAndSaveCertificatePdf,
+} from '@/lib/services/pdf-service';
 import { store } from '@/lib/services/data-store';
 import { NextRequest } from 'next/server';
 import { GET as getReceiptPdfRoute } from '@/app/api/receipts/[id]/pdf/route';
@@ -152,6 +157,30 @@ describe('PDF Generation Service & API Routes', () => {
       const json = await res.json();
       expect(json.success).toBe(false);
       expect(json.error).toContain('not found');
+    });
+  });
+
+  describe('Persistent Storage & Permanent URL Generation', () => {
+    it('generates binary PDF buffer and assigns permanent URL for receipt', async () => {
+      const receipt = { ...store.receipts[0] };
+      const res = await generateAndSaveReceiptPdf(receipt);
+
+      expect(Buffer.isBuffer(res.buffer)).toBe(true);
+      expect(res.buffer.length).toBeGreaterThan(3000);
+      expect(res.pdfUrl).toBeDefined();
+      expect(res.pdfUrl).toContain(receipt.receipt_number);
+      expect(receipt.pdf_url).toBe(res.pdfUrl);
+    });
+
+    it('generates binary PDF buffer and assigns permanent URL for certificate', async () => {
+      const cert = { ...store.certificates[0] };
+      const res = await generateAndSaveCertificatePdf(cert);
+
+      expect(Buffer.isBuffer(res.buffer)).toBe(true);
+      expect(res.buffer.length).toBeGreaterThan(3000);
+      expect(res.pdfUrl).toBeDefined();
+      expect(res.pdfUrl).toContain(cert.certificate_id);
+      expect(cert.pdf_url).toBe(res.pdfUrl);
     });
   });
 });

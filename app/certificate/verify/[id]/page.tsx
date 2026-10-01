@@ -43,16 +43,28 @@ export default function CertificateVerifyPage() {
 
         <div className="flex items-center space-x-2">
           {cert && (
-            <a
-              href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1.5 shadow-sm">
-                <Download className="h-4 w-4" />
-                <span>Download Verified PDF</span>
-              </Button>
-            </a>
+            <>
+              <a
+                href={`/api/certificates/${cert.certificate_id}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="sm" className="text-xs flex items-center space-x-1.5 shadow-xs">
+                  <Printer className="h-4 w-4" />
+                  <span>Print View</span>
+                </Button>
+              </a>
+              <a
+                href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1.5 shadow-sm">
+                  <Download className="h-4 w-4" />
+                  <span>Download Verified PDF</span>
+                </Button>
+              </a>
+            </>
           )}
           <Link href="/dashboard">
             <Button variant="outline" size="sm" className="text-xs">
