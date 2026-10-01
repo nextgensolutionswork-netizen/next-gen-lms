@@ -17,7 +17,7 @@ import { UserProfile } from '@/types';
  */
 export function isLiveSupabaseEnabled(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) return false;
   if (url.includes('mock-sap-lms') || anonKey.includes('mockAnonKey')) return false;
@@ -469,7 +469,10 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
  */
 export function getDb(auth?: RlsAuthContext | string | UserProfile): any {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock-sap-lms.supabase.co';
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-key';
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    'mock-key';
 
   const user = resolveUserProfile(auth);
   const isBypass = typeof auth === 'object' && auth !== null && 'bypassRls' in auth ? Boolean(auth.bypassRls) : false;

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-10-01T06:58:26.963Z",
+  "timestamp": "2026-10-01T07:29:13.539Z",
   "settings": {
     "id": "sys-01",
     "institute_name": "Next-Gen ERP Solutions",
@@ -244,9 +244,47 @@
       "is_active": true,
       "created_at": "2026-10-01T06:58:26.758Z",
       "updated_at": "2026-10-01T06:58:26.758Z"
+    },
+    {
+      "id": "usr-stu-1790839753295",
+      "email": "test.student.1790839753294@example.com",
+      "full_name": "Rajesh Test",
+      "role": "student",
+      "phone": "+91 99999 88888",
+      "is_active": true,
+      "created_at": "2026-10-01T07:29:13.295Z",
+      "updated_at": "2026-10-01T07:29:13.295Z"
     }
   ],
   "admissions": [
+    {
+      "id": "adm-1790839753295",
+      "admission_number": "ADM-2026-0025",
+      "student_name": "Rajesh Test",
+      "phone": "+91 99999 88888",
+      "email": "test.student.1790839753294@example.com",
+      "dob": "2000-01-01",
+      "gender": "Male",
+      "address": "Madhapur",
+      "city": "Hyderabad",
+      "state": "Telangana",
+      "state_code": "36",
+      "education": "B.Tech",
+      "experience_years": 1,
+      "current_employment_status": "Employed",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "training_mode": "Hybrid",
+      "admission_date": "2026-03-01",
+      "course_fee": 45000,
+      "discount": 5000,
+      "discount_reason": "Merit",
+      "net_payable": 40000,
+      "payment_plan": "2 Installments",
+      "status": "Confirmed",
+      "created_at": "2026-10-01T07:29:13.295Z",
+      "updated_at": "2026-10-01T07:29:13.295Z"
+    },
     {
       "id": "adm-1790837906758",
       "admission_number": "ADM-2026-0024",
@@ -888,6 +926,32 @@
     }
   ],
   "students": [
+    {
+      "id": "stu-1790839753295",
+      "user_id": "usr-stu-1790839753295",
+      "admission_id": "adm-1790839753295",
+      "student_code": "STU-FICO-015",
+      "admission_number": "ADM-2026-0025",
+      "full_name": "Rajesh Test",
+      "email": "test.student.1790839753294@example.com",
+      "phone": "+91 99999 88888",
+      "address": "Madhapur, Hyderabad, Telangana",
+      "city": "Hyderabad",
+      "state": "Telangana",
+      "state_code": "36",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "joining_date": "2026-03-01",
+      "status": "Active",
+      "total_fee": 40000,
+      "paid_amount": 5000,
+      "outstanding_amount": 35000,
+      "attendance_percentage": 0,
+      "course_progress": 0,
+      "placement_status": "Not Started",
+      "created_at": "2026-10-01T07:29:13.295Z",
+      "updated_at": "2026-10-01T07:29:13.298Z"
+    },
     {
       "id": "stu-1790837906758",
       "user_id": "usr-stu-1790837906758",
@@ -1903,6 +1967,24 @@
   ],
   "feeAccounts": [
     {
+      "id": "fa-1790839753295",
+      "student_id": "stu-1790839753295",
+      "student_name": "Rajesh Test",
+      "admission_id": "adm-1790839753295",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "original_fee": 45000,
+      "discount": 5000,
+      "discount_reason": "Merit",
+      "net_payable": 40000,
+      "paid_amount": 5000,
+      "outstanding_amount": 35000,
+      "payment_plan": "2 Installments",
+      "status": "Partially Paid",
+      "created_at": "2026-10-01T07:29:13.295Z",
+      "updated_at": "2026-10-01T07:29:13.298Z"
+    },
+    {
       "id": "fa-1790837906758",
       "student_id": "stu-1790837906758",
       "student_name": "Rajesh Test",
@@ -2444,6 +2526,26 @@
       "id": "inst-fa-1790837906758-2",
       "fee_account_id": "fa-1790837906758",
       "student_id": "stu-1790837906758",
+      "installment_number": 2,
+      "amount": 20000,
+      "due_date": "2026-04-01",
+      "paid_amount": 0,
+      "status": "Upcoming"
+    },
+    {
+      "id": "inst-fa-1790839753295-1",
+      "fee_account_id": "fa-1790839753295",
+      "student_id": "stu-1790839753295",
+      "installment_number": 1,
+      "amount": 20000,
+      "due_date": "2026-03-01",
+      "paid_amount": 5000,
+      "status": "Partial"
+    },
+    {
+      "id": "inst-fa-1790839753295-2",
+      "fee_account_id": "fa-1790839753295",
+      "student_id": "stu-1790839753295",
       "installment_number": 2,
       "amount": 20000,
       "due_date": "2026-04-01",
@@ -4021,6 +4123,23 @@
     }
   ],
   "auditLogs": [
+    {
+      "user_id": "usr-admin",
+      "user_name": "Priya Nair (Operations Head)",
+      "user_role": "admin",
+      "action": "ADMISSION_CONFIRMED",
+      "module": "ADMISSIONS",
+      "record_id": "adm-1790839753295",
+      "new_value": {
+        "admission_number": "ADM-2026-0025",
+        "student": "Rajesh Test",
+        "course": "SAP S/4HANA Finance (FICO)",
+        "net_payable": 40000,
+        "installments": 2
+      },
+      "id": "aud-1790839753296-874",
+      "created_at": "2026-10-01T07:29:13.296Z"
+    },
     {
       "user_id": "usr-admin",
       "user_name": "Priya Nair (Operations Head)",
