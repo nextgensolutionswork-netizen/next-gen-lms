@@ -83,6 +83,7 @@ export type LeadStage =
   | 'Interested'
   | 'Not Interested'
   | 'Converted'
+  | 'Enrolled'
   | 'Lost';
 
 export interface Lead {
@@ -405,7 +406,9 @@ export interface Quiz {
   title: string;
   description: string;
   duration_minutes: number;
+  time_limit_minutes?: number;
   pass_percentage: number;
+  passing_percentage?: number;
   attempts_allowed: number;
   randomize_questions: boolean;
   show_answers_after: boolean;
@@ -426,8 +429,10 @@ export interface QuizQuestion {
   options: {
     id: string;
     text: string;
-    is_correct: boolean;
+    is_correct?: boolean;
+    [key: string]: any;
   }[];
+  correct_option?: string;
   explanation?: string;
 }
 

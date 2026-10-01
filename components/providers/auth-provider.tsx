@@ -6,6 +6,11 @@ import { UserProfile, UserRole, Permission } from '@/types';
 import { store } from '@/lib/services/data-store';
 import { ROLE_PERMISSIONS, hasPermission as checkRbacPermission } from '@/lib/auth/rbac';
 import { getDb, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import {
+  AUTH_COOKIE_NAME,
+  AUTH_SIG_COOKIE_NAME,
+  generateAuthCookieSignature,
+} from '@/lib/security/auth-cookie';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -22,9 +27,8 @@ export interface AuthContextType {
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_COOKIE_NAME = 'next_gen_auth_user';
-
 let memoryCookieStorage = '';
+let memorySigCookieStorage = '';
 
 export function getAvatarUrl(user: UserProfile | null): string {
   if (user?.avatar_url) return user.avatar_url;
@@ -49,6 +53,17 @@ export function setAuthCookie(user: UserProfile) {
   if (typeof document !== 'undefined') {
     document.cookie = `${AUTH_COOKIE_NAME}=${val}; path=/; max-age=604800; SameSite=Lax`;
   }
+
+  // Generate and set HMAC signature cookie
+  generateAuthCookieSignature(val)
+    .then((sig) => {
+      memorySigCookieStorage = `${AUTH_SIG_COOKIE_NAME}=${sig}`;
+      if (typeof document !== 'undefined') {
+        document.cookie = `${AUTH_SIG_COOKIE_NAME}=${sig}; path=/; max-age=604800; SameSite=Lax`;
+      }
+    })
+    .catch(() => {});
+
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(user));
@@ -58,8 +73,10 @@ export function setAuthCookie(user: UserProfile) {
 
 export function clearAuthCookie() {
   memoryCookieStorage = '';
+  memorySigCookieStorage = '';
   if (typeof document !== 'undefined') {
     document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+    document.cookie = `${AUTH_SIG_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
   }
   if (typeof localStorage !== 'undefined') {
     try {

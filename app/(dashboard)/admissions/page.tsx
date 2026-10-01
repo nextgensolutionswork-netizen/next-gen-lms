@@ -51,6 +51,36 @@ export default function AdmissionsPage() {
   const [discount, setDiscount] = React.useState(0);
   const [discountReason, setDiscountReason] = React.useState('');
   const [paymentPlan, setPaymentPlan] = React.useState<'Full Payment' | '2 Installments' | '3 Installments' | 'Custom'>('3 Installments');
+  const [convertedLeadId, setConvertedLeadId] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const leadId = params.get('convertLeadId');
+      if (leadId) {
+        setConvertedLeadId(leadId);
+        const lead = store.leads.find((l) => l.id === leadId);
+        if (lead) {
+          setName(lead.full_name || '');
+          setPhone(lead.phone || '');
+          setEmail(lead.email || '');
+          if (lead.interested_course_id) {
+            setCourseId(lead.interested_course_id);
+          }
+          if (lead.training_preference) {
+            setTrainingMode(lead.training_preference);
+          }
+          if (lead.experience_years) {
+            setExperienceYears(lead.experience_years);
+          }
+          if (lead.current_status) {
+            setEducation(lead.current_status);
+          }
+          setIsNewModalOpen(true);
+        }
+      }
+    }
+  }, []);
 
   const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];
   const courseFee = selectedCourse?.price || 45000;
@@ -110,6 +140,7 @@ export default function AdmissionsPage() {
         discount_reason: discountReason,
         payment_plan: paymentPlan,
         counsellor_id: 'usr-counsellor',
+        lead_id: convertedLeadId,
       },
       'usr-admin'
     );

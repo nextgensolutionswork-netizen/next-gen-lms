@@ -6,6 +6,29 @@ import { ArrowRight, BookOpen, Eye, EyeOff, GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
+import {
+  generateAuthCookieSignature,
+  AUTH_COOKIE_NAME,
+  AUTH_SIG_COOKIE_NAME,
+  AUTH_COOKIE_SECRET,
+} from '@/lib/security/auth-cookie';
+
+async function signAuthCookiePayload(cookieVal: string): Promise<string> {
+  const sig = await generateAuthCookieSignature(cookieVal, AUTH_COOKIE_SECRET);
+  if (typeof document !== 'undefined') {
+    document.cookie = `${AUTH_SIG_COOKIE_NAME}=${sig}; path=/; max-age=604800; SameSite=Lax`;
+  }
+  return sig;
+}
+
+async function signCurrentAuthCookie(): Promise<string | null> {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + AUTH_COOKIE_NAME + '=([^;]*)'));
+  if (match && match[1]) {
+    return await signAuthCookiePayload(match[1]);
+  }
+  return null;
+}
 
 const DEMO_ACCOUNTS = [
   {
@@ -106,6 +129,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await login(account.email, account.password);
+      await signCurrentAuthCookie();
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in. Please try again.');
     } finally {
@@ -122,6 +146,8 @@ export default function LoginPage() {
       const ok = await login(email, password);
       if (!ok) {
         setError('Unable to sign in. Check your email and password and try again.');
+      } else {
+        await signCurrentAuthCookie();
       }
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in. Check your email and password and try again.');

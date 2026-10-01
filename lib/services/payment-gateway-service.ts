@@ -31,6 +31,34 @@ export function isLiveRazorpayConfigured(): boolean {
   );
 }
 
+export interface CashfreeConfig {
+  appId: string;
+  secretKey: string;
+  apiVersion: string;
+  baseUrl: string;
+}
+
+export function getCashfreeConfig(): CashfreeConfig {
+  return {
+    appId:
+      process.env.CASHFREE_APP_ID ||
+      process.env.NEXT_PUBLIC_CASHFREE_APP_ID ||
+      'cf_test_mock_app_id',
+    secretKey: process.env.CASHFREE_SECRET_KEY || 'cf_test_mock_secret_key',
+    apiVersion: process.env.CASHFREE_API_VERSION || '2023-08-01',
+    baseUrl: process.env.CASHFREE_BASE_URL || 'https://sandbox.cashfree.com/pg',
+  };
+}
+
+export function isLiveCashfreeConfigured(): boolean {
+  const cfg = getCashfreeConfig();
+  return (
+    !cfg.appId.includes('mock') &&
+    !cfg.secretKey.includes('mock') &&
+    Boolean(process.env.CASHFREE_APP_ID)
+  );
+}
+
 export interface CreateOrderInput {
   amount: number; // in INR (e.g. 10000)
   currency?: string;
@@ -56,9 +84,97 @@ export interface GatewayOrderResult {
 }
 
 /**
- * Creates an official order on Razorpay or generates a valid simulated order for dev/testing.
+ * Creates an order with Cashfree payment gateway or generates a simulated order.
  */
-export async function createGatewayOrder(input: CreateOrderInput): Promise<GatewayOrderResult> {
+export async function createCashfreeOrder(input: CreateOrderInput): Promise<GatewayOrderResult> {
+  const config = getCashfreeConfig();
+  const amountInPaise = Math.round(input.amount * 100);
+  const receipt = `rcpt_${Date.now()}`;
+  const notes = {
+    student_id: input.student_id,
+    course_id: input.course_id,
+    fee_account_id: input.fee_account_id,
+    installment_id: input.installment_id || '',
+    student_name: input.student_name || '',
+    student_email: input.student_email || '',
+    ...input.notes,
+  };
+
+  const orderId = `cf_order_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+  if (isLiveCashfreeConfigured()) {
+    try {
+      const response = await fetch(`${config.baseUrl}/orders`, {
+        method: 'POST',
+        headers: {
+          'x-client-id': config.appId,
+          'x-client-secret': config.secretKey,
+          'x-api-version': config.apiVersion,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          order_amount: input.amount,
+          order_currency: input.currency || 'INR',
+          customer_details: {
+            customer_id: input.student_id,
+            customer_email: input.student_email || 'student@example.com',
+            customer_phone: '9999999999',
+            customer_name: input.student_name || 'Student',
+          },
+          order_meta: {
+            return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/portal?order_id={order_id}`,
+          },
+          order_tags: notes,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          order_id: data.order_id || orderId,
+          amount: amountInPaise,
+          currency: input.currency || 'INR',
+          receipt,
+          key_id: config.appId,
+          gateway: 'Cashfree',
+          status: data.order_status || 'ACTIVE',
+          is_mock: false,
+          notes,
+        };
+      }
+      const errText = await response.text();
+      console.warn(`Cashfree live order creation failed (${response.status}): ${errText}`);
+    } catch (err: any) {
+      console.warn('Cashfree live order exception, falling back to simulated order:', err?.message || err);
+    }
+  }
+
+  return {
+    order_id: orderId,
+    amount: amountInPaise,
+    currency: input.currency || 'INR',
+    receipt,
+    key_id: config.appId,
+    gateway: 'Cashfree',
+    status: 'ACTIVE',
+    is_mock: true,
+    notes,
+  };
+}
+
+/**
+ * Creates an official order on Razorpay with automatic Cashfree fallback,
+ * or routes directly to Cashfree if preferred.
+ */
+export async function createGatewayOrder(
+  input: CreateOrderInput,
+  preferredGateway: 'Razorpay' | 'Cashfree' = 'Razorpay'
+): Promise<GatewayOrderResult> {
+  if (preferredGateway === 'Cashfree') {
+    return createCashfreeOrder(input);
+  }
+
   const config = getGatewayConfig();
   const amountInPaise = Math.round(input.amount * 100);
   const receipt = `rcpt_${Date.now()}`;
@@ -94,7 +210,8 @@ export async function createGatewayOrder(input: CreateOrderInput): Promise<Gatew
 
       if (!response.ok) {
         const errorBody = await response.text();
-        throw new Error(`Razorpay Order API returned ${response.status}: ${errorBody}`);
+        console.warn(`Razorpay Order API returned ${response.status}: ${errorBody}. Falling back to Cashfree.`);
+        return createCashfreeOrder(input);
       }
 
       const orderData = await response.json();
@@ -110,7 +227,8 @@ export async function createGatewayOrder(input: CreateOrderInput): Promise<Gatew
         notes,
       };
     } catch (err: any) {
-      console.warn('Razorpay live order creation failed, falling back to sandbox mode:', err?.message || err);
+      console.warn('Razorpay live order creation failed, falling back to Cashfree:', err?.message || err);
+      return createCashfreeOrder(input);
     }
   }
 
@@ -177,6 +295,36 @@ export function verifyRazorpayWebhookSignature(
     .createHmac('sha256', webhookSecret)
     .update(rawBody)
     .digest('hex');
+
+  try {
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const receivedBuffer = Buffer.from(receivedSignature, 'utf8');
+    if (expectedBuffer.length !== receivedBuffer.length) return false;
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verifies Cashfree Webhook signature:
+ * hmac_sha256(timestamp + rawBody, secretKey) === signature (base64)
+ */
+export function verifyCashfreeWebhookSignature(
+  rawBody: string,
+  receivedSignature: string,
+  timestamp: string,
+  secretOverride?: string
+): boolean {
+  if (!rawBody || !receivedSignature || !timestamp) return false;
+
+  const secret = secretOverride || getCashfreeConfig().secretKey;
+  const payload = `${timestamp}${rawBody}`;
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('base64');
 
   try {
     const expectedBuffer = Buffer.from(expectedSignature, 'utf8');

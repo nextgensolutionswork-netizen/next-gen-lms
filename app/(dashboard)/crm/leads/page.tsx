@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Users,
   Search,
@@ -30,6 +31,7 @@ import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { formatDate } from '@/lib/utils/formatters';
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [leads, setLeads] = React.useState<Lead[]>(store.leads);
   const [search, setSearch] = React.useState('');
   const [selectedStage, setSelectedStage] = React.useState<string>('All');
@@ -286,18 +288,30 @@ export default function LeadsPage() {
                       >
                         Update
                       </Button>
-                      {lead.stage !== 'Converted' && (
-                        <Button
-                          variant="sap"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setIsConvertModalOpen(true);
-                          }}
-                          className="text-xs px-2 py-1"
-                        >
-                          Convert
-                        </Button>
+                      {lead.stage !== 'Converted' && lead.stage !== 'Enrolled' && (
+                        <>
+                          <Button
+                            variant="sap"
+                            size="sm"
+                            onClick={() => {
+                              router.push(`/admissions?convertLeadId=${lead.id}`);
+                            }}
+                            className="text-xs px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            Convert to Admission
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedLead(lead);
+                              setIsConvertModalOpen(true);
+                            }}
+                            className="text-xs px-2 py-1"
+                          >
+                            Quick Convert
+                          </Button>
+                        </>
                       )}
                     </td>
                   </tr>

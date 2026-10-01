@@ -632,6 +632,36 @@ export async function gradeAssignmentSubmission(
   return sub;
 }
 
+// --- Lesson Prerequisite Locking Validation ---
+/**
+ * Determines whether a lesson at `lessonIndex` in the syllabus is unlocked for a student.
+ * Sequential Prerequisite Rules:
+ * - Lesson 1 (index 0) is always unlocked.
+ * - For Lesson i (i > 0), it is unlocked if Lesson i - 1 is completed
+ *   (store.lessonProgress has is_completed === true or completed_percentage >= 90).
+ * - Otherwise locked.
+ */
+export function isLessonUnlocked(
+  lessonIndex: number,
+  lessonsList: { id: string }[],
+  studentId: string,
+  progressList: LessonProgress[] = store.lessonProgress
+): boolean {
+  if (lessonIndex <= 0) return true;
+  const prevLesson = lessonsList[lessonIndex - 1];
+  if (!prevLesson) return false;
+
+  const prevProgress = progressList.find(
+    (lp) => lp.student_id === studentId && lp.lesson_id === prevLesson.id
+  );
+  if (!prevProgress) return false;
+
+  return Boolean(
+    prevProgress.is_completed === true ||
+    (typeof prevProgress.completed_percentage === 'number' && prevProgress.completed_percentage >= 90)
+  );
+}
+
 // --- Quizzes & Automatic Objective Grading ---
 export async function getQuizzes(courseId?: string): Promise<Quiz[]> {
   if (courseId) return store.quizzes.filter((q) => q.course_id === courseId);
@@ -642,6 +672,185 @@ export async function getQuizQuestions(quizId: string): Promise<QuizQuestion[]> 
   return store.quizQuestions.filter((q) => q.quiz_id === quizId);
 }
 
+export interface QuizQuestionResult {
+  questionId: string;
+  questionText: string;
+  selectedOptionId?: string;
+  correctOptionId?: string;
+  correctOptionText?: string;
+  isCorrect: boolean;
+  pointsEarned: number;
+  pointsPossible: number;
+  explanation?: string;
+}
+
+export interface QuizEvaluationResult {
+  score: number;
+  total_points: number;
+  percentage: number;
+  passed: boolean;
+  passing_percentage: number;
+  questionResults: QuizQuestionResult[];
+}
+
+/**
+ * Pure evaluation function for Quiz submissions.
+ * Supports comparing answers against:
+ * - `q.correct_option` (option ID, option letter 'A'/'B'..., or option text)
+ * - `opt.is_correct` in the options array
+ * Supports both `quiz.passing_percentage` and `quiz.pass_percentage`.
+ */
+export function evaluateQuizSubmission(
+  quiz: Quiz,
+  questions: QuizQuestion[],
+  answers: Record<string, string> // questionId -> selectedOptionId / letter / value
+): QuizEvaluationResult {
+  let earnedPoints = 0;
+  let totalPoints = 0;
+
+  const questionResults: QuizQuestionResult[] = questions.map((q) => {
+    const qPoints = q.points !== undefined && q.points !== null ? q.points : 1;
+    totalPoints += qPoints;
+    const selected = answers[q.id];
+
+    const options = Array.isArray(q.options) ? q.options : [];
+
+    let correctId: string | undefined = undefined;
+    let correctText: string | undefined = undefined;
+
+    // 1. Check explicit `q.correct_option`
+    if ((q as any).correct_option !== undefined && (q as any).correct_option !== null) {
+      const explicit = String((q as any).correct_option).trim();
+      correctId = explicit;
+
+      // Find match in options
+      const match = options.find((opt: any, optIdx: number) => {
+        const oId = typeof opt === 'string' ? opt : opt?.id;
+        const oLetter = String.fromCharCode(65 + optIdx);
+        const oText = typeof opt === 'string' ? opt : opt?.text;
+        return (
+          oId === explicit ||
+          oLetter.toUpperCase() === explicit.toUpperCase() ||
+          (oText && oText.trim().toLowerCase() === explicit.trim().toLowerCase())
+        );
+      });
+
+      if (match) {
+        correctId = typeof match === 'string' ? match : match.id;
+        correctText = typeof match === 'string' ? match : match.text;
+      }
+    }
+
+    // 2. Check options with is_correct
+    if (!correctId) {
+      const match = options.find((opt: any) => typeof opt === 'object' && Boolean(opt?.is_correct));
+      if (match) {
+        correctId = match.id;
+        correctText = match.text;
+      }
+    }
+
+    // Check correctness
+    let isCorrect = false;
+    if (selected !== undefined && selected !== null && selected !== '') {
+      const selStr = String(selected).trim();
+
+      if (correctId && (selStr === correctId || selStr.toLowerCase() === String(correctId).toLowerCase())) {
+        isCorrect = true;
+      } else {
+        const selectedOpt = options.find((opt: any, optIdx: number) => {
+          const oId = typeof opt === 'string' ? opt : opt?.id;
+          const oLetter = String.fromCharCode(65 + optIdx);
+          return oId === selStr || oLetter.toUpperCase() === selStr.toUpperCase();
+        });
+
+        if (selectedOpt) {
+          if (typeof selectedOpt === 'object' && selectedOpt?.is_correct) {
+            isCorrect = true;
+          } else if ((q as any).correct_option) {
+            const exp = String((q as any).correct_option).trim().toLowerCase();
+            const oId = typeof selectedOpt === 'string' ? selectedOpt : selectedOpt?.id;
+            const oText = typeof selectedOpt === 'string' ? selectedOpt : selectedOpt?.text;
+            const oIdx = options.indexOf(selectedOpt);
+            const oLetter = String.fromCharCode(65 + oIdx).toLowerCase();
+
+            if (
+              (oId && String(oId).toLowerCase() === exp) ||
+              (oText && String(oText).toLowerCase() === exp) ||
+              oLetter === exp
+            ) {
+              isCorrect = true;
+            }
+          }
+        }
+      }
+    }
+
+    const pointsEarned = isCorrect ? qPoints : 0;
+    earnedPoints += pointsEarned;
+
+    return {
+      questionId: q.id,
+      questionText: q.question_text,
+      selectedOptionId: selected,
+      correctOptionId: correctId,
+      correctOptionText: correctText,
+      isCorrect,
+      pointsEarned,
+      pointsPossible: qPoints,
+      explanation: q.explanation,
+    };
+  });
+
+  const percentage = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+  const passingPercentage = (quiz as any).passing_percentage ?? quiz.pass_percentage ?? 70;
+  const passed = percentage >= passingPercentage;
+
+  return {
+    score: earnedPoints,
+    total_points: totalPoints,
+    percentage,
+    passed,
+    passing_percentage: passingPercentage,
+    questionResults,
+  };
+}
+
+/**
+ * Records a completed QuizAttempt into `store.quizAttempts` and triggers persistence.
+ */
+export function recordQuizAttempt(
+  quiz: Quiz,
+  studentId: string,
+  evaluation: QuizEvaluationResult,
+  startedAt?: string
+): QuizAttempt {
+  const student = store.students.find((s) => s.id === studentId);
+  const attempt: QuizAttempt = {
+    id: `qa-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    quiz_id: quiz.id,
+    quiz_title: quiz.title,
+    student_id: studentId,
+    student_name: student?.full_name || 'Student',
+    score: evaluation.score,
+    total_points: evaluation.total_points,
+    percentage: evaluation.percentage,
+    passed: evaluation.passed,
+    started_at: startedAt || new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    completed_at: new Date().toISOString(),
+    status: 'Completed',
+  };
+
+  store.quizAttempts.unshift(attempt);
+  try {
+    store.persist();
+  } catch (err) {
+    // persistent storage catch
+  }
+
+  return attempt;
+}
+
 export async function submitQuizAnswers(
   quizId: string,
   studentId: string,
@@ -650,40 +859,9 @@ export async function submitQuizAnswers(
   const quiz = store.quizzes.find((q) => q.id === quizId);
   if (!quiz) throw new Error('Quiz not found');
 
-  const student = store.students.find((s) => s.id === studentId);
   const questions = store.quizQuestions.filter((q) => q.quiz_id === quizId);
+  const evaluation = evaluateQuizSubmission(quiz, questions, userAnswers);
+  const attempt = recordQuizAttempt(quiz, studentId, evaluation);
 
-  let earnedPoints = 0;
-  let totalPoints = 0;
-
-  for (const q of questions) {
-    totalPoints += q.points;
-    const selectedOptionId = userAnswers[q.id];
-    const correctOption = q.options.find((opt) => opt.is_correct);
-
-    if (selectedOptionId && correctOption && selectedOptionId === correctOption.id) {
-      earnedPoints += q.points;
-    }
-  }
-
-  const percentage = Math.round((earnedPoints / (totalPoints || 1)) * 100);
-  const passed = percentage >= quiz.pass_percentage;
-
-  const attempt: QuizAttempt = {
-    id: `qa-${Date.now()}`,
-    quiz_id: quizId,
-    quiz_title: quiz.title,
-    student_id: studentId,
-    student_name: student?.full_name,
-    score: earnedPoints,
-    total_points: totalPoints,
-    percentage,
-    passed,
-    started_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    completed_at: new Date().toISOString(),
-    status: 'Completed',
-  };
-
-  store.quizAttempts.push(attempt);
   return attempt;
 }

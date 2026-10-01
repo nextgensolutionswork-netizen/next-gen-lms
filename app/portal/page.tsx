@@ -36,6 +36,9 @@ import {
   Paperclip,
   FileCheck,
   UploadCloud,
+  Lock,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,14 +49,28 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { HlsVideoPlayer } from '@/components/ui/hls-video-player';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
-import { updateVideoProgress, getStudentCourseProgress, submitAssignment } from '@/lib/services/academics-service';
+import {
+  updateVideoProgress,
+  getStudentCourseProgress,
+  submitAssignment,
+  isLessonUnlocked,
+} from '@/lib/services/academics-service';
 import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
 import { uploadStudentResume } from '@/lib/services/placement-service';
 import { useRealtime } from '@/lib/hooks/use-realtime';
-import { StudentDoubt, DoubtCategory, DoubtPriority, Assignment, AssignmentSubmission } from '@/types';
+import {
+  StudentDoubt,
+  DoubtCategory,
+  DoubtPriority,
+  Assignment,
+  AssignmentSubmission,
+  Quiz,
+  QuizAttempt,
+} from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
+import { QuizRunnerModal } from '@/components/portal/quiz-runner-modal';
 
 export default function StudentPortalPage() {
   const { user, logout } = useAuth();
@@ -82,11 +99,33 @@ export default function StudentPortalPage() {
   const [isResumeModalOpen, setIsResumeModalOpen] = React.useState(false);
 
   // Active Lesson for Video Player
-  const [activeLesson, setActiveLesson] = React.useState(lessons[0]);
+  const sortedLessons = React.useMemo(() => {
+    return [...lessons].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  }, [lessons]);
+
+  const [activeLesson, setActiveLesson] = React.useState(sortedLessons[0] || lessons[0]);
   const [videoPosition, setVideoPosition] = React.useState(0);
   const [videoDuration, setVideoDuration] = React.useState(2700); // 45 mins
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [courseProgress, setCourseProgress] = React.useState(student.course_progress);
+
+  // Quizzes & Academic Assessments
+  const courseQuizzes = store.quizzes.filter((q) => q.course_id === student.course_id);
+  const [quizAttemptsList, setQuizAttemptsList] = React.useState<QuizAttempt[]>(
+    store.quizAttempts.filter((a) => a.student_id === student.id)
+  );
+  const [selectedQuizForRunner, setSelectedQuizForRunner] = React.useState<Quiz | null>(null);
+  const [isQuizModalOpen, setIsQuizModalOpen] = React.useState(false);
+
+  // Lesson Prerequisite Toast Notice
+  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
   const [paymentsList, setPaymentsList] = React.useState(store.payments.filter((p) => p.student_id === student.id));
   const [outstandingAmount, setOutstandingAmount] = React.useState(student.outstanding_amount);
   const [paidAmount, setPaidAmount] = React.useState(student.paid_amount);
@@ -404,7 +443,11 @@ export default function StudentPortalPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleLessonSelect = (les: any) => {
+  const handleLessonSelect = (les: any, isLocked: boolean = false) => {
+    if (isLocked) {
+      setToastMessage('Please complete previous lesson first');
+      return;
+    }
     setActiveLesson(les);
     const existingProgress = store.lessonProgress.find(
       (lp) => lp.student_id === student.id && lp.lesson_id === les.id
@@ -619,41 +662,64 @@ export default function StudentPortalPage() {
                 <CardTitle className="text-sm">Course Syllabus & Lessons</CardTitle>
               </CardHeader>
               <CardContent className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
-                {lessons.map((les, idx) => {
+                {sortedLessons.map((les, idx) => {
                   const prog = store.lessonProgress.find(
                     (lp) => lp.student_id === student.id && lp.lesson_id === les.id
                   );
-                  const isCompleted = prog?.is_completed;
+                  const isCompleted = Boolean(
+                    prog &&
+                      (prog.is_completed === true ||
+                        (typeof prog.completed_percentage === 'number' && prog.completed_percentage >= 90))
+                  );
                   const isSelected = activeLesson?.id === les.id;
+                  const isUnlocked = isLessonUnlocked(idx, sortedLessons, student.id, store.lessonProgress);
+                  const isLocked = !isUnlocked;
 
                   return (
                     <div
                       key={les.id}
-                      onClick={() => handleLessonSelect(les)}
-                      className={`cursor-pointer p-3 rounded-xl border transition-all text-xs flex items-center justify-between ${
-                        isSelected
-                          ? 'bg-blue-50 border-[#0A6ED1] shadow-xs'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      onClick={() => handleLessonSelect(les, isLocked)}
+                      title={isLocked ? 'Please complete previous lesson first' : undefined}
+                      className={`p-3 rounded-xl border transition-all text-xs flex items-center justify-between ${
+                        isLocked
+                          ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-75'
+                          : isSelected
+                          ? 'bg-blue-50 border-[#0A6ED1] shadow-xs cursor-pointer'
+                          : 'bg-white border-slate-200 hover:border-slate-300 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center space-x-2.5 overflow-hidden">
-                        {isCompleted ? (
+                        {isLocked ? (
+                          <Lock className="h-4 w-4 text-slate-400 shrink-0" />
+                        ) : isCompleted ? (
                           <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
                         ) : (
                           <PlayCircle className="h-4 w-4 text-blue-600 flex-shrink-0" />
                         )}
                         <div className="truncate">
-                          <p className={`font-semibold truncate ${isSelected ? 'text-[#0A6ED1]' : 'text-slate-800'}`}>
-                            {les.title}
-                          </p>
+                          <div className="flex items-center space-x-1.5">
+                            <p
+                              className={`font-semibold truncate ${
+                                isLocked ? 'text-slate-400' : isSelected ? 'text-[#0A6ED1]' : 'text-slate-800'
+                              }`}
+                            >
+                              {les.title}
+                            </p>
+                            {isLocked && <Lock className="h-3 w-3 text-slate-400 shrink-0 inline" />}
+                          </div>
                           <p className="text-[10px] text-slate-400">{les.duration_minutes} mins</p>
                         </div>
                       </div>
-                      {isCompleted && (
+                      {isLocked ? (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded flex items-center space-x-0.5">
+                          <Lock className="h-2.5 w-2.5" />
+                          <span>Locked</span>
+                        </span>
+                      ) : isCompleted ? (
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
                           Done
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   );
                 })}
@@ -1239,6 +1305,153 @@ export default function StudentPortalPage() {
           </CardContent>
         </Card>
 
+        {/* Academic Assessments & Quizzes Card */}
+        <Card className="border border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center shrink-0">
+                  <Award className="h-5 w-5 text-blue-300" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm sm:text-base font-bold text-white flex items-center space-x-2">
+                    <span>Academic Assessments & Quizzes</span>
+                    <span className="text-[10px] bg-blue-500/30 text-blue-200 border border-blue-400/40 px-2 py-0.5 rounded-full font-semibold">
+                      Objective Grading
+                    </span>
+                  </CardTitle>
+                  <p className="text-xs text-blue-200 mt-0.5">
+                    Test your knowledge with timed modular assessments, instant scoring, and complete answer keys.
+                  </p>
+                </div>
+              </div>
+              <div className="text-xs text-blue-200 font-medium shrink-0">
+                Course Quizzes: <span className="font-bold text-white">{courseQuizzes.length}</span> Published
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
+            {courseQuizzes.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                <Award className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">No assessments scheduled</p>
+                <p className="text-slate-400 mt-1">
+                  There are currently no active quizzes published for your enrolled course.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {courseQuizzes.map((quiz) => {
+                  const studentAttempts = quizAttemptsList.filter(
+                    (qa) => qa.quiz_id === quiz.id && qa.student_id === student.id
+                  );
+                  const latestAttempt = studentAttempts[0];
+                  const hasPassed = studentAttempts.some((a) => a.passed);
+                  const hasAttempted = studentAttempts.length > 0;
+                  const durationMins = quiz.time_limit_minutes ?? quiz.duration_minutes ?? 30;
+                  const passingScore = quiz.passing_percentage ?? quiz.pass_percentage ?? 70;
+
+                  return (
+                    <div
+                      key={quiz.id}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white transition-all shadow-xs"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <h4 className="font-bold text-slate-900 text-sm sm:text-base">
+                              {quiz.title}
+                            </h4>
+                            {hasPassed && (
+                              <Badge variant="success" className="text-[10px]">
+                                Passed
+                              </Badge>
+                            )}
+                            {hasAttempted && !hasPassed && (
+                              <Badge variant="destructive" className="text-[10px]">
+                                Retake Needed
+                              </Badge>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {quiz.description}
+                          </p>
+
+                          {/* Assessment Metadata */}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-1">
+                            <span className="flex items-center space-x-1">
+                              <Clock className="h-3.5 w-3.5 text-slate-400" />
+                              <span>
+                                Duration: <strong className="text-slate-700">{durationMins} mins</strong>
+                              </span>
+                            </span>
+                            <span>&bull;</span>
+                            <span className="flex items-center space-x-1">
+                              <Award className="h-3.5 w-3.5 text-slate-400" />
+                              <span>
+                                Passing Benchmark: <strong className="text-slate-700">{passingScore}%</strong>
+                              </span>
+                            </span>
+                            {quiz.questions_count && (
+                              <>
+                                <span>&bull;</span>
+                                <span>
+                                  Questions: <strong className="text-slate-700">{quiz.questions_count}</strong>
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Previous Attempts Summary */}
+                          {hasAttempted && (
+                            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-3 text-xs">
+                              <span className="font-medium text-slate-500">
+                                Previous Attempts ({studentAttempts.length}):
+                              </span>
+                              {studentAttempts.slice(0, 3).map((att) => (
+                                <div
+                                  key={att.id}
+                                  className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200"
+                                >
+                                  <span className="font-bold text-slate-700">
+                                    Score: {att.score}/{att.total_points} ({att.percentage}%)
+                                  </span>
+                                  <Badge
+                                    variant={att.passed ? 'success' : 'destructive'}
+                                    className="text-[9px] px-1 py-0 h-4"
+                                  >
+                                    {att.passed ? 'Pass' : 'Fail'}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-2">
+                          <Button
+                            variant={hasPassed ? 'outline' : 'sap'}
+                            size="sm"
+                            onClick={() => {
+                              setSelectedQuizForRunner(quiz);
+                              setIsQuizModalOpen(true);
+                            }}
+                            className="text-xs px-3.5 py-1.5 flex items-center space-x-1.5"
+                          >
+                            <PlayCircle className="h-3.5 w-3.5" />
+                            <span>{hasAttempted ? 'Retake Assessment' : 'Take Assessment'}</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Certificate Banner if Issued */}
         {certificate && (
           <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1686,6 +1899,46 @@ export default function StudentPortalPage() {
               </div>
             </form>
           </Modal>
+        )}
+
+        {/* Student Quiz / Assessment Runner Modal */}
+        {selectedQuizForRunner && (
+          <QuizRunnerModal
+            isOpen={isQuizModalOpen}
+            onClose={() => {
+              setIsQuizModalOpen(false);
+              setSelectedQuizForRunner(null);
+            }}
+            quiz={selectedQuizForRunner}
+            questions={store.quizQuestions.filter(
+              (q) => q.quiz_id === selectedQuizForRunner.id
+            )}
+            studentId={student.id}
+            courseId={student.course_id}
+            onQuizCompleted={() => {
+              setQuizAttemptsList([...store.quizAttempts.filter((a) => a.student_id === student.id)]);
+              setCourseProgress(student.course_progress);
+            }}
+          />
+        )}
+
+        {/* Lesson Prerequisite Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-200 max-w-md">
+            <div className="h-7 w-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <Lock className="h-4 w-4 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-slate-100">{toastMessage}</p>
+            </div>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-md"
+              aria-label="Close notification"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </main>
     </div>

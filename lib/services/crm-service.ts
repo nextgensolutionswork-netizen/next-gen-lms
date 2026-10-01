@@ -2,6 +2,7 @@ import { store } from './data-store';
 import { Lead, LeadFollowup, LeadStage } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { CreateAdmissionInput } from './admission-service';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
@@ -192,4 +193,38 @@ export async function updateLeadStage(
   });
 
   return lead;
+}
+
+/**
+ * One-click Convert Lead to Admission workflow helper:
+ * Transitions the lead stage to 'Enrolled' and prepares prefilled admission input.
+ */
+export function convertLeadToAdmission(leadId: string): {
+  lead: Lead;
+  admissionPrefill: Partial<CreateAdmissionInput>;
+} {
+  const lead = store.leads.find((l) => l.id === leadId);
+  if (!lead) throw new Error(`Lead not found: ${leadId}`);
+
+  lead.stage = 'Enrolled';
+  lead.updated_at = new Date().toISOString();
+  store.persist();
+
+  const course = store.courses.find((c) => c.id === lead.interested_course_id);
+
+  const admissionPrefill: Partial<CreateAdmissionInput> = {
+    student_name: lead.full_name,
+    email: lead.email,
+    phone: lead.phone,
+    city: 'Hyderabad',
+    education: lead.current_status || 'Graduate / B.Tech / MBA',
+    experience_years: lead.experience_years ?? 1,
+    course_id: lead.interested_course_id || (store.courses[0]?.id ?? ''),
+    counsellor_id: lead.counsellor_id,
+    lead_id: lead.id,
+    training_mode: (lead.training_preference as any) || 'Hybrid',
+    course_fee: course?.price ?? 45000,
+  };
+
+  return { lead, admissionPrefill };
 }

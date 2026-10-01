@@ -46,10 +46,19 @@ export default function FinanceReportsPage() {
 
     for (const p of store.payments) {
       const student = store.students.find((s) => s.id === p.student_id);
-      const gst = calculateGstBreakdown(
-        p.amount,
-        student ? { city: student.address, state: student.address } : null
+      const admission = store.admissions.find(
+        (a) => a.id === student?.admission_id || a.admission_number === student?.admission_number
       );
+      const studentLoc =
+        student?.state_code ||
+        student?.state ||
+        admission?.state_code ||
+        admission?.state ||
+        admission?.city ||
+        admission?.address ||
+        student?.address ||
+        'Telangana';
+      const gst = calculateGstBreakdown(p.amount, studentLoc);
       totalTaxable += gst.taxable_amount;
       totalTax += gst.total_tax;
       if (gst.supply_type === 'INTRA_STATE') {

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } from '@/lib/security/auth-cookie';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -70,22 +71,60 @@ export async function middleware(request: NextRequest) {
   let userId: string | null = null;
   let isActiveUser: boolean = true;
 
-  // 4. Check active auth cookie (next_gen_auth_user)
-  const authCookie = request.cookies.get('next_gen_auth_user')?.value;
+  // 4. Check active auth cookie (next_gen_auth_user) and verify HMAC signature
+  const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const sigCookie = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;
+
   if (authCookie) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(authCookie));
-      if (parsed && typeof parsed === 'object') {
-        if (parsed.is_active === false) {
-          isActiveUser = false;
-        } else {
-          userEmail = parsed.email || null;
-          userRole = parsed.role || null;
-          userId = parsed.id || null;
+    let isSignatureValid = true;
+    if (sigCookie) {
+      isSignatureValid = await verifyAuthCookieSignature(authCookie, sigCookie);
+    }
+
+    if (!isSignatureValid) {
+      // Tampered cookie detected: signature does not match!
+      // Reject the session as unauthenticated and clear the cookie
+      isActiveUser = false;
+      userEmail = null;
+      userRole = null;
+      userId = null;
+      response.cookies.set(AUTH_COOKIE_NAME, '', { maxAge: 0, path: '/' });
+      response.cookies.set(AUTH_SIG_COOKIE_NAME, '', { maxAge: 0, path: '/' });
+    } else {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(authCookie));
+        if (parsed && typeof parsed === 'object') {
+          // If payload itself includes an embedded signature, verify it
+          if (parsed.sig && parsed.payload) {
+            const isPayloadValid = await verifyAuthCookieSignature(JSON.stringify(parsed.payload), parsed.sig);
+            if (!isPayloadValid) {
+              isActiveUser = false;
+              userEmail = null;
+              userRole = null;
+              userId = null;
+              response.cookies.set(AUTH_COOKIE_NAME, '', { maxAge: 0, path: '/' });
+              response.cookies.set(AUTH_SIG_COOKIE_NAME, '', { maxAge: 0, path: '/' });
+            } else {
+              const target = parsed.payload;
+              if (target.is_active === false) {
+                isActiveUser = false;
+              } else {
+                userEmail = target.email || null;
+                userRole = target.role || null;
+                userId = target.id || null;
+              }
+            }
+          } else if (parsed.is_active === false) {
+            isActiveUser = false;
+          } else {
+            userEmail = parsed.email || null;
+            userRole = parsed.role || null;
+            userId = parsed.id || null;
+          }
         }
+      } catch {
+        // Corrupt JSON in cookie -> unauthenticated
       }
-    } catch {
-      // Corrupt JSON in cookie -> unauthenticated
     }
   }
 
