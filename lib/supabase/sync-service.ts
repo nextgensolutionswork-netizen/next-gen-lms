@@ -271,6 +271,113 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
     errors.push(`attendance_records: ${err.message}`);
   }
 
+  // 6. Admissions
+  try {
+    for (const adm of store.admissions) {
+      await db.from('admissions').upsert({
+        id: adm.id,
+        admission_number: adm.admission_number,
+        student_name: adm.student_name,
+        phone: adm.phone,
+        email: adm.email,
+        dob: adm.dob,
+        gender: adm.gender,
+        address: adm.address,
+        city: adm.city,
+        state: (adm as any).state || null,
+        state_code: (adm as any).state_code || null,
+        gstin: (adm as any).gstin || null,
+        education: adm.education,
+        experience_years: adm.experience_years,
+        current_employment_status: adm.current_employment_status,
+        course_id: adm.course_id,
+        training_mode: adm.training_mode,
+        batch_id: adm.batch_id,
+        trainer_id: adm.trainer_id,
+        course_fee: adm.course_fee,
+        discount: adm.discount,
+        net_payable: adm.net_payable,
+        payment_plan: adm.payment_plan,
+        status: adm.status,
+      });
+      totalSynced++;
+    }
+    syncedTables.push('admissions');
+  } catch (err: any) {
+    errors.push(`admissions: ${err.message}`);
+  }
+
+  // 7. Student Fee Accounts & Payments
+  try {
+    for (const fa of store.feeAccounts) {
+      await db.from('student_fee_accounts').upsert({
+        id: fa.id,
+        student_id: fa.student_id,
+        admission_id: fa.admission_id,
+        original_fee: fa.original_fee,
+        discount: fa.discount,
+        net_payable: fa.net_payable,
+        collected_amount: (fa as any).collected_amount ?? fa.paid_amount,
+        outstanding_balance: (fa as any).outstanding_balance ?? fa.outstanding_amount,
+        status: fa.status,
+      });
+      totalSynced++;
+    }
+    syncedTables.push('student_fee_accounts');
+  } catch (err: any) {
+    errors.push(`student_fee_accounts: ${err.message}`);
+  }
+
+  try {
+    for (const p of store.payments) {
+      await db.from('payments').upsert({
+        id: p.id,
+        receipt_number: p.receipt_number,
+        fee_account_id: p.fee_account_id,
+        student_id: p.student_id,
+        amount: p.amount,
+        payment_mode: p.payment_mode,
+        transaction_reference: p.transaction_reference,
+        payment_date: p.payment_date,
+        collected_by: p.collected_by,
+        remarks: p.notes || (p as any).remarks || null,
+      });
+      totalSynced++;
+    }
+    syncedTables.push('payments');
+  } catch (err: any) {
+    errors.push(`payments: ${err.message}`);
+  }
+
+  try {
+    for (const r of store.receipts) {
+      await db.from('receipts').upsert({
+        id: r.id,
+        receipt_number: r.receipt_number,
+        payment_id: r.payment_id,
+        student_id: r.student_id,
+        student_name: r.student_name,
+        student_code: r.admission_number || (r as any).student_code || '',
+        course_name: r.course_name,
+        amount: r.payment_amount ?? (r as any).amount ?? 0,
+        amount_in_words: (r as any).amount_in_words || `${r.payment_amount} Rupees`,
+        payment_mode: r.payment_mode,
+        transaction_reference: r.transaction_reference,
+        receipt_date: r.payment_date || (r as any).receipt_date || new Date().toISOString(),
+        issued_by: r.authorized_by || (r as any).issued_by || '11111111-1111-1111-1111-111111111111',
+        supply_type: r.supply_type || 'Intrastate',
+        taxable_amount: r.taxable_amount || null,
+        cgst_amount: r.cgst_amount || 0,
+        sgst_amount: r.sgst_amount || 0,
+        total_tax: (r as any).total_tax || ((r.cgst_amount || 0) + (r.sgst_amount || 0)),
+      });
+      totalSynced++;
+    }
+    syncedTables.push('receipts');
+  } catch (err: any) {
+    errors.push(`receipts: ${err.message}`);
+  }
+
   return {
     success: errors.length === 0,
     direction: 'push',
@@ -343,6 +450,44 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
     }
   } catch (err: any) {
     errors.push(`leads pull: ${err.message}`);
+  }
+
+  try {
+    // 3. Pull Admissions
+    const { data: admissions, error: aErr } = await db.from('admissions').select('*');
+    if (!aErr && admissions) {
+      for (const adm of admissions) {
+        const idx = store.admissions.findIndex((item) => item.id === adm.id);
+        if (idx >= 0) {
+          store.admissions[idx] = { ...store.admissions[idx], ...adm };
+        } else {
+          store.admissions.push(adm);
+        }
+        totalSynced++;
+      }
+      syncedTables.push('admissions');
+    }
+  } catch (err: any) {
+    errors.push(`admissions pull: ${err.message}`);
+  }
+
+  try {
+    // 4. Pull Courses
+    const { data: courses, error: cErr } = await db.from('courses').select('*');
+    if (!cErr && courses) {
+      for (const c of courses) {
+        const idx = store.courses.findIndex((item) => item.id === c.id);
+        if (idx >= 0) {
+          store.courses[idx] = { ...store.courses[idx], ...c };
+        } else {
+          store.courses.push(c);
+        }
+        totalSynced++;
+      }
+      syncedTables.push('courses');
+    }
+  } catch (err: any) {
+    errors.push(`courses pull: ${err.message}`);
   }
 
   // Persist updated store to local disk

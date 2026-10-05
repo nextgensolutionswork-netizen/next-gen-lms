@@ -30,13 +30,83 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 let memoryCookieStorage = '';
 let memorySigCookieStorage = '';
 
+const USER_ROLES: UserRole[] = [
+  'super_admin',
+  'admin',
+  'accountant',
+  'counsellor',
+  'trainer',
+  'placement_coordinator',
+  'support',
+  'student',
+];
+
+function isUserRole(role: unknown): role is UserRole {
+  return typeof role === 'string' && USER_ROLES.includes(role as UserRole);
+}
+
+async function loadApplicationProfile(
+  db: ReturnType<typeof getDb>,
+  authUser: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+    created_at?: string;
+  }
+): Promise<UserProfile | null> {
+  const { data, error } = await db
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load your application profile: ${error.message}`);
+  }
+
+  if (data) {
+    if (!isUserRole(data.role)) {
+      throw new Error('Your application profile has an invalid role. Contact the administrator.');
+    }
+    if (data.is_active === false) {
+      throw new Error('This account is inactive. Contact the administrator.');
+    }
+
+    const metadataName = authUser.user_metadata?.full_name;
+    return {
+      ...data,
+      id: authUser.id,
+      email: data.email || authUser.email || '',
+      full_name:
+        data.full_name ||
+        (typeof metadataName === 'string' ? metadataName : undefined) ||
+        authUser.email?.split('@')[0] ||
+        'User',
+      role: data.role,
+      is_active: true,
+      created_at: data.created_at || authUser.created_at || new Date().toISOString(),
+      updated_at: data.updated_at || new Date().toISOString(),
+    };
+  }
+
+  // Live navigation requires a real profile; a local demo record cannot satisfy
+  // the server's profile check and would otherwise create a login redirect loop.
+  if (isLiveSupabaseEnabled()) return null;
+
+  return store.users.find(
+    (profile) =>
+      profile.id === authUser.id ||
+      profile.email.toLowerCase() === authUser.email?.toLowerCase()
+  ) || null;
+}
+
 export function getAvatarUrl(user: UserProfile | null): string {
   if (user?.avatar_url) return user.avatar_url;
   const name = user?.full_name || user?.email || 'User';
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0A6ED1&color=fff&bold=true`;
 }
 
-export function setAuthCookie(user: UserProfile) {
+export async function setAuthCookie(user: UserProfile) {
   const val = encodeURIComponent(
     JSON.stringify({
       id: user.id,
@@ -55,7 +125,7 @@ export function setAuthCookie(user: UserProfile) {
   }
 
   // Generate and set HMAC signature cookie
-  generateAuthCookieSignature(val)
+  await generateAuthCookieSignature(val)
     .then((sig) => {
       memorySigCookieStorage = `${AUTH_SIG_COOKIE_NAME}=${sig}`;
       if (typeof document !== 'undefined') {
@@ -125,9 +195,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Lazily initialize user and role from persistent cookies/localStorage to avoid defaulting to super_admin
-  const [user, setUser] = React.useState<UserProfile | null>(() => getStoredUser());
-  const [role, setRole] = React.useState<UserRole>(() => getStoredUser()?.role || 'super_admin');
+  // Server and first browser render must match. Restore the profile in the
+  // effect below, after hydration, rather than reading browser storage here.
+  const [user, setUser] = React.useState<UserProfile | null>(null);
+  const [role, setRole] = React.useState<UserRole>('super_admin');
   const [isLoading, setIsLoading] = React.useState(true);
 
   // Read supabase.auth.getUser() on mount and sync global auth state
@@ -141,37 +212,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (data?.user && !error) {
           const authUser = data.user;
-          const userRole = (authUser.app_metadata?.role ||
-            authUser.user_metadata?.role ||
-            'student') as UserRole;
-
-          const matched = store.users.find(
-            (u) =>
-              u.id === authUser.id ||
-              u.email.toLowerCase() === authUser.email?.toLowerCase()
-          );
-
-          const profile: UserProfile = matched || {
-            id: authUser.id,
-            email: authUser.email || '',
-            full_name:
-              authUser.user_metadata?.full_name ||
-              authUser.user_metadata?.name ||
-              authUser.email?.split('@')[0] ||
-              'User',
-            role: userRole,
-            avatar_url: authUser.user_metadata?.avatar_url,
-            is_active: true,
-            created_at: authUser.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
+          const profile = await loadApplicationProfile(db, authUser);
 
           if (isMounted) {
-            setUser(profile);
-            setRole(profile.role);
-            setAuthCookie(profile);
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
+            if (profile) {
+              setUser(profile);
+              setRole(profile.role);
+              setAuthCookie(profile);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
+              }
+            } else {
+              setUser(null);
+              clearAuthCookie();
             }
           }
         } else {
@@ -187,6 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn('[AuthProvider] supabase.auth.getUser() error:', err);
+        if (isMounted) {
+          setUser(null);
+          clearAuthCookie();
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -203,32 +260,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: authListener } = db.auth.onAuthStateChange(async (_event: string, session: any) => {
           if (session?.user) {
             const authUser = session.user;
-            const userRole = (authUser.app_metadata?.role ||
-              authUser.user_metadata?.role ||
-              'student') as UserRole;
-            const matched = store.users.find(
-              (u) =>
-                u.id === authUser.id ||
-                u.email.toLowerCase() === authUser.email?.toLowerCase()
-            );
-            const profile: UserProfile = matched || {
-              id: authUser.id,
-              email: authUser.email || '',
-              full_name:
-                authUser.user_metadata?.full_name ||
-                authUser.email?.split('@')[0] ||
-                'User',
-              role: userRole,
-              avatar_url: authUser.user_metadata?.avatar_url,
-              is_active: true,
-              created_at: authUser.created_at || new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            if (isMounted) {
-              setUser(profile);
-              setRole(profile.role);
-              setAuthCookie(profile);
-            }
+            void loadApplicationProfile(db, authUser).then((profile) => {
+              if (!isMounted) return;
+              if (profile) {
+                setUser(profile);
+                setRole(profile.role);
+                setAuthCookie(profile);
+              } else {
+                setUser(null);
+                clearAuthCookie();
+              }
+            }).catch((err) => {
+              console.warn('[AuthProvider] Unable to load application profile:', err);
+              if (isMounted) {
+                setUser(null);
+                clearAuthCookie();
+              }
+            });
           } else if (_event === 'SIGNED_OUT') {
             if (isMounted) {
               setUser(null);
@@ -287,10 +335,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 1. If Supabase is live, attempt genuine login
       if (isLiveSupabaseEnabled() && password) {
         const db = getDb();
-        const { error } = await db.auth.signInWithPassword({ email: email.trim(), password });
+        const { data, error } = await db.auth.signInWithPassword({ email: email.trim(), password });
         if (error) {
           throw error;
         }
+
+        const authUser = data?.user;
+        if (!authUser) {
+          throw new Error('Supabase sign-in succeeded without returning a user.');
+        }
+
+        const profile = await loadApplicationProfile(db, authUser);
+        if (!profile) {
+          await db.auth.signOut();
+          throw new Error('No LMS profile is set up for this account. Contact the administrator.');
+        }
+
+        setUser(profile);
+        setRole(profile.role);
+        await setAuthCookie(profile);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
+        }
+
+        const destination = {
+          student: '/portal', support: '/support', accountant: '/accounts/fees',
+          counsellor: '/crm/leads', placement_coordinator: '/placement',
+          trainer: '/academics/courses', admin: '/dashboard', super_admin: '/dashboard',
+        }[profile.role];
+        // Request the destination with the completed session cookies, avoiding
+        // a cached unauthenticated App Router response from before sign-in.
+        window.location.assign(destination);
+        return true;
       }
 
       // 2. Match profile from store
@@ -304,7 +380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(matched);
       setRole(matched.role);
-      setAuthCookie(matched);
+      await setAuthCookie(matched);
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(matched));
       }

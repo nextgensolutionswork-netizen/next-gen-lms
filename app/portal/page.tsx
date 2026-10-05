@@ -1206,7 +1206,7 @@ export default function StudentPortalPage() {
                                   : 'outline'
                               }
                             >
-                              {isGraded ? 'Graded' : isSubmitted ? 'Submitted' : 'Pending Submission'}
+                              {isGraded ? 'Graded' : isSubmitted ? 'Submitted (Under Review)' : 'Pending Submission'}
                             </Badge>
                           </div>
                           <p className="text-xs text-slate-600 leading-relaxed">{asg.description}</p>
@@ -1223,12 +1223,13 @@ export default function StudentPortalPage() {
                                 <a
                                   href={asg.attachment_url}
                                   target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 font-semibold border border-blue-200 transition-colors"
                                 >
-                                  <Paperclip className="h-3 w-3 text-blue-500" />
-                                  <span>Download Blueprint / Material</span>
-                                  <ExternalLink className="h-2.5 w-2.5" />
+                                  <Download className="h-3 w-3 text-blue-600" />
+                                  <span>Download Blueprint / Practice File</span>
+                                  <ExternalLink className="h-2.5 w-2.5 text-blue-400" />
                                 </a>
                               </>
                             )}
@@ -1242,6 +1243,11 @@ export default function StudentPortalPage() {
                               <span className="text-sm font-black text-emerald-700">
                                 {sub.marks_obtained} / {asg.maximum_marks}
                               </span>
+                              {asg.maximum_marks > 0 && (
+                                <span className="ml-1.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                                  {Math.round(((sub.marks_obtained || 0) / asg.maximum_marks) * 100)}%
+                                </span>
+                              )}
                             </div>
                           )}
                           <Button
@@ -1287,12 +1293,24 @@ export default function StudentPortalPage() {
                             </p>
                           )}
 
-                          {isGraded && sub.feedback && (
-                            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
-                              <p className="font-bold text-[11px] uppercase tracking-wider text-emerald-800">
-                                Faculty Evaluation & Feedback:
-                              </p>
-                              <p className="mt-0.5 text-xs text-emerald-950 font-medium">{sub.feedback}</p>
+                          {isGraded && (
+                            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-emerald-800 font-bold uppercase tracking-wider gap-1">
+                                <span>Faculty Evaluation & Feedback:</span>
+                                {sub.graded_by && (
+                                  <span className="font-medium text-emerald-700 capitalize">
+                                    Trainer: {sub.graded_by}
+                                  </span>
+                                )}
+                              </div>
+                              {sub.feedback ? (
+                                <p className="mt-0.5 text-xs text-emerald-950 font-medium leading-relaxed">{sub.feedback}</p>
+                              ) : (
+                                <p className="mt-0.5 text-xs text-emerald-700 italic">No remarks provided.</p>
+                              )}
+                              {sub.graded_at && (
+                                <p className="text-[10px] text-emerald-600">Graded on: {formatDateTime(sub.graded_at)}</p>
+                              )}
                             </div>
                           )}
                         </div>

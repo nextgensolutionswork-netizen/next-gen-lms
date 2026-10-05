@@ -59,7 +59,7 @@ CREATE POLICY "Super Admins and Admins manage courses" ON courses
 CREATE POLICY "Trainers view assigned courses only" ON courses
   FOR SELECT USING (
     get_current_user_role() = 'trainer' AND
-    id = ANY((SELECT assigned_course_ids FROM profiles WHERE id = auth.uid()))
+    id IN (SELECT unnest(assigned_course_ids) FROM profiles WHERE id = auth.uid())
   );
 
 -- Counsellors can view courses for admission counseling
@@ -81,7 +81,7 @@ CREATE POLICY "Super Admins and Admins manage modules" ON course_modules
 CREATE POLICY "Trainers view assigned modules" ON course_modules
   FOR SELECT USING (
     get_current_user_role() = 'trainer' AND
-    course_id = ANY((SELECT assigned_course_ids FROM profiles WHERE id = auth.uid()))
+    course_id IN (SELECT unnest(assigned_course_ids) FROM profiles WHERE id = auth.uid())
   );
 
 CREATE POLICY "Students view enrolled modules" ON course_modules
@@ -96,7 +96,7 @@ CREATE POLICY "Super Admins and Admins manage lessons" ON lessons
 CREATE POLICY "Trainers manage assigned lessons" ON lessons
   FOR ALL USING (
     get_current_user_role() = 'trainer' AND
-    course_id = ANY((SELECT assigned_course_ids FROM profiles WHERE id = auth.uid()))
+    course_id IN (SELECT unnest(assigned_course_ids) FROM profiles WHERE id = auth.uid())
   );
 
 CREATE POLICY "Students view published enrolled lessons" ON lessons

@@ -22,6 +22,7 @@ import { store } from '@/lib/services/data-store';
 import { SystemSettings } from '@/types';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { syncStoreToSupabase, SeedSyncResult } from '@/lib/supabase/seeder';
+import { syncPostgresToLocal } from '@/lib/supabase/sync-service';
 
 export default function SettingsPage() {
   const [settings, setSettings] = React.useState<SystemSettings>(store.settings);
@@ -29,6 +30,11 @@ export default function SettingsPage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [syncResult, setSyncResult] = React.useState<SeedSyncResult | null>(null);
   const isSupabaseLive = isLiveSupabaseEnabled();
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const projectRef = supabaseUrl.includes('.supabase.co')
+    ? supabaseUrl.replace(/^https?:\/\//, '').split('.')[0]
+    : isSupabaseLive ? 'Connected' : 'Local In-Memory';
 
   const handleSyncToDb = async () => {
     setIsSyncing(true);
@@ -40,6 +46,29 @@ export default function SettingsPage() {
       setSyncResult({
         success: false,
         message: err.message || 'Sync failed',
+        syncedTables: [],
+        errors: [err.message],
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handlePullFromDb = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await syncPostgresToLocal();
+      setSyncResult({
+        success: res.success,
+        message: res.success ? 'Successfully pulled latest data from Supabase PostgreSQL' : 'Pull completed with warnings',
+        syncedTables: res.syncedTables.map((t) => ({ table: t, count: res.totalSynced })),
+        errors: res.errors,
+      });
+    } catch (err: any) {
+      setSyncResult({
+        success: false,
+        message: err.message || 'Pull failed',
         syncedTables: [],
         errors: [err.message],
       });
@@ -248,7 +277,7 @@ export default function SettingsPage() {
                   {isSupabaseLive ? 'Direct PostgreSQL Database Queries' : 'Hybrid Dual-Layer Cache'}
                 </p>
                 <p className="text-[10px] text-slate-500">
-                  Project: <strong className="font-mono text-slate-700">yutulwbkkvmryaxqjbfp</strong>
+                  Project: <strong className="font-mono text-slate-700">{projectRef}</strong>
                 </p>
               </div>
             </div>
@@ -282,19 +311,32 @@ export default function SettingsPage() {
 
             <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="text-[11px] text-slate-500">
-                Click below to push all institute seed data (courses, staff, students, fees) directly into your Supabase database.
+                Synchronize institute seed data (courses, staff, students, fees) with your live Supabase PostgreSQL database.
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSyncToDb}
-                disabled={isSyncing}
-                className="text-xs flex items-center space-x-1.5 self-start sm:self-auto bg-slate-100 hover:bg-slate-200 text-slate-800"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Syncing to Database...' : 'Sync Store to Supabase DB'}</span>
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePullFromDb}
+                  disabled={isSyncing}
+                  className="text-xs flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>Pull from DB</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSyncToDb}
+                  disabled={isSyncing}
+                  className="text-xs flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Syncing...' : 'Push to Supabase DB'}</span>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

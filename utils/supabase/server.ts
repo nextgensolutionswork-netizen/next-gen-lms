@@ -6,19 +6,20 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const createClient = (cookieStore: Awaited<ReturnType<typeof cookies>>) => {
+export const createClient = (cookieStore?: Awaited<ReturnType<typeof cookies>>) => {
+  const store = cookieStore || cookies();
   return createServerClient(
     supabaseUrl!,
     supabaseKey!,
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return store.getAll();
         },
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: any }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              store.set(name, value, options)
             );
           } catch {
             // The `setAll` method was called from a Server Component.

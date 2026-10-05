@@ -5,6 +5,14 @@ import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } fro
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Supabase may fall back to the Site URL. Preserve callback query parameters
+  // and let the browser carry its fragment to login before any dashboard redirect.
+  if (pathname === '/') {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
+  }
+
   // 1. Skip static assets, images, and next internal files
   if (
     pathname.startsWith('/_next') ||
@@ -33,7 +41,8 @@ export async function middleware(request: NextRequest) {
 
   // 3. Initialize Supabase SSR client for cookie and session verification
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock-sap-lms.supabase.co';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-key';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-key';
+  const isSupabaseLive = Boolean(supabaseUrl && !supabaseUrl.includes('mock-sap-lms'));
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -75,7 +84,7 @@ export async function middleware(request: NextRequest) {
   const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const sigCookie = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;
 
-  if (authCookie) {
+  if (authCookie && !isSupabaseLive) {
     let isSignatureValid = true;
     if (sigCookie) {
       isSignatureValid = await verifyAuthCookieSignature(authCookie, sigCookie);
@@ -129,14 +138,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. If live Supabase instance configured, verify session cryptographically with getUser()
-  const isSupabaseLive = Boolean(supabaseUrl && !supabaseUrl.includes('mock-sap-lms'));
   if (isSupabaseLive) {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (user && !error) {
-        userEmail = user.email || userEmail;
-        userId = user.id || userId;
-        userRole = user.app_metadata?.role || user.user_metadata?.role || userRole;
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles').select('role, is_active').eq('id', user.id).maybeSingle();
+        if (profile && !profileError && profile.is_active !== false) {
+          userEmail = user.email || null;
+          userId = user.id;
+          userRole = profile.role;
+        }
       } else {
         // Token invalid or session expired on Supabase Auth
         userEmail = null;
@@ -171,16 +183,9 @@ export async function middleware(request: NextRequest) {
     return createRedirect(loginUrl);
   }
 
-  // 9. Authenticated navigation to /login or / -> redirect to role's home view
-  if ((pathname === '/login' || pathname === '/') && isAuthenticated) {
-    if (userRole === 'student') {
-      return createRedirect('/portal');
-    }
-    if (userRole === 'support') {
-      return createRedirect('/support');
-    }
-    return createRedirect('/dashboard');
-  }
+  // Email callbacks can carry tokens in a fragment, which the server cannot see.
+  // Let the login page process them even when a session already exists.
+  if (pathname === '/login') return response;
 
   // 10. Student boundary isolation: students can only access /portal and /certificate/verify
   if (isAuthenticated && userRole === 'student') {

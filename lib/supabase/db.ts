@@ -1,5 +1,6 @@
 import { createClient as createBrowserClient, SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from './admin';
+import { createClient as createSessionClient } from './client';
 import { store } from '@/lib/services/data-store';
 import {
   RlsAuthContext,
@@ -121,6 +122,8 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   private action: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select';
   private selectColumns: string = '*';
   private payload: any = null;
+  private upsertOptions?: { onConflict?: string; ignoreDuplicates?: boolean };
+  private ops: Array<{ type: string; args: any[] }> = [];
   private filters: Array<(row: any) => boolean> = [];
   private orderColumn?: string;
   private orderAscending: boolean = true;
@@ -158,9 +161,10 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
     return this;
   }
 
-  upsert(values: any): this {
+  upsert(values: any, options?: { onConflict?: string; ignoreDuplicates?: boolean }): this {
     this.action = 'upsert';
     this.payload = values;
+    this.upsertOptions = options;
     return this;
   }
 
@@ -170,54 +174,64 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   }
 
   eq(column: string, value: any): this {
+    this.ops.push({ type: 'eq', args: [column, value] });
     this.filters.push((row) => row[column] === value);
     return this;
   }
 
   neq(column: string, value: any): this {
+    this.ops.push({ type: 'neq', args: [column, value] });
     this.filters.push((row) => row[column] !== value);
     return this;
   }
 
   gt(column: string, value: any): this {
+    this.ops.push({ type: 'gt', args: [column, value] });
     this.filters.push((row) => row[column] > value);
     return this;
   }
 
   gte(column: string, value: any): this {
+    this.ops.push({ type: 'gte', args: [column, value] });
     this.filters.push((row) => row[column] >= value);
     return this;
   }
 
   lt(column: string, value: any): this {
+    this.ops.push({ type: 'lt', args: [column, value] });
     this.filters.push((row) => row[column] < value);
     return this;
   }
 
   lte(column: string, value: any): this {
+    this.ops.push({ type: 'lte', args: [column, value] });
     this.filters.push((row) => row[column] <= value);
     return this;
   }
 
   like(column: string, pattern: string): this {
+    this.ops.push({ type: 'like', args: [column, pattern] });
     const regex = new RegExp(`^${pattern.replace(/%/g, '.*')}$`);
     this.filters.push((row) => regex.test(String(row[column] || '')));
     return this;
   }
 
   ilike(column: string, pattern: string): this {
+    this.ops.push({ type: 'ilike', args: [column, pattern] });
     const regex = new RegExp(`^${pattern.replace(/%/g, '.*')}$`, 'i');
     this.filters.push((row) => regex.test(String(row[column] || '')));
     return this;
   }
 
   in(column: string, values: any[]): this {
+    this.ops.push({ type: 'in', args: [column, values] });
     const set = new Set(values);
     this.filters.push((row) => set.has(row[column]));
     return this;
   }
 
   or(conditionStr: string): this {
+    this.ops.push({ type: 'or', args: [conditionStr] });
     // Parses comma-delimited conditions like "id.eq.X,ticket_number.eq.X"
     const subConds = conditionStr.split(',').map((cond) => {
       const parts = cond.split('.');
@@ -236,12 +250,14 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   }
 
   order(column: string, options?: { ascending?: boolean }): this {
+    this.ops.push({ type: 'order', args: [column, options] });
     this.orderColumn = column;
     this.orderAscending = options?.ascending ?? true;
     return this;
   }
 
   limit(count: number): this {
+    this.ops.push({ type: 'limit', args: [count] });
     this.limitCount = count;
     return this;
   }
@@ -257,7 +273,7 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   }
 
   private async execute(): Promise<{ data: any; error: any }> {
-    // 1. If Live Supabase is enabled, execute remote query with active auth token
+    // 1. If Live Supabase is enabled, execute remote query with active auth token and chained modifiers
     if (this.liveClient && isLiveSupabaseEnabled()) {
       try {
         let liveQuery: any = this.liveClient.from(this.table);
@@ -268,15 +284,35 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
         } else if (this.action === 'update') {
           liveQuery = liveQuery.update(this.payload);
         } else if (this.action === 'upsert') {
-          liveQuery = liveQuery.upsert(this.payload);
+          liveQuery = liveQuery.upsert(this.payload, this.upsertOptions);
         } else if (this.action === 'delete') {
           liveQuery = liveQuery.delete();
+        }
+
+        // Replay all query operations (eq, order, limit, etc.) on the PostgREST query
+        for (const op of this.ops) {
+          if (typeof liveQuery[op.type] === 'function') {
+            liveQuery = liveQuery[op.type](...op.args);
+          }
+        }
+
+        if (this.isSingle && typeof liveQuery.single === 'function') {
+          liveQuery = liveQuery.single();
+        } else if (this.isMaybeSingle && typeof liveQuery.maybeSingle === 'function') {
+          liveQuery = liveQuery.maybeSingle();
         }
 
         const res = await liveQuery;
         if (!res.error) {
           return res;
         }
+
+        // If single() row wasn't found (PGRST116), return expected standard error
+        if (res.error.code === 'PGRST116') {
+          return { data: null, error: { message: 'Row not found', code: 'PGRST116' } };
+        }
+
+        console.warn(`Supabase query for ${this.table} returned error, evaluating fallback:`, res.error.message);
       } catch (liveErr) {
         console.warn(`Supabase query for ${this.table} failed, evaluating with local RLS:`, liveErr);
       }
@@ -495,7 +531,7 @@ export function getDb(auth?: RlsAuthContext | string | UserProfile): any {
 
   let liveClient: SupabaseClient | undefined;
   if (isLiveSupabaseEnabled()) {
-    liveClient = createBrowserClient(url, anonKey, {
+    liveClient = typeof window !== 'undefined' ? createSessionClient() : createBrowserClient(url, anonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: typeof window !== 'undefined',

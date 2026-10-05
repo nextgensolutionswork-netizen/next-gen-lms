@@ -82,6 +82,19 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(res.status).toBe(200);
   });
 
+  it.each(['student', 'support', 'super_admin'])(
+    'preserves a password recovery callback for an authenticated %s',
+    async (role) => {
+      const cookie = encodeURIComponent(JSON.stringify({
+        id: 'existing-user', email: 'user@example.com', role,
+      }));
+      const req = createMockRequest('/login?type=recovery&code=test-code', cookie);
+      const res = await middleware(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('location')).toBeNull();
+    }
+  );
+
   it('allows unauthenticated visitor to access public certificate verification', async () => {
     const req = createMockRequest('http://localhost:3000/certificate/verify/CERT-2026-FICO-0091');
     const res = await middleware(req);
@@ -228,7 +241,7 @@ describe('8. Middleware & Session Verification Tests', () => {
   // =========================================================================
   // 5. AUTHENTICATED REDIRECT FROM /login AND /
   // =========================================================================
-  it('redirects authenticated visitor visiting /login to their appropriate dashboard/portal', async () => {
+  it('keeps login accessible for email callbacks with an existing session', async () => {
     const studentCookie = encodeURIComponent(
       JSON.stringify({
         id: 'usr-student-01',
@@ -238,8 +251,8 @@ describe('8. Middleware & Session Verification Tests', () => {
     );
     const req1 = createMockRequest('http://localhost:3000/login', studentCookie);
     const res1 = await middleware(req1);
-    expect(res1.status).toBe(307);
-    expect(res1.headers.get('location')).toContain('/portal');
+    expect(res1.status).toBe(200);
+    expect(res1.headers.get('location')).toBeNull();
 
     const adminCookie = encodeURIComponent(
       JSON.stringify({
@@ -250,11 +263,11 @@ describe('8. Middleware & Session Verification Tests', () => {
     );
     const req2 = createMockRequest('http://localhost:3000/login', adminCookie);
     const res2 = await middleware(req2);
-    expect(res2.status).toBe(307);
-    expect(res2.headers.get('location')).toContain('/dashboard');
+    expect(res2.status).toBe(200);
+    expect(res2.headers.get('location')).toBeNull();
   });
 
-  it('redirects authenticated visitor visiting / to their appropriate dashboard/portal', async () => {
+  it('routes the site URL through login so fragment callbacks can be handled', async () => {
     const supportCookie = encodeURIComponent(
       JSON.stringify({
         id: 'usr-support-01',
@@ -265,7 +278,12 @@ describe('8. Middleware & Session Verification Tests', () => {
     const req = createMockRequest('http://localhost:3000/', supportCookie);
     const res = await middleware(req);
     expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toContain('/support');
+    expect(res.headers.get('location')).toContain('/login');
+  });
+
+  it.each(['?code=reset-code&type=recovery', '?error_code=otp_expired'])('preserves site URL callback parameters %s', async (query) => {
+    const res = await middleware(createMockRequest(`/${query}`));
+    expect(res.headers.get('location')).toBe(`http://localhost:3000/login${query}`);
   });
 
   // =========================================================================

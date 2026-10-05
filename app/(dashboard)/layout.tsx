@@ -12,8 +12,16 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { role, user, switchRole } = useAuth();
+  const { role, user, switchRole, isLoading } = useAuth();
   const userName = user?.full_name || 'User';
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">
+        <p role="status">Loading your workspace…</p>
+      </main>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans">
