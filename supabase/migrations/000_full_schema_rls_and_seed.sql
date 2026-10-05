@@ -1,4 +1,3 @@
--- ==============================================================================
 -- NEXT-GEN ERP SOLUTIONS: CONSOLIDATED PRODUCTION DATABASE SETUP
 -- Target: Supabase PostgreSQL
 -- Includes:
@@ -8,19 +7,14 @@
 --   4. Row-Level Security (RLS) Policies for All Tables (Default-Deny + RBAC)
 --   5. Core Seed Data (Profiles, 8 Role Accounts, Courses, Batches, Students, Todos)
 --   6. Supabase Storage Buckets & Storage Policies
--- ==============================================================================
 
 BEGIN;
 
--- ==============================================================================
 -- 1. EXTENSIONS
--- ==============================================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ==============================================================================
 -- 2. TABLE DEFINITIONS
--- ==============================================================================
 
 -- 2.1 Profiles & Roles
 CREATE TABLE IF NOT EXISTS profiles (
@@ -620,9 +614,7 @@ CREATE TABLE IF NOT EXISTS todos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ==============================================================================
 -- 3. PERFORMANCE INDEXES
--- ==============================================================================
 CREATE INDEX IF NOT EXISTS idx_leads_stage ON leads(stage);
 CREATE INDEX IF NOT EXISTS idx_leads_counsellor ON leads(counsellor_id);
 CREATE INDEX IF NOT EXISTS idx_admissions_student ON admissions(student_name);
@@ -644,9 +636,7 @@ CREATE INDEX IF NOT EXISTS idx_doubt_messages_doubt ON doubt_messages(doubt_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_audit_module ON audit_logs(module, created_at);
 
--- ==============================================================================
 -- 4. ROW-LEVEL SECURITY (RLS) POLICIES
--- ==============================================================================
 
 -- Enable RLS on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -1076,9 +1066,7 @@ DROP POLICY IF EXISTS "Todos public access" ON todos;
 CREATE POLICY "Todos public access" ON todos
   FOR ALL USING (true) WITH CHECK (true);
 
--- ==============================================================================
 -- 5. CORE SEED DATA
--- ==============================================================================
 
 -- 5.1 System Settings
 INSERT INTO system_settings (
@@ -1256,9 +1244,7 @@ INSERT INTO todos (id, title, is_completed) VALUES
   ('91000000-0000-0000-0000-000000000003', 'Synchronize institute student roster and fee ledgers', false)
 ON CONFLICT (id) DO NOTHING;
 
--- ==============================================================================
 -- 6. SUPABASE STORAGE BUCKETS SETUP & STORAGE RLS POLICIES
--- ==============================================================================
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'storage') THEN

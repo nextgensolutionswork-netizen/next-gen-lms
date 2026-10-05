@@ -1,168 +1,209 @@
--- Next-Gen ERP LMS: 003_seed_data.sql
--- Seed Data for Next-Gen ERP Solutions - SAP Professional Training Institute
+BEGIN;
 
--- 1. System Settings
+-- 5. CORE SEED DATA
+
+-- 5.1 System Settings
 INSERT INTO system_settings (
-  institute_name,
-  tagline,
-  address,
-  phone,
-  email,
-  gst_number,
-  default_currency,
-  academic_year,
-  receipt_prefix,
-  invoice_prefix,
-  timezone
+  id, institute_name, tagline, address, phone, email, gst_number, default_currency, academic_year, receipt_prefix, invoice_prefix, timezone
 ) VALUES (
+  '11111111-1111-1111-1111-111111111111',
   'Next-Gen ERP Solutions',
-  'Premier SAP Training, Certification & Placement Institute',
-  'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081',
-  '+91 98765 43210',
-  'admissions@next-generpsolutions.com',
-  '36AAACN1234F1Z8',
+  'Premier SAP Training Institute & Enterprise Academy',
+  'Cyber Towers, HITEC City, Hyderabad, Telangana 500081',
+  '+91 98000 00000',
+  'info@next-generpsolutions.com',
+  '36AAACN1234F1Z5',
   'INR',
   '2026-2027',
-  'REC',
-  'INV',
+  'REC-2026-',
+  'INV-2026-',
   'Asia/Kolkata'
-) ON CONFLICT DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET
+  institute_name = EXCLUDED.institute_name,
+  gst_number = EXCLUDED.gst_number,
+  updated_at = NOW();
 
--- 2. Staff & User Profiles
+-- 5.2 All 8 Role Accounts in public.profiles
 INSERT INTO profiles (id, email, full_name, role, phone, is_active) VALUES
-('11111111-1111-1111-1111-111111111111', 'superadmin@next-generpsolutions.com', 'Rajesh Sharma (Director)', 'super_admin', '+91 98000 00001', true),
-('22222222-2222-2222-2222-222222222222', 'admin@next-generpsolutions.com', 'Priya Nair (Operations Head)', 'admin', '+91 98000 00002', true),
-('33333333-3333-3333-3333-333333333333', 'accounts@next-generpsolutions.com', 'Suresh Kumar (Chief Accountant)', 'accountant', '+91 98000 00003', true),
-('44444444-4444-4444-4444-444444444444', 'counsellor@next-generpsolutions.com', 'Ananya Desai (Senior Counsellor)', 'counsellor', '+91 98000 00004', true),
-('55555555-5555-5555-5555-555555555551', 'vikram.fico@next-generpsolutions.com', 'Vikram Rao (SAP FICO Lead)', 'trainer', '+91 98000 00005', true),
-('55555555-5555-5555-5555-555555555552', 'neha.mm@next-generpsolutions.com', 'Neha Patel (SAP MM Lead)', 'trainer', '+91 98000 00006', true),
-('66666666-6666-6666-6666-666666666666', 'placement@next-generpsolutions.com', 'Sunita Reddy (Placement Head)', 'placement_coordinator', '+91 98000 00007', true),
-('77777777-7777-7777-7777-777777777771', 'amit.gupta@student.next-gen.com', 'Amit Gupta', 'student', '+91 98111 22233', true),
-('77777777-7777-7777-7777-777777777772', 'sneha.k@student.next-gen.com', 'Sneha Kulkarni', 'student', '+91 98222 33344', true)
-ON CONFLICT DO NOTHING;
+  ('11111111-1111-1111-1111-111111111111', 'superadmin@next-generpsolutions.com', 'Rajesh Sharma (Director)', 'super_admin', '+91 98000 00001', true),
+  ('22222222-2222-2222-2222-222222222222', 'admin@next-generpsolutions.com', 'Priya Nair (Operations Head)', 'admin', '+91 98000 00002', true),
+  ('33333333-3333-3333-3333-333333333333', 'accounts@next-generpsolutions.com', 'Suresh Kumar (Chief Accountant)', 'accountant', '+91 98000 00003', true),
+  ('44444444-4444-4444-4444-444444444444', 'counsellor@next-generpsolutions.com', 'Ananya Desai (Senior Counsellor)', 'counsellor', '+91 98000 00004', true),
+  ('55555555-5555-5555-5555-555555555551', 'vikram.fico@next-generpsolutions.com', 'Vikram Rao (SAP FICO Lead)', 'trainer', '+91 98000 00005', true),
+  ('55555555-5555-5555-5555-555555555552', 'neha.mm@next-generpsolutions.com', 'Neha Patel (SAP MM Lead)', 'trainer', '+91 98000 00006', true),
+  ('66666666-6666-6666-6666-666666666666', 'placement@next-generpsolutions.com', 'Sunita Reddy (Placement Head)', 'placement_coordinator', '+91 98000 00007', true),
+  ('88888888-8888-8888-8888-888888888888', 'support@next-generpsolutions.com', 'Ananya Deshmukh (SAP Support Lead)', 'support', '+91 98000 00008', true),
+  ('77777777-7777-7777-7777-777777777771', 'amit.gupta@student.next-gen.com', 'Amit Gupta (SAP FICO Student)', 'student', '+91 98111 22233', true),
+  ('77777777-7777-7777-7777-777777777772', 'sneha.k@student.next-gen.com', 'Sneha Kulkarni (SAP MM Student)', 'student', '+91 98222 33344', true)
+ON CONFLICT (email) DO UPDATE SET
+  role = EXCLUDED.role,
+  full_name = EXCLUDED.full_name,
+  phone = EXCLUDED.phone,
+  is_active = true,
+  updated_at = NOW();
 
--- 3. SAP Courses
+-- 5.3 Seed into auth.users (if pgcrypto & auth schema present)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    -- Remove any previous test accounts with mismatched IDs to prevent unique email conflict
+    DELETE FROM auth.users WHERE email IN (
+      'superadmin@next-generpsolutions.com',
+      'admin@next-generpsolutions.com',
+      'accounts@next-generpsolutions.com',
+      'counsellor@next-generpsolutions.com',
+      'vikram.fico@next-generpsolutions.com',
+      'neha.mm@next-generpsolutions.com',
+      'placement@next-generpsolutions.com',
+      'support@next-generpsolutions.com',
+      'amit.gupta@student.next-gen.com',
+      'sneha.k@student.next-gen.com'
+    ) AND id NOT IN (
+      '11111111-1111-1111-1111-111111111111',
+      '22222222-2222-2222-2222-222222222222',
+      '33333333-3333-3333-3333-333333333333',
+      '44444444-4444-4444-4444-444444444444',
+      '55555555-5555-5555-5555-555555555551',
+      '55555555-5555-5555-5555-555555555552',
+      '66666666-6666-6666-6666-666666666666',
+      '88888888-8888-8888-8888-888888888888',
+      '77777777-7777-7777-7777-777777777771',
+      '77777777-7777-7777-7777-777777777772'
+    );
+
+    INSERT INTO auth.users (
+      id, instance_id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
+    ) VALUES 
+      ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'superadmin@next-generpsolutions.com', crypt('AdminPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Rajesh Sharma (Director)","role":"super_admin"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'admin@next-generpsolutions.com', crypt('AdminPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Priya Nair (Operations Head)","role":"admin"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'accounts@next-generpsolutions.com', crypt('AccountsPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Suresh Kumar (Chief Accountant)","role":"accountant"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000000', 'counsellor@next-generpsolutions.com', crypt('CounsellorPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Ananya Desai (Senior Counsellor)","role":"counsellor"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('55555555-5555-5555-5555-555555555551', '00000000-0000-0000-0000-000000000000', 'vikram.fico@next-generpsolutions.com', crypt('TrainerPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Vikram Rao (SAP FICO Lead)","role":"trainer"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('55555555-5555-5555-5555-555555555552', '00000000-0000-0000-0000-000000000000', 'neha.mm@next-generpsolutions.com', crypt('TrainerPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Neha Patel (SAP MM Lead)","role":"trainer"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('66666666-6666-6666-6666-666666666666', '00000000-0000-0000-0000-000000000000', 'placement@next-generpsolutions.com', crypt('PlacementPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Sunita Reddy (Placement Head)","role":"placement_coordinator"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('88888888-8888-8888-8888-888888888888', '00000000-0000-0000-0000-000000000000', 'support@next-generpsolutions.com', crypt('SupportPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Ananya Deshmukh (SAP Support Lead)","role":"support"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('77777777-7777-7777-7777-777777777771', '00000000-0000-0000-0000-000000000000', 'amit.gupta@student.next-gen.com', crypt('StudentPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Amit Gupta (SAP FICO Student)","role":"student"}', NOW(), NOW(), 'authenticated', 'authenticated'),
+      ('77777777-7777-7777-7777-777777777772', '00000000-0000-0000-0000-000000000000', 'sneha.k@student.next-gen.com', crypt('StudentPass#2026', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Sneha Kulkarni (SAP MM Student)","role":"student"}', NOW(), NOW(), 'authenticated', 'authenticated')
+    ON CONFLICT (id) DO UPDATE SET
+      encrypted_password = EXCLUDED.encrypted_password,
+      raw_user_meta_data = EXCLUDED.raw_user_meta_data,
+      updated_at = NOW();
+  END IF;
+END $$;
+
+-- 5.4 Courses
 INSERT INTO courses (id, course_name, course_code, description, duration_weeks, category, trainer_id, price, status) VALUES
-('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'SAP S/4HANA Finance (FICO)', 'SAP-FICO-2026', 'Comprehensive Financial Accounting and Controlling on SAP S/4HANA with real-time enterprise implementation projects.', 12, 'SAP Functional', '55555555-5555-5555-5555-555555555551', 45000, 'Published'),
-('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'SAP S/4HANA Materials Management (MM)', 'SAP-MM-2026', 'End-to-end Procurement, Inventory Management, Physical Inventory, and Logistics Invoice Verification.', 10, 'SAP Functional', '55555555-5555-5555-5555-555555555552', 40000, 'Published'),
-('cccccccc-cccc-cccc-cccc-cccccccccccc', 'SAP Sales & Distribution (SD)', 'SAP-SD-2026', 'Order-to-Cash (O2C) cycle, Pricing, Billing, Shipping, and Credit Management on S/4HANA.', 10, 'SAP Functional', NULL, 40000, 'Published'),
-('dddddddd-dddd-dddd-dddd-dddddddddddd', 'SAP ABAP on HANA & Core Data Services', 'SAP-ABAP-2026', 'Modern ABAP programming, CDS Views, AMDP, OData Services, and RAP (RESTful Application Programming model).', 12, 'SAP Technical', NULL, 50000, 'Published')
-ON CONFLICT DO NOTHING;
+  ('c1000000-0000-0000-0000-000000000001', 'SAP S/4HANA Finance (FICO)', 'SAP-FICO-2026', 'Comprehensive financial accounting and controlling on SAP S/4HANA enterprise edition.', 12, 'SAP Functional', '55555555-5555-5555-5555-555555555551', 45000, 'Published'),
+  ('c1000000-0000-0000-0000-000000000002', 'SAP S/4HANA Sourcing & Procurement (MM)', 'SAP-MM-2026', 'End-to-end materials management, purchase requisition, inventory management, and invoice verification.', 10, 'SAP Functional', '55555555-5555-5555-5555-555555555552', 40000, 'Published'),
+  ('c1000000-0000-0000-0000-000000000003', 'SAP Sales & Distribution (SD)', 'SAP-SD-2026', 'Sales order processing, pricing procedures, billing, and credit management.', 10, 'SAP Functional', '55555555-5555-5555-5555-555555555551', 40000, 'Published'),
+  ('c1000000-0000-0000-0000-000000000004', 'SAP ABAP on HANA & Cloud Extensibility', 'SAP-ABAP-2026', 'Modern object-oriented ABAP programming, CDS views, AMDP, and RAP framework.', 14, 'SAP Technical', '55555555-5555-5555-5555-555555555552', 50000, 'Published')
+ON CONFLICT (course_code) DO UPDATE SET
+  course_name = EXCLUDED.course_name,
+  price = EXCLUDED.price,
+  status = EXCLUDED.status,
+  updated_at = NOW();
 
--- Update trainer course assignment scope
-UPDATE profiles SET assigned_course_ids = ARRAY['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid] WHERE id = '55555555-5555-5555-5555-555555555551';
-UPDATE profiles SET assigned_course_ids = ARRAY['bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid] WHERE id = '55555555-5555-5555-5555-555555555552';
+-- Assign courses to trainers
+UPDATE profiles SET assigned_course_ids = ARRAY['c1000000-0000-0000-0000-000000000001'::UUID, 'c1000000-0000-0000-0000-000000000003'::UUID] WHERE id = '55555555-5555-5555-5555-555555555551';
+UPDATE profiles SET assigned_course_ids = ARRAY['c1000000-0000-0000-0000-000000000002'::UUID, 'c1000000-0000-0000-0000-000000000004'::UUID] WHERE id = '55555555-5555-5555-5555-555555555552';
 
--- 4. Course Modules & Lessons for SAP FICO
+-- 5.5 Course Modules & Lessons
 INSERT INTO course_modules (id, course_id, title, description, order_index) VALUES
-('m1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Module 1: Enterprise Structure & General Ledger', 'Company Code, Chart of Accounts, Fiscal Year Variants, and Document Posting', 1),
-('m2222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Module 2: Accounts Payable & Accounts Receivable', 'Vendor/Customer Master, Automatic Payment Program (F110), and Dunning', 2),
-('m3333333-3333-3333-3333-333333333333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Module 3: Asset Accounting & S/4HANA New GL', 'Depreciation Run, Asset Master, Universal Journal (ACDOCA)', 3)
-ON CONFLICT DO NOTHING;
+  ('d1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 'Module 1: General Ledger & Universal Journal (ACDOCA)', 'Architecture of S/4HANA Finance and GL setup', 1),
+  ('d1000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001', 'Module 2: Accounts Payable (AP) & Accounts Receivable (AR)', 'Vendor and customer business partner integration', 2),
+  ('d1000000-0000-0000-0000-000000000003', 'c1000000-0000-0000-0000-000000000002', 'Module 1: Enterprise Structure & Master Data', 'Plant, storage location, purchase organization, and material master', 1)
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO lessons (id, module_id, course_id, title, lesson_type, duration_minutes, order_index, is_published, video_signed_path) VALUES
-('l1111111-1111-1111-1111-111111111111', 'm1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '1.1 Introduction to SAP S/4HANA Architecture & Navigation', 'Video', 45, 1, true, '/videos/sap-fico/mod1_intro.mp4'),
-('l2222222-2222-2222-2222-222222222222', 'm1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '1.2 Configuring Enterprise Structure (OX02, OX15, OX16)', 'Video', 60, 2, true, '/videos/sap-fico/mod1_config.mp4'),
-('l3333333-3333-3333-3333-333333333333', 'm1111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Module 1 Configuration Blueprints & Handout', 'PDF', 20, 3, true, '/docs/sap-fico/mod1_handout.pdf'),
-('l4444444-4444-4444-4444-444444444444', 'm2222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2.1 Business Partner (BP) Approach in S/4HANA', 'Video', 55, 1, true, '/videos/sap-fico/mod2_bp.mp4'),
-('l5555555-5555-5555-5555-555555555555', 'm2222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2.2 Automatic Payment Program (F110) End-to-End', 'Video', 75, 2, true, '/videos/sap-fico/mod2_f110.mp4')
-ON CONFLICT DO NOTHING;
+INSERT INTO lessons (id, module_id, course_id, title, lesson_type, duration_minutes, order_index, is_published, content_url) VALUES
+  ('e1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', '1.1 Introduction to SAP S/4HANA Architecture', 'Video', 45, 1, true, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'),
+  ('e1000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', '1.2 Configuring Enterprise Structure in SPRO', 'PDF', 30, 2, true, 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'),
+  ('e1000000-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000003', 'c1000000-0000-0000-0000-000000000002', '1.1 Material Master Record Configuration', 'Video', 40, 1, true, 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4')
+ON CONFLICT (id) DO NOTHING;
 
--- 5. Batches
+-- 5.6 Batches
 INSERT INTO batches (id, batch_code, batch_name, course_id, trainer_id, training_mode, start_date, end_date, start_time, end_time, days, maximum_capacity, status) VALUES
-('b1111111-1111-1111-1111-111111111111', 'B-FICO-2601', 'SAP FICO Morning Fast-Track Batch', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '55555555-5555-5555-5555-555555555551', 'Hybrid', '2026-02-01', '2026-04-30', '08:00:00', '10:00:00', '{"Mon","Tue","Wed","Thu","Fri"}', 25, 'Active'),
-('b2222222-2222-2222-2222-222222222222', 'B-MM-2601', 'SAP MM Weekend Professional Batch', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '55555555-5555-5555-5555-555555555552', 'Online', '2026-02-15', '2026-05-15', '10:00:00', '13:00:00', '{"Sat","Sun"}', 30, 'Active')
-ON CONFLICT DO NOTHING;
+  ('b1000000-0000-0000-0000-000000000001', 'B-2026-FICO-01', 'SAP FICO Morning Cohort (Weekday)', 'c1000000-0000-0000-0000-000000000001', '55555555-5555-5555-5555-555555555551', 'Online', '2026-09-01', '2026-11-25', '07:30:00', '09:00:00', '{"Mon","Wed","Fri"}', 25, 'Active'),
+  ('b1000000-0000-0000-0000-000000000002', 'B-2026-MM-01', 'SAP MM Weekend Masterclass', 'c1000000-0000-0000-0000-000000000002', '55555555-5555-5555-5555-555555555552', 'Hybrid', '2026-09-15', '2026-12-10', '10:00:00', '13:00:00', '{"Sat","Sun"}', 20, 'Active')
+ON CONFLICT (batch_code) DO UPDATE SET
+  status = EXCLUDED.status,
+  updated_at = NOW();
 
--- 6. Admissions & Students
+-- 5.7 Admissions & Students
 INSERT INTO admissions (
-  id, admission_number, student_name, phone, email, dob, gender, address, city, education, experience_years,
-  current_employment_status, course_id, training_mode, batch_id, trainer_id, admission_date, course_fee,
-  discount, discount_reason, net_payable, payment_plan, counsellor_id, status
-) VALUES (
-  'ad111111-1111-1111-1111-111111111111', 'ADM-2026-0001', 'Amit Gupta', '+91 98111 22233', 'amit.gupta@student.next-gen.com',
-  '1999-05-14', 'Male', 'H-12, Madhapur', 'Hyderabad', 'B.Com, MBA Finance', 2, 'Employed',
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Hybrid', 'b1111111-1111-1111-1111-111111111111', '55555555-5555-5555-5555-555555555551',
-  '2026-01-25', 45000, 5000, 'Early bird discount', 40000, '3 Installments', '44444444-4444-4444-4444-444444444444', 'Confirmed'
-),
-(
-  'ad222222-2222-2222-2222-222222222222', 'ADM-2026-0002', 'Sneha Kulkarni', '+91 98222 33344', 'sneha.k@student.next-gen.com',
-  '2001-08-20', 'Female', '404 Baner Road', 'Pune', 'B.Tech Mechanical', 1, 'Career Gap',
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Online', 'b2222222-2222-2222-2222-222222222222', '55555555-5555-5555-5555-555555555552',
-  '2026-02-02', 40000, 0, NULL, 40000, '2 Installments', '44444444-4444-4444-4444-444444444444', 'Confirmed'
-) ON CONFLICT DO NOTHING;
+  id, admission_number, student_name, phone, email, dob, gender, address, city, state, state_code, education, current_employment_status, course_id, training_mode, batch_id, trainer_id, course_fee, discount, net_payable, payment_plan, status
+) VALUES
+  ('a1000000-0000-0000-0000-000000000001', 'ADM-2026-001', 'Amit Gupta', '+91 98111 22233', 'amit.gupta@student.next-gen.com', '1998-05-12', 'Male', 'B-402, Green Glen Layout, Bellandur', 'Bengaluru', 'Karnataka', '29', 'B.Com, M.Com', 'Employed', 'c1000000-0000-0000-0000-000000000001', 'Online', 'b1000000-0000-0000-0000-000000000001', '55555555-5555-5555-5555-555555555551', 45000, 5000, 40000, '2 Installments', 'Confirmed'),
+  ('a1000000-0000-0000-0000-000000000002', 'ADM-2026-002', 'Sneha Kulkarni', '+91 98222 33344', 'sneha.k@student.next-gen.com', '1999-11-20', 'Female', 'Flat 12, Prathamesh Heights, Kothrud', 'Pune', 'Maharashtra', '27', 'B.E. Mechanical', 'Student', 'c1000000-0000-0000-0000-000000000002', 'Hybrid', 'b1000000-0000-0000-0000-000000000002', '55555555-5555-5555-5555-555555555552', 40000, 0, 40000, 'Full Payment', 'Confirmed')
+ON CONFLICT (admission_number) DO NOTHING;
 
 INSERT INTO students (
-  id, user_id, admission_id, student_code, admission_number, full_name, email, phone, course_id, batch_id, trainer_id,
-  joining_date, status, total_fee, paid_amount, outstanding_amount, attendance_percentage, course_progress, placement_status
-) VALUES (
-  's1111111-1111-1111-1111-111111111111', '77777777-7777-7777-7777-777777777771', 'ad111111-1111-1111-1111-111111111111',
-  'STU-FICO-001', 'ADM-2026-0001', 'Amit Gupta', 'amit.gupta@student.next-gen.com', '+91 98111 22233',
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'b1111111-1111-1111-1111-111111111111', '55555555-5555-5555-5555-555555555551',
-  '2026-02-01', 'Active', 40000, 25000, 15000, 92.5, 68.0, 'Resume Preparation'
-),
-(
-  's2222222-2222-2222-2222-222222222222', '77777777-7777-7777-7777-777777777772', 'ad222222-2222-2222-2222-222222222222',
-  'STU-MM-002', 'ADM-2026-0002', 'Sneha Kulkarni', 'sneha.k@student.next-gen.com', '+91 98222 33344',
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b2222222-2222-2222-2222-222222222222', '55555555-5555-5555-5555-555555555552',
-  '2026-02-15', 'Active', 40000, 20000, 20000, 88.0, 52.0, 'Not Started'
-) ON CONFLICT DO NOTHING;
+  id, user_id, admission_id, student_code, admission_number, full_name, email, phone, course_id, batch_id, trainer_id, total_fee, paid_amount, outstanding_amount, attendance_percentage, course_progress, placement_status
+) VALUES
+  ('51000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-777777777771', 'a1000000-0000-0000-0000-000000000001', 'STU-2026-001', 'ADM-2026-001', 'Amit Gupta', 'amit.gupta@student.next-gen.com', '+91 98111 22233', 'c1000000-0000-0000-0000-000000000001', 'b1000000-0000-0000-0000-000000000001', '55555555-5555-5555-5555-555555555551', 40000, 20000, 20000, 85, 45, 'In Preparation'),
+  ('51000000-0000-0000-0000-000000000002', '77777777-7777-7777-7777-777777777772', 'a1000000-0000-0000-0000-000000000002', 'STU-2026-002', 'ADM-2026-002', 'Sneha Kulkarni', 'sneha.k@student.next-gen.com', '+91 98222 33344', 'c1000000-0000-0000-0000-000000000002', 'b1000000-0000-0000-0000-000000000002', '55555555-5555-5555-5555-555555555552', 40000, 40000, 0, 92, 70, 'Eligible')
+ON CONFLICT (student_code) DO NOTHING;
 
--- 7. Fee Accounts, Installments & Payments
+-- 5.8 Fee Accounts & Payments
 INSERT INTO student_fee_accounts (
-  id, student_id, admission_id, course_id, original_fee, discount, discount_reason, net_payable, paid_amount, outstanding_amount, payment_plan, status
-) VALUES (
-  'fa111111-1111-1111-1111-111111111111', 's1111111-1111-1111-1111-111111111111', 'ad111111-1111-1111-1111-111111111111',
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 45000, 5000, 'Early bird discount', 40000, 25000, 15000, '3 Installments', 'Partially Paid'
-) ON CONFLICT DO NOTHING;
+  id, student_id, admission_id, original_fee, discount, net_payable, collected_amount, outstanding_balance, status
+) VALUES
+  ('f1000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000001', 45000, 5000, 40000, 20000, 20000, 'Partial'),
+  ('f1000000-0000-0000-0000-000000000002', '51000000-0000-0000-0000-000000000002', 'a1000000-0000-0000-0000-000000000002', 40000, 0, 40000, 40000, 0, 'Paid')
+ON CONFLICT (student_id) DO NOTHING;
 
-INSERT INTO installments (id, fee_account_id, student_id, installment_number, amount, due_date, paid_amount, paid_date, status) VALUES
-('inst-1', 'fa111111-1111-1111-1111-111111111111', 's1111111-1111-1111-1111-111111111111', 1, 15000, '2026-01-25', 15000, '2026-01-25', 'Paid'),
-('inst-2', 'fa111111-1111-1111-1111-111111111111', 's1111111-1111-1111-1111-111111111111', 2, 10000, '2026-02-25', 10000, '2026-02-24', 'Paid'),
-('inst-3', 'fa111111-1111-1111-1111-111111111111', 's1111111-1111-1111-1111-111111111111', 3, 15000, '2026-03-25', 0, NULL, 'Upcoming')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO payments (id, receipt_number, student_id, fee_account_id, installment_id, course_id, amount, payment_date, payment_mode, transaction_reference, collected_by, notes) VALUES
-('p1111111-1111-1111-1111-111111111111', 'REC-2026-0001', 's1111111-1111-1111-1111-111111111111', 'fa111111-1111-1111-1111-111111111111', 'inst-1', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 15000, '2026-01-25', 'UPI', 'UPI/260125/4491028', '33333333-3333-3333-3333-333333333333', 'Admission installment 1 paid'),
-('p2222222-2222-2222-2222-222222222222', 'REC-2026-0002', 's1111111-1111-1111-1111-111111111111', 'fa111111-1111-1111-1111-111111111111', 'inst-2', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 10000, '2026-02-24', 'Bank Transfer', 'NEFT-HDFC-991823', '33333333-3333-3333-3333-333333333333', 'Installment 2 paid')
-ON CONFLICT DO NOTHING;
+INSERT INTO payments (
+  id, receipt_number, fee_account_id, student_id, amount, payment_mode, transaction_reference, payment_date, collected_by, remarks
+) VALUES
+  ('61000000-0000-0000-0000-000000000001', 'REC-2026-0001', 'f1000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001', 20000, 'UPI', 'UPI-98234827104', '2026-09-01', '33333333-3333-3333-3333-333333333333', '1st installment payment at admission'),
+  ('61000000-0000-0000-0000-000000000002', 'REC-2026-0002', 'f1000000-0000-0000-0000-000000000002', '51000000-0000-0000-0000-000000000002', 40000, 'Net Banking', 'NEFT-HDFC-9912048', '2026-09-15', '33333333-3333-3333-3333-333333333333', 'Full course fee payment')
+ON CONFLICT (receipt_number) DO NOTHING;
 
 INSERT INTO receipts (
-  id, receipt_number, payment_id, student_id, student_name, admission_number, course_name, payment_amount, payment_mode,
-  transaction_reference, payment_date, remaining_balance, authorized_by, institute_name, institute_address, institute_phone, institute_gst
-) VALUES (
-  'r1111111-1111-1111-1111-111111111111', 'REC-2026-0001', 'p1111111-1111-1111-1111-111111111111', 's1111111-1111-1111-1111-111111111111',
-  'Amit Gupta', 'ADM-2026-0001', 'SAP S/4HANA Finance (FICO)', 15000, 'UPI', 'UPI/260125/4491028', '2026-01-25', 25000,
-  'Suresh Kumar (Accountant)', 'Next-Gen ERP Solutions', 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081', '+91 98765 43210', '36AAACN1234F1Z8'
-) ON CONFLICT DO NOTHING;
-
--- 8. CRM Leads
-INSERT INTO leads (
-  lead_code, full_name, phone, email, interested_course_id, current_status, experience_years, training_preference,
-  lead_source, counsellor_id, demo_preference, stage, notes
+  id, receipt_number, payment_id, student_id, student_name, student_code, course_name, amount, amount_in_words, payment_mode, transaction_reference, receipt_date, issued_by, taxable_amount, cgst_amount, sgst_amount, total_tax
 ) VALUES
-('LD-2026-001', 'Vikas Sharma', '+91 99887 76655', 'vikas.sharma@gmail.com', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Working professional', 3, 'Hybrid', 'Google Ads', '44444444-4444-4444-4444-444444444444', true, 'Demo Scheduled', 'Interested in SAP FICO S/4HANA migration syllabus'),
-('LD-2026-002', 'Deepika Reddy', '+91 98711 22334', 'deepika.r@gmail.com', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Fresher', 0, 'Classroom', 'Walk-in', '44444444-4444-4444-4444-444444444444', false, 'Follow-up', 'Looking for SAP MM weekend batch')
-ON CONFLICT DO NOTHING;
+  ('81000000-0000-0000-0000-000000000001', 'REC-2026-0001', '61000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001', 'Amit Gupta', 'STU-2026-001', 'SAP S/4HANA Finance (FICO)', 20000, 'Twenty Thousand Rupees Only', 'UPI', 'UPI-98234827104', '2026-09-01', '33333333-3333-3333-3333-333333333333', 16949.15, 1525.42, 1525.42, 3050.84),
+  ('81000000-0000-0000-0000-000000000002', 'REC-2026-0002', '61000000-0000-0000-0000-000000000002', '51000000-0000-0000-0000-000000000002', 'Sneha Kulkarni', 'STU-2026-002', 'SAP S/4HANA Sourcing & Procurement (MM)', 40000, 'Forty Thousand Rupees Only', 'Net Banking', 'NEFT-HDFC-9912048', '2026-09-15', '33333333-3333-3333-3333-333333333333', 33898.31, 3050.85, 3050.85, 6101.69)
+ON CONFLICT (receipt_number) DO NOTHING;
 
--- 9. Expenses & Vendors
-INSERT INTO vendors (id, vendor_name, contact_person, phone, email, address, gst_number) VALUES
-('v1111111-1111-1111-1111-111111111111', 'Amazon Web Services India', 'AWS Billing', '+91 80 4000 1234', 'aws-billing@amazon.com', 'Bengaluru, India', '29AABCA1234F1Z1'),
-('v2222222-2222-2222-2222-222222222222', 'Silicon Towers Facilities', 'K. Ramesh', '+91 94400 11223', 'facilities@silicontowers.com', 'Hitec City, Hyderabad', '36AAAFS5566G1Z2')
-ON CONFLICT DO NOTHING;
+-- 5.9 SAP Server Systems & Lab Sandbox
+INSERT INTO sap_server_systems (id, system_name, sid, instance_number, server_host, sap_router, default_client, description, status) VALUES
+  ('e1000000-0000-0000-0000-000000000001', 'SAP S/4HANA 2023 Enterprise Sandbox', 'S4H', '00', 's4h.lab.next-gen.internal', '/H/router.next-gen.internal/S/3299', '800', 'Primary student training lab instance with fully pre-configured best practice company codes (1000, 1010).', 'Online'),
+  ('e1000000-0000-0000-0000-000000000002', 'SAP ECC 6.0 EHP8 Legacy Environment', 'EC8', '01', 'ecc.lab.next-gen.internal', '/H/router.next-gen.internal/S/3299', '800', 'Secondary classical ERP lab instance for comparative analysis.', 'Online')
+ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO expenses (expense_code, expense_date, category, vendor_id, description, amount, payment_mode, reference, status, approved_by) VALUES
-('EXP-2026-001', '2026-02-01', 'Rent', 'v2222222-2222-2222-2222-222222222222', 'Institute Classroom & Office Rent for Feb 2026', 75000, 'Bank Transfer', 'NEFT-RENT-FEB26', 'Paid', '11111111-1111-1111-1111-111111111111'),
-('EXP-2026-002', '2026-02-05', 'Internet', 'v1111111-1111-1111-1111-111111111111', 'High-Speed Dedicated Fiber Leased Line (1 Gbps)', 12500, 'UPI', 'UPI-ACT-020526', 'Paid', '11111111-1111-1111-1111-111111111111')
-ON CONFLICT DO NOTHING;
+-- 5.10 Test Todos
+INSERT INTO todos (id, title, is_completed) VALUES
+  ('91000000-0000-0000-0000-000000000001', 'Verify Supabase PostgreSQL live connection', true),
+  ('91000000-0000-0000-0000-000000000002', 'Complete RLS policies for academic and accounts tables', true),
+  ('91000000-0000-0000-0000-000000000003', 'Synchronize institute student roster and fee ledgers', false)
+ON CONFLICT (id) DO NOTHING;
 
--- 10. Placement Job Openings
-INSERT INTO job_openings (company_name, job_title, module, experience_required, location, salary_range, description, application_deadline, status) VALUES
-('Deloitte USI', 'SAP FICO Associate Consultant', 'SAP FICO', '0-2 Years', 'Hyderabad / Bengaluru', '₹6.5 - ₹8.5 LPA', 'Implementation and support of S/4HANA Finance with General Ledger, AP/AR, and Asset Accounting knowledge.', '2026-04-30', 'Open'),
-('Accenture Solutions', 'SAP MM Functional Analyst', 'SAP MM', '0-3 Years', 'Pune / Mumbai', '₹6.0 - ₹8.0 LPA', 'Procure to pay lifecycle, master data governance, inventory control, and purchase order configuration.', '2026-05-15', 'Open')
-ON CONFLICT DO NOTHING;
+-- 6. SUPABASE STORAGE BUCKETS SETUP & STORAGE RLS POLICIES
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'storage') THEN
+    INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    VALUES 
+      ('resumes', 'resumes', true, 15728640, ARRAY['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']),
+      ('assignments', 'assignments', true, 26214400, ARRAY['application/pdf', 'application/zip', 'application/x-zip-compressed', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']),
+      ('doubt-attachments', 'doubt-attachments', true, 15728640, ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf']),
+      ('receipts', 'receipts', true, 10485760, ARRAY['application/pdf', 'image/png', 'image/jpeg']),
+      ('screenshots', 'screenshots', true, 10485760, ARRAY['image/png', 'image/jpeg', 'image/webp']),
+      ('avatars', 'avatars', true, 5242880, ARRAY['image/png', 'image/jpeg', 'image/webp'])
+    ON CONFLICT (id) DO UPDATE SET
+      public = EXCLUDED.public,
+      file_size_limit = EXCLUDED.file_size_limit,
+      allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- 11. Certificates
-INSERT INTO certificates (certificate_id, student_id, student_name, course_id, course_name, grade, issue_date, completion_date, attendance_percentage, assignment_completion_rate, exam_score_percentage, verification_url, is_valid) VALUES
-('CERT-2026-FICO-0091', 's1111111-1111-1111-1111-111111111111', 'Amit Gupta', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'SAP S/4HANA Finance (FICO)', 'A+ (Distinction)', '2026-04-20', '2026-04-18', 92.5, 95.0, 91.0, 'https://lms.next-generpsolutions.com/certificate/verify/CERT-2026-FICO-0091', true)
-ON CONFLICT DO NOTHING;
+    -- Storage RLS Policies
+    DROP POLICY IF EXISTS "Public can view active storage objects" ON storage.objects;
+    CREATE POLICY "Public can view active storage objects" ON storage.objects
+      FOR SELECT USING (bucket_id IN ('resumes', 'assignments', 'doubt-attachments', 'receipts', 'screenshots', 'avatars'));
+
+    DROP POLICY IF EXISTS "Authenticated users can upload storage objects" ON storage.objects;
+    CREATE POLICY "Authenticated users can upload storage objects" ON storage.objects
+      FOR INSERT WITH CHECK (bucket_id IN ('resumes', 'assignments', 'doubt-attachments', 'receipts', 'screenshots', 'avatars'));
+  END IF;
+END $$;
+
+COMMIT;
