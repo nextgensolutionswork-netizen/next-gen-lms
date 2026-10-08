@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus } from '@/types';
-import { createAdmissionWorkflow } from '@/lib/services/admission-service';
+import { createAdmissionWorkflow, getAdmissions } from '@/lib/services/admission-service';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { calculateGstBreakdown, resolveState, GST_STATE_CODES } from '@/lib/services/gst-service';
 
@@ -90,8 +90,8 @@ export default function AdmissionsPage() {
     return calculateGstBreakdown(netPayable, stateCode);
   }, [netPayable, stateCode]);
 
-  const refreshList = () => {
-    let list = [...store.admissions];
+  const refreshList = async () => {
+    let list = await getAdmissions();
     if (statusFilter !== 'All') {
       list = list.filter((a) => a.status === statusFilter);
     }
@@ -99,10 +99,10 @@ export default function AdmissionsPage() {
       const q = search.toLowerCase();
       list = list.filter(
         (a) =>
-          a.student_name.toLowerCase().includes(q) ||
-          a.admission_number.toLowerCase().includes(q) ||
-          a.phone.includes(q) ||
-          a.email.toLowerCase().includes(q)
+          a.student_name?.toLowerCase().includes(q) ||
+          a.admission_number?.toLowerCase().includes(q) ||
+          a.phone?.includes(q) ||
+          a.email?.toLowerCase().includes(q)
       );
     }
     setAdmissions(list);
@@ -223,6 +223,19 @@ export default function AdmissionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {admissions.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
+                      <UserCheck className="h-8 w-8 mx-auto text-slate-400 mb-2 opacity-50" />
+                      <p className="font-semibold text-slate-700">No Admissions Found</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {search || statusFilter !== 'All'
+                          ? 'Try adjusting your search query or status filter.'
+                          : 'No admissions have been registered yet. Click "New Admission" above to add one.'}
+                      </p>
+                    </td>
+                  </tr>
+                )}
                 {admissions.map((adm) => {
                   const resolved = resolveState(adm.state_code || adm.state || adm.city || adm.address);
                   const isIntra = resolved.code === '36';

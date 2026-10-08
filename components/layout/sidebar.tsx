@@ -42,6 +42,15 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
     setOpenSection(openSection === section ? null : section);
   };
 
+  React.useEffect(() => {
+    if (pathname.startsWith('/crm')) setOpenSection('crm');
+    else if (pathname.startsWith('/admissions') || pathname.startsWith('/students')) setOpenSection('admissions');
+    else if (pathname.startsWith('/finance')) setOpenSection('finance');
+    else if (pathname.startsWith('/academics') || pathname.startsWith('/batches') || pathname.startsWith('/courses')) setOpenSection('academics');
+    else if (pathname.startsWith('/placement')) setOpenSection('placement');
+    else if (pathname.startsWith('/portal')) setOpenSection('portal');
+  }, [pathname]);
+
   const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
 
   // RBAC Menu Filtering
@@ -141,8 +150,8 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
           </div>
         )}
 
-        {/* Admissions (Counsellor, Admin, Super Admin) */}
-        {isCounsellor && (
+        {/* Admissions (Counsellor, Accountant, Admin, Super Admin) */}
+        {(isCounsellor || isAccountant) && (
           <div>
             <button
               onClick={() => toggleSection('admissions')}
