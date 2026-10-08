@@ -16,6 +16,7 @@ const nextConfig = {
         ...config.resolve.fallback,
         fs: false,
         path: false,
+        crypto: false,
         async_hooks: false,
       };
     }
