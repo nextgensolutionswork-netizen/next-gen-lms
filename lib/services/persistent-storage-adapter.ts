@@ -44,6 +44,14 @@ export interface InstituteDataSnapshot {
   placementEnrollments?: any[];
   placementEnrollmentStatusHistories?: any[];
   placementEligibilitySettings?: any;
+  studentFees?: any[];
+  feeApprovalHistories?: any[];
+  feeCategories?: any[];
+  feeRevisionRequests?: any[];
+  studentPayments?: any[];
+  studentRefunds?: any[];
+  studentFinancialLedgers?: any[];
+  financeSettings?: any;
 }
 
 const STORAGE_DIR = path.join(process.cwd(), 'data');

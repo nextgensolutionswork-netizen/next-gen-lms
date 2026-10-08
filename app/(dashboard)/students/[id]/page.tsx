@@ -40,6 +40,7 @@ export default function StudentDetailsPage() {
     | 'assessments'
     | 'payments'
     | 'receipts'
+    | 'finance'
     | 'certificates'
     | 'placement'
     | 'documents'
@@ -82,6 +83,8 @@ export default function StudentDetailsPage() {
     placement,
     certificate,
     transfers,
+    studentFees = [],
+    studentLedger = [],
   } = data;
 
   const tabs = [
@@ -93,6 +96,7 @@ export default function StudentDetailsPage() {
     { id: 'assessments', label: 'Assessments' },
     { id: 'payments', label: 'Payments' },
     { id: 'receipts', label: 'Receipts' },
+    { id: 'finance', label: 'Finance & Ledger' },
     { id: 'certificates', label: 'Certificates' },
     { id: 'placement', label: 'Placement' },
     { id: 'documents', label: 'Documents' },
@@ -477,7 +481,174 @@ export default function StudentDetailsPage() {
         </Card>
       )}
 
-      {/* Tab 9: Certificates */}
+      {/* Tab: Centralized Finance & Ledger */}
+      {activeTab === 'finance' && (
+        <div className="space-y-6">
+          {/* Financial Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <Card className="border-l-4 border-l-blue-500 shadow-xs">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Approved Fees</p>
+                <h4 className="text-xl font-bold text-slate-900 mt-1">
+                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.final_payable, 0))}
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">{studentFees.length} Fee Category Plan(s)</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-emerald-500 shadow-xs">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Verified Paid</p>
+                <h4 className="text-xl font-bold text-emerald-700 mt-1">
+                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.paid_amount, 0))}
+                </h4>
+                <p className="text-[11px] text-emerald-600 mt-0.5 font-medium">Financially cleared</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-amber-500 shadow-xs">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Outstanding Due</p>
+                <h4 className="text-xl font-bold text-amber-700 mt-1">
+                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.outstanding_amount, 0))}
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">Remaining balance</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-indigo-500 shadow-xs">
+              <CardContent className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Clearance Standing</p>
+                <h4 className="text-sm font-bold text-indigo-700 mt-1">
+                  {studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.outstanding_amount, 0) === 0 && studentFees.length > 0 ? (
+                    <Badge variant="success">Financially Cleared ✓</Badge>
+                  ) : (
+                    <Badge variant="warning">Payment Pending</Badge>
+                  )}
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1">Placement & Certificate gate</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Centralized Student Fees */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-bold text-slate-800">
+                Course & Module Fee Plans
+              </CardTitle>
+              <Link href="/accounts/approvals">
+                <Button variant="outline" size="sm" className="text-xs">
+                  Fee Approvals Desk →
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+                  <tr>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Course / Module</th>
+                    <th className="px-4 py-3 text-right">Standard</th>
+                    <th className="px-4 py-3 text-right">Discount</th>
+                    <th className="px-4 py-3 text-right">GST (18%)</th>
+                    <th className="px-4 py-3 text-right">Final Total</th>
+                    <th className="px-4 py-3 text-right">Outstanding</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Counsellor</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {studentFees.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-6 text-center text-slate-400">
+                        No centralized fee plan configured yet for this student.
+                      </td>
+                    </tr>
+                  ) : (
+                    studentFees.map((fee: any) => (
+                      <tr key={fee.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-semibold text-indigo-700">{fee.fee_category}</td>
+                        <td className="px-4 py-3 text-slate-700">{fee.course_name || fee.sap_module || '—'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-500">{formatINR(fee.standard_fee)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-emerald-700">
+                          {fee.discount_amount > 0 ? `-${formatINR(fee.discount_amount)} (${fee.discount_percentage}%)` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-500">{formatINR(fee.tax_gst_amount)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{formatINR(fee.final_payable)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-amber-700">{formatINR(fee.outstanding_amount)}</td>
+                        <td className="px-4 py-3 text-slate-600">{fee.payment_plan}</td>
+                        <td className="px-4 py-3 text-slate-600">{fee.counsellor_name}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={fee.approval_status === 'Approved' ? 'success' : fee.approval_status === 'Pending Accountant Approval' ? 'warning' : 'destructive'}>
+                            {fee.approval_status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+
+          {/* Student Financial Ledger */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold text-slate-800">
+                Student Financial Audit Ledger
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Entry Type</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3 text-right">Debit (₹)</th>
+                    <th className="px-4 py-3 text-right">Credit (₹)</th>
+                    <th className="px-4 py-3 text-right">Running Balance (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono">
+                  {studentLedger.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-slate-400 font-sans">
+                        No financial ledger entries posted yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    studentLedger.map((entry: any) => (
+                      <tr key={entry.id} className="hover:bg-slate-50 font-sans">
+                        <td className="px-4 py-3 text-slate-500 font-mono">{entry.entry_date}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={entry.debit > 0 ? 'destructive' : 'success'}>
+                            {entry.entry_type}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{entry.description}</td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-800">
+                          {entry.debit > 0 ? formatINR(entry.debit) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">
+                          {entry.credit > 0 ? formatINR(entry.credit) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                          {formatINR(entry.running_balance)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Tab: Certificates */}
       {activeTab === 'certificates' && (
         <Card>
           <CardHeader>

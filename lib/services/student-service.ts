@@ -96,6 +96,11 @@ export async function getStudentProfileFullDetails(studentId: string) {
   const placement = store.placementProfiles.find((pp) => pp.student_id === student.id);
   const certificate = store.certificates.find((cert) => cert.student_id === student.id);
   const transfers = store.batchTransferAudits.filter((bta) => bta.student_id === student.id);
+  const studentFees = (store.studentFees || []).filter((f) => f.student_id === student.id);
+  const studentPayments = (store.studentPayments || []).filter((p) => p.student_id === student.id);
+  const studentLedger = (store.studentFinancialLedgers || [])
+    .filter((l) => l.student_id === student.id)
+    .sort((a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime());
 
   return {
     student,
@@ -112,5 +117,8 @@ export async function getStudentProfileFullDetails(studentId: string) {
     placement,
     certificate,
     transfers,
+    studentFees,
+    studentPayments,
+    studentLedger,
   };
 }

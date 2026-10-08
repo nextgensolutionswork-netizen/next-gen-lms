@@ -1037,4 +1037,287 @@ export interface PlacementEligibilitySettings {
   updated_by?: string;
 }
 
+// ============================================================================
+// GLOBAL LMS FEE APPROVAL & FINANCIAL MANAGEMENT WORKFLOW ARCHITECTURE
+// ============================================================================
+
+export type GlobalFeeCategory =
+  | 'Course Admission Fee'
+  | 'Course Fee'
+  | 'Registration Fee'
+  | 'Placement Fee'
+  | 'Certification Fee'
+  | 'Exam / Assessment Fee'
+  | 'Fast Track Fee'
+  | 'Additional Training Fee'
+  | 'Rejoining Fee'
+  | 'Module Change Fee'
+  | 'Batch Transfer Fee'
+  | 'Late Fee'
+  | 'Material Fee'
+  | 'Project Fee'
+  | 'Other Student Charges';
+
+export type FeeApprovalStatus =
+  | 'Draft'
+  | 'Submitted for Approval'
+  | 'Pending Accountant Approval'
+  | 'Approved'
+  | 'Rejected'
+  | 'Correction Required'
+  | 'Cancelled'
+  | 'Superseded';
+
+export type PaymentVerificationStatus =
+  | 'Pending'
+  | 'Recorded'
+  | 'Pending Verification'
+  | 'Verified'
+  | 'Rejected'
+  | 'Partially Paid'
+  | 'Fully Paid'
+  | 'Refunded'
+  | 'Cancelled';
+
+export type StudentFinancialStatus =
+  | 'No Fee Created'
+  | 'Approval Pending'
+  | 'Approved'
+  | 'Payment Pending'
+  | 'Partially Paid'
+  | 'Fully Paid'
+  | 'Overdue'
+  | 'Payment Verification Pending'
+  | 'Refund Pending'
+  | 'Financial Hold'
+  | 'Financially Cleared';
+
+export type FeeReferenceType =
+  | 'Course'
+  | 'Placement'
+  | 'Certification'
+  | 'Assessment'
+  | 'Fast Track'
+  | 'General'
+  | 'Other';
+
+export interface FeeCategoryItem {
+  id: string;
+  name: string;
+  code: string;
+  default_amount: number;
+  is_taxable: boolean;
+  gst_rate: number;
+  sac_code?: string;
+  reference_type: FeeReferenceType;
+  description: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface StudentFee {
+  id: string;
+  student_id: string;
+  student_name: string;
+  student_code: string;
+  admission_number: string;
+  fee_category: string;
+  reference_type: FeeReferenceType;
+  reference_id?: string;
+  course_id?: string;
+  course_name?: string;
+  batch_id?: string;
+  batch_name?: string;
+  sap_module?: string;
+  placement_enrollment_id?: string;
+
+  standard_fee: number;
+  proposed_fee: number;
+  discount_amount: number;
+  discount_percentage: number;
+  discount_reason?: string;
+  discount_approval_level?: 'Accountant' | 'Finance Manager' | 'Management';
+  tax_gst_amount: number;
+  additional_charges: number;
+  final_payable: number;
+  paid_amount: number;
+  outstanding_amount: number;
+
+  payment_plan: 'Full Payment' | '2 Installments' | '3 Installments' | 'Custom';
+  number_of_installments: number;
+  first_due_date: string;
+
+  counsellor_id: string;
+  counsellor_name: string;
+  counsellor_notes?: string;
+
+  approval_status: FeeApprovalStatus;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  submitted_at?: string;
+
+  approved_by?: string;
+  approved_by_name?: string;
+  approved_at?: string;
+  approved_fee?: number;
+  approved_discount?: number;
+  approved_tax?: number;
+  approved_total?: number;
+  approval_notes?: string;
+
+  rejection_reason?: string;
+  correction_reason?: string;
+  correction_notes?: string;
+
+  version: number;
+  parent_fee_id?: string;
+  is_payable: boolean;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeeApprovalHistory {
+  id: string;
+  fee_id: string;
+  student_id: string;
+  action: 'Created' | 'Submitted' | 'Approved' | 'Rejected' | 'Correction Requested' | 'Revised' | 'Cancelled';
+  actor_id: string;
+  actor_name: string;
+  actor_role: string;
+  old_status?: FeeApprovalStatus;
+  new_status: FeeApprovalStatus;
+  amount_snapshot: number;
+  discount_snapshot: number;
+  reason?: string;
+  notes?: string;
+  timestamp: string;
+}
+
+export interface FeeRevisionRequest {
+  id: string;
+  original_fee_id: string;
+  student_id: string;
+  student_name: string;
+  revision_type:
+    | 'Additional Discount'
+    | 'Wrong Fee Amount'
+    | 'Course Change'
+    | 'Module Change'
+    | 'Batch Change'
+    | 'Installment Change'
+    | 'Offer Adjustment'
+    | 'Management Approval'
+    | 'Cancellation';
+  requested_by: string;
+  requested_by_name: string;
+  requested_at: string;
+  justification: string;
+  proposed_changes: Partial<StudentFee>;
+  status: 'Pending Review' | 'Approved' | 'Rejected';
+  reviewed_by?: string;
+  reviewed_by_name?: string;
+  reviewed_at?: string;
+  review_notes?: string;
+  created_at: string;
+}
+
+export interface StudentPaymentRecord {
+  id: string;
+  fee_id: string;
+  installment_id?: string;
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  fee_category: string;
+  amount_paid: number;
+  payment_date: string;
+  payment_mode: PaymentMethod;
+  transaction_reference?: string;
+  bank_upi_reference?: string;
+  receipt_number?: string;
+  payment_proof_url?: string;
+  notes?: string;
+
+  recorded_by: string;
+  recorded_by_name: string;
+  recorded_by_role: string;
+
+  verification_status: PaymentVerificationStatus;
+  verified_by?: string;
+  verified_by_name?: string;
+  verified_at?: string;
+  verification_notes?: string;
+
+  created_at: string;
+}
+
+export interface StudentFinancialLedgerEntry {
+  id: string;
+  student_id: string;
+  entry_date: string;
+  entry_type:
+    | 'Fee Raised'
+    | 'Discount Approved'
+    | 'Payment Recorded'
+    | 'Payment Verified'
+    | 'Refund Processed'
+    | 'Fee Adjustment'
+    | 'Fee Waiver'
+    | 'Debit Note'
+    | 'Credit Note';
+  fee_category: string;
+  reference_type: string;
+  reference_id: string;
+  debit: number;
+  credit: number;
+  running_balance: number;
+  description: string;
+  recorded_by: string;
+  receipt_id?: string;
+  created_at: string;
+}
+
+export interface StudentRefundRequest {
+  id: string;
+  student_id: string;
+  student_name: string;
+  fee_id: string;
+  payment_id: string;
+  receipt_number?: string;
+  refund_amount: number;
+  refund_reason: string;
+  requested_by: string;
+  requested_by_name: string;
+  requested_at: string;
+  status: 'Requested' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Processed' | 'Cancelled';
+  approved_by?: string;
+  approved_by_name?: string;
+  approved_at?: string;
+  processed_by?: string;
+  processed_by_name?: string;
+  processed_at?: string;
+  transaction_reference?: string;
+  created_at: string;
+}
+
+export interface FinanceWorkflowSettings {
+  id: string;
+  low_discount_max_percent: number;
+  medium_discount_max_percent: number;
+  exceptional_discount_threshold: number;
+  require_payment_verification_for_all_non_accountants: boolean;
+  auto_clearance_on_zero_balance: boolean;
+  clearance_rules: {
+    course_access: boolean;
+    certificate_generation: boolean;
+    placement_eligibility: boolean;
+    exam_access: boolean;
+    project_access: boolean;
+    batch_transfer: boolean;
+  };
+  updated_at: string;
+  updated_by: string;
+}
+
 

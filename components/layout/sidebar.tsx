@@ -253,8 +253,8 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
           </div>
         )}
 
-        {/* Accounts & Finance (Accountant, Admin, Super Admin) */}
-        {isAccountant && (
+        {/* Accounts & Finance (Accountant, Admin, Super Admin, Counsellor) */}
+        {(isAccountant || isCounsellor) && (
           <div>
             <button
               onClick={() => toggleSection('accounts')}
@@ -268,6 +268,17 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
             </button>
             {openSection === 'accounts' && (
               <div className="pl-9 pr-2 py-1 space-y-1">
+                <Link
+                  href="/accounts/approvals"
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    isActive('/accounts/approvals') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>Fee Approvals</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                    Approvals
+                  </span>
+                </Link>
                 <Link
                   href="/accounts/fees"
                   className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
@@ -292,22 +303,26 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
                 >
                   Installments & Overdue
                 </Link>
-                <Link
-                  href="/accounts/expenses"
-                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                    isActive('/accounts/expenses') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Expenses & Approvals
-                </Link>
-                <Link
-                  href="/accounts/vendors"
-                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                    isActive('/accounts/vendors') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Vendors & GST
-                </Link>
+                {isAccountant && (
+                  <>
+                    <Link
+                      href="/accounts/expenses"
+                      className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                        isActive('/accounts/expenses') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Expenses & Approvals
+                    </Link>
+                    <Link
+                      href="/accounts/vendors"
+                      className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                        isActive('/accounts/vendors') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Vendors & GST
+                    </Link>
+                  </>
+                )}
                 <Link
                   href="/accounts/reports"
                   className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
