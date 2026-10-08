@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-10-05T11:33:31.084Z",
+  "timestamp": "2026-10-08T03:23:45.728Z",
   "settings": {
     "id": "sys-01",
     "institute_name": "Next-Gen ERP Solutions",
@@ -267,6 +267,56 @@
     }
   ],
   "admissions": [
+    {
+      "id": "adm-test-1791429819818",
+      "admission_number": "ADM-2026-TEST-1791429819818",
+      "student_name": "Database Persistence Test Student",
+      "phone": "+91 99999 88888",
+      "email": "persistence.test.1791429819818@example.com",
+      "dob": "2000-01-01",
+      "gender": "Male",
+      "address": "Hitec City, Hyderabad",
+      "city": "Hyderabad",
+      "education": "B.Tech",
+      "experience_years": 2,
+      "current_employment_status": "Employed",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "training_mode": "Online",
+      "admission_date": "2026-10-08",
+      "course_fee": 40000,
+      "discount": 0,
+      "net_payable": 40000,
+      "payment_plan": "Full Payment",
+      "status": "Active",
+      "created_at": "2026-10-08T03:23:39.818Z",
+      "updated_at": "2026-10-08T03:23:39.818Z"
+    },
+    {
+      "id": "adm-test-1791202889717",
+      "admission_number": "ADM-2026-TEST-1791202889717",
+      "student_name": "Database Persistence Test Student",
+      "phone": "+91 99999 88888",
+      "email": "persistence.test.1791202889717@example.com",
+      "dob": "2000-01-01",
+      "gender": "Male",
+      "address": "Hitec City, Hyderabad",
+      "city": "Hyderabad",
+      "education": "B.Tech",
+      "experience_years": 2,
+      "current_employment_status": "Employed",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "training_mode": "Online",
+      "admission_date": "2026-10-05",
+      "course_fee": 40000,
+      "discount": 0,
+      "net_payable": 40000,
+      "payment_plan": "Full Payment",
+      "status": "Active",
+      "created_at": "2026-10-05T12:21:29.717Z",
+      "updated_at": "2026-10-05T12:21:29.717Z"
+    },
     {
       "id": "adm-test-1791200011036",
       "admission_number": "ADM-2026-TEST-1791200011036",
@@ -1088,7 +1138,7 @@
       "course_progress": 0,
       "placement_status": "Not Started",
       "created_at": "2026-10-05T10:58:57.632Z",
-      "updated_at": "2026-10-05T11:33:31.037Z"
+      "updated_at": "2026-10-08T03:23:39.821Z"
     },
     {
       "id": "stu-1790839753295",
@@ -1432,13 +1482,13 @@
       "joining_date": "2026-02-01",
       "status": "Active",
       "total_fee": 40000,
-      "paid_amount": 60000,
+      "paid_amount": 65000,
       "outstanding_amount": 20000,
       "attendance_percentage": 0,
       "course_progress": 68,
       "placement_status": "Resume Preparation",
       "created_at": "2026-01-25T10:00:00Z",
-      "updated_at": "2026-10-02T09:56:31.620Z"
+      "updated_at": "2026-10-08T03:23:44.742Z"
     },
     {
       "id": "stu-02",
@@ -1459,16 +1509,46 @@
       "joining_date": "2026-02-15",
       "status": "Active",
       "total_fee": 40000,
-      "paid_amount": 60000,
+      "paid_amount": 65000,
       "outstanding_amount": 20000,
       "attendance_percentage": 88,
       "course_progress": 52,
       "placement_status": "Not Started",
       "created_at": "2026-02-02T11:00:00Z",
-      "updated_at": "2026-10-02T09:56:32.158Z"
+      "updated_at": "2026-10-08T03:23:45.342Z"
     }
   ],
   "leads": [
+    {
+      "id": "lead-repo-test-1791429819839",
+      "lead_code": "LD-2026-TEST-1791429819839",
+      "full_name": "Postgres Lead Test",
+      "phone": "+91 98888 77777",
+      "email": "lead.pg.1791429819839@example.com",
+      "interested_course_id": "crs-fico-01",
+      "current_status": "Professional",
+      "experience_years": 3,
+      "training_preference": "Hybrid",
+      "lead_source": "Website",
+      "stage": "New",
+      "created_at": "2026-10-08T03:23:39.839Z",
+      "updated_at": "2026-10-08T03:23:39.839Z"
+    },
+    {
+      "id": "lead-repo-test-1791202889721",
+      "lead_code": "LD-2026-TEST-1791202889721",
+      "full_name": "Postgres Lead Test",
+      "phone": "+91 98888 77777",
+      "email": "lead.pg.1791202889721@example.com",
+      "interested_course_id": "crs-fico-01",
+      "current_status": "Professional",
+      "experience_years": 3,
+      "training_preference": "Hybrid",
+      "lead_source": "Website",
+      "stage": "New",
+      "created_at": "2026-10-05T12:21:29.721Z",
+      "updated_at": "2026-10-05T12:21:29.721Z"
+    },
     {
       "id": "lead-repo-test-1791200011043",
       "lead_code": "LD-2026-TEST-1791200011043",
@@ -2081,7 +2161,7 @@
       "marked_at": "2026-10-02T09:52:09.860Z"
     },
     {
-      "id": "att-repo-test-1791200011038",
+      "id": "att-repo-test-1791429819822",
       "student_id": "stu-1791197937632",
       "session_id": "sess-01",
       "batch_id": "batch-fico-01",
@@ -2090,7 +2170,7 @@
       "source": "Manual",
       "duration_minutes": 90,
       "marked_by": "usr-admin",
-      "marked_at": "2026-10-05T11:33:31.038Z"
+      "marked_at": "2026-10-08T03:23:39.822Z"
     }
   ],
   "assignments": [
@@ -2477,12 +2557,12 @@
       "discount": 5000,
       "discount_reason": "Early bird registration discount",
       "net_payable": 40000,
-      "paid_amount": 60000,
+      "paid_amount": 65000,
       "outstanding_amount": 20000,
       "payment_plan": "3 Installments",
       "status": "Partially Paid",
       "created_at": "2026-01-25T10:00:00Z",
-      "updated_at": "2026-10-02T09:56:31.619Z"
+      "updated_at": "2026-10-08T03:23:44.742Z"
     },
     {
       "id": "fa-02",
@@ -2494,12 +2574,12 @@
       "original_fee": 40000,
       "discount": 0,
       "net_payable": 40000,
-      "paid_amount": 60000,
+      "paid_amount": 65000,
       "outstanding_amount": 20000,
       "payment_plan": "2 Installments",
       "status": "Partially Paid",
       "created_at": "2026-02-02T11:00:00Z",
-      "updated_at": "2026-10-02T09:56:32.158Z"
+      "updated_at": "2026-10-08T03:23:45.342Z"
     }
   ],
   "installments": [
@@ -2841,6 +2921,68 @@
     }
   ],
   "payments": [
+    {
+      "id": "pay-1791429825341",
+      "receipt_number": "REC-2026-0037",
+      "student_id": "stu-02",
+      "student_name": "Sneha Kulkarni",
+      "admission_number": "ADM-2026-0002",
+      "fee_account_id": "fa-02",
+      "course_id": "crs-mm-01",
+      "course_name": "SAP S/4HANA Materials Management (MM)",
+      "amount": 5000,
+      "payment_date": "2026-03-01",
+      "payment_mode": "Bank Transfer",
+      "transaction_reference": "NEFT-TEST-GST-1791429825341",
+      "status": "Success",
+      "collected_by": "usr-accounts",
+      "collected_by_name": "Suresh Kumar (Chief Accountant)",
+      "created_at": "2026-10-08T03:23:45.341Z"
+    },
+    {
+      "id": "pay-1791429824742",
+      "receipt_number": "REC-2026-0036",
+      "student_id": "stu-01",
+      "student_name": "Amit Gupta",
+      "admission_number": "ADM-2026-0001",
+      "fee_account_id": "fa-01",
+      "course_id": "crs-fico-01",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "amount": 5000,
+      "payment_date": "2026-03-01",
+      "payment_mode": "UPI",
+      "transaction_reference": "UPI-TEST-GST-1791429824740",
+      "status": "Success",
+      "collected_by": "usr-accounts",
+      "collected_by_name": "Suresh Kumar (Chief Accountant)",
+      "created_at": "2026-10-08T03:23:44.742Z"
+    },
+    {
+      "id": "pay-repo-test-1791429819824",
+      "receipt_number": "REC-2026-TEST-1791429819824",
+      "student_id": "stu-1791197937632",
+      "course_id": "crs-fico-01",
+      "fee_account_id": "fa-1791197937632",
+      "amount": 5000,
+      "payment_date": "2026-10-08",
+      "payment_mode": "UPI",
+      "status": "Success",
+      "collected_by": "usr-admin",
+      "created_at": "2026-10-08T03:23:39.825Z"
+    },
+    {
+      "id": "pay-repo-test-1791202889720",
+      "receipt_number": "REC-2026-TEST-1791202889720",
+      "student_id": "stu-1791197937632",
+      "course_id": "crs-fico-01",
+      "fee_account_id": "fa-1791197937632",
+      "amount": 5000,
+      "payment_date": "2026-10-05",
+      "payment_mode": "UPI",
+      "status": "Success",
+      "collected_by": "usr-admin",
+      "created_at": "2026-10-05T12:21:29.720Z"
+    },
     {
       "id": "pay-repo-test-1791200011041",
       "receipt_number": "REC-2026-TEST-1791200011041",
@@ -3374,6 +3516,150 @@
     }
   ],
   "receipts": [
+    {
+      "id": "rcpt-1791429825342",
+      "receipt_number": "REC-2026-0037",
+      "payment_id": "pay-1791429825341",
+      "student_id": "stu-02",
+      "student_name": "Sneha Kulkarni",
+      "admission_number": "ADM-2026-0002",
+      "course_name": "SAP S/4HANA Materials Management (MM)",
+      "payment_amount": 5000,
+      "payment_mode": "Bank Transfer",
+      "transaction_reference": "NEFT-TEST-GST-1791429825341",
+      "payment_date": "2026-03-01",
+      "remaining_balance": 20000,
+      "authorized_by": "Suresh Kumar (Chief Accountant)",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-10-08T03:23:45.342Z",
+      "supply_type": "INTER_STATE",
+      "place_of_supply": "Maharashtra (27)",
+      "place_of_supply_code": "27",
+      "sac_code": "999293",
+      "taxable_amount": 4237.29,
+      "cgst_rate": 0,
+      "cgst_amount": 0,
+      "sgst_rate": 0,
+      "sgst_amount": 0,
+      "igst_rate": 18,
+      "igst_amount": 762.71,
+      "total_tax": 762.71,
+      "is_reverse_charge": false,
+      "irn": "b35ae1bf61f77644d776e9318f77367b7db64f465f874410ae35c9b1ba7b8e1f",
+      "ack_no": "122691429825342",
+      "ack_date": "2026-10-08T03:23:45.342Z",
+      "pdf_url": "/api/storage/receipts/stu-02/receipt-REC-2026-0037.pdf"
+    },
+    {
+      "id": "rcpt-1791429824743",
+      "receipt_number": "REC-2026-0036",
+      "payment_id": "pay-1791429824742",
+      "student_id": "stu-01",
+      "student_name": "Amit Gupta",
+      "admission_number": "ADM-2026-0001",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "payment_amount": 5000,
+      "payment_mode": "UPI",
+      "transaction_reference": "UPI-TEST-GST-1791429824740",
+      "payment_date": "2026-03-01",
+      "remaining_balance": 20000,
+      "authorized_by": "Suresh Kumar (Chief Accountant)",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-10-08T03:23:44.743Z",
+      "supply_type": "INTRA_STATE",
+      "place_of_supply": "Telangana (36)",
+      "place_of_supply_code": "36",
+      "sac_code": "999293",
+      "taxable_amount": 4237.29,
+      "cgst_rate": 9,
+      "cgst_amount": 381.36,
+      "sgst_rate": 9,
+      "sgst_amount": 381.35,
+      "igst_rate": 0,
+      "igst_amount": 0,
+      "total_tax": 762.71,
+      "is_reverse_charge": false,
+      "irn": "81f2efcd5f08099d31baeacfbe010a6de3266b5e03d3a6868d7480c82e149809",
+      "ack_no": "122691429824743",
+      "ack_date": "2026-10-08T03:23:44.743Z",
+      "pdf_url": "/api/storage/receipts/stu-01/receipt-REC-2026-0036.pdf"
+    },
+    {
+      "id": "rcpt-repo-test-1791429819825",
+      "receipt_number": "REC-2026-TEST-1791429819824",
+      "payment_id": "pay-repo-test-1791429819824",
+      "student_id": "stu-1791197937632",
+      "student_name": "Rajesh Test",
+      "admission_number": "ADM-2026-0027",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "payment_amount": 5000,
+      "payment_mode": "UPI",
+      "payment_date": "2026-10-08",
+      "remaining_balance": 10000,
+      "authorized_by": "Finance Department",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hyderabad",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-10-08T03:23:39.825Z",
+      "supply_type": "INTRA_STATE",
+      "place_of_supply": "Telangana (36)",
+      "place_of_supply_code": "36",
+      "sac_code": "999293",
+      "taxable_amount": 4237.29,
+      "cgst_rate": 9,
+      "cgst_amount": 381.36,
+      "sgst_rate": 9,
+      "sgst_amount": 381.35,
+      "igst_rate": 0,
+      "igst_amount": 0,
+      "total_tax": 762.71,
+      "is_reverse_charge": false,
+      "irn": "eb35a8a79b63c092505d107e385e17f79514f9ae4bfd6d142d9d16cf4b7cac16",
+      "ack_no": "122691429819926",
+      "ack_date": "2026-10-08T03:23:39.926Z"
+    },
+    {
+      "id": "rcpt-repo-test-1791202889720",
+      "receipt_number": "REC-2026-TEST-1791202889720",
+      "payment_id": "pay-repo-test-1791202889720",
+      "student_id": "stu-1791197937632",
+      "student_name": "Rajesh Test",
+      "admission_number": "ADM-2026-0027",
+      "course_name": "SAP S/4HANA Finance (FICO)",
+      "payment_amount": 5000,
+      "payment_mode": "UPI",
+      "payment_date": "2026-10-05",
+      "remaining_balance": 10000,
+      "authorized_by": "Finance Department",
+      "institute_name": "Next-Gen ERP Solutions",
+      "institute_address": "Plot 42, Silicon Valley Towers, Hyderabad",
+      "institute_phone": "+91 98765 43210",
+      "institute_gst": "36AAACN1234F1Z8",
+      "created_at": "2026-10-05T12:21:29.720Z",
+      "supply_type": "INTRA_STATE",
+      "place_of_supply": "Telangana (36)",
+      "place_of_supply_code": "36",
+      "sac_code": "999293",
+      "taxable_amount": 4237.29,
+      "cgst_rate": 9,
+      "cgst_amount": 381.36,
+      "sgst_rate": 9,
+      "sgst_amount": 381.35,
+      "igst_rate": 0,
+      "igst_amount": 0,
+      "total_tax": 762.71,
+      "is_reverse_charge": false,
+      "irn": "6511f8331839a59eceaaecedf7ad7d39d0f43099123aebba0a532ed01247c3fa",
+      "ack_no": "122691202889739",
+      "ack_date": "2026-10-05T12:21:29.739Z"
+    },
     {
       "id": "rcpt-repo-test-1791200011042",
       "receipt_number": "REC-2026-TEST-1791200011041",
@@ -4726,6 +5012,28 @@
   ],
   "notifications": [
     {
+      "id": "notif-1791429825499-4hcb",
+      "user_id": "stu-02",
+      "title": "Fee Payment Received: ₹5,000",
+      "message": "Tuition fee payment of ₹5,000 for SAP S/4HANA Materials Management (MM) recorded successfully. Receipt No: REC-2026-0037. Remaining Balance: ₹20,000. Download PDF: /api/storage/receipts/stu-02/receipt-REC-2026-0037.pdf",
+      "type": "success",
+      "category": "payment",
+      "is_read": false,
+      "action_url": "/api/storage/receipts/stu-02/receipt-REC-2026-0037.pdf",
+      "created_at": "2026-10-08T03:23:45.499Z"
+    },
+    {
+      "id": "notif-1791429825336-s872",
+      "user_id": "stu-01",
+      "title": "Fee Payment Received: ₹5,000",
+      "message": "Tuition fee payment of ₹5,000 for SAP S/4HANA Finance (FICO) recorded successfully. Receipt No: REC-2026-0036. Remaining Balance: ₹20,000. Download PDF: /api/storage/receipts/stu-01/receipt-REC-2026-0036.pdf",
+      "type": "success",
+      "category": "payment",
+      "is_read": false,
+      "action_url": "/api/storage/receipts/stu-01/receipt-REC-2026-0036.pdf",
+      "created_at": "2026-10-08T03:23:45.336Z"
+    },
+    {
       "id": "notif-1791198300109-bsuz",
       "user_id": "stu-1791197937632",
       "title": "Fee Payment Received: ₹10,000",
@@ -4804,6 +5112,46 @@
     }
   ],
   "auditLogs": [
+    {
+      "user_id": "usr-accounts",
+      "user_name": "Suresh Kumar (Chief Accountant)",
+      "user_role": "accountant",
+      "action": "PAYMENT_RECORDED_ATOMIC",
+      "module": "FINANCE",
+      "record_id": "pay-1791429825341",
+      "old_value": {
+        "outstanding": 25000
+      },
+      "new_value": {
+        "amount": 5000,
+        "receipt": "REC-2026-0037",
+        "mode": "Bank Transfer",
+        "remaining_balance": 20000,
+        "pdf_url": "/api/storage/receipts/stu-02/receipt-REC-2026-0037.pdf"
+      },
+      "id": "aud-1791429825499-834",
+      "created_at": "2026-10-08T03:23:45.499Z"
+    },
+    {
+      "user_id": "usr-accounts",
+      "user_name": "Suresh Kumar (Chief Accountant)",
+      "user_role": "accountant",
+      "action": "PAYMENT_RECORDED_ATOMIC",
+      "module": "FINANCE",
+      "record_id": "pay-1791429824742",
+      "old_value": {
+        "outstanding": 25000
+      },
+      "new_value": {
+        "amount": 5000,
+        "receipt": "REC-2026-0036",
+        "mode": "UPI",
+        "remaining_balance": 20000,
+        "pdf_url": "/api/storage/receipts/stu-01/receipt-REC-2026-0036.pdf"
+      },
+      "id": "aud-1791429825335-820",
+      "created_at": "2026-10-08T03:23:45.335Z"
+    },
     {
       "user_id": "usr-gateway-system",
       "user_name": "Razorpay Payment Gateway Webhook",
@@ -5562,5 +5910,170 @@
       "updated_at": "2026-03-01T14:00:00Z"
     }
   ],
-  "meetingLogs": []
+  "meetingLogs": [],
+  "placementEnrollments": [
+    {
+      "id": "pe-01",
+      "student_id": "stu-02",
+      "student_name": "Sneha Kulkarni",
+      "admission_number": "ADM-2026-0002",
+      "student_code": "STU-2026-002",
+      "email": "sneha.k@student.next-gen.com",
+      "mobile_number": "+91 98222 33344",
+      "whatsapp_number": "+91 98222 33344",
+      "course_id": "crs-mm-01",
+      "course_name": "SAP S/4HANA Materials Management (MM)",
+      "sap_module": "SAP MM",
+      "batch_id": "bch-mm-01",
+      "batch_name": "SAP MM Weekend Masterclass",
+      "trainer_id": "usr-trainer-mm",
+      "trainer_name": "Neha Patel (SAP MM Lead)",
+      "enrollment_status": "Enrollment Approved",
+      "is_placement_eligible": false,
+      "eligibility_reasons": [
+        "Resume review pending by placement officer",
+        "Technical mock interview pending (scheduled)"
+      ],
+      "current_status": "Working Professional",
+      "employment_status": "Currently Working",
+      "current_company": "Tata Technologies Ltd",
+      "current_designation": "Procurement Specialist",
+      "total_experience_years": 2.5,
+      "relevant_sap_experience_years": 1,
+      "current_ctc_lpa": 5.2,
+      "expected_ctc_lpa": 8.5,
+      "notice_period": "30 Days",
+      "highest_qualification": "Post Graduate",
+      "degree": "M.Tech / B.E. Mechanical",
+      "specialization": "Industrial & Supply Chain",
+      "college_university": "Savitribai Phule Pune University",
+      "graduation_year": 2023,
+      "percentage_or_cgpa": "8.4 CGPA",
+      "preferred_job_roles": [
+        "SAP MM Functional Consultant",
+        "SAP SCM Analyst"
+      ],
+      "preferred_locations": [
+        "Pune",
+        "Mumbai",
+        "Bengaluru",
+        "Hybrid"
+      ],
+      "preferred_work_mode": "Hybrid",
+      "willing_to_relocate": true,
+      "immediate_joiner": false,
+      "preferred_industry": "Manufacturing / Consulting",
+      "resume_url": "https://example.com/resumes/sneha_kulkarni_mm.pdf",
+      "resume_name": "Sneha_Kulkarni_SAP_MM_2026.pdf",
+      "resume_status": "Pending Review",
+      "documents": [
+        {
+          "id": "doc-01",
+          "document_type": "Degree Certificate",
+          "file_name": "BE_Degree_Certificate.pdf",
+          "file_url": "https://example.com/docs/sneha_degree.pdf",
+          "uploaded_at": "2026-03-01T12:00:00Z",
+          "is_verified": true,
+          "verified_by": "usr-placement",
+          "verified_at": "2026-03-02T10:00:00Z"
+        },
+        {
+          "id": "doc-02",
+          "document_type": "Aadhaar / ID Proof",
+          "file_name": "Govt_ID_Proof.pdf",
+          "file_url": "https://example.com/docs/sneha_id.pdf",
+          "uploaded_at": "2026-03-01T12:05:00Z",
+          "is_verified": true,
+          "verified_by": "usr-placement",
+          "verified_at": "2026-03-02T10:00:00Z"
+        },
+        {
+          "id": "doc-03",
+          "document_type": "Passport Photo",
+          "file_name": "Passport_Photo.jpg",
+          "file_url": "https://example.com/docs/sneha_photo.jpg",
+          "uploaded_at": "2026-03-01T12:10:00Z",
+          "is_verified": true,
+          "verified_by": "usr-placement",
+          "verified_at": "2026-03-02T10:00:00Z"
+        }
+      ],
+      "declaration": {
+        "terms_version": "v2026.1",
+        "accepted_by": "stu-02",
+        "accepted_by_name": "Sneha Kulkarni",
+        "accepted_at": "2026-03-01T11:45:00Z",
+        "confirmed_information_correct": true,
+        "understands_no_guarantee": true,
+        "agrees_attend_scheduled_interviews": true,
+        "agrees_inform_external_offer": true,
+        "authorizes_resume_sharing": true,
+        "understands_sensitive_docs_policy": true,
+        "agrees_keep_profile_updated": true
+      },
+      "enrollment_date": "2026-03-01T11:45:00Z",
+      "reviewed_at": "2026-03-02T10:00:00Z",
+      "reviewed_by": "usr-placement",
+      "reviewed_by_name": "Sunita Reddy (Placement Head)",
+      "assigned_placement_officer_id": "usr-placement",
+      "assigned_placement_officer_name": "Sunita Reddy",
+      "internal_notes": [
+        "Candidate has strong procurement domain experience, preparing for Big 4 referrals."
+      ],
+      "created_at": "2026-03-01T11:45:00Z",
+      "updated_at": "2026-03-02T10:00:00Z"
+    }
+  ],
+  "placementEnrollmentStatusHistories": [
+    {
+      "id": "pesh-01",
+      "enrollment_id": "pe-01",
+      "student_id": "stu-02",
+      "old_status": "Not Enrolled",
+      "new_status": "Application Submitted",
+      "changed_by": "stu-02",
+      "changed_by_name": "Sneha Kulkarni",
+      "changed_by_role": "student",
+      "changed_at": "2026-03-01T11:45:00Z",
+      "reason": "Initial student registration form submitted"
+    },
+    {
+      "id": "pesh-02",
+      "enrollment_id": "pe-01",
+      "student_id": "stu-02",
+      "old_status": "Application Submitted",
+      "new_status": "Under Review",
+      "changed_by": "usr-placement",
+      "changed_by_name": "Sunita Reddy",
+      "changed_by_role": "placement_coordinator",
+      "changed_at": "2026-03-01T14:30:00Z",
+      "reason": "Profile taken up for primary screening"
+    },
+    {
+      "id": "pesh-03",
+      "enrollment_id": "pe-01",
+      "student_id": "stu-02",
+      "old_status": "Under Review",
+      "new_status": "Enrollment Approved",
+      "changed_by": "usr-placement",
+      "changed_by_name": "Sunita Reddy",
+      "changed_by_role": "placement_coordinator",
+      "changed_at": "2026-03-02T10:00:00Z",
+      "reason": "Mandatory profile and education verified. Moved to resume review and mock interview queue."
+    }
+  ],
+  "placementEligibilitySettings": {
+    "id": "pes-default",
+    "min_course_progress_percentage": 80,
+    "min_attendance_percentage": 80,
+    "require_assessments_completed": true,
+    "require_mock_interview_completed": true,
+    "min_mock_interview_score": 75,
+    "require_resume_approved": true,
+    "require_mandatory_documents_verified": true,
+    "require_fees_cleared": true,
+    "allow_admin_override": true,
+    "updated_at": "2026-03-01T10:00:00Z",
+    "updated_by": "usr-admin"
+  }
 }

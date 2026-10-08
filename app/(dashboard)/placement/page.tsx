@@ -115,7 +115,29 @@ export default function PlacementPage() {
         </Button>
       </div>
 
-      {/* Active Job Openings Grid */}
+      {/* Navigation Sub-Tabs */}
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-3 text-sm">
+        <Link
+          href="/placement"
+          className="px-3 py-1.5 rounded-lg bg-[#0A6ED1] text-white font-semibold flex items-center space-x-2 shadow-xs"
+        >
+          <Briefcase className="h-4 w-4" />
+          <span>Drives & Openings</span>
+          <Badge variant="outline" className="ml-1 bg-white/20 text-white border-0 text-[10px]">
+            {jobs.length}
+          </Badge>
+        </Link>
+        <Link
+          href="/placement/enrollments"
+          className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium flex items-center space-x-2 transition-colors"
+        >
+          <CheckCircle className="h-4 w-4 text-purple-600" />
+          <span>Enrollments & Candidates</span>
+          <Badge variant="secondary" className="ml-1 text-[10px]">
+            {store.placementEnrollments.length}
+          </Badge>
+        </Link>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {jobs.map((j) => (
           <Card key={j.id} className="hover:border-[#0A6ED1] transition-all">

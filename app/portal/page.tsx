@@ -71,9 +71,11 @@ import {
 } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { QuizRunnerModal } from '@/components/portal/quiz-runner-modal';
+import { StudentPlacementHub } from '@/components/portal/student-placement-hub';
 
 export default function StudentPortalPage() {
   const { user, logout } = useAuth();
+  const [activePortalTab, setActivePortalTab] = React.useState<'curriculum' | 'placement'>('curriculum');
   const student =
     (user &&
       store.students.find(
@@ -83,6 +85,7 @@ export default function StudentPortalPage() {
           s.user_id === user.id
       )) ||
     store.students[0];
+  const studentEnrollment = store.placementEnrollments.find((e) => e.student_id === student.id);
   const course = store.courses.find((c) => c.id === student.course_id);
   const modules = store.modules.filter((m) => m.course_id === student.course_id);
   const lessons = store.lessons.filter((l) => l.course_id === student.course_id && l.is_published);
@@ -500,6 +503,50 @@ export default function StudentPortalPage() {
         </div>
       </header>
 
+      {/* Student Navigation Sub-Bar */}
+      <div className="bg-slate-900 border-b border-slate-800 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center space-x-2 py-2.5">
+          <button
+            onClick={() => setActivePortalTab('curriculum')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition-all ${
+              activePortalTab === 'curriculum'
+                ? 'bg-[#0A6ED1] text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Learning & Curriculum</span>
+          </button>
+
+          <button
+            onClick={() => setActivePortalTab('placement')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition-all ${
+              activePortalTab === 'placement'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <Briefcase className="h-4 w-4 text-purple-400" />
+            <span>Placement Support</span>
+            {studentEnrollment ? (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  studentEnrollment.is_placement_eligible
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-purple-500/20 text-purple-200 border border-purple-500/30'
+                }`}
+              >
+                {studentEnrollment.enrollment_status}
+              </span>
+            ) : (
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold">
+                Enroll for Placement
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Main Student Dashboard Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* Welcome Banner */}
@@ -563,26 +610,45 @@ export default function StudentPortalPage() {
             )}
           </Card>
 
-          <Card className="p-4 border-l-4 border-l-purple-600 flex flex-col justify-between">
+          <Card
+            className="p-4 border-l-4 border-l-purple-600 flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setActivePortalTab('placement')}
+          >
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Placement & Career</p>
-              <h3 className="text-xl font-bold text-purple-900 mt-1">{student.placement_status}</h3>
+              <h3 className="text-xl font-bold text-purple-900 mt-1">
+                {studentEnrollment?.enrollment_status || 'Not Enrolled'}
+              </h3>
               <p className="text-[11px] text-purple-600 font-medium">
-                Resume: {placementProfile?.resume_status || 'Pending Upload'}
+                {studentEnrollment
+                  ? studentEnrollment.is_placement_eligible
+                    ? 'Placement Eligible ✓'
+                    : 'Action Pending'
+                  : 'Enroll for Placement Support'}
               </p>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsResumeModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setActivePortalTab('placement');
+              }}
               className="mt-2 text-[11px] py-1 h-7 border-purple-200 text-purple-700 hover:bg-purple-50 w-full flex items-center justify-center space-x-1"
             >
-              <FileText className="h-3 w-3" />
-              <span>Manage Resume</span>
+              <Briefcase className="h-3 w-3" />
+              <span>{studentEnrollment ? 'Placement Hub' : 'Enroll for Placement'}</span>
             </Button>
           </Card>
         </div>
 
+        {activePortalTab === 'placement' ? (
+          <StudentPlacementHub
+            student={student}
+            onOpenResumeModal={() => setIsResumeModalOpen(true)}
+          />
+        ) : (
+          <>
         {/* LMS Interactive Video Player & Lesson Curriculum Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Video Player Column */}
@@ -1503,6 +1569,9 @@ export default function StudentPortalPage() {
             </div>
           </div>
         )}
+          </>
+        )}
+
         {/* Online Payment Modal */}
         <Modal
           isOpen={isPayModalOpen}

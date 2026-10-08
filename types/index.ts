@@ -183,6 +183,7 @@ export interface Student {
   gstin?: string;
   course_id: string;
   course_name?: string;
+  sap_module?: string;
   batch_id?: string;
   batch_name?: string;
   trainer_id?: string;
@@ -844,6 +845,196 @@ export interface StudentDoubt {
   resolved_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+// --- Placement Enrollment & Eligibility Architecture ---
+
+export type PlacementCurrentStatus =
+  | 'Student'
+  | 'Fresher'
+  | 'Working Professional'
+  | 'Career Restart'
+  | 'Looking for Job Change';
+
+export type PlacementEmploymentStatus =
+  | 'Fresher'
+  | 'Currently Working'
+  | 'Not Working'
+  | 'Serving Notice Period'
+  | 'Immediate Joiner';
+
+export type PlacementWorkMode = 'On-Site' | 'Hybrid' | 'Remote' | 'Any';
+
+export type PlacementEnrollmentStatus =
+  | 'Not Enrolled'
+  | 'Application Submitted'
+  | 'Under Review'
+  | 'More Information Required'
+  | 'Enrollment Approved'
+  | 'Profile Completion Pending'
+  | 'Documents Pending'
+  | 'Resume Review Pending'
+  | 'Mock Interview Pending'
+  | 'Placement Eligible'
+  | 'Active Placement'
+  | 'Placed'
+  | 'Placement Closed'
+  | 'Enrollment Rejected'
+  | 'Enrollment On Hold'
+  | 'Student Withdrawn'
+  | 'Re-enrollment Requested'
+  | 'Re-enrollment Under Review'
+  | 'Re-enrollment Approved'
+  | 'Re-enrollment Rejected';
+
+export interface PlacementDocumentItem {
+  id: string;
+  document_type:
+    | 'Passport Photo'
+    | 'Aadhaar / ID Proof'
+    | 'PAN Card'
+    | 'Degree Certificate'
+    | 'Marksheets'
+    | 'Experience Letter'
+    | 'Relieving Letter'
+    | 'SAP Certification'
+    | 'Other Certification';
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
+  is_verified?: boolean;
+  verified_by?: string;
+  verified_at?: string;
+  verification_notes?: string;
+}
+
+export interface PlacementDeclaration {
+  terms_version: string;
+  accepted_by: string;
+  accepted_by_name: string;
+  accepted_at: string;
+  confirmed_information_correct: boolean;
+  understands_no_guarantee: boolean;
+  agrees_attend_scheduled_interviews: boolean;
+  agrees_inform_external_offer: boolean;
+  authorizes_resume_sharing: boolean;
+  understands_sensitive_docs_policy: boolean;
+  agrees_keep_profile_updated: boolean;
+  ip_address?: string;
+  user_agent?: string;
+}
+
+export interface PlacementEnrollment {
+  id: string;
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  student_code: string;
+  email: string;
+  mobile_number: string;
+  whatsapp_number: string;
+  course_id: string;
+  course_name: string;
+  sap_module: string;
+  batch_id?: string;
+  batch_name?: string;
+  trainer_id?: string;
+  trainer_name?: string;
+
+  // Status Lifecycle
+  enrollment_status: PlacementEnrollmentStatus;
+  is_placement_eligible: boolean;
+  eligibility_reasons?: string[];
+  eligibility_overridden?: boolean;
+  override_reason?: string;
+  overridden_by?: string;
+  overridden_at?: string;
+
+  // Current & Employment Status
+  current_status: PlacementCurrentStatus;
+  employment_status: PlacementEmploymentStatus;
+
+  // Professional Experience (if experienced/working)
+  current_company?: string;
+  current_designation?: string;
+  total_experience_years?: number;
+  relevant_sap_experience_years?: number;
+  current_ctc_lpa?: number;
+  expected_ctc_lpa?: number;
+  notice_period?: string;
+  last_working_date?: string;
+
+  // Academic Education
+  highest_qualification: string;
+  degree: string;
+  specialization: string;
+  college_university: string;
+  graduation_year: number;
+  percentage_or_cgpa: string;
+
+  // Placement Preferences
+  preferred_job_roles: string[];
+  preferred_locations: string[];
+  preferred_work_mode: PlacementWorkMode;
+  willing_to_relocate: boolean;
+  immediate_joiner: boolean;
+  preferred_industry?: string;
+
+  // Resume & Documents
+  resume_url?: string;
+  resume_name?: string;
+  resume_status: 'Not Uploaded' | 'Pending Review' | 'Reviewed & Approved' | 'Needs Improvement';
+  documents: PlacementDocumentItem[];
+
+  // Terms and Declaration
+  declaration: PlacementDeclaration;
+
+  // Administration Review
+  enrollment_date: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  reviewed_by_name?: string;
+  assigned_placement_officer_id?: string;
+  assigned_placement_officer_name?: string;
+  internal_notes?: string[];
+
+  // Rejection, Hold & Change Notes
+  rejection_reason?: string;
+  hold_reason?: string;
+  withdrawal_reason?: string;
+  more_info_required_notes?: string;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlacementEnrollmentStatusHistory {
+  id: string;
+  enrollment_id: string;
+  student_id: string;
+  old_status: PlacementEnrollmentStatus;
+  new_status: PlacementEnrollmentStatus;
+  changed_by: string;
+  changed_by_name: string;
+  changed_by_role: string;
+  changed_at: string;
+  reason?: string;
+  notes?: string;
+}
+
+export interface PlacementEligibilitySettings {
+  id: string;
+  min_course_progress_percentage: number; // default 80
+  min_attendance_percentage: number; // default 80
+  require_assessments_completed: boolean; // default true
+  require_mock_interview_completed: boolean; // default true
+  min_mock_interview_score: number; // default 75
+  require_resume_approved: boolean; // default true
+  require_mandatory_documents_verified: boolean; // default true
+  require_fees_cleared: boolean; // default true
+  allow_admin_override: boolean; // default true
+  updated_at: string;
+  updated_by?: string;
 }
 
 

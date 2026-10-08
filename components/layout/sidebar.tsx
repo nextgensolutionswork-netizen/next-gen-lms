@@ -323,15 +323,38 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
 
         {/* Placement Support (Placement, Admin, Super Admin) */}
         {isPlacement && (
-          <Link
-            href="/placement"
-            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-              isActive('/placement') ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Briefcase className="h-4 w-4 text-purple-400" />
-            <span>Placement Support</span>
-          </Link>
+          <div>
+            <button
+              onClick={() => toggleSection('placement')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <Briefcase className="h-4 w-4 text-purple-400" />
+                <span>Placement Support</span>
+              </div>
+              <ChevronDown className={`h-3 w-3 transition-transform ${openSection === 'placement' ? 'rotate-180' : ''}`} />
+            </button>
+            {(openSection === 'placement' || isActive('/placement')) && (
+              <div className="pl-9 pr-2 py-1 space-y-1">
+                <Link
+                  href="/placement"
+                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    pathname === '/placement' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Drives & Openings
+                </Link>
+                <Link
+                  href="/placement/enrollments"
+                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    isActive('/placement/enrollments') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Enrollments & Candidates
+                </Link>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Academic Support Helpdesk (Support, Trainer, Admin, Super Admin) */}

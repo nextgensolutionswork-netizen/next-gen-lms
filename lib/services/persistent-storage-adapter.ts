@@ -41,6 +41,9 @@ export interface InstituteDataSnapshot {
   sapAllocations: any[];
   doubts: any[];
   meetingLogs: any[];
+  placementEnrollments?: any[];
+  placementEnrollmentStatusHistories?: any[];
+  placementEligibilitySettings?: any;
 }
 
 const STORAGE_DIR = path.join(process.cwd(), 'data');
@@ -141,6 +144,9 @@ export class PersistentStorageAdapter {
         sapAllocations: state.sapAllocations || [],
         doubts: state.doubts || [],
         meetingLogs: state.meetingLogs || [],
+        placementEnrollments: (state as any).placementEnrollments || [],
+        placementEnrollmentStatusHistories: (state as any).placementEnrollmentStatusHistories || [],
+        placementEligibilitySettings: (state as any).placementEligibilitySettings || null,
       };
 
       const tmpFile = `${STORAGE_FILE}.tmp.${Date.now()}`;

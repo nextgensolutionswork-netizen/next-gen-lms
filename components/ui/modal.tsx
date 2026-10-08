@@ -10,6 +10,7 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  className?: string;
 }
 
 export function Modal({
@@ -19,6 +20,7 @@ export function Modal({
   description,
   children,
   maxWidth = 'lg',
+  className = '',
 }: ModalProps) {
   if (!isOpen) return null;
 
@@ -33,7 +35,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
       <div
-        className={`w-full ${maxWidths[maxWidth]} rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden transform transition-all`}
+        className={`w-full ${maxWidths[maxWidth]} rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden transform transition-all ${className}`}
         role="dialog"
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
