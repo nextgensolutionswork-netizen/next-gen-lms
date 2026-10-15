@@ -14,6 +14,7 @@ export async function getDoubts(filters?: {
   status?: DoubtStatus | 'All';
   category?: DoubtCategory | 'All';
   search?: string;
+  batch_id?: string;
 }): Promise<StudentDoubt[]> {
   if (isLiveSupabaseEnabled()) {
     try {
@@ -28,6 +29,9 @@ export async function getDoubts(filters?: {
       }
       if (filters?.assigned_to_id) {
         query = query.eq('assigned_to_id', filters.assigned_to_id);
+      }
+      if (filters?.batch_id && filters.batch_id !== 'All') {
+        query = query.eq('batch_id', filters.batch_id);
       }
       if (filters?.status && filters.status !== 'All') {
         query = query.eq('status', filters.status);
@@ -57,6 +61,14 @@ export async function getDoubts(filters?: {
 
   if (filters?.assigned_to_id) {
     list = list.filter((d) => d.assigned_to_id === filters.assigned_to_id);
+  }
+
+  if (filters?.batch_id && filters.batch_id !== 'All') {
+    list = list.filter((d) => {
+      if (d.batch_id === filters.batch_id) return true;
+      const student = store.students.find((s) => s.id === d.student_id);
+      return student?.batch_id === filters.batch_id;
+    });
   }
 
   if (filters?.status && filters.status !== 'All') {
@@ -289,7 +301,10 @@ export async function replyToDoubt(
   doubt.updated_at = now;
 
   // If support or trainer replies, transition from Open/Assigned to In Progress
-  if ((senderRole === 'support' || senderRole === 'trainer' || senderRole === 'admin') && doubt.status !== 'Resolved') {
+  if (
+    (senderRole === 'support' || senderRole === 'trainer' || senderRole === 'admin' || senderRole === 'super_admin') &&
+    doubt.status !== 'Resolved'
+  ) {
     doubt.status = 'In Progress';
   }
   store.persist();
@@ -483,6 +498,7 @@ export async function resolveDoubt(
 
   let resolutionMsg: DoubtMessage | undefined;
   if (resolutionNotes && resolutionNotes.trim()) {
+    doubt.resolution_notes = resolutionNotes.trim();
     resolutionMsg = {
       id: `msg-${Date.now()}`,
       doubt_id: doubt.id,

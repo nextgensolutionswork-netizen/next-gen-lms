@@ -238,6 +238,22 @@ export async function createJobOpening(data: Omit<JobOpening, 'id' | 'applicatio
   return job;
 }
 
+export async function updateJobOpeningStatus(jobId: string, status: 'Open' | 'Closed'): Promise<JobOpening | null> {
+  const job = store.jobOpenings.find((j) => j.id === jobId);
+  if (!job) return null;
+  job.status = status;
+  store.persist();
+  return job;
+}
+
+export async function deleteJobOpening(jobId: string): Promise<boolean> {
+  const idx = store.jobOpenings.findIndex((j) => j.id === jobId);
+  if (idx === -1) return false;
+  store.jobOpenings.splice(idx, 1);
+  store.persist();
+  return true;
+}
+
 export async function getJobApplications(): Promise<JobApplication[]> {
   if (isLiveSupabaseEnabled()) {
     try {
@@ -258,9 +274,13 @@ export async function getJobApplications(): Promise<JobApplication[]> {
  * Apply for Job Opening.
  * Strictly enforces that the student has an approved Placement Enrollment AND is Placement Eligible.
  */
-export async function applyForJob(jobId: string, studentId: string): Promise<JobApplication> {
+export async function applyForJob(
+  jobId: string,
+  studentId: string,
+  appliedByUserId?: string
+): Promise<JobApplication> {
   // Business Invariant: LMS Student -> Placement Enrolled -> Placement Eligible
-  const enrollment = store.placementEnrollments.find((e) => e.student_id === studentId);
+  const enrollment = (store.placementEnrollments || []).find((e) => e.student_id === studentId);
   if (!enrollment || enrollment.enrollment_status === 'Not Enrolled') {
     throw new Error('Student has not enrolled for placement support. Please enroll for Placement Support first.');
   }
@@ -271,13 +291,13 @@ export async function applyForJob(jobId: string, studentId: string): Promise<Job
     );
   }
 
-  const existing = store.jobApplications.find(
+  const existing = (store.jobApplications || []).find(
     (a) => a.job_id === jobId && a.student_id === studentId
   );
   if (existing) throw new Error('Already applied to this opening');
 
-  const job = store.jobOpenings.find((j) => j.id === jobId);
-  const student = store.students.find((s) => s.id === studentId);
+  const job = (store.jobOpenings || []).find((j) => j.id === jobId);
+  const student = (store.students || []).find((s) => s.id === studentId);
 
   const application: JobApplication = {
     id: `app-${Date.now()}`,
@@ -290,6 +310,7 @@ export async function applyForJob(jobId: string, studentId: string): Promise<Job
     status: 'Applied',
   };
 
+  if (!store.jobApplications) store.jobApplications = [];
   store.jobApplications.push(application);
   if (job) job.applications_count = (job.applications_count || 0) + 1;
   store.persist();
@@ -308,6 +329,60 @@ export async function applyForJob(jobId: string, studentId: string): Promise<Job
       console.warn('Supabase applyForJob direct query warning, preserved locally:', err);
     }
   }
+
+  const actor = (store.users || []).find((u) => u.id === appliedByUserId);
+  await recordAuditLog({
+    user_id: appliedByUserId || studentId,
+    user_name: actor?.full_name || student?.full_name || 'Placement Coordinator',
+    user_role: actor?.role || (appliedByUserId ? 'placement_coordinator' : 'student'),
+    action: 'JOB_APPLICATION_SUBMITTED',
+    module: 'PLACEMENT',
+    record_id: application.id,
+    new_value: {
+      job_id: jobId,
+      company: job?.company_name,
+      job_title: job?.job_title,
+      student_id: studentId,
+      student_name: student?.full_name,
+    },
+  });
+
+  return application;
+}
+
+export async function updateJobApplicationStatus(
+  applicationId: string,
+  status: JobApplication['status'],
+  updatedByUserId?: string
+): Promise<JobApplication> {
+  const application = (store.jobApplications || []).find((a) => a.id === applicationId);
+  if (!application) throw new Error('Job application not found');
+
+  application.status = status;
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('job_applications')
+        .update({ status })
+        .eq('id', applicationId);
+    } catch (err) {
+      console.warn('Supabase updateJobApplicationStatus warning, preserved locally:', err);
+    }
+  }
+
+  const actor = (store.users || []).find((u) => u.id === updatedByUserId);
+  await recordAuditLog({
+    user_id: updatedByUserId || 'usr-placement',
+    user_name: actor?.full_name || 'Placement Coordinator',
+    user_role: actor?.role || 'placement_coordinator',
+    action: 'JOB_APPLICATION_STATUS_UPDATED',
+    module: 'PLACEMENT',
+    record_id: applicationId,
+    new_value: { status },
+  });
 
   return application;
 }

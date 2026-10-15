@@ -15,11 +15,14 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
   ArrowLeft,
   Mail,
   Phone,
   MapPin,
   ExternalLink,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,12 +30,15 @@ import { Button } from '@/components/ui/button';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function StudentDetailsPage() {
+  const { user, role } = useAuth();
   const params = useParams();
   const studentId = params?.id as string;
   const [activeTab, setActiveTab] = React.useState<
     | 'overview'
+    | 'onboarding'
     | 'courses'
     | 'batch'
     | 'attendance'
@@ -74,7 +80,6 @@ export default function StudentDetailsPage() {
     course,
     batch,
     feeAccount,
-    installments,
     payments,
     receipts,
     attendance,
@@ -84,11 +89,50 @@ export default function StudentDetailsPage() {
     certificate,
     transfers,
     studentFees = [],
+    studentPayments = [],
     studentLedger = [],
   } = data;
 
+  // Student ownership security validation (IDOR protection)
+  if (role === 'student' && user) {
+    const isOwnProfile =
+      student.user_id === user.id ||
+      student.id === user.id ||
+      student.email?.toLowerCase() === user.email?.toLowerCase();
+
+    if (!isOwnProfile) {
+      return (
+        <div className="max-w-md mx-auto my-16 text-center space-y-4">
+          <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900">Access Restricted</h2>
+          <p className="text-xs text-slate-500">
+            You are only authorized to view your own student academic and fee profile.
+          </p>
+          <div className="pt-2">
+            <Link href="/portal">
+              <Button variant="sap" size="sm" className="text-xs">
+                Back to Student Portal
+              </Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  const onboardingCase = store.onboardingCases.find(
+    (c) =>
+      c.student_id === student.id ||
+      c.student_id === student.student_code ||
+      c.admission_id === student.admission_id ||
+      c.admission_number === student.admission_number
+  );
+
   const tabs = [
     { id: 'overview', label: 'Overview' },
+    { id: 'onboarding', label: 'Onboarding & Induction' },
     { id: 'courses', label: 'Courses' },
     { id: 'batch', label: 'Batch' },
     { id: 'attendance', label: 'Attendance' },
@@ -129,6 +173,24 @@ export default function StudentDetailsPage() {
                   <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full font-semibold">
                     {student.status}
                   </span>
+                  {onboardingCase && (
+                    <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || student.full_name)}`}>
+                      <span
+                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border flex items-center space-x-1 cursor-pointer hover:opacity-90 transition-opacity ${
+                          onboardingCase.status === 'completed'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : onboardingCase.status === 'in_progress'
+                            ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                            : onboardingCase.status === 'blocked'
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        }`}
+                      >
+                        <span>Onboarding: {onboardingCase.status === 'in_progress' ? 'In Progress' : onboardingCase.status.replace('_', ' ')}</span>
+                        <ExternalLink className="h-2.5 w-2.5 ml-0.5 inline" />
+                      </span>
+                    </Link>
+                  )}
                 </div>
                 <p className="text-xs text-blue-200 mt-0.5">
                   Code: <span className="font-semibold text-white">{student.student_code}</span> | Admission #{' '}
@@ -196,6 +258,123 @@ export default function StudentDetailsPage() {
               <CardTitle className="text-sm">Academic & Enrollment Snapshot</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-xs">
+              {/* Onboarding Checklist Summary Card */}
+              {onboardingCase ? (
+                <div className="p-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50 border border-blue-200/80 rounded-xl shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start sm:items-center space-x-3">
+                      <div className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0 ${
+                        onboardingCase.status === 'completed'
+                          ? 'bg-emerald-600 text-white'
+                          : onboardingCase.status === 'blocked'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-[#0A6ED1] text-white'
+                      }`}>
+                        {onboardingCase.status === 'completed' ? '✓' : '⚡'}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-xs">Onboarding & Induction:</span>
+                          <Badge
+                            variant={
+                              onboardingCase.status === 'completed'
+                                ? 'success'
+                                : onboardingCase.status === 'in_progress'
+                                ? 'info'
+                                : onboardingCase.status === 'blocked'
+                                ? 'destructive'
+                                : 'warning'
+                            }
+                            className="text-[10px] capitalize font-semibold"
+                          >
+                            {onboardingCase.status === 'in_progress' ? 'In Progress' : onboardingCase.status.replace('_', ' ')}
+                          </Badge>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            Case #{onboardingCase.case_number}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          Specialist: <span className="font-semibold text-slate-800">{onboardingCase.assigned_staff_name || 'Unassigned'}</span>
+                          {onboardingCase.orientation_date && (
+                            <> • Orientation: <span className="font-semibold text-slate-800">{formatDate(onboardingCase.orientation_date)}</span></>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
+                        onClick={() => setActiveTab('onboarding')}
+                      >
+                        Open Onboarding Tab
+                      </Button>
+                      <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || onboardingCase.case_number)}`}>
+                        <Button
+                          variant="sap"
+                          size="sm"
+                          className="text-xs flex items-center space-x-1"
+                        >
+                          <span>View Onboarding Case</span>
+                          <ExternalLink className="h-3 w-3 ml-1" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar & Step Metrics */}
+                  <div className="space-y-1.5 pt-2 border-t border-blue-100">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-600 font-medium">Checklist Verification Progress</span>
+                      <span className="font-bold text-slate-900">
+                        {Object.values(onboardingCase.checklist).filter((i) => i.completed).length} of{' '}
+                        {Object.values(onboardingCase.checklist).length} Steps Completed (
+                        {Math.round(
+                          (Object.values(onboardingCase.checklist).filter((i) => i.completed).length /
+                            Math.max(1, Object.values(onboardingCase.checklist).length)) *
+                            100
+                        )}
+                        %)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          onboardingCase.status === 'completed' ? 'bg-emerald-600' : 'bg-[#0A6ED1]'
+                        }`}
+                        style={{
+                          width: `${Math.round(
+                            (Object.values(onboardingCase.checklist).filter((i) => i.completed).length /
+                              Math.max(1, Object.values(onboardingCase.checklist).length)) *
+                              100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs">
+                      ℹ
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800 text-xs">Onboarding Case Not Generated</p>
+                      <p className="text-[11px] text-slate-500">
+                        No active onboarding case was linked to Admission #{student.admission_number || 'N/A'}.
+                      </p>
+                    </div>
+                  </div>
+                  <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || '')}`}>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      Check Onboarding Workspace
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <div>
                   <p className="text-slate-400 uppercase font-semibold text-[10px]">Enrolled Course</p>
@@ -252,17 +431,352 @@ export default function StudentDetailsPage() {
                 <span>{formatINR(feeAccount?.outstanding_amount)}</span>
               </div>
               <div className="pt-2">
-                <Button
-                  variant="sap"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={() => setActiveTab('payments')}
-                >
-                  Record Fee Payment
-                </Button>
+                <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
+                  <Button
+                    variant="sap"
+                    size="sm"
+                    className="w-full text-xs"
+                  >
+                    Record Fee Payment
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Tab: Onboarding & Induction */}
+      {activeTab === 'onboarding' && (
+        <div className="space-y-6">
+          {!onboardingCase ? (
+            <Card>
+              <CardContent className="py-12 text-center space-y-4">
+                <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                  <AlertCircle className="h-8 w-8" />
+                </div>
+                <div className="max-w-md mx-auto">
+                  <h3 className="text-base font-bold text-slate-800">No Onboarding Case Found</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    There is no active onboarding workflow case associated with Student ID {student.student_code} (Admission #{student.admission_number}). This usually occurs if the student was admitted prior to the onboarding system rollout.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link href="/onboarding">
+                    <Button variant="sap" size="sm" className="text-xs">
+                      Open Onboarding Workspace
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Header / Case Snapshot Card */}
+              <Card>
+                <CardHeader className="pb-3 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <CardTitle className="text-base">Onboarding & Induction Case #{onboardingCase.case_number}</CardTitle>
+                        <Badge
+                          variant={
+                            onboardingCase.status === 'completed'
+                              ? 'success'
+                              : onboardingCase.status === 'in_progress'
+                              ? 'info'
+                              : onboardingCase.status === 'blocked'
+                              ? 'destructive'
+                              : 'warning'
+                          }
+                          className="text-[10px] capitalize font-semibold"
+                        >
+                          {onboardingCase.status === 'in_progress' ? 'In Progress' : onboardingCase.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Created on {formatDate(onboardingCase.created_at)} • Target SLA Due: {onboardingCase.due_date ? formatDate(onboardingCase.due_date) : 'Standard 3-Day SLA'}
+                      </p>
+                    </div>
+                    <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || onboardingCase.case_number)}`}>
+                      <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1.5">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>Open in Onboarding Workspace &rarr;</span>
+                      </Button>
+                    </Link>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  {onboardingCase.blocked_reason && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start space-x-2 text-rose-800 text-xs">
+                      <AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Workflow Blocked: </span>
+                        <span>{onboardingCase.blocked_reason}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <p className="text-slate-400 font-semibold text-[10px] uppercase">Assigned Specialist</p>
+                      <p className="font-bold text-slate-800 text-sm mt-0.5">{onboardingCase.assigned_staff_name || 'Unassigned'}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Academic Operations</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                      <p className="text-blue-600 font-semibold text-[10px] uppercase">Checklist Progress</p>
+                      <p className="font-bold text-slate-900 text-sm mt-0.5">
+                        {Object.values(onboardingCase.checklist).filter((i) => i.completed).length} / {Object.values(onboardingCase.checklist).length} Steps
+                      </p>
+                      <p className="text-[10px] text-blue-700 mt-0.5">
+                        {Math.round((Object.values(onboardingCase.checklist).filter((i) => i.completed).length / Math.max(1, Object.values(onboardingCase.checklist).length)) * 100)}% Completed
+                      </p>
+                    </div>
+                    <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                      <p className="text-indigo-600 font-semibold text-[10px] uppercase">Orientation Schedule</p>
+                      <p className="font-bold text-slate-900 text-sm mt-0.5">
+                        {onboardingCase.orientation_date ? formatDate(onboardingCase.orientation_date) : 'Pending Schedule'}
+                      </p>
+                      <p className="text-[10px] text-indigo-700 mt-0.5">Mode: {onboardingCase.orientation_mode || 'Hybrid'}</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
+                      <p className="text-emerald-600 font-semibold text-[10px] uppercase">LMS & Handover</p>
+                      <p className="font-bold text-slate-900 text-sm mt-0.5">
+                        {onboardingCase.lms_account_created ? 'LMS Provisioned' : 'LMS Pending'}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 mt-0.5">
+                        {onboardingCase.academic_handover_confirmed ? 'Handover Complete' : 'Handover Pending'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 10-Point Checklist Card */}
+              <Card>
+                <CardHeader className="pb-3 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base">10-Point Onboarding Verification Checklist</CardTitle>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Mandatory compliance and verification gates required before final academic handover.
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-slate-50 font-semibold">
+                      {Object.values(onboardingCase.checklist).filter((i) => i.completed).length} of {Object.values(onboardingCase.checklist).length} Completed
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100">
+                    {Object.values(onboardingCase.checklist).map((item, idx) => (
+                      <div key={item.key} className="p-4 flex items-start justify-between hover:bg-slate-50/50 transition-colors">
+                        <div className="flex items-start space-x-3">
+                          <div
+                            className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${
+                              item.completed
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            {item.completed ? '✓' : idx + 1}
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-semibold text-slate-800 text-xs">{item.title}</span>
+                              {item.mandatory && (
+                                <span className="text-[9px] uppercase px-1.5 py-0.5 bg-slate-100 text-slate-600 font-bold rounded">
+                                  Mandatory
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-slate-500 text-[11px] mt-0.5">{item.description}</p>
+                            {item.notes && (
+                              <p className="text-blue-600 text-[11px] mt-1 bg-blue-50/60 p-1.5 rounded border border-blue-100">
+                                Note: {item.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-4">
+                          <Badge variant={item.completed ? 'success' : 'outline'} className="text-[10px]">
+                            {item.completed ? 'Verified & Completed' : 'Pending'}
+                          </Badge>
+                          {item.completed && item.completed_at && (
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {formatDateTime(item.completed_at)}
+                              {item.completed_by_name ? ` • ${item.completed_by_name}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Uploaded Verification Documents Card */}
+              <Card>
+                <CardHeader className="pb-3 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base">Uploaded Verification Documents</CardTitle>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Government ID proof, degree certificates, and academic records attached to this case.
+                      </p>
+                    </div>
+                    <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || onboardingCase.case_number)}`}>
+                      <Button variant="outline" size="sm" className="text-xs">
+                        Manage Documents
+                      </Button>
+                    </Link>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {onboardingCase.documents && onboardingCase.documents.length > 0 ? (
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+                        <tr>
+                          <th className="px-4 py-3">Document Name</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Uploaded</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {onboardingCase.documents.map((doc) => (
+                          <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-slate-800">
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <span>{doc.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 capitalize text-slate-600">{doc.doc_type.replace('_', ' ')}</td>
+                            <td className="px-4 py-3 text-slate-500">{formatDate(doc.uploaded_at)}</td>
+                            <td className="px-4 py-3">
+                              <Badge
+                                variant={
+                                  doc.status === 'verified'
+                                    ? 'success'
+                                    : doc.status === 'rejected'
+                                    ? 'destructive'
+                                    : 'warning'
+                                }
+                                className="text-[10px] capitalize"
+                              >
+                                {doc.status}
+                              </Badge>
+                              {doc.rejection_reason && (
+                                <p className="text-[10px] text-rose-600 mt-0.5">{doc.rejection_reason}</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {doc.file_url ? (
+                                <a
+                                  href={doc.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  <span>View File</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="text-slate-400 italic">No link</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      <FileCheck className="h-8 w-8 mx-auto mb-2 opacity-40 text-slate-400" />
+                      <p className="font-semibold text-slate-600">No verification documents attached yet</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Student identity documents can be uploaded in the Onboarding Workspace drawer.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Handover & Induction Snapshot */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Orientation & Student Induction Status</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Scheduled Date:</span>
+                      <span className="font-semibold text-slate-800">
+                        {onboardingCase.orientation_date ? formatDate(onboardingCase.orientation_date) : 'Not Scheduled'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Delivery Mode:</span>
+                      <span className="font-semibold text-slate-800">{onboardingCase.orientation_mode || 'Hybrid'}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">LMS Account Provisioning:</span>
+                      <Badge variant={onboardingCase.lms_account_created ? 'success' : 'warning'} className="text-[10px]">
+                        {onboardingCase.lms_account_created ? 'Provisioned & Active' : 'Pending Activation'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">LMS Activated At:</span>
+                      <span className="font-medium text-slate-700">
+                        {onboardingCase.lms_account_activated_at ? formatDateTime(onboardingCase.lms_account_activated_at) : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5">
+                      <span className="text-slate-500">Portal Access Confirmed:</span>
+                      <Badge variant={onboardingCase.portal_access_confirmed ? 'success' : 'outline'} className="text-[10px]">
+                        {onboardingCase.portal_access_confirmed ? 'Confirmed' : 'Pending Verification'}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Academic Operations Handover</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Academic Handover Status:</span>
+                      <Badge variant={onboardingCase.academic_handover_confirmed ? 'success' : 'warning'} className="text-[10px]">
+                        {onboardingCase.academic_handover_confirmed ? 'Handed Over' : 'Pending Handover'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Assigned Batch:</span>
+                      <span className="font-semibold text-slate-800">{batch?.batch_name || onboardingCase.batch_name || 'SAP Morning Batch'}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Designated Faculty Lead:</span>
+                      <span className="font-semibold text-slate-800">{batch?.trainer_name || onboardingCase.trainer_name || 'Lead Trainer'}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Workflow Completion Date:</span>
+                      <span className="font-medium text-slate-700">
+                        {onboardingCase.completed_at ? formatDateTime(onboardingCase.completed_at) : 'In Progress'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5">
+                      <span className="text-slate-500">Case Internal Notes:</span>
+                      <span className="font-medium text-slate-600 truncate max-w-[200px]">
+                        {onboardingCase.notes || 'No notes added'}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -310,7 +824,9 @@ export default function StudentDetailsPage() {
               </div>
               <div>
                 <p className="text-slate-400 font-semibold text-[10px] uppercase">Days</p>
-                <p className="font-bold text-slate-800 text-sm mt-0.5">{batch?.days.join(', ')}</p>
+                <p className="font-bold text-slate-800 text-sm mt-0.5">
+                  {Array.isArray(batch?.days) ? batch.days.join(', ') : 'Flexible Schedule'}
+                </p>
               </div>
               <div>
                 <p className="text-slate-400 font-semibold text-[10px] uppercase">Batch Trainer</p>
@@ -338,16 +854,24 @@ export default function StudentDetailsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {attendance.map((att: any) => (
-                  <tr key={att.id}>
-                    <td className="px-4 py-3 font-medium text-slate-800">{formatDate(att.attendance_date)}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={att.status === 'Present' ? 'success' : 'destructive'}>{att.status}</Badge>
+                {attendance.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                      No attendance records logged for this student yet.
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{att.marked_by_name || 'Faculty'}</td>
-                    <td className="px-4 py-3 text-slate-500">{formatDateTime(att.marked_at)}</td>
                   </tr>
-                ))}
+                ) : (
+                  attendance.map((att: any) => (
+                    <tr key={att.id}>
+                      <td className="px-4 py-3 font-medium text-slate-800">{formatDate(att.attendance_date)}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={att.status === 'Present' ? 'success' : 'destructive'}>{att.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{att.marked_by_name || 'Faculty'}</td>
+                      <td className="px-4 py-3 text-slate-500">{formatDateTime(att.marked_at)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </CardContent>
@@ -372,15 +896,23 @@ export default function StudentDetailsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {submissions.map((sub: any) => (
-                  <tr key={sub.id}>
-                    <td className="px-4 py-3 font-medium text-slate-800 max-w-[200px] truncate">{sub.submission_text}</td>
-                    <td className="px-4 py-3 text-slate-500">{formatDateTime(sub.submitted_at)}</td>
-                    <td className="px-4 py-3"><Badge variant="success">{sub.status}</Badge></td>
-                    <td className="px-4 py-3 font-bold text-slate-900">{sub.marks_obtained} / 100</td>
-                    <td className="px-4 py-3 text-slate-600 italic">&ldquo;{sub.feedback}&rdquo;</td>
+                {submissions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                      No assignment submissions found for this student.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  submissions.map((sub: any) => (
+                    <tr key={sub.id}>
+                      <td className="px-4 py-3 font-medium text-slate-800 max-w-[200px] truncate">{sub.submission_text}</td>
+                      <td className="px-4 py-3 text-slate-500">{formatDateTime(sub.submitted_at)}</td>
+                      <td className="px-4 py-3"><Badge variant="success">{sub.status}</Badge></td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{sub.marks_obtained} / 100</td>
+                      <td className="px-4 py-3 text-slate-600 italic">&ldquo;{sub.feedback}&rdquo;</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </CardContent>
@@ -405,19 +937,27 @@ export default function StudentDetailsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {quizAttempts.map((qa: any) => (
-                  <tr key={qa.id}>
-                    <td className="px-4 py-3 font-medium text-slate-800">{qa.quiz_title}</td>
-                    <td className="px-4 py-3 font-bold text-slate-900">{qa.score} / {qa.total_points}</td>
-                    <td className="px-4 py-3 font-bold text-blue-600">{qa.percentage}%</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={qa.passed ? 'success' : 'destructive'}>
-                        {qa.passed ? 'Passed' : 'Failed'}
-                      </Badge>
+                {quizAttempts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                      No quiz or exam attempts recorded for this student.
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{formatDateTime(qa.completed_at)}</td>
                   </tr>
-                ))}
+                ) : (
+                  quizAttempts.map((qa: any) => (
+                    <tr key={qa.id}>
+                      <td className="px-4 py-3 font-medium text-slate-800">{qa.quiz_title}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{qa.score} / {qa.total_points}</td>
+                      <td className="px-4 py-3 font-bold text-blue-600">{qa.percentage}%</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={qa.passed ? 'success' : 'destructive'}>
+                          {qa.passed ? 'Passed' : 'Failed'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{formatDateTime(qa.completed_at)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </CardContent>
@@ -427,30 +967,82 @@ export default function StudentDetailsPage() {
       {/* Tab 7: Payments */}
       {activeTab === 'payments' && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">Payment History</CardTitle>
+            <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
+              <Button variant="sap" size="sm" className="text-xs">
+                Collect Payment Desk
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Receipt #</th>
+                  <th className="px-4 py-3">Receipt / Ref #</th>
                   <th className="px-4 py-3">Amount Paid</th>
                   <th className="px-4 py-3">Method</th>
                   <th className="px-4 py-3">Transaction Reference</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Recorded By</th>
                   <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {payments.map((p: any) => (
-                  <tr key={p.id}>
-                    <td className="px-4 py-3 font-semibold text-blue-600">{p.receipt_number}</td>
-                    <td className="px-4 py-3 font-bold text-emerald-600">{formatINR(p.amount)}</td>
-                    <td className="px-4 py-3"><Badge variant="outline">{p.payment_mode}</Badge></td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{p.transaction_reference || '—'}</td>
-                    <td className="px-4 py-3 text-slate-500">{formatDate(p.payment_date)}</td>
+                {(!studentPayments || studentPayments.length === 0) && (!payments || payments.length === 0) ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      No payment records found for this student.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  ((studentPayments && studentPayments.length > 0) ? studentPayments : payments).map((p: any) => {
+                    const isVerified = p.verification_status === 'Verified' || p.status === 'Success';
+                    const isRejected = p.verification_status === 'Rejected' || p.status === 'Failed';
+                    const isPending = !isVerified && !isRejected;
+                    return (
+                      <tr key={p.id}>
+                        <td className="px-4 py-3 font-semibold text-blue-600">
+                          {isVerified ? (p.receipt_number || p.id) : (p.id || 'Pending Ref')}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">
+                          {formatINR(p.amount_paid ?? p.amount)}
+                        </td>
+                        <td className="px-4 py-3"><Badge variant="outline">{p.payment_mode}</Badge></td>
+                        <td className="px-4 py-3 font-mono text-slate-600">
+                          {p.transaction_reference || p.bank_upi_reference || '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {isVerified ? (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                              Verified
+                            </Badge>
+                          ) : isRejected ? (
+                            <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">
+                              Rejected
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                              Pending Approval
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {p.recorded_by_name || p.collected_by_name || 'Finance Staff'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{formatDate(p.payment_date)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <Link href={`/accounts/payments?search=${encodeURIComponent(student.student_code || student.id)}`}>
+                            <Button variant="outline" size="sm" className="text-[11px] h-6 px-2">
+                              Desk
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </CardContent>
@@ -464,19 +1056,25 @@ export default function StudentDetailsPage() {
             <CardTitle className="text-base">Official Signed Fee Receipts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {receipts.map((r: any) => (
-              <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50">
-                <div>
-                  <p className="font-bold text-slate-800 text-xs">{r.receipt_number}</p>
-                  <p className="text-[11px] text-slate-500">Amount: {formatINR(r.payment_amount)} | Date: {formatDate(r.payment_date)}</p>
+            {receipts.length === 0 ? (
+              <p className="py-6 text-center text-slate-400 text-xs">
+                No official fee receipts found for this student.
+              </p>
+            ) : (
+              receipts.map((r: any) => (
+                <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div>
+                    <p className="font-bold text-slate-800 text-xs">{r.receipt_number}</p>
+                    <p className="text-[11px] text-slate-500">Amount: {formatINR(r.payment_amount)} | Date: {formatDate(r.payment_date)}</p>
+                  </div>
+                  <Link href={`/accounts/receipts/${r.id}`}>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      View / Print Receipt
+                    </Button>
+                  </Link>
                 </div>
-                <Link href={`/accounts/receipts/${r.id}`}>
-                  <Button variant="outline" size="sm" className="text-xs">
-                    View / Print Receipt
-                  </Button>
-                </Link>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
       )}
@@ -551,10 +1149,10 @@ export default function StudentDetailsPage() {
                     <th className="px-4 py-3">Course / Module</th>
                     <th className="px-4 py-3 text-right">Standard</th>
                     <th className="px-4 py-3 text-right">Discount</th>
-                    <th className="px-4 py-3 text-right">GST (18%)</th>
+                    
                     <th className="px-4 py-3 text-right">Final Total</th>
                     <th className="px-4 py-3 text-right">Outstanding</th>
-                    <th className="px-4 py-3">Plan</th>
+                    
                     <th className="px-4 py-3">Counsellor</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
@@ -562,7 +1160,7 @@ export default function StudentDetailsPage() {
                 <tbody className="divide-y divide-slate-100">
                   {studentFees.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-6 text-center text-slate-400">
+                      <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
                         No centralized fee plan configured yet for this student.
                       </td>
                     </tr>
@@ -575,10 +1173,10 @@ export default function StudentDetailsPage() {
                         <td className="px-4 py-3 text-right font-mono text-emerald-700">
                           {fee.discount_amount > 0 ? `-${formatINR(fee.discount_amount)} (${fee.discount_percentage}%)` : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500">{formatINR(fee.tax_gst_amount)}</td>
+                        
                         <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{formatINR(fee.final_payable)}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-amber-700">{formatINR(fee.outstanding_amount)}</td>
-                        <td className="px-4 py-3 text-slate-600">{fee.payment_plan}</td>
+                        
                         <td className="px-4 py-3 text-slate-600">{fee.counsellor_name}</td>
                         <td className="px-4 py-3">
                           <Badge variant={fee.approval_status === 'Approved' ? 'success' : fee.approval_status === 'Pending Accountant Approval' ? 'warning' : 'destructive'}>
@@ -696,11 +1294,19 @@ export default function StudentDetailsPage() {
               </div>
               <div>
                 <p className="text-slate-400 font-semibold text-[10px] uppercase">Tech Interview Score</p>
-                <p className="font-bold text-slate-800 text-sm mt-1">{placement?.technical_interview_score || '—'} / 100</p>
+                <p className="font-bold text-slate-800 text-sm mt-1">
+                  {typeof placement?.technical_interview_score === 'number'
+                    ? `${placement.technical_interview_score} / 100`
+                    : '—'}
+                </p>
               </div>
               <div>
                 <p className="text-slate-400 font-semibold text-[10px] uppercase">HR Interview Score</p>
-                <p className="font-bold text-slate-800 text-sm mt-1">{placement?.hr_interview_score || '—'} / 100</p>
+                <p className="font-bold text-slate-800 text-sm mt-1">
+                  {typeof placement?.hr_interview_score === 'number'
+                    ? `${placement.hr_interview_score} / 100`
+                    : '—'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -711,23 +1317,58 @@ export default function StudentDetailsPage() {
       {activeTab === 'documents' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Submitted Student Documents</CardTitle>
+            <CardTitle className="text-base">Submitted Student Documents & Verification</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-              <div className="flex items-center space-x-2">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <span>Identity Proof (Aadhaar / Passport)</span>
+          <CardContent className="space-y-3 text-xs">
+            {onboardingCase && onboardingCase.documents.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {onboardingCase.documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-800 text-xs">{doc.name}</p>
+                      <p className="text-[10px] text-slate-400 capitalize">{doc.doc_type}</p>
+                      {doc.verified_by && (
+                        <p className="text-[10px] text-emerald-700 mt-0.5">
+                          Verified by {doc.verified_by}
+                        </p>
+                      )}
+                    </div>
+                    <Badge
+                      variant={
+                        doc.status === 'verified'
+                          ? 'success'
+                          : doc.status === 'rejected'
+                          ? 'destructive'
+                          : 'warning'
+                      }
+                      className="text-[10px] capitalize"
+                    >
+                      {doc.status}
+                    </Badge>
+                  </div>
+                ))}
               </div>
-              <Badge variant="success">Verified</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-              <div className="flex items-center space-x-2">
-                <FileText className="h-4 w-4 text-purple-600" />
-                <span>Graduation Degree Certificate</span>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    <span>Identity Proof (Aadhaar / Passport)</span>
+                  </div>
+                  <Badge variant="success">Verified</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4 text-purple-600" />
+                    <span>Graduation Degree Certificate</span>
+                  </div>
+                  <Badge variant="success">Verified</Badge>
+                </div>
               </div>
-              <Badge variant="success">Verified</Badge>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -739,18 +1380,28 @@ export default function StudentDetailsPage() {
             <CardTitle className="text-base">Student Timeline & Audit Log</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-xs">
-            <div className="border-l-2 border-[#0A6ED1] pl-3 py-1">
-              <p className="font-bold text-slate-800">Fee Payment Completed (REC-2026-0002)</p>
-              <p className="text-slate-500 text-[10px]">24 Feb 2026</p>
-            </div>
-            <div className="border-l-2 border-emerald-500 pl-3 py-1">
-              <p className="font-bold text-slate-800">Assignment 1 Graded (Score 95/100)</p>
-              <p className="text-slate-500 text-[10px]">27 Feb 2026</p>
-            </div>
+            {payments.map((p: any) => (
+              <div key={p.id} className="border-l-2 border-[#0A6ED1] pl-3 py-1">
+                <p className="font-bold text-slate-800">Fee Payment Recorded ({p.receipt_number} - {formatINR(p.amount)})</p>
+                <p className="text-slate-500 text-[10px]">{formatDate(p.payment_date)} • Mode: {p.payment_mode}</p>
+              </div>
+            ))}
+            {submissions.map((s: any) => (
+              <div key={s.id} className="border-l-2 border-emerald-500 pl-3 py-1">
+                <p className="font-bold text-slate-800">Assignment Submission ({s.status} - Score: {s.marks_obtained}/100)</p>
+                <p className="text-slate-500 text-[10px]">{formatDateTime(s.submitted_at)}</p>
+              </div>
+            ))}
             <div className="border-l-2 border-blue-500 pl-3 py-1">
-              <p className="font-bold text-slate-800">Enrolled into {batch?.batch_name}</p>
+              <p className="font-bold text-slate-800">Enrolled into {batch?.batch_name || 'SAP Batch'}</p>
               <p className="text-slate-500 text-[10px]">{formatDate(student.joining_date)}</p>
             </div>
+            {admission && (
+              <div className="border-l-2 border-purple-500 pl-3 py-1">
+                <p className="font-bold text-slate-800">Admission Confirmed ({admission.admission_number})</p>
+                <p className="text-slate-500 text-[10px]">{formatDate(admission.admission_date)}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

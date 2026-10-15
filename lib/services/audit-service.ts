@@ -3,6 +3,24 @@ import { AuditLog } from '@/types';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export async function getAuditLogs(): Promise<AuditLog[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs)) {
+          store.auditLogs = data.logs;
+          return data.logs;
+        }
+      } else if (res.status === 403) {
+        console.warn('Unauthorized audit trail access blocked by server RBAC.');
+        return [];
+      }
+    } catch (err) {
+      console.warn('Client audit-logs API fetch error, fallback to local store:', err);
+    }
+  }
+
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
@@ -20,7 +38,7 @@ export async function getAuditLogs(): Promise<AuditLog[]> {
     }
   }
 
-  return [...store.auditLogs].sort(
+  return [...(store.auditLogs || [])].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 }

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Bell, Search, ExternalLink, ShieldCheck, CheckCircle2, LogOut } from 'lucide-react';
-import { UserRole } from '@/types';
+import { UserRole, NotificationItem } from '@/types';
 import { useAuth } from '@/components/providers/auth-provider';
 
 interface HeaderProps {
@@ -13,7 +13,26 @@ interface HeaderProps {
 }
 
 export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
+  React.useEffect(() => {
+    if (!user) { setNotifications([]); return; }
+    let active = true;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try {
+        if (document.visibilityState !== 'hidden') {
+          const response = await fetch('/api/workflow/notifications', { cache: 'no-store', signal: controller.signal });
+          const data = await response.json();
+          if (active && response.ok) setNotifications(data.notifications || []);
+        }
+      } catch {}
+      if (active) timer = setTimeout(refresh, 15000);
+    };
+    void refresh();
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [user?.id]);
   const [showNotifications, setShowNotifications] = React.useState(false);
 
   return (
@@ -60,26 +79,24 @@ export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
             title="Notifications"
           >
             <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
+            {notifications.some((n) => !n.is_read) && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />}
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white shadow-xl border border-slate-200 py-2 z-50 text-xs">
               <div className="px-4 py-2 border-b border-slate-100 font-bold text-slate-800 flex justify-between items-center">
-                <span>Notifications (2 new)</span>
-                <span className="text-[10px] text-blue-600 cursor-pointer hover:underline">Mark all read</span>
+                <span>Notifications ({notifications.filter((n) => !n.is_read).length} new)</span>
+                <button type="button" className="text-[10px] text-blue-600 hover:underline" onClick={async () => { const response = await fetch('/api/workflow/notifications', { method: 'POST' }); if (response.ok) setNotifications((items) => items.map((n) => ({ ...n, is_read: true }))); }}>Mark all read</button>
               </div>
               <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                <div className="p-3 hover:bg-slate-50 transition-colors">
-                  <p className="font-semibold text-slate-800">New Payment Recorded</p>
-                  <p className="text-slate-500 mt-0.5">₹10,000 received for Amit Gupta (REC-2026-0002).</p>
-                  <span className="text-[10px] text-slate-400 mt-1 block">15 mins ago</span>
-                </div>
-                <div className="p-3 hover:bg-slate-50 transition-colors">
-                  <p className="font-semibold text-slate-800">Demo Scheduled</p>
-                  <p className="text-slate-500 mt-0.5">Vikas Sharma booked a SAP FICO demo session.</p>
-                  <span className="text-[10px] text-slate-400 mt-1 block">1 hour ago</span>
-                </div>
+                {notifications.length === 0 && <p className="p-3 text-slate-500">No notifications yet.</p>}
+                {notifications.map((notification) => (
+                  <Link key={notification.id} href={notification.action_url || '#'} className="block p-3 hover:bg-slate-50 transition-colors" onClick={() => setShowNotifications(false)}>
+                    <p className="font-semibold text-slate-800">{notification.title}</p>
+                    <p className="text-slate-500 mt-0.5">{notification.message}</p>
+                    <span className="text-[10px] text-slate-400 mt-1 block">{new Date(notification.created_at).toLocaleString()}</span>
+                  </Link>
+                ))}
               </div>
             </div>
           )}

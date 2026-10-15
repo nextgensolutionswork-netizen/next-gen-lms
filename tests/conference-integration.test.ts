@@ -16,6 +16,7 @@ import {
 } from '@/lib/services/meeting-attendance-service';
 import { store } from '@/lib/services/data-store';
 import { createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
+import { markAttendance, getOrCreateClassSessionForDate } from '@/lib/services/academics-service';
 
 describe('Live Class Conference Integration & Automated Attendance Tracking', () => {
   describe('1. Conference Service & Automated Meeting Link Generation', () => {
@@ -269,6 +270,70 @@ describe('Live Class Conference Integration & Automated Attendance Tracking', ()
       const updatedDoubt = store.doubts.find((d) => d.id === newDoubt.id);
       expect(updatedDoubt?.status).toBe('In Progress');
       expect(updatedDoubt?.messages.some((m) => m.id === reply.id)).toBe(true);
+    });
+  });
+
+  describe('6. Attendance Register & Session Resolution Engine', () => {
+    it('strictly matches attendance records by student ID, session date, and batch ID', async () => {
+      const student = store.students.find((s) => s.batch_id) || store.students[0];
+      const batchId = student?.batch_id || store.batches[0]?.id || 'batch-fico-01';
+      const testDate = '2026-10-25';
+
+      // Record an attendance entry for testDate
+      const session = await getOrCreateClassSessionForDate(batchId, testDate, 'usr-test-instructor');
+      expect(session).toBeDefined();
+      expect(session.batch_id).toBe(batchId);
+      expect(session.session_date).toBe(testDate);
+
+      const records = await markAttendance(
+        session.id,
+        [{ student_id: student.id, status: 'Present', notes: 'Active session' }],
+        'usr-test-instructor',
+        testDate
+      );
+      expect(records.length).toBe(1);
+
+      // Verify strict match
+      const exactMatch = store.attendanceRecords.find(
+        (a) => a.student_id === student.id && a.attendance_date === testDate && a.batch_id === batchId
+      );
+      expect(exactMatch).toBeDefined();
+      expect(exactMatch?.status).toBe('Present');
+
+      // Different date in same batch should not match
+      const differentDateMatch = store.attendanceRecords.find(
+        (a) => a.student_id === student.id && a.attendance_date === '2026-10-26' && a.batch_id === batchId
+      );
+      expect(differentDateMatch).toBeUndefined();
+
+      // Different batch on same date should not match
+      const differentBatchMatch = store.attendanceRecords.find(
+        (a) => a.student_id === student.id && a.attendance_date === testDate && a.batch_id === 'batch-other-xyz'
+      );
+      expect(differentBatchMatch).toBeUndefined();
+    });
+
+    it('defensively resolves session and does not crash when an unknown sessionId is provided', async () => {
+      const student = store.students[0];
+      const nonExistentSessionId = 'sess-non-existent-999';
+
+      const records = await markAttendance(
+        nonExistentSessionId,
+        [{ student_id: student.id, status: 'Late', notes: 'Defensive fallback test' }],
+        'usr-trainer-custom',
+        '2026-10-27'
+      );
+
+      expect(records).toBeDefined();
+      expect(records.length).toBe(1);
+      expect(records[0].status).toBe('Late');
+      expect(records[0].session_id).toBe(nonExistentSessionId);
+    });
+
+    it('dynamically resolves trainer ID in getOrCreateClassSessionForDate without hardcoding', async () => {
+      const batch = store.batches[0];
+      const session = await getOrCreateClassSessionForDate(batch.id, '2026-11-01', 'usr-custom-trainer-77');
+      expect(session.trainer_id).toBe('usr-custom-trainer-77');
     });
   });
 });

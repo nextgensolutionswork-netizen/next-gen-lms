@@ -6,9 +6,11 @@ export type UserRole =
   | 'trainer'
   | 'placement_coordinator'
   | 'support'
+  | 'onboarding_team'
   | 'student';
 
 export interface UserProfile {
+  tenant_id?: string;
   id: string;
   email: string;
   full_name: string;
@@ -16,6 +18,7 @@ export interface UserProfile {
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
+  status?: string;
   branch_id?: string;
   assigned_course_ids?: string[];
   created_at: string;
@@ -26,6 +29,7 @@ export type Permission =
   | 'all:manage'
   | 'users:read'
   | 'users:write'
+  | 'users:manage'
   | 'roles:manage'
   | 'crm:read'
   | 'crm:write'
@@ -64,15 +68,26 @@ export type Permission =
   | 'vendors:write'
   | 'placements:read'
   | 'placements:write'
+  | 'placement:read'
+  | 'placement:write'
   | 'certificates:read'
   | 'certificates:generate'
+  | 'certificates:issue'
+  | 'certificates:revoke'
   | 'reports:read'
   | 'audit:read'
   | 'settings:manage'
+  | 'settings:write'
   | 'doubts:read'
   | 'doubts:write'
   | 'doubts:assign'
-  | 'doubts:resolve';
+  | 'doubts:resolve'
+  | 'support:reply'
+  | 'onboarding:read'
+  | 'onboarding:write'
+  | 'onboarding:assign'
+  | 'onboarding:activate'
+  | 'onboarding:complete';
 
 export type LeadStage =
   | 'New'
@@ -92,12 +107,13 @@ export interface Lead {
   full_name: string;
   phone: string;
   email: string;
-  interested_course_id: string;
+  interested_course_id?: string;
   interested_course_name?: string;
-  current_status: string;
-  experience_years: number;
-  training_preference: 'Online' | 'Classroom' | 'Hybrid';
-  lead_source: 'Website' | 'Google Ads' | 'Meta Ads' | 'Referral' | 'Walk-in' | 'Other';
+  current_status?: string;
+  education?: string;
+  experience_years?: number;
+  training_preference?: 'Online' | 'Classroom' | 'Hybrid';
+  lead_source?: 'Website' | 'Google Ads' | 'Meta Ads' | 'Referral' | 'Walk-in' | 'Other';
   campaign?: string;
   counsellor_id?: string;
   counsellor_name?: string;
@@ -131,8 +147,10 @@ export type AdmissionStatus =
   | 'On Hold';
 
 export interface Admission {
+  tenant_id?: string;
   id: string;
   admission_number: string;
+  student_id?: string;
   student_name: string;
   phone: string;
   email: string;
@@ -167,6 +185,8 @@ export interface Admission {
 }
 
 export interface Student {
+  onboarding_required?: boolean;
+  tenant_id?: string;
   id: string;
   user_id: string;
   admission_id: string;
@@ -191,6 +211,7 @@ export interface Student {
   joining_date: string;
   status: 'Active' | 'On Hold' | 'Completed' | 'Suspended' | 'Dropped';
   total_fee: number;
+  discount?: number;
   paid_amount: number;
   outstanding_amount: number;
   attendance_percentage: number;
@@ -211,7 +232,8 @@ export interface Course {
   trainer_name?: string;
   thumbnail_url?: string;
   price: number;
-  status: 'Draft' | 'Published' | 'Archived';
+  status: 'Draft' | 'Under Review' | 'Published' | 'Archived';
+  syllabus_url?: string;
   modules_count?: number;
   lessons_count?: number;
   created_at: string;
@@ -244,7 +266,8 @@ export interface Lesson {
   module_id: string;
   course_id: string;
   title: string;
-  lesson_type: LessonType;
+  lesson_type?: LessonType;
+  content_type?: LessonType;
   duration_minutes: number;
   order_index: number;
   is_published: boolean;
@@ -272,6 +295,7 @@ export interface Batch {
   id: string;
   batch_code: string;
   batch_name: string;
+  name?: string;
   course_id: string;
   course_name?: string;
   trainer_id: string;
@@ -284,7 +308,7 @@ export interface Batch {
   days: string[]; // e.g. ['Mon', 'Wed', 'Fri']
   maximum_capacity: number;
   current_enrolled: number;
-  status: 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
+  status: 'Upcoming' | 'Active' | 'Completed' | 'Cancelled' | 'On Hold';
   created_at: string;
   updated_at: string;
 }
@@ -320,7 +344,7 @@ export interface ClassSession {
   meeting_provider?: 'Zoom' | 'Google Meet';
   classroom?: string;
   notes?: string;
-  status: 'Scheduled' | 'Completed' | 'Cancelled' | 'Rescheduled';
+  status: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled' | 'Rescheduled';
   created_at: string;
 }
 
@@ -405,18 +429,18 @@ export interface Quiz {
   course_id: string;
   course_name?: string;
   title: string;
-  description: string;
+  description?: string;
   duration_minutes: number;
   time_limit_minutes?: number;
   pass_percentage: number;
   passing_percentage?: number;
-  attempts_allowed: number;
-  randomize_questions: boolean;
-  show_answers_after: boolean;
+  attempts_allowed?: number;
+  randomize_questions?: boolean;
+  show_answers_after?: boolean;
   start_date?: string;
   end_date?: string;
   questions_count?: number;
-  status: 'Draft' | 'Published' | 'Archived';
+  status?: 'Draft' | 'Published' | 'Archived';
   created_at: string;
 }
 
@@ -424,7 +448,7 @@ export interface QuizQuestion {
   id: string;
   quiz_id: string;
   question_text: string;
-  question_type: 'MCQ' | 'Multiple' | 'TrueFalse' | 'ShortAnswer';
+  question_type: 'MCQ' | 'Multiple' | 'TrueFalse' | 'ShortAnswer' | 'Multiple Choice';
   points: number;
   order_index: number;
   options: {
@@ -435,6 +459,7 @@ export interface QuizQuestion {
   }[];
   correct_option?: string;
   explanation?: string;
+  created_at?: string;
 }
 
 export interface QuizAttempt {
@@ -450,11 +475,14 @@ export interface QuizAttempt {
   started_at: string;
   completed_at?: string;
   status: 'In Progress' | 'Completed' | 'Timed Out';
+  answers?: Record<string, string>;
+  question_results?: any[];
 }
 
 export type FeeStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Refunded';
 
 export interface StudentFeeAccount {
+  tenant_id?: string;
   id: string;
   student_id: string;
   student_name?: string;
@@ -474,6 +502,7 @@ export interface StudentFeeAccount {
 }
 
 export interface Installment {
+  tenant_id?: string;
   id: string;
   fee_account_id: string;
   student_id: string;
@@ -490,11 +519,15 @@ export type PaymentMethod =
   | 'UPI'
   | 'Bank Transfer'
   | 'Card'
+  | 'Credit Card'
+  | 'Debit Card'
+  | 'Net Banking'
   | 'Cheque'
   | 'Payment Gateway'
   | 'Other';
 
 export interface Payment {
+  tenant_id?: string;
   id: string;
   receipt_number: string;
   student_id: string;
@@ -520,11 +553,13 @@ export interface Payment {
 }
 
 export interface Receipt {
+  tenant_id?: string;
   id: string;
   receipt_number: string;
   payment_id: string;
   student_id: string;
   student_name: string;
+  student_email?: string;
   admission_number: string;
   course_name: string;
   payment_amount: number;
@@ -557,6 +592,13 @@ export interface Receipt {
   ack_no?: string;
   ack_date?: string;
   pdf_url?: string;
+
+  // Receipt Cancellation & Credit Note Workflow
+  status?: 'Valid' | 'Void';
+  void_reason?: string;
+  void_at?: string;
+  void_by?: string;
+  credit_note_number?: string;
 }
 
 export type ExpenseCategory =
@@ -607,16 +649,22 @@ export interface Vendor {
   id: string;
   vendor_name: string;
   contact_person: string;
-  phone: string;
-  email: string;
-  address: string;
+  phone?: string;
+  email?: string;
+  address?: string;
   gst_number?: string;
+  pan_number?: string;
+  tds_section?: string;
+  tds_rate?: number;
   bank_name?: string;
   bank_account_number?: string;
   bank_ifsc?: string;
   notes?: string;
   total_paid?: number;
+  is_active?: boolean;
+  status?: 'Active' | 'Archived';
   created_at: string;
+  updated_at?: string;
 }
 
 export interface PlacementProfile {
@@ -683,6 +731,10 @@ export interface Certificate {
   verification_url: string;
   pdf_url?: string;
   is_valid: boolean;
+  status?: 'Issued' | 'Revoked' | 'Suspended';
+  revocation_reason?: string;
+  revoked_at?: string;
+  revoked_by?: string;
   created_at: string;
 }
 
@@ -696,11 +748,13 @@ export type NotificationCategory =
   | 'certificate'
   | 'placement'
   | 'support'
+  | 'onboarding'
   | 'general';
 
-export type NotificationChannel = 'in_app' | 'email' | 'whatsapp';
+export type NotificationChannel = 'in_app' | 'email' | 'whatsapp' | 'sms';
 
 export interface NotificationItem {
+  tenant_id?: string;
   id: string;
   user_id: string;
   title: string;
@@ -735,6 +789,7 @@ export interface RealtimeMessageEvent {
 }
 
 export interface AuditLog {
+  tenant_id?: string;
   id: string;
   user_id: string;
   user_name: string;
@@ -757,14 +812,28 @@ export interface SystemSettings {
   phone: string;
   email: string;
   gst_number: string;
+  bank_account_name?: string;
+  bank_name?: string;
+  bank_account_no?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  bank_branch?: string;
+  upi_id?: string;
   default_currency: string;
   academic_year: string;
   receipt_prefix: string;
-  invoice_prefix: string;
+  invoice_prefix?: string;
+  admission_prefix?: string;
+  student_code_prefix?: string;
+  invoice_terms?: string;
+  authorized_signatory_name?: string;
+  authorized_signatory_designation?: string;
   timezone: string;
   enable_email_notifications: boolean;
   enable_sms_notifications: boolean;
   enable_whatsapp_notifications: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SapServerSystem {
@@ -777,6 +846,8 @@ export interface SapServerSystem {
   default_client: string;
   description: string;
   status: 'Online' | 'Maintenance' | 'Offline';
+  capacity?: number;
+  active_users?: number;
 }
 
 export interface SapServerAllocation {
@@ -842,6 +913,7 @@ export interface StudentDoubt {
   status: DoubtStatus;
   sap_tcode?: string;
   messages: DoubtMessage[];
+  resolution_notes?: string;
   resolved_at?: string;
   created_at: string;
   updated_at: string;
@@ -1116,6 +1188,8 @@ export interface FeeCategoryItem {
 }
 
 export interface StudentFee {
+  enrollment_id?: string;
+  tenant_id?: string;
   id: string;
   student_id: string;
   student_name: string;
@@ -1130,6 +1204,7 @@ export interface StudentFee {
   batch_name?: string;
   sap_module?: string;
   placement_enrollment_id?: string;
+  fee_account_id?: string;
 
   standard_fee: number;
   proposed_fee: number;
@@ -1150,6 +1225,7 @@ export interface StudentFee {
   counsellor_id: string;
   counsellor_name: string;
   counsellor_notes?: string;
+  notes?: string;
 
   approval_status: FeeApprovalStatus;
   submitted_by?: string;
@@ -1223,6 +1299,13 @@ export interface FeeRevisionRequest {
 }
 
 export interface StudentPaymentRecord {
+  status?: 'Pending Approval' | 'Approved' | 'Rejected';
+  enrollment_id?: string;
+  idempotency_key?: string;
+  rejection_reason?: string;
+  rejected_by?: string;
+  rejected_at?: string;
+  tenant_id?: string;
   id: string;
   fee_id: string;
   installment_id?: string;
@@ -1249,10 +1332,16 @@ export interface StudentPaymentRecord {
   verified_at?: string;
   verification_notes?: string;
 
+  updated_at?: string;
+  updated_by?: string;
+  updated_by_name?: string;
+  updated_by_role?: string;
+
   created_at: string;
 }
 
 export interface StudentFinancialLedgerEntry {
+  tenant_id?: string;
   id: string;
   student_id: string;
   entry_date: string;
@@ -1319,5 +1408,131 @@ export interface FinanceWorkflowSettings {
   updated_at: string;
   updated_by: string;
 }
+
+// ==========================================
+// ONBOARDING TEAM & WORKFLOW DOMAIN TYPES
+// ==========================================
+
+export type OnboardingStatus = 'pending' | 'in_progress' | 'blocked' | 'completed';
+
+export type OnboardingChecklistKey =
+  | 'admission_confirmation'
+  | 'student_details_verification'
+  | 'document_verification'
+  | 'course_confirmation'
+  | 'batch_allocation'
+  | 'fee_clearance_verification'
+  | 'lms_account_activation'
+  | 'welcome_notification'
+  | 'orientation_confirmation'
+  | 'first_class_confirmation'
+  | 'academic_handover';
+
+export interface OnboardingChecklistItem {
+  key: OnboardingChecklistKey;
+  title: string;
+  description: string;
+  completed: boolean;
+  completed_at?: string;
+  completed_by?: string;
+  completed_by_name?: string;
+  notes?: string;
+  mandatory: boolean;
+}
+
+export interface OnboardingDocument {
+  id: string;
+  name: string;
+  doc_type: 'photo' | 'id_proof' | 'degree_certificate' | 'marksheets' | 'experience_letter' | 'other';
+  status: 'pending' | 'verified' | 'rejected';
+  file_url: string;
+  uploaded_at: string;
+  verified_at?: string;
+  verified_by?: string;
+  rejection_reason?: string;
+}
+
+export interface OnboardingAuditEvent {
+  tenant_id?: string;
+  id: string;
+  case_id: string;
+  timestamp: string;
+  action: string;
+  actor_id: string;
+  actor_name: string;
+  actor_role: string;
+  details: string;
+}
+
+export interface OnboardingCase {
+  tenant_id?: string;
+  id: string;
+  case_number: string;
+  admission_id: string;
+  admission_number: string;
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  student_phone: string;
+  course_id: string;
+  course_name: string;
+  batch_id?: string;
+  batch_name?: string;
+  trainer_id?: string;
+  trainer_name?: string;
+  assigned_staff_id?: string;
+  assigned_staff_name?: string;
+  assigned_at?: string;
+  status: OnboardingStatus;
+  blocked_reason?: string;
+  checklist: Record<OnboardingChecklistKey, OnboardingChecklistItem>;
+  documents: OnboardingDocument[];
+  orientation_date?: string;
+  orientation_mode?: 'Online' | 'Classroom' | 'Hybrid';
+  lms_account_created: boolean;
+  lms_account_activated_at?: string;
+  portal_access_confirmed: boolean;
+  academic_handover_confirmed: boolean;
+  completed_at?: string;
+  completed_by?: string;
+  notes?: string;
+  due_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OnboardingKpis {
+  total: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  blocked: number;
+  overdue: number;
+}
+
+export interface OnboardingStaffPerformance {
+  staff_id: string;
+  staff_name: string;
+  staff_email: string;
+  staff_role: string;
+  total_assigned: number;
+  pending_count: number;
+  in_progress_count: number;
+  blocked_count: number;
+  completed_count: number;
+  overdue_count: number;
+  avg_completion_days: number;
+  sla_compliance_rate: number;
+  workload_status: 'Available' | 'Balanced' | 'High Workload';
+}
+
+export interface LegacyBackfillResult {
+  total_processed: number;
+  cases_created: number;
+  cases_skipped: number;
+  created_case_numbers: string[];
+  message: string;
+}
+
 
 

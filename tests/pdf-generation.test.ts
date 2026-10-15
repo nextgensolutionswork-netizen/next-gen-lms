@@ -1,3 +1,4 @@
+import { generateAuthCookieSignatureSync, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } from '@/lib/security/auth-cookie';
 import { describe, it, expect } from 'vitest';
 import {
   generateReceiptPdfBuffer,
@@ -7,11 +8,35 @@ import {
 } from '@/lib/services/pdf-service';
 import { store } from '@/lib/services/data-store';
 import { NextRequest } from 'next/server';
+import { inflateSync } from 'node:zlib';
 import { GET as getReceiptPdfRoute } from '@/app/api/receipts/[id]/pdf/route';
 import { GET as getCertificatePdfRoute } from '@/app/api/certificates/[id]/pdf/route';
 
+function receiptRequest(url: string) {
+  const user = store.users.find((u) => u.role === 'accountant' && u.is_active)!;
+  const value = encodeURIComponent(JSON.stringify(user));
+  return new NextRequest(url, { headers: { cookie: AUTH_COOKIE_NAME + '=' + value + '; ' + AUTH_SIG_COOKIE_NAME + '=' + generateAuthCookieSignatureSync(value) } });
+}
+
 describe('PDF Generation Service & API Routes', () => {
   describe('generateReceiptPdfBuffer', () => {
+    it('prints payment and balance without tax details, including for historical receipts', async () => {
+      const receipt = { ...store.receipts[0], institute_gst: 'LEGACY-GST-ID', total_tax: 900, irn: 'LEGACY-INVOICE-ID' };
+      const before = structuredClone(receipt);
+      const buffer = await generateReceiptPdfBuffer(receipt);
+      const raw = buffer.toString('latin1');
+      let text = '';
+      for (const match of raw.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+        let stream: string;
+        try { stream = inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1'); } catch { continue; }
+        for (const token of stream.matchAll(/<([a-f0-9]+)>/gi)) text += Buffer.from(token[1], 'hex').toString('latin1');
+      }
+      expect(text).toContain('OFFICIAL FEE RECEIPT');
+      expect(text).toContain('Remaining balance:');
+      expect(text).not.toMatch(/GST|IRN|Tax|LEGACY-INVOICE-ID|LEGACY-GST-ID/);
+      expect(receipt).toEqual(before);
+    });
+
     it('generates a valid A4 PDF buffer for a receipt', async () => {
       const receipt = store.receipts[0];
       expect(receipt).toBeDefined();
@@ -80,7 +105,7 @@ describe('PDF Generation Service & API Routes', () => {
   describe('GET /api/receipts/[id]/pdf Route Handler', () => {
     it('returns 200 with inline application/pdf for a valid receipt ID', async () => {
       const receipt = store.receipts[0];
-      const req = new NextRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`);
+      const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`);
       const res = await getReceiptPdfRoute(req, { params: { id: receipt.id } });
 
       expect(res.status).toBe(200);
@@ -95,7 +120,7 @@ describe('PDF Generation Service & API Routes', () => {
 
     it('returns attachment disposition when download=true is requested', async () => {
       const receipt = store.receipts[0];
-      const req = new NextRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf?download=true`);
+      const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf?download=true`);
       const res = await getReceiptPdfRoute(req, { params: { id: receipt.id } });
 
       expect(res.status).toBe(200);
@@ -105,7 +130,7 @@ describe('PDF Generation Service & API Routes', () => {
 
     it('looks up receipt by receipt_number as well', async () => {
       const receipt = store.receipts[0];
-      const req = new NextRequest(`http://localhost:3000/api/receipts/${receipt.receipt_number}/pdf`);
+      const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.receipt_number}/pdf`);
       const res = await getReceiptPdfRoute(req, { params: { id: receipt.receipt_number } });
 
       expect(res.status).toBe(200);
@@ -113,7 +138,7 @@ describe('PDF Generation Service & API Routes', () => {
     });
 
     it('returns 404 for non-existent receipt ID', async () => {
-      const req = new NextRequest('http://localhost:3000/api/receipts/non-existent-id/pdf');
+      const req = receiptRequest('http://localhost:3000/api/receipts/non-existent-id/pdf');
       const res = await getReceiptPdfRoute(req, { params: { id: 'non-existent-id' } });
 
       expect(res.status).toBe(404);

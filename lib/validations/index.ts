@@ -47,7 +47,7 @@ export const admissionSchema = z.object({
   course_fee: z.coerce.number().positive('Course fee must be greater than 0'),
   discount: z.coerce.number().min(0).default(0),
   discount_reason: z.string().optional(),
-  payment_plan: z.enum(['Full Payment', '2 Installments', '3 Installments', 'Custom']),
+  payment_plan: z.literal('Full Payment').default('Full Payment'),
   counsellor_id: z.string().optional(),
 });
 
@@ -55,7 +55,6 @@ export const paymentSchema = z.object({
   student_id: z.string().min(1, 'Student ID is required'),
   course_id: z.string().min(1, 'Course ID is required'),
   fee_account_id: z.string().min(1, 'Fee account is required'),
-  installment_id: z.string().optional(),
   amount: z.coerce.number().positive('Payment amount must be greater than 0'),
   payment_date: z.string().min(1, 'Payment date is required'),
   payment_mode: z.enum([
@@ -165,7 +164,7 @@ export const settingsSchema = z.object({
   address: z.string().min(5),
   phone: z.string().min(8),
   email: z.string().email(),
-  gst_number: z.string().min(5),
+  gst_number: z.string().optional(),
   default_currency: z.string().default('INR'),
   academic_year: z.string().default('2026-2027'),
   receipt_prefix: z.string().default('REC'),

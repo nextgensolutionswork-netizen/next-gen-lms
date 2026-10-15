@@ -138,9 +138,8 @@ describe('2. Admissions & Automated Student Lifecycle Workflow', () => {
     // Verify fee account & installments
     expect(result.feeAccount.net_payable).toBe(40000);
     const insts = store.installments.filter((i) => i.fee_account_id === result.feeAccount.id);
-    expect(insts.length).toBe(2);
-    expect(insts[0].amount).toBe(20000);
-    expect(insts[1].amount).toBe(20000);
+    expect(insts).toHaveLength(0);
+    expect(result.studentFee?.tax_gst_amount).toBe(0);
   });
 });
 
@@ -182,7 +181,7 @@ describe('3. Financial Operations & Atomic Payment Transactions', () => {
   it('Detects and prevents duplicate payment transactions with the same transaction reference', async () => {
     const student = store.students[0];
     const feeAccount = store.feeAccounts.find((f) => f.student_id === student.id)!;
-    const duplicateTxn = `DUP-TXN-REF-9999`;
+    const duplicateTxn = `DUP-TXN-REF-${Date.now()}`;
 
     // First attempt
     await recordPaymentAtomic(

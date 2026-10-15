@@ -15,6 +15,7 @@ import {
   Calendar,
   ExternalLink,
   ShieldCheck,
+  ShieldAlert,
   Award,
   ChevronRight,
   Filter,
@@ -28,6 +29,7 @@ import {
   User,
   ArrowRight,
   Sparkles,
+  Plus,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,7 @@ import {
   PlacementEnrollmentStatus,
   PlacementEligibilitySettings,
   PlacementEnrollmentStatusHistory,
+  PlacementWorkMode,
 } from '@/types';
 import {
   getPlacementEnrollments,
@@ -52,12 +55,30 @@ import {
   overridePlacementEligibility,
   verifyEnrollmentDocument,
   getPlacementEnrollmentHistory,
+  createPlacementEnrollment,
 } from '@/lib/services/placement-service';
 import { formatDate, formatDateTime, formatINR } from '@/lib/utils/formatters';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function PlacementEnrollmentsPage() {
+  const { user, role, hasPermission } = useAuth();
   const [enrollments, setEnrollments] = React.useState<PlacementEnrollment[]>([]);
   const [loading, setLoading] = React.useState(true);
+
+  const canManage =
+    hasPermission('placement:write') ||
+    role === 'placement_coordinator' ||
+    role === 'admin' ||
+    role === 'super_admin';
+  const canConfigure =
+    role === 'admin' ||
+    role === 'super_admin' ||
+    role === 'placement_coordinator' ||
+    hasPermission('placement:write');
+  const canOverride =
+    role === 'admin' ||
+    role === 'super_admin' ||
+    role === 'placement_coordinator';
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   const [moduleFilter, setModuleFilter] = React.useState<string>('all');
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -76,14 +97,65 @@ export default function PlacementEnrollmentsPage() {
   const [isOverrideModalOpen, setIsOverrideModalOpen] = React.useState(false);
   const [isOfficerModalOpen, setIsOfficerModalOpen] = React.useState(false);
 
+  // Manual / Coordinator Candidate Enrollment State with Automated Eligibility Audit
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = React.useState(false);
+  const [candidateStudentId, setCandidateStudentId] = React.useState('');
+  const [candidateAuditResult, setCandidateAuditResult] = React.useState<any>(null);
+  const [candidateOverride, setCandidateOverride] = React.useState(false);
+  const [candidateOverrideReason, setCandidateOverrideReason] = React.useState('');
+  const [candidateRoles, setCandidateRoles] = React.useState('SAP Functional Consultant');
+  const [candidateLocations, setCandidateLocations] = React.useState('Hyderabad, Bengaluru, Pune');
+  const [candidateWorkMode, setCandidateWorkMode] = React.useState<PlacementWorkMode>('Hybrid');
+  const [candidateExpectedCtc, setCandidateExpectedCtc] = React.useState(6.5);
+  const [isSubmittingCandidate, setIsSubmittingCandidate] = React.useState(false);
+  const [candidateEnrollError, setCandidateEnrollError] = React.useState<string | null>(null);
+
   // Form states for modals
   const [actionReason, setActionReason] = React.useState('');
   const [internalNoteText, setInternalNoteText] = React.useState('');
-  const [selectedOfficerId, setSelectedOfficerId] = React.useState('usr-placement');
+  const [selectedOfficerId, setSelectedOfficerId] = React.useState(user?.id || 'usr-admin');
 
   // Eligibility Settings state
   const [settings, setSettings] = React.useState<PlacementEligibilitySettings>(store.placementEligibilitySettings);
   const [settingsForm, setSettingsForm] = React.useState<PlacementEligibilitySettings>(store.placementEligibilitySettings);
+
+  // Live Automated Pre-requisite Audit Calculation for Candidate Enrollment
+  React.useEffect(() => {
+    if (!candidateStudentId) {
+      setCandidateAuditResult(null);
+      return;
+    }
+    const student = (store.students || []).find((s) => s.id === candidateStudentId);
+    if (!student) {
+      setCandidateAuditResult(null);
+      return;
+    }
+    const attendance = student.attendance_percentage ?? 0;
+    const progress = student.course_progress ?? 0;
+    const outstanding = student.outstanding_amount ?? 0;
+    const minAtt = settings.min_attendance_percentage ?? 80;
+    const minProg = settings.min_course_progress_percentage ?? 80;
+    const requireFees = settings.require_fees_cleared ?? true;
+
+    const passesAttendance = attendance >= minAtt;
+    const passesProgress = progress >= minProg;
+    const passesFees = !requireFees || outstanding <= 0;
+    const allPassed = passesAttendance && passesProgress && passesFees;
+
+    setCandidateAuditResult({
+      student,
+      attendance,
+      passesAttendance,
+      minAtt,
+      progress,
+      passesProgress,
+      minProg,
+      outstanding,
+      passesFees,
+      requireFees,
+      allPassed,
+    });
+  }, [candidateStudentId, settings]);
 
   const loadData = async () => {
     setLoading(true);
@@ -117,11 +189,30 @@ export default function PlacementEnrollmentsPage() {
 
   const handleApproveEnrollment = async () => {
     if (!selectedEnrollment) return;
+
+    // Automated Eligibility Audit Validation Before Approval
+    const student = (store.students || []).find((s) => s.id === selectedEnrollment.student_id);
+    const attendance = student?.attendance_percentage ?? 0;
+    const minAtt = settings.min_attendance_percentage ?? 80;
+    const outstanding = student?.outstanding_amount ?? 0;
+    const passesAttendance = attendance >= minAtt;
+    const passesFees = !settings.require_fees_cleared || outstanding <= 0;
+
+    if ((!passesAttendance || !passesFees) && !selectedEnrollment.eligibility_overridden) {
+      alert(
+        `Automated Eligibility Audit Warning: Candidate has not fulfilled mandatory institutional prerequisites:\n` +
+          (!passesAttendance ? `• Attendance is ${attendance}% (Required: ≥ ${minAtt}%)\n` : '') +
+          (!passesFees ? `• Outstanding fee balance is ₹${formatINR(outstanding)} (Required: ₹0 No Dues)\n` : '') +
+          `\nTo approve this student, please grant an Authorized Admin Override with mandatory justification.`
+      );
+      return;
+    }
+
     try {
       const updated = await updatePlacementEnrollmentStatus(
         selectedEnrollment.id,
         'Enrollment Approved',
-        'usr-placement',
+        user?.id || 'usr-admin',
         'Enrollment application verified and approved by Placement Cell.'
       );
       setSelectedEnrollment({ ...updated });
@@ -135,6 +226,76 @@ export default function PlacementEnrollmentsPage() {
     }
   };
 
+  const handleEnrollCandidateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!candidateStudentId || !candidateAuditResult) return;
+    setCandidateEnrollError(null);
+
+    const { allPassed, student, passesAttendance, passesFees, attendance, minAtt, outstanding } = candidateAuditResult;
+    if (!allPassed && !candidateOverride) {
+      setCandidateEnrollError(
+        `Automated Eligibility Audit Failed: Candidate does not meet mandatory prerequisites (` +
+          (!passesAttendance ? `Attendance ${attendance}% < ${minAtt}%; ` : '') +
+          (!passesFees ? `Fee Arrears: ₹${formatINR(outstanding)}; ` : '') +
+          `). Check "Grant Authorized Administrative Override" with justification to proceed.`
+      );
+      return;
+    }
+
+    if (!allPassed && candidateOverride && !candidateOverrideReason.trim()) {
+      setCandidateEnrollError('Mandatory administrative override justification reason is required to bypass failed criteria.');
+      return;
+    }
+
+    setIsSubmittingCandidate(true);
+    try {
+      const decl = {
+        terms_version: 'v2026.1',
+        accepted_by: user?.id || 'usr-admin',
+        accepted_by_name: user?.full_name || 'Placement Coordinator',
+        accepted_at: new Date().toISOString(),
+        confirmed_information_correct: true,
+        understands_no_guarantee: true,
+        agrees_attend_scheduled_interviews: true,
+        agrees_inform_external_offer: true,
+        authorizes_resume_sharing: true,
+        understands_sensitive_docs_policy: true,
+        agrees_keep_profile_updated: true,
+      };
+
+      const newEnr = await createPlacementEnrollment(
+        {
+          student_id: student.id,
+          preferred_job_roles: candidateRoles.split(',').map((r) => r.trim()).filter(Boolean),
+          preferred_locations: candidateLocations.split(',').map((l) => l.trim()).filter(Boolean),
+          preferred_work_mode: candidateWorkMode,
+          expected_ctc_lpa: Number(candidateExpectedCtc) || 6.5,
+          declaration: decl,
+        },
+        user?.id || 'usr-admin'
+      );
+
+      // If override was granted, record override immediately
+      if (!allPassed && candidateOverride) {
+        await overridePlacementEligibility(
+          newEnr.id,
+          user?.id || 'usr-admin',
+          candidateOverrideReason.trim()
+        );
+      }
+
+      setIsEnrollModalOpen(false);
+      setCandidateStudentId('');
+      setCandidateOverride(false);
+      setCandidateOverrideReason('');
+      await loadData();
+    } catch (err: any) {
+      setCandidateEnrollError(err.message || 'Error creating placement enrollment');
+    } finally {
+      setIsSubmittingCandidate(false);
+    }
+  };
+
   const handleRejectEnrollment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEnrollment || !actionReason.trim()) return;
@@ -142,7 +303,7 @@ export default function PlacementEnrollmentsPage() {
       const updated = await updatePlacementEnrollmentStatus(
         selectedEnrollment.id,
         'Enrollment Rejected',
-        'usr-placement',
+        user?.id || 'usr-admin',
         actionReason.trim()
       );
       setSelectedEnrollment({ ...updated });
@@ -163,7 +324,7 @@ export default function PlacementEnrollmentsPage() {
       const updated = await updatePlacementEnrollmentStatus(
         selectedEnrollment.id,
         'Enrollment On Hold',
-        'usr-placement',
+        user?.id || 'usr-admin',
         actionReason.trim()
       );
       setSelectedEnrollment({ ...updated });
@@ -184,7 +345,7 @@ export default function PlacementEnrollmentsPage() {
       const updated = await updatePlacementEnrollmentStatus(
         selectedEnrollment.id,
         'More Information Required',
-        'usr-placement',
+        user?.id || 'usr-admin',
         actionReason.trim(),
         'Student instructed to revise details or re-upload documents.'
       );
@@ -205,7 +366,7 @@ export default function PlacementEnrollmentsPage() {
     try {
       const updated = await overridePlacementEligibility(
         selectedEnrollment.id,
-        'usr-placement',
+        user?.id || 'usr-admin',
         actionReason.trim()
       );
       setSelectedEnrollment({ ...updated });
@@ -224,14 +385,14 @@ export default function PlacementEnrollmentsPage() {
   const handleAssignOfficer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEnrollment) return;
-    const officer = store.users.find((u) => u.id === selectedOfficerId);
+    const officer = (store.users || []).find((u) => u.id === selectedOfficerId);
     const officerName = officer?.full_name || 'Placement Officer';
     try {
       const updated = await assignPlacementOfficer(
         selectedEnrollment.id,
         selectedOfficerId,
         officerName,
-        'usr-placement'
+        user?.id || 'usr-admin'
       );
       setSelectedEnrollment({ ...updated });
       setIsOfficerModalOpen(false);
@@ -248,7 +409,7 @@ export default function PlacementEnrollmentsPage() {
       const updated = await addInternalNoteToEnrollment(
         selectedEnrollment.id,
         internalNoteText.trim(),
-        'usr-placement'
+        user?.id || 'usr-admin'
       );
       setSelectedEnrollment({ ...updated });
       setInternalNoteText('');
@@ -266,7 +427,7 @@ export default function PlacementEnrollmentsPage() {
         docId,
         !currentVerified,
         !currentVerified ? 'Document verified by placement coordinator' : 'Document unverified',
-        'usr-placement'
+        user?.id || 'usr-admin'
       );
       setSelectedEnrollment({ ...updated });
       const evalRes = await evaluatePlacementEligibility(updated.student_id);
@@ -280,7 +441,7 @@ export default function PlacementEnrollmentsPage() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const updated = await updatePlacementEligibilitySettings(settingsForm, 'usr-placement');
+      const updated = await updatePlacementEligibilitySettings(settingsForm, user?.id || 'usr-admin');
       setSettings(updated);
       setIsSettingsModalOpen(false);
       if (selectedEnrollment) {
@@ -294,18 +455,38 @@ export default function PlacementEnrollmentsPage() {
   };
 
   // KPI Calculations
-  const totalCount = store.placementEnrollments.length;
-  const underReviewCount = store.placementEnrollments.filter(
+  const placementList = store.placementEnrollments || [];
+  const totalCount = placementList.length;
+  const underReviewCount = placementList.filter(
     (e) => e.enrollment_status === 'Application Submitted' || e.enrollment_status === 'Under Review'
   ).length;
-  const approvedCount = store.placementEnrollments.filter(
+  const approvedCount = placementList.filter(
     (e) =>
       e.enrollment_status === 'Enrollment Approved' ||
       e.enrollment_status === 'Placement Eligible' ||
       e.enrollment_status === 'Active Placement'
   ).length;
-  const eligibleCount = store.placementEnrollments.filter((e) => e.is_placement_eligible).length;
-  const onHoldCount = store.placementEnrollments.filter((e) => e.enrollment_status === 'Enrollment On Hold').length;
+  const eligibleCount = placementList.filter((e) => e.is_placement_eligible).length;
+  const onHoldCount = placementList.filter((e) => e.enrollment_status === 'Enrollment On Hold').length;
+
+  const canAccess =
+    ['super_admin', 'admin', 'placement_coordinator'].includes(role || '') ||
+    hasPermission('placement:write') ||
+    hasPermission('placements:write');
+
+  if (!canAccess) {
+    return (
+      <div className="p-8 max-w-xl mx-auto text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
+        <p className="text-sm text-slate-500">
+          You do not have administrative permissions to view or manage corporate placement candidate enrollments.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -320,15 +501,35 @@ export default function PlacementEnrollmentsPage() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSettingsModalOpen(true)}
-            className="text-xs flex items-center space-x-1 border-slate-300"
-          >
-            <Sliders className="h-3.5 w-3.5 text-blue-600" />
-            <span>Eligibility Rules Engine</span>
-          </Button>
+          {canManage && (
+            <Button
+              variant="sap"
+              size="sm"
+              onClick={() => {
+                setCandidateStudentId('');
+                setCandidateAuditResult(null);
+                setCandidateOverride(false);
+                setCandidateOverrideReason('');
+                setCandidateEnrollError(null);
+                setIsEnrollModalOpen(true);
+              }}
+              className="text-xs flex items-center space-x-1"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Enroll Candidate</span>
+            </Button>
+          )}
+          {canConfigure && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="text-xs flex items-center space-x-1 border-slate-300"
+            >
+              <Sliders className="h-3.5 w-3.5 text-blue-600" />
+              <span>Eligibility Rules Engine</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -447,6 +648,7 @@ export default function PlacementEnrollmentsPage() {
                 <th className="p-3">Course & SAP Module</th>
                 <th className="p-3">Current Status</th>
                 <th className="p-3">Employment</th>
+                <th className="p-3">Audit Prerequisites</th>
                 <th className="p-3">Resume Status</th>
                 <th className="p-3">Documents</th>
                 <th className="p-3">Enrollment Date</th>
@@ -459,7 +661,7 @@ export default function PlacementEnrollmentsPage() {
             <tbody className="divide-y divide-slate-100">
               {enrollments.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-slate-400">
+                  <td colSpan={12} className="p-8 text-center text-slate-400">
                     No placement enrollments matching current filters.
                   </td>
                 </tr>
@@ -499,6 +701,52 @@ export default function PlacementEnrollmentsPage() {
                             {enr.current_company}
                           </div>
                         )}
+                      </td>
+
+                      {/* Audit Prerequisites (Att. / Dues) */}
+                      <td className="p-3">
+                        {(() => {
+                          const stu = (store.students || []).find((s) => s.id === enr.student_id);
+                          const att = stu?.attendance_percentage ?? 0;
+                          const dues = stu?.outstanding_amount ?? 0;
+                          const minAtt = settings.min_attendance_percentage ?? 80;
+                          const passAtt = att >= minAtt;
+                          const passDues = !settings.require_fees_cleared || dues <= 0;
+                          const isOverridden = enr.eligibility_overridden;
+
+                          return (
+                            <div className="space-y-1">
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit ${
+                                    passAtt
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  }`}
+                                  title={`Attendance: ${att}% (Required: ≥${minAtt}%)`}
+                                >
+                                  {passAtt ? <Check className="h-2.5 w-2.5 mr-0.5" /> : <X className="h-2.5 w-2.5 mr-0.5" />}
+                                  {att}% Att.
+                                </span>
+                                <span
+                                  className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit ${
+                                    passDues
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  }`}
+                                  title={`Outstanding Fee Dues: ₹${dues}`}
+                                >
+                                  {passDues ? '₹0 Dues' : `₹${formatINR(dues)} Due`}
+                                </span>
+                              </div>
+                              {isOverridden && (
+                                <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 py-0 px-1">
+                                  Override Active
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Resume Status */}
@@ -649,16 +897,18 @@ export default function PlacementEnrollmentsPage() {
                 )}
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsOfficerModalOpen(true)}
-                  className="text-[11px] bg-white h-7"
-                >
-                  Change Officer
-                </Button>
-              </div>
+              {canManage && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsOfficerModalOpen(true)}
+                    className="text-[11px] bg-white h-7"
+                  >
+                    Change Officer
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Section 1: Academic & LMS Profile */}
@@ -845,17 +1095,19 @@ export default function PlacementEnrollmentsPage() {
                     Live audit against institutional benchmarks. Students can only apply for jobs once all criteria pass or an administrative override is granted.
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsOverrideModalOpen(true)}
-                  className="text-xs bg-slate-800 text-amber-300 border-amber-600/50 hover:bg-slate-700 h-7"
-                >
-                  Grant Admin Override
-                </Button>
+                {canOverride && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsOverrideModalOpen(true)}
+                    className="text-xs bg-slate-800 text-amber-300 border-amber-600/50 hover:bg-slate-700 h-7"
+                  >
+                    Grant Admin Override
+                  </Button>
+                )}
               </div>
 
-              {evaluationResult && (
+              {evaluationResult && Array.isArray(evaluationResult.criteriaResults) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
                   {evaluationResult.criteriaResults.map((c: any, idx: number) => (
                     <div
@@ -893,7 +1145,7 @@ export default function PlacementEnrollmentsPage() {
                 <span>Declaration Acceptance Audit Trail</span>
               </h4>
               <p className="text-[10px] text-slate-500">
-                Accepted by: <strong className="text-slate-700">{selectedEnrollment.declaration.accepted_by_name}</strong> on {formatDateTime(selectedEnrollment.declaration.accepted_at)} (Terms Version: {selectedEnrollment.declaration.terms_version})
+                Accepted by: <strong className="text-slate-700">{selectedEnrollment.declaration?.accepted_by_name || 'Candidate'}</strong> on {selectedEnrollment.declaration?.accepted_at ? formatDateTime(selectedEnrollment.declaration.accepted_at) : 'N/A'} (Terms Version: {selectedEnrollment.declaration?.terms_version || '1.0'})
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[10px] text-slate-600 pt-1">
                 <span className="flex items-center space-x-1">
@@ -963,26 +1215,30 @@ export default function PlacementEnrollmentsPage() {
                 <span>Immutable Status History & Audit Trail</span>
               </h4>
               <div className="space-y-2">
-                {enrollmentHistory.map((hist) => (
-                  <div key={hist.id} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-mono text-[10px] text-slate-500">{hist.old_status}</span>
-                        <ArrowRight className="h-3 w-3 text-slate-400" />
-                        <span className="font-bold text-slate-900">{hist.new_status}</span>
+                {!enrollmentHistory || enrollmentHistory.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 italic">No historical status transitions recorded yet.</p>
+                ) : (
+                  enrollmentHistory.map((hist) => (
+                    <div key={hist.id} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono text-[10px] text-slate-500">{hist.old_status}</span>
+                          <ArrowRight className="h-3 w-3 text-slate-400" />
+                          <span className="font-bold text-slate-900">{hist.new_status}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">{formatDateTime(hist.changed_at)}</span>
                       </div>
-                      <span className="text-[10px] text-slate-400">{formatDateTime(hist.changed_at)}</span>
-                    </div>
-                    {hist.reason && (
-                      <p className="text-[11px] text-slate-700 font-medium mt-1">
-                        Reason: {hist.reason}
+                      {hist.reason && (
+                        <p className="text-[11px] text-slate-700 font-medium mt-1">
+                          Reason: {hist.reason}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Changed by: {hist.changed_by_name} ({hist.changed_by_role})
                       </p>
-                    )}
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Changed by: {hist.changed_by_name} ({hist.changed_by_role})
-                    </p>
-                  </div>
-                ))}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -999,56 +1255,58 @@ export default function PlacementEnrollmentsPage() {
                 </Button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setActionReason('');
-                    setIsChangesModalOpen(true);
-                  }}
-                  className="text-amber-700 border-amber-300 hover:bg-amber-50"
-                >
-                  Request Changes
-                </Button>
+              {canManage && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionReason('');
+                      setIsChangesModalOpen(true);
+                    }}
+                    className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                  >
+                    Request Changes
+                  </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setActionReason('');
-                    setIsHoldModalOpen(true);
-                  }}
-                  className="text-orange-700 border-orange-300 hover:bg-orange-50"
-                >
-                  Put On Hold
-                </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionReason('');
+                      setIsHoldModalOpen(true);
+                    }}
+                    className="text-orange-700 border-orange-300 hover:bg-orange-50"
+                  >
+                    Put On Hold
+                  </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setActionReason('');
-                    setIsRejectModalOpen(true);
-                  }}
-                  className="text-rose-700 border-rose-300 hover:bg-rose-50"
-                >
-                  Reject Enrollment
-                </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setActionReason('');
+                      setIsRejectModalOpen(true);
+                    }}
+                    className="text-rose-700 border-rose-300 hover:bg-rose-50"
+                  >
+                    Reject Enrollment
+                  </Button>
 
-                <Button
-                  type="button"
-                  variant="sap"
-                  size="sm"
-                  onClick={handleApproveEnrollment}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                >
-                  Approve Placement Enrollment ✓
-                </Button>
-              </div>
+                  <Button
+                    type="button"
+                    variant="sap"
+                    size="sm"
+                    onClick={handleApproveEnrollment}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    Approve Placement Enrollment ✓
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </Modal>
@@ -1221,9 +1479,13 @@ export default function PlacementEnrollmentsPage() {
               onChange={(e) => setSelectedOfficerId(e.target.value)}
               className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
             >
-              <option value="usr-placement">Sunita Reddy (Placement Head)</option>
-              <option value="usr-admin">Rajesh Kumar (Center Director)</option>
-              <option value="usr-counsellor">Priya Sharma (Career Counsellor)</option>
+              {store.users
+                .filter((u) => u.role === 'placement_coordinator' || u.role === 'admin' || u.role === 'super_admin' || u.role === 'counsellor')
+                .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.full_name} ({u.role.replace('_', ' ')})
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -1233,6 +1495,238 @@ export default function PlacementEnrollmentsPage() {
             </Button>
             <Button type="submit" variant="sap" size="sm">
               Save Assignment
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL: CANDIDATE ENROLLMENT WITH AUTOMATED ELIGIBILITY AUDIT */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={isEnrollModalOpen}
+        onClose={() => setIsEnrollModalOpen(false)}
+        title="Enroll Student in Corporate Placements"
+        description="Automated pre-requisite audit evaluating attendance (≥80%) and 100% fee clearance before onboarding candidate."
+        className="max-w-xl"
+      >
+        <form onSubmit={handleEnrollCandidateSubmit} className="space-y-4 text-xs">
+          {candidateEnrollError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2 text-red-700">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
+              <span className="text-[11px] leading-relaxed">{candidateEnrollError}</span>
+            </div>
+          )}
+
+          {/* Student Selector */}
+          <div>
+            <label className="block text-slate-700 font-semibold mb-1">
+              Select Student Candidate <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={candidateStudentId}
+              onChange={(e) => setCandidateStudentId(e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+              required
+            >
+              <option value="">-- Choose a Student --</option>
+              {(store.students || []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.full_name} ({s.student_code || s.id}) · {s.course_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Live Automated Pre-requisite Audit Card */}
+          {candidateAuditResult && (
+            <div
+              className={`p-3.5 rounded-xl border space-y-3 ${
+                candidateAuditResult.allPassed
+                  ? 'bg-emerald-50/60 border-emerald-200'
+                  : 'bg-amber-50/60 border-amber-200'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold flex items-center space-x-1.5 text-slate-900">
+                  <ShieldCheck
+                    className={`h-4 w-4 ${candidateAuditResult.allPassed ? 'text-emerald-600' : 'text-amber-600'}`}
+                  />
+                  <span>Automated Pre-requisite Audit Engine</span>
+                </span>
+                <Badge
+                  variant={candidateAuditResult.allPassed ? 'success' : 'warning'}
+                  className="text-[10px]"
+                >
+                  {candidateAuditResult.allPassed ? 'Eligible to Enroll' : 'Criteria Unmet'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                {/* Attendance */}
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <span className="text-[10px] text-slate-400 block font-semibold">ATTENDANCE</span>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="font-bold text-slate-800">{candidateAuditResult.attendance}%</span>
+                    <span
+                      className={`text-[10px] font-bold ${
+                        candidateAuditResult.passesAttendance ? 'text-emerald-600' : 'text-rose-600'
+                      }`}
+                    >
+                      {candidateAuditResult.passesAttendance ? 'PASS' : `FAIL (<${candidateAuditResult.minAtt}%)`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Course Progress */}
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <span className="text-[10px] text-slate-400 block font-semibold">PROGRESS</span>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="font-bold text-slate-800">{candidateAuditResult.progress}%</span>
+                    <span
+                      className={`text-[10px] font-bold ${
+                        candidateAuditResult.passesProgress ? 'text-emerald-600' : 'text-rose-600'
+                      }`}
+                    >
+                      {candidateAuditResult.passesProgress ? 'PASS' : `FAIL (<${candidateAuditResult.minProg}%)`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Fee Clearance */}
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <span className="text-[10px] text-slate-400 block font-semibold">FEE STATUS</span>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="font-bold text-slate-800">
+                      {candidateAuditResult.outstanding <= 0
+                        ? 'Cleared'
+                        : `₹${formatINR(candidateAuditResult.outstanding)}`}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold ${
+                        candidateAuditResult.passesFees ? 'text-emerald-600' : 'text-rose-600'
+                      }`}
+                    >
+                      {candidateAuditResult.passesFees ? 'PASS' : 'DUE'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Administrative Override Toggle if criteria unmet */}
+              {!candidateAuditResult.allPassed && canOverride && (
+                <div className="pt-2 border-t border-amber-200/60 space-y-2">
+                  <label className="flex items-start space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={candidateOverride}
+                      onChange={(e) => setCandidateOverride(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="text-slate-800 font-semibold text-xs block">
+                        Grant Authorized Administrative Override
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        Allow student with pending attendance (&lt;80%) or fee arrears to enroll in placement preparation under approved dispensation.
+                      </span>
+                    </div>
+                  </label>
+
+                  {candidateOverride && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Mandatory Override Justification <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={candidateOverrideReason}
+                        onChange={(e) => setCandidateOverrideReason(e.target.value)}
+                        placeholder="State reason (e.g. Dean approved medical absence exception, student committed payment next week)..."
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                        rows={2}
+                        required={candidateOverride}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Preferences and Expectations */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Preferred Job Roles</label>
+              <Input
+                value={candidateRoles}
+                onChange={(e) => setCandidateRoles(e.target.value)}
+                placeholder="e.g. SAP FICO Consultant, Analyst"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Target Locations</label>
+              <Input
+                value={candidateLocations}
+                onChange={(e) => setCandidateLocations(e.target.value)}
+                placeholder="e.g. Hyderabad, Bengaluru, Remote"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Preferred Work Mode</label>
+              <select
+                value={candidateWorkMode}
+                onChange={(e) => setCandidateWorkMode(e.target.value as PlacementWorkMode)}
+                className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+              >
+                <option value="Hybrid">Hybrid</option>
+                <option value="On-Site">On-Site</option>
+                <option value="Remote">Remote</option>
+                <option value="Any">Any</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Expected CTC (LPA ₹)</label>
+              <Input
+                type="number"
+                step="0.5"
+                min="1"
+                value={candidateExpectedCtc}
+                onChange={(e) => setCandidateExpectedCtc(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEnrollModalOpen(false)}
+              disabled={isSubmittingCandidate}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="sap"
+              size="sm"
+              disabled={
+                isSubmittingCandidate ||
+                !candidateStudentId ||
+                (!candidateAuditResult?.allPassed && !candidateOverride)
+              }
+            >
+              {isSubmittingCandidate
+                ? 'Enrolling Candidate...'
+                : candidateAuditResult && !candidateAuditResult.allPassed && candidateOverride
+                ? 'Enroll Candidate With Override'
+                : 'Enroll Candidate'}
             </Button>
           </div>
         </form>

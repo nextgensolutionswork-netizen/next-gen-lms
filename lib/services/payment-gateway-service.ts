@@ -94,7 +94,6 @@ export async function createCashfreeOrder(input: CreateOrderInput): Promise<Gate
     student_id: input.student_id,
     course_id: input.course_id,
     fee_account_id: input.fee_account_id,
-    installment_id: input.installment_id || '',
     student_name: input.student_name || '',
     student_email: input.student_email || '',
     ...input.notes,
@@ -182,7 +181,6 @@ export async function createGatewayOrder(
     student_id: input.student_id,
     course_id: input.course_id,
     fee_account_id: input.fee_account_id,
-    installment_id: input.installment_id || '',
     student_name: input.student_name || '',
     student_email: input.student_email || '',
     ...input.notes,
@@ -370,7 +368,6 @@ export async function processRazorpayWebhookEvent(payload: any): Promise<{
   const studentId = notes.student_id;
   const feeAccountId = notes.fee_account_id;
   const courseId = notes.course_id;
-  const installmentId = notes.installment_id || undefined;
 
   if (!studentId || !feeAccountId || !courseId) {
     throw new Error(
@@ -402,7 +399,6 @@ export async function processRazorpayWebhookEvent(payload: any): Promise<{
       student_id: studentId,
       course_id: courseId,
       fee_account_id: feeAccountId,
-      installment_id: installmentId,
       amount,
       payment_date: new Date().toISOString().split('T')[0],
       payment_mode: 'Payment Gateway',

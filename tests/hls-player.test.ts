@@ -133,7 +133,7 @@ describe('HLS Video Player & Anti-Piracy Watermarking Engine', () => {
 
   describe('5. Real Video Progress Tracking & Course Benchmark Sync', () => {
     it('marks lesson complete when watched percentage crosses 90%', async () => {
-      const student = store.students[0];
+      const student = store.students.find((s) => store.lessons.some((l) => l.course_id === s.course_id)) || store.students[0];
       const lesson = store.lessons.find((l) => l.course_id === student.course_id)!;
       expect(lesson).toBeDefined();
 

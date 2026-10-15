@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ExternalLink,
   ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,18 +24,83 @@ import { SystemSettings } from '@/types';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { syncStoreToSupabase, SeedSyncResult } from '@/lib/supabase/seeder';
 import { syncPostgresToLocal } from '@/lib/supabase/sync-service';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function SettingsPage() {
-  const [settings, setSettings] = React.useState<SystemSettings>(store.settings);
+  const { role: currentRole, hasPermission } = useAuth();
+  const [settings, setSettings] = React.useState<SystemSettings>(
+    store.settings || {
+      id: 'sys-01',
+      institute_name: 'Next-Gen ERP Solutions',
+      tagline: 'Premier SAP Training, Certification & Placement Institute',
+      address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081',
+      phone: '+91 98765 43210',
+      email: 'admissions@next-generpsolutions.com',
+      gst_number: '',
+      default_currency: 'INR',
+      academic_year: '2026-2027',
+      receipt_prefix: 'REC',
+      admission_prefix: 'ADM',
+      student_code_prefix: 'STU',
+      invoice_terms: 'Full payment required before course completion certificate is generated.',
+      authorized_signatory_name: 'Dr. Rajesh Kumar',
+      authorized_signatory_designation: 'Managing Director & Academic Dean',
+      bank_account_name: 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED',
+      bank_name: 'HDFC Bank Ltd',
+      bank_account_number: '50200088991122',
+      bank_ifsc: 'HDFC0000123',
+      bank_branch: 'Hitec City, Hyderabad',
+      upi_id: 'nextgenerp@hdfcbank',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  );
   const [saved, setSaved] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [syncResult, setSyncResult] = React.useState<SeedSyncResult | null>(null);
   const isSupabaseLive = isLiveSupabaseEnabled();
 
+  const canManageSettings =
+    currentRole === 'admin' ||
+    currentRole === 'super_admin' ||
+    hasPermission('settings:manage');
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const projectRef = supabaseUrl.includes('.supabase.co')
     ? supabaseUrl.replace(/^https?:\/\//, '').split('.')[0]
     : isSupabaseLive ? 'Connected' : 'Local In-Memory';
+  const { user } = useAuth();
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    // 1. Immediately hydrate from localStorage if client had previously saved
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('institute_settings');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setSettings((prev) => ({ ...prev, ...parsed }));
+          store.settings = { ...store.settings, ...parsed };
+        }
+      } catch {}
+    }
+
+    // 2. Fetch authoritative persisted settings from server disk snapshot
+    void fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setSettings((prev) => ({ ...prev, ...data.settings }));
+          store.settings = { ...store.settings, ...data.settings };
+          if (typeof localStorage !== 'undefined') {
+            try {
+              localStorage.setItem('institute_settings', JSON.stringify(data.settings));
+            } catch {}
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSyncToDb = async () => {
     setIsSyncing(true);
@@ -77,12 +143,101 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    store.settings = { ...settings };
+    if (!canManageSettings) {
+      alert('Access Denied: You do not have permission to modify global system settings.');
+      return;
+    }
+    setIsSaving(true);
+    const updatedSettings: SystemSettings = {
+      ...settings,
+      bank_account_no: settings.bank_account_no || settings.bank_account_number,
+      bank_account_number: settings.bank_account_no || settings.bank_account_number,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Instantly update in-memory client singleton
+    store.settings = { ...updatedSettings };
+
+    // 2. Persist to browser localStorage across multiple storage adapters
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('institute_settings', JSON.stringify(updatedSettings));
+        const rawSnapshot = localStorage.getItem('next_gen_lms_store_snapshot_v1');
+        const parsedSnapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {};
+        parsedSnapshot.settings = updatedSettings;
+        localStorage.setItem('next_gen_lms_store_snapshot_v1', JSON.stringify(parsedSnapshot));
+      } catch (err) {
+        console.warn('[Settings] LocalStorage persistence warning:', err);
+      }
+    }
+
+    // 3. Persist client-side store adapter
+    store.persistSync();
+    store.persist();
+
+    // 4. Record in-memory audit log
+    if (!store.auditLogs) store.auditLogs = [];
+    store.auditLogs.unshift({
+      id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user_id: user?.id || 'usr-admin',
+      user_name: user?.full_name || 'Administrator',
+      user_role: currentRole,
+      action: 'SETTINGS_UPDATED',
+      module: 'SETTINGS',
+      record_id: updatedSettings.id || 'sys-01',
+      new_value: updatedSettings,
+      created_at: new Date().toISOString(),
+    });
+
+    // 5. Persist to server disk snapshot & database via /api/settings
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...updatedSettings,
+          updated_by: user?.id || 'usr-admin',
+          updated_by_name: user?.full_name || 'Administrator',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save settings on server');
+      }
+      if (data.settings) {
+        setSettings(data.settings);
+        store.settings = { ...store.settings, ...data.settings };
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('institute_settings', JSON.stringify(data.settings));
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn('[Settings] Failed to save to /api/settings:', err);
+    } finally {
+      setIsSaving(false);
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
+
+  if (currentRole === 'student') {
+    return (
+      <div className="p-8 max-w-xl mx-auto text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
+        <p className="text-sm text-slate-500">
+          Students do not have access to institutional configuration and financial settings.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -90,10 +245,19 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Institute System Settings</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Global institution profile, statutory GSTIN details, default currency (INR ₹), timezone, and numbering prefixes.
+            Global institution profile, default currency (INR ₹), timezone, and numbering prefixes.
           </p>
         </div>
       </div>
+
+      {!canManageSettings && (
+        <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center space-x-2.5">
+          <ShieldAlert className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <span>
+            <strong>Read-Only Mode:</strong> Your role ({currentRole ? currentRole.replace('_', ' ') : 'viewer'}) does not have administrative permissions to edit global system settings. Only Super Admins and Operations Admins can commit changes.
+          </span>
+        </div>
+      )}
 
       {saved && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center space-x-2">
@@ -113,6 +277,7 @@ export default function SettingsPage() {
               label="Institute Full Name *"
               value={settings.institute_name}
               onChange={(e) => setSettings({ ...settings, institute_name: e.target.value })}
+              disabled={!canManageSettings}
               required
             />
 
@@ -120,6 +285,7 @@ export default function SettingsPage() {
               label="Tagline / Motto"
               value={settings.tagline}
               onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
+              disabled={!canManageSettings}
             />
 
             <div className="grid grid-cols-2 gap-3">
@@ -128,12 +294,14 @@ export default function SettingsPage() {
                 type="email"
                 value={settings.email}
                 onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+                disabled={!canManageSettings}
                 required
               />
               <Input
                 label="Official Phone *"
                 value={settings.phone}
                 onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                disabled={!canManageSettings}
                 required
               />
             </div>
@@ -142,6 +310,7 @@ export default function SettingsPage() {
               label="Registered Campus Address *"
               value={settings.address}
               onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+              disabled={!canManageSettings}
               required
             />
           </CardContent>
@@ -154,16 +323,12 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="GSTIN Number *"
-                value={settings.gst_number}
-                onChange={(e) => setSettings({ ...settings, gst_number: e.target.value })}
-                required
-              />
+              
               <Input
                 label="Default Currency Code *"
                 value={settings.default_currency}
                 onChange={(e) => setSettings({ ...settings, default_currency: e.target.value })}
+                disabled={!canManageSettings}
                 required
               />
             </div>
@@ -173,12 +338,14 @@ export default function SettingsPage() {
                 label="Academic Year *"
                 value={settings.academic_year}
                 onChange={(e) => setSettings({ ...settings, academic_year: e.target.value })}
+                disabled={!canManageSettings}
                 required
               />
               <Input
                 label="Default Timezone *"
                 value={settings.timezone}
                 onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                disabled={!canManageSettings}
                 required
               />
             </div>
@@ -188,11 +355,78 @@ export default function SettingsPage() {
                 label="Receipt Sequence Prefix"
                 value={settings.receipt_prefix}
                 onChange={(e) => setSettings({ ...settings, receipt_prefix: e.target.value })}
+                disabled={!canManageSettings}
               />
               <Input
                 label="Invoice Sequence Prefix"
                 value={settings.invoice_prefix}
                 onChange={(e) => setSettings({ ...settings, invoice_prefix: e.target.value })}
+                disabled={!canManageSettings}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bank & Settlement Details */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Official Bank & Settlement Accounts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Bank Name"
+                placeholder="e.g. HDFC Bank Ltd"
+                value={settings.bank_name || ''}
+                onChange={(e) => setSettings({ ...settings, bank_name: e.target.value })}
+                disabled={!canManageSettings}
+              />
+              <Input
+                label="Beneficiary / Account Name"
+                placeholder="e.g. NEXT GEN ERP SOLUTIONS PRIVATE LIMITED"
+                value={settings.bank_account_name || ''}
+                onChange={(e) => setSettings({ ...settings, bank_account_name: e.target.value })}
+                disabled={!canManageSettings}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Account Number"
+                placeholder="e.g. 50200088991122"
+                value={settings.bank_account_no || settings.bank_account_number || ''}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    bank_account_no: e.target.value,
+                    bank_account_number: e.target.value,
+                  })
+                }
+                disabled={!canManageSettings}
+              />
+              <Input
+                label="IFSC Code"
+                placeholder="e.g. HDFC0000123"
+                value={settings.bank_ifsc || ''}
+                onChange={(e) => setSettings({ ...settings, bank_ifsc: e.target.value })}
+                disabled={!canManageSettings}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Branch Location"
+                placeholder="e.g. Hitec City, Hyderabad"
+                value={settings.bank_branch || ''}
+                onChange={(e) => setSettings({ ...settings, bank_branch: e.target.value })}
+                disabled={!canManageSettings}
+              />
+              <Input
+                label="Primary Institute UPI VPA ID"
+                placeholder="e.g. nextgenerp@hdfcbank"
+                value={settings.upi_id || ''}
+                onChange={(e) => setSettings({ ...settings, upi_id: e.target.value })}
+                disabled={!canManageSettings}
               />
             </div>
           </CardContent>
@@ -204,37 +438,40 @@ export default function SettingsPage() {
             <CardTitle className="text-sm">Automated Multi-Channel Notifications</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-xs">
-            <label className="flex items-center space-x-2 cursor-pointer">
+            <label className={`flex items-center space-x-2 ${canManageSettings ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
               <input
                 type="checkbox"
                 checked={settings.enable_email_notifications}
                 onChange={(e) =>
                   setSettings({ ...settings, enable_email_notifications: e.target.checked })
                 }
+                disabled={!canManageSettings}
                 className="rounded border-slate-300 text-[#0A6ED1] focus:ring-[#0A6ED1]"
               />
               <span className="font-medium text-slate-800">Enable Automated Email Dispatch</span>
             </label>
 
-            <label className="flex items-center space-x-2 cursor-pointer">
+            <label className={`flex items-center space-x-2 ${canManageSettings ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
               <input
                 type="checkbox"
                 checked={settings.enable_whatsapp_notifications}
                 onChange={(e) =>
                   setSettings({ ...settings, enable_whatsapp_notifications: e.target.checked })
                 }
+                disabled={!canManageSettings}
                 className="rounded border-slate-300 text-[#0A6ED1] focus:ring-[#0A6ED1]"
               />
               <span className="font-medium text-slate-800">Enable Instant WhatsApp Fee Receipt & Class Alerts</span>
             </label>
 
-            <label className="flex items-center space-x-2 cursor-pointer">
+            <label className={`flex items-center space-x-2 ${canManageSettings ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
               <input
                 type="checkbox"
                 checked={settings.enable_sms_notifications}
                 onChange={(e) =>
                   setSettings({ ...settings, enable_sms_notifications: e.target.checked })
                 }
+                disabled={!canManageSettings}
                 className="rounded border-slate-300 text-[#0A6ED1] focus:ring-[#0A6ED1]"
               />
               <span className="font-medium text-slate-800">Enable SMS Gateways for Overdue Reminders</span>
@@ -313,40 +550,50 @@ export default function SettingsPage() {
               <span className="text-[11px] text-slate-500">
                 Synchronize institute seed data (courses, staff, students, fees) with your live Supabase PostgreSQL database.
               </span>
-              <div className="flex items-center space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePullFromDb}
-                  disabled={isSyncing}
-                  className="text-xs flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>Pull from DB</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSyncToDb}
-                  disabled={isSyncing}
-                  className="text-xs flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Syncing...' : 'Push to Supabase DB'}</span>
-                </Button>
-              </div>
+              {canManageSettings && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePullFromDb}
+                    disabled={isSyncing}
+                    className="text-xs flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>Pull from DB</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncToDb}
+                    disabled={isSyncing}
+                    className="text-xs flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isSyncing ? 'Syncing...' : 'Push to Supabase DB'}</span>
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
-          <Button type="submit" variant="sap" size="md" className="text-xs flex items-center space-x-1">
-            <Save className="h-4 w-4" />
-            <span>Save System Settings</span>
-          </Button>
-        </div>
+        {canManageSettings ? (
+          <div className="flex justify-end">
+            <Button type="submit" variant="sap" size="md" disabled={isSaving} className="text-xs flex items-center space-x-1">
+              <Save className={`h-4 w-4 ${isSaving ? 'animate-spin' : ''}`} />
+              <span>{isSaving ? 'Saving Settings...' : 'Save System Settings'}</span>
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="md" disabled className="text-xs text-slate-400 cursor-not-allowed">
+              Read-Only Configuration (Admin Required)
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );

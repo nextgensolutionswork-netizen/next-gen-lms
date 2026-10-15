@@ -8,7 +8,7 @@ import {
   verifyCashfreeWebhookSignature,
   getCashfreeConfig,
 } from '@/lib/services/payment-gateway-service';
-import { calculateGstBreakdown, resolveState } from '@/lib/services/gst-service';
+import { resolveState } from '@/lib/services/finance-formatters';
 import { Lead } from '@/types';
 
 describe('CRM & Finance Enhancements Test Suite', () => {
@@ -184,54 +184,10 @@ describe('CRM & Finance Enhancements Test Suite', () => {
     });
   });
 
-  describe('4. Financial Reports GST State Resolution Parity', () => {
-    it('correctly resolves Telangana (36) as INTRA_STATE with CGST 9% and SGST 9%', () => {
-      const gst = calculateGstBreakdown(11800, '36');
-      expect(gst.supply_type).toBe('INTRA_STATE');
-      expect(gst.place_of_supply_code).toBe('36');
-      expect(gst.taxable_amount).toBe(10000);
-      expect(gst.cgst_amount).toBe(900);
-      expect(gst.sgst_amount).toBe(900);
-      expect(gst.igst_amount).toBe(0);
-      expect(gst.total_tax).toBe(1800);
-    });
-
-    it('correctly resolves Maharashtra (27) as INTER_STATE with IGST 18%', () => {
-      const gst = calculateGstBreakdown(11800, '27');
-      expect(gst.supply_type).toBe('INTER_STATE');
-      expect(gst.place_of_supply_code).toBe('27');
-      expect(gst.taxable_amount).toBe(10000);
-      expect(gst.cgst_amount).toBe(0);
-      expect(gst.sgst_amount).toBe(0);
-      expect(gst.igst_amount).toBe(1800);
-      expect(gst.total_tax).toBe(1800);
-    });
-
-    it('prioritizes state_code over address string in composite student location object', () => {
-      // Even if address mentions Mumbai, state_code '36' takes priority
-      const resolved = resolveState('36');
-      expect(resolved.code).toBe('36');
-      expect(resolved.name).toBe('Telangana');
-
-      const gst = calculateGstBreakdown(11800, {
-        state_code: '36',
-        city: 'Mumbai',
-        address: 'Nariman Point, Mumbai, Maharashtra',
-      });
-      expect(gst.supply_type).toBe('INTRA_STATE');
-      expect(gst.place_of_supply_code).toBe('36');
-    });
-
-    it('resolves Bangalore / Karnataka as INTER_STATE (29)', () => {
-      const gst = calculateGstBreakdown(5900, {
-        state_code: '29',
-        state: 'Karnataka',
-        city: 'Bengaluru',
-      });
-      expect(gst.supply_type).toBe('INTER_STATE');
-      expect(gst.place_of_supply_code).toBe('29');
-      expect(gst.igst_amount).toBe(900);
-      expect(gst.total_tax).toBe(900);
+  describe('Student location resolution', () => {
+    it('resolves locations independently of payment calculations', () => {
+      expect(resolveState('36')).toEqual({ code: '36', name: 'Telangana' });
+      expect(resolveState('Bengaluru')).toEqual({ code: '29', name: 'Karnataka' });
     });
   });
 });

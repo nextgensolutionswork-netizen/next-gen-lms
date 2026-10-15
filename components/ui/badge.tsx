@@ -3,7 +3,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'outline' | 'info';
+  variant?: 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'danger' | 'outline' | 'info';
 }
 
 export function Badge({ className, variant = 'default', ...props }: BadgeProps) {
@@ -13,6 +13,7 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
     success: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     warning: 'bg-amber-100 text-amber-800 border-amber-200',
     destructive: 'bg-red-100 text-red-800 border-red-200',
+    danger: 'bg-red-100 text-red-800 border-red-200',
     outline: 'border border-slate-300 text-slate-700 bg-transparent',
     info: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   };

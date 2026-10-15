@@ -6,8 +6,7 @@
  */
 
 import { store } from '@/lib/services/data-store';
-import { AttendanceRecord, StudentFeeAccount, Payment, Expense } from '@/types';
-import { calculateGstBreakdown } from '@/lib/services/gst-service';
+import { AttendanceRecord, StudentFeeAccount, Payment, Expense, Receipt } from '@/types';
 import { formatDate } from './formatters';
 
 export interface ExcelColumn {
@@ -342,7 +341,6 @@ export function generateFeeLedgerExcelXml(
     { header: 'Net Payable (₹)', width: 18, style: 'CurrencyInt' },
     { header: 'Paid Amount (₹)', width: 18, style: 'CurrencyInt' },
     { header: 'Outstanding (₹)', width: 18, style: 'CurrencyInt' },
-    { header: 'Plan', width: 18 },
     { header: 'Status', width: 16 },
     { header: 'Last Updated', width: 16, style: 'Date' },
   ];
@@ -368,7 +366,6 @@ export function generateFeeLedgerExcelXml(
       fa.net_payable,
       fa.paid_amount,
       fa.outstanding_amount,
-      fa.payment_plan,
       fa.status,
       fa.updated_at ? fa.updated_at.slice(0, 10) : '—',
     ];
@@ -382,7 +379,6 @@ export function generateFeeLedgerExcelXml(
     sumNet,
     sumPaid,
     sumOutstanding,
-    '',
     '',
     '',
   ];
@@ -406,249 +402,32 @@ export function exportFeeLedgerToExcel(
 }
 
 // ==========================================
-// 3. GST COMPLIANCE & TAX INVOICE EXCEL EXPORT
-// ==========================================
-
-export function generateGstReportExcelXml(
-  payments?: Payment[],
-  options: { instituteGst?: string; instituteName?: string } = {}
-): string {
-  const list = payments || store.payments;
-  const instituteGst = options.instituteGst || store.settings.gst_number || '36AAACN1234F1Z8';
-  const instituteName = options.instituteName || store.settings.institute_name || 'Netizen ERP Academy';
-
-  // Calculate GST breakdowns for all payments
-  const detailedInvoices = list.map((p) => {
-    const student = store.students.find((s) => s.id === p.student_id);
-    const receipt = store.receipts.find((r) => r.payment_id === p.id);
-
-    const gst = calculateGstBreakdown(
-      p.amount,
-      student ? { city: student.address, state: student.address } : null,
-      {
-        customDocNumber: p.receipt_number,
-        customDocDate: p.payment_date,
-      }
-    );
-
-    return {
-      receiptNumber: p.receipt_number,
-      paymentDate: p.payment_date,
-      studentName: p.student_name,
-      placeOfSupply: gst.place_of_supply,
-      placeOfSupplyCode: gst.place_of_supply_code,
-      supplyType: gst.supply_type,
-      sacCode: gst.sac_code,
-      taxableAmount: gst.taxable_amount,
-      cgstRate: gst.cgst_rate,
-      cgstAmount: gst.cgst_amount,
-      sgstRate: gst.sgst_rate,
-      sgstAmount: gst.sgst_amount,
-      igstRate: gst.igst_rate,
-      igstAmount: gst.igst_amount,
-      totalTax: gst.total_tax,
-      totalAmount: gst.total_amount,
-      paymentMode: p.payment_mode,
-      irn: receipt?.irn || gst.irn,
-      ackNo: receipt?.ack_no || gst.ack_no,
-    };
-  });
-
-  // Sheet 1: Detailed Tax Invoices
-  const invoiceColumns: ExcelColumn[] = [
-    { header: 'Receipt / Invoice #', width: 20, style: 'Bold' },
-    { header: 'Invoice Date', width: 14, style: 'Date' },
-    { header: 'Student Name', width: 24 },
-    { header: 'Place of Supply', width: 22 },
-    { header: 'Supply Type', width: 16 },
-    { header: 'SAC Code', width: 12 },
-    { header: 'Taxable Value (₹)', width: 18, style: 'Currency' },
-    { header: 'CGST (9%)', width: 16, style: 'Currency' },
-    { header: 'SGST (9%)', width: 16, style: 'Currency' },
-    { header: 'IGST (18%)', width: 16, style: 'Currency' },
-    { header: 'Total GST (₹)', width: 16, style: 'Currency' },
-    { header: 'Gross Total (₹)', width: 18, style: 'Currency' },
-    { header: 'Payment Mode', width: 16 },
-    { header: 'e-Invoice IRN', width: 34 },
-    { header: 'Ack No', width: 18 },
-  ];
-
-  let sumTaxable = 0;
-  let sumCgst = 0;
-  let sumSgst = 0;
-  let sumIgst = 0;
-  let sumTax = 0;
-  let sumGross = 0;
-
-  const invoiceRows = detailedInvoices.map((inv) => {
-    sumTaxable += inv.taxableAmount;
-    sumCgst += inv.cgstAmount;
-    sumSgst += inv.sgstAmount;
-    sumIgst += inv.igstAmount;
-    sumTax += inv.totalTax;
-    sumGross += inv.totalAmount;
-
-    return [
-      inv.receiptNumber,
-      inv.paymentDate,
-      inv.studentName,
-      inv.placeOfSupply,
-      inv.supplyType === 'INTRA_STATE' ? 'Intra-State (TS)' : 'Inter-State',
-      inv.sacCode,
-      inv.taxableAmount,
-      inv.cgstAmount,
-      inv.sgstAmount,
-      inv.igstAmount,
-      inv.totalTax,
-      inv.totalAmount,
-      inv.paymentMode,
-      inv.irn,
-      inv.ackNo,
-    ];
-  });
-
-  const invoiceSheet: ExcelSheet = {
-    name: 'B2C Tax Invoices',
-    columns: invoiceColumns,
-    rows: invoiceRows,
-    summaryRow: [
-      'TOTAL TAX AUDIT',
-      `${detailedInvoices.length} Invoices`,
-      '',
-      '',
-      '',
-      '',
-      sumTaxable,
-      sumCgst,
-      sumSgst,
-      sumIgst,
-      sumTax,
-      sumGross,
-      '',
-      '',
-      '',
-    ],
-  };
-
-  // Sheet 2: GSTR-1 Outward Supply Summary
-  const intraTaxable = detailedInvoices
-    .filter((i) => i.supplyType === 'INTRA_STATE')
-    .reduce((acc, i) => acc + i.taxableAmount, 0);
-  const interTaxable = detailedInvoices
-    .filter((i) => i.supplyType === 'INTER_STATE')
-    .reduce((acc, i) => acc + i.taxableAmount, 0);
-
-  const gstrSummarySheet: ExcelSheet = {
-    name: 'GSTR-1 Tax Summary',
-    headers: [
-      'Supply Classification',
-      'SAC Code',
-      'Applicable Tax Rate',
-      'Taxable Value (₹)',
-      'CGST (₹)',
-      'SGST (₹)',
-      'IGST (₹)',
-      'Total Tax (₹)',
-      'Gross Invoice Value (₹)',
-    ],
+// 3. PAYMENT RECEIPTS EXPORT
+export function generateReceiptsExcelXml(receipts: Receipt[]): string {
+  return buildXmlSpreadsheet([{
+    name: 'Payment Receipts',
     columns: [
-      { header: 'Supply Classification', width: 28, style: 'Bold' },
-      { header: 'SAC Code', width: 14 },
-      { header: 'Applicable Tax Rate', width: 20 },
-      { header: 'Taxable Value (₹)', width: 20, style: 'Currency' },
-      { header: 'CGST (₹)', width: 16, style: 'Currency' },
-      { header: 'SGST (₹)', width: 16, style: 'Currency' },
-      { header: 'IGST (₹)', width: 16, style: 'Currency' },
-      { header: 'Total Tax (₹)', width: 18, style: 'Currency' },
-      { header: 'Gross Invoice Value (₹)', width: 22, style: 'Currency' },
+      { header: 'Receipt Number', width: 24 }, { header: 'Student', width: 28 },
+      { header: 'Course', width: 28 }, { header: 'Payment Date', width: 18 },
+      { header: 'Amount Paid', width: 18, style: 'Currency' },
+      { header: 'Remaining Balance', width: 20, style: 'Currency' },
+      { header: 'Payment Mode', width: 18 }, { header: 'Reference', width: 24 },
+      { header: 'Status', width: 14 },
     ],
-    rows: [
-      [
-        'Intra-State Supplies (Within Telangana)',
-        '999293',
-        '9% CGST + 9% SGST',
-        intraTaxable,
-        sumCgst,
-        sumSgst,
-        0,
-        sumCgst + sumSgst,
-        intraTaxable + sumCgst + sumSgst,
-      ],
-      [
-        'Inter-State Supplies (Out of State)',
-        '999293',
-        '18% IGST',
-        interTaxable,
-        0,
-        0,
-        sumIgst,
-        sumIgst,
-        interTaxable + sumIgst,
-      ],
-    ],
-    summaryRow: [
-      'NET OUTWARD SUPPLIES',
-      '999293',
-      '18% Total GST',
-      sumTaxable,
-      sumCgst,
-      sumSgst,
-      sumIgst,
-      sumTax,
-      sumGross,
-    ],
-  };
-
-  // Sheet 3: State-wise Distribution
-  const stateMap: Record<string, { count: number; taxable: number; tax: number; total: number }> = {};
-  for (const inv of detailedInvoices) {
-    if (!stateMap[inv.placeOfSupply]) {
-      stateMap[inv.placeOfSupply] = { count: 0, taxable: 0, tax: 0, total: 0 };
-    }
-    stateMap[inv.placeOfSupply].count += 1;
-    stateMap[inv.placeOfSupply].taxable += inv.taxableAmount;
-    stateMap[inv.placeOfSupply].tax += inv.totalTax;
-    stateMap[inv.placeOfSupply].total += inv.totalAmount;
-  }
-
-  const stateSheet: ExcelSheet = {
-    name: 'State-wise Tax Distribution',
-    headers: ['Place of Supply', 'Invoice Count', 'Taxable Value (₹)', 'Total Tax (₹)', 'Total Collected (₹)'],
-    columns: [
-      { header: 'Place of Supply', width: 28, style: 'Bold' },
-      { header: 'Invoice Count', width: 16, style: 'Integer' },
-      { header: 'Taxable Value (₹)', width: 20, style: 'Currency' },
-      { header: 'Total Tax (₹)', width: 18, style: 'Currency' },
-      { header: 'Total Collected (₹)', width: 22, style: 'Currency' },
-    ],
-    rows: Object.entries(stateMap).map(([state, data]) => [
-      state,
-      data.count,
-      data.taxable,
-      data.tax,
-      data.total,
-    ]),
-    summaryRow: ['TOTAL ALL STATES', detailedInvoices.length, sumTaxable, sumTax, sumGross],
-  };
-
-  return buildXmlSpreadsheet([invoiceSheet, gstrSummarySheet, stateSheet]);
+    rows: receipts.map(r => [r.receipt_number, r.student_name, r.course_name, r.payment_date,
+      r.payment_amount, r.remaining_balance, r.payment_mode, r.transaction_reference || '', r.status || 'Valid']),
+  }]);
+}
+export function exportReceiptsToExcel(receipts: Receipt[]): void {
+  downloadExcelFile('payment_receipts.xls', generateReceiptsExcelXml(receipts));
 }
 
-export function exportGstReportToExcel(
-  payments?: Payment[],
-  options: { instituteGst?: string; instituteName?: string } = {}
-): void {
-  const xml = generateGstReportExcelXml(payments, options);
-  const dateStr = new Date().toISOString().slice(0, 10);
-  downloadExcelFile(`gst_tax_invoice_report_${dateStr}.xls`, xml);
-}
-
-// ==========================================
 // 4. COLLECTIONS & EXPENSES EXCEL EXPORT
 // ==========================================
 
 export function generateCollectionsExcelXml(payments?: Payment[]): string {
-  const list = payments || store.payments;
+  store.reconcileDualLedgers();
+  const list = payments || store.payments.filter((p) => p.status !== 'Failed');
 
   const columns: ExcelColumn[] = [
     { header: 'Receipt #', width: 18, style: 'Bold' },
@@ -733,8 +512,11 @@ export function generateExpensesExcelXml(expenses?: Expense[]): string {
   return buildXmlSpreadsheet([sheet]);
 }
 
-export function exportExpensesToExcel(expenses?: Expense[]): void {
+export function exportExpensesToExcel(expenses?: Expense[], periodLabel?: string): void {
   const xml = generateExpensesExcelXml(expenses);
   const dateStr = new Date().toISOString().slice(0, 10);
-  downloadExcelFile(`finance_expenses_${dateStr}.xls`, xml);
+  const prefix = periodLabel ? `finance_expenses_${periodLabel.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}_` : 'finance_expenses_';
+  downloadExcelFile(`${prefix}${dateStr}.xls`, xml);
 }
+
+// ==========================================

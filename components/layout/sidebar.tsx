@@ -30,11 +30,10 @@ import { UserRole } from '@/types';
 interface SidebarProps {
   currentRole: UserRole;
   currentUserName: string;
-  onRoleSwitch?: (role: UserRole) => void;
   avatar?: string;
 }
 
-export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: SidebarProps) {
+export function Sidebar({ currentRole, currentUserName, avatar }: SidebarProps) {
   const pathname = usePathname();
   const [openSection, setOpenSection] = React.useState<string | null>('academics');
 
@@ -61,6 +60,9 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
   const isTrainer = isSuperAdmin || isAdmin || currentRole === 'trainer';
   const isPlacement = isSuperAdmin || isAdmin || currentRole === 'placement_coordinator';
   const isSupport = isSuperAdmin || isAdmin || currentRole === 'support' || currentRole === 'trainer';
+  const isOnboarding = isSuperAdmin || isAdmin || currentRole === 'onboarding_team';
+  const isOnboardingOnly = currentRole === 'onboarding_team';
+  const isStudent = currentRole === 'student';
 
   return (
     <aside className="w-64 flex-shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col h-screen sticky top-0">
@@ -75,44 +77,59 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
         </div>
       </div>
 
-      {/* Role Switcher for Interactive Live Testing */}
-      <div className="px-4 py-2 bg-slate-800/60 border-b border-slate-800 text-xs">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Preview Role:</span>
-          <span className="font-bold text-[#0A6ED1] uppercase text-[10px] bg-blue-950 px-1.5 py-0.5 rounded border border-blue-800">
-            {currentRole.replace('_', ' ')}
-          </span>
-        </div>
-        <select
-          value={currentRole}
-          onChange={(e) => onRoleSwitch && onRoleSwitch(e.target.value as UserRole)}
-          className="w-full text-xs bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
-        >
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="accountant">Accountant</option>
-          <option value="counsellor">Counsellor</option>
-          <option value="trainer">Trainer</option>
-          <option value="support">Support Mentor</option>
-          <option value="placement_coordinator">Placement Coord</option>
-          <option value="student">Student</option>
-        </select>
-      </div>
-
       {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1 text-sm font-medium">
-        {/* Main Dashboard */}
-        <Link
-          href="/dashboard"
-          className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-            pathname === '/dashboard' || pathname === '/'
-              ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm'
-              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <LayoutDashboard className="h-4 w-4" />
-          <span>Dashboard</span>
-        </Link>
+        {/* Student Navigation Shortcuts */}
+        {isStudent && (
+          <div className="space-y-1 pb-2 border-b border-slate-800 mb-2">
+            <Link
+              href="/portal"
+              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                pathname === '/portal'
+                  ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <BookOpen className="h-4 w-4 text-blue-400" />
+              <span>Student Learning Portal</span>
+            </Link>
+          </div>
+        )}
+
+        {/* Main Dashboard (Hidden for onboarding-only and student roles) */}
+        {!isOnboardingOnly && !isStudent && (
+          <Link
+            href="/dashboard"
+            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+              pathname === '/dashboard' || pathname === '/'
+                ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            <span>Dashboard</span>
+          </Link>
+        )}
+
+        {/* Student Onboarding Workspace (Onboarding Team, Admin, Super Admin) */}
+        {isOnboarding && (
+          <Link
+            href="/onboarding"
+            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/onboarding')
+                ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <UserCheck className="h-4 w-4 text-teal-400" />
+            <div className="flex-1 flex items-center justify-between">
+              <span>Student Onboarding</span>
+              <span className="text-[10px] bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded border border-teal-800 font-semibold">
+                Operations
+              </span>
+            </div>
+          </Link>
+        )}
 
         {/* CRM Module (Counsellor, Admin, Super Admin) */}
         {isCounsellor && (
@@ -304,14 +321,7 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
                 >
                   Payments & Receipts
                 </Link>
-                <Link
-                  href="/accounts/installments"
-                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                    isActive('/accounts/installments') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Installments & Overdue
-                </Link>
+                
                 {isAccountant && (
                   <>
                     <Link
@@ -328,7 +338,7 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
                         isActive('/accounts/vendors') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Vendors & GST
+                      Vendors
                     </Link>
                   </>
                 )}
@@ -398,29 +408,33 @@ export function Sidebar({ currentRole, currentUserName, onRoleSwitch, avatar }: 
         )}
 
         {/* Certificates */}
-        <Link
-          href="/certificates"
-          className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-            isActive('/certificates') ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <CheckCircle className="h-4 w-4 text-amber-400" />
-          <span>Certificates</span>
-        </Link>
+        {!isOnboardingOnly && !isStudent && (
+          <Link
+            href="/certificates"
+            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/certificates') ? 'bg-[#0A6ED1] text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <CheckCircle className="h-4 w-4 text-amber-400" />
+            <span>Certificates</span>
+          </Link>
+        )}
 
         {/* Dedicated Student Portal Switch */}
-        <div className="pt-2 border-t border-slate-800">
-          <Link
-            href="/portal"
-            className="flex items-center justify-between px-3 py-2 rounded-lg bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs font-semibold hover:from-blue-800 hover:to-indigo-800 transition-colors shadow-sm"
-          >
-            <div className="flex items-center space-x-2">
-              <BookOpen className="h-4 w-4 text-blue-300" />
-              <span>Student LMS Portal</span>
-            </div>
-            <span className="text-[10px] bg-blue-500/30 px-1.5 py-0.5 rounded text-blue-200">Live</span>
-          </Link>
-        </div>
+        {!isOnboardingOnly && (
+          <div className="pt-2 border-t border-slate-800">
+            <Link
+              href="/portal"
+              className="flex items-center justify-between px-3 py-2 rounded-lg bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs font-semibold hover:from-blue-800 hover:to-indigo-800 transition-colors shadow-sm"
+            >
+              <div className="flex items-center space-x-2">
+                <BookOpen className="h-4 w-4 text-blue-300" />
+                <span>Student LMS Portal</span>
+              </div>
+              <span className="text-[10px] bg-blue-500/30 px-1.5 py-0.5 rounded text-blue-200">Live</span>
+            </Link>
+          </div>
+        )}
 
         {/* Admin Tools */}
         {isAdmin && (

@@ -490,7 +490,23 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
     errors.push(`courses pull: ${err.message}`);
   }
 
+  try {
+    // 5. Pull System Settings
+    const { data: dbSettings, error: setErr } = await db.from('system_settings').select('*').maybeSingle();
+    if (!setErr && dbSettings) {
+      store.settings = {
+        ...store.settings,
+        ...dbSettings,
+      };
+      totalSynced++;
+      syncedTables.push('system_settings');
+    }
+  } catch (err: any) {
+    errors.push(`system_settings pull: ${err.message}`);
+  }
+
   // Persist updated store to local disk
+  store.persistSync();
   store.persist();
 
   return {

@@ -34,3 +34,10 @@ next-env.d.ts
 data/backups/*
 !data/backups/.gitkeep
 data/*.tmp*
+data/payment-proofs/
+
+# Private role login credentials
+.local-role-logins.json
+
+# Local Supabase CLI connection metadata
+supabase/.temp/

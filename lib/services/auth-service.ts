@@ -47,5 +47,39 @@ export async function createUser(data: Partial<UserProfile>): Promise<UserProfil
     updated_at: new Date().toISOString(),
   };
   store.users.push(newUser);
+  store.persist();
   return newUser;
 }
+
+export async function updateUser(userId: string, data: Partial<UserProfile>): Promise<UserProfile | null> {
+  const idx = store.users.findIndex((u) => u.id === userId);
+  if (idx === -1) return null;
+  store.users[idx] = {
+    ...store.users[idx],
+    ...data,
+    updated_at: new Date().toISOString(),
+  };
+  store.persist();
+  return store.users[idx];
+}
+
+export async function setUserActiveStatus(
+  userId: string,
+  isActive: boolean,
+  actorUserId?: string
+): Promise<UserProfile | null> {
+  if (actorUserId && userId === actorUserId && !isActive) {
+    throw new Error('You cannot deactivate your own account.');
+  }
+  return updateUser(userId, { is_active: isActive });
+}
+
+export async function generatePasswordResetLink(userId: string): Promise<{ resetToken: string; resetLink: string; user: UserProfile } | null> {
+  const user = store.users.find((u) => u.id === userId);
+  if (!user) return null;
+  const resetToken = `rst_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://lms.next-generpsolutions.com';
+  const resetLink = `${baseUrl}/login?reset_token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+  return { resetToken, resetLink, user };
+}
+

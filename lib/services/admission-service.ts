@@ -1,10 +1,30 @@
 import { store } from './data-store';
-import { Admission, Student, StudentFeeAccount, Installment } from '@/types';
+import {
+  Admission,
+  Student,
+  StudentFeeAccount,
+  Installment,
+  StudentFee,
+  StudentFinancialLedgerEntry,
+  FeeApprovalHistory,
+  Payment,
+  Receipt,
+  PaymentMethod,
+} from '@/types';
 import { recordAuditLog } from './audit-service';
 import { generateAdmissionNumber } from '@/lib/utils/formatters';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { ensureOnboardingCaseForAdmission } from './onboarding-service';
+import { feeWorkflowService } from './fee-workflow-service';
+import { tenantId } from '@/lib/auth/tenant';
+import type { StudentPaymentRecord } from '@/types';
 
 export async function getAdmissions(): Promise<Admission[]> {
+  if (typeof window !== 'undefined') {
+    const { paymentWorkflowClient } = await import('./payment-workflow-client');
+    await paymentWorkflowClient.refreshAdmissions();
+    return [...store.admissions];
+  }
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
@@ -64,39 +84,100 @@ export interface CreateAdmissionInput {
   experience_years: number;
   current_employment_status: 'Employed' | 'Unemployed' | 'Student' | 'Career Gap';
   course_id: string;
-  training_mode: 'Online' | 'Classroom' | 'Hybrid';
+  training_mode?: 'Online' | 'Classroom' | 'Hybrid';
   batch_id?: string;
   trainer_id?: string;
   admission_date: string;
+  fee_due_date?: string;
   course_fee: number;
   discount: number;
   discount_reason?: string;
   payment_plan: 'Full Payment' | '2 Installments' | '3 Installments' | 'Custom';
   counsellor_id?: string;
   lead_id?: string; // Optional: if converted from CRM
+  initial_payment_amount?: number;
+  payment_mode?: PaymentMethod;
+  transaction_reference?: string;
+  initial_payment_notes?: string;
+  payment_proof_url?: string;
 }
 
 export async function createAdmissionWorkflow(
   input: CreateAdmissionInput,
-  performedByUserId: string
-): Promise<{ admission: Admission; student: Student; feeAccount: StudentFeeAccount }> {
+  performedByUserId: string,
+  transactional = false
+): Promise<{
+  admission: Admission;
+  student: Student;
+  feeAccount: StudentFeeAccount;
+  studentFee?: StudentFee;
+  installments?: Installment[];
+  payment?: StudentPaymentRecord;
+  receipt?: Receipt;
+}> {
+  if (typeof window !== 'undefined') {
+    const { paymentWorkflowClient } = await import('./payment-workflow-client');
+    return paymentWorkflowClient.createAdmission(input);
+  }
+  const performingUser = store.users.find((u) => u.id === performedByUserId);
+  if (!performingUser || !performingUser.is_active || !['counsellor', 'admin', 'super_admin'].includes(performingUser.role)) throw new Error('Unauthorized admission registration.');
+  const admissionTenant = tenantId(performingUser);
+  const feeDueDate = input.fee_due_date || input.admission_date;
+  const parsedDueDate = new Date(`${feeDueDate}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(feeDueDate) || !Number.isFinite(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== feeDueDate) {
+    throw new Error('Please enter a valid fee due date.');
+  }
+  if (feeDueDate < input.admission_date) throw new Error('Fee due date cannot be before the admission date.');
   const sequence = store.admissions.length + 1;
   const admission_number = generateAdmissionNumber(sequence);
 
-  const course = store.courses.find((c) => c.id === input.course_id);
-  const batch = store.batches.find((b) => b.id === input.batch_id);
-  const trainer = store.users.find((u) => u.id === (input.trainer_id || batch?.trainer_id));
-  const counsellor = store.users.find((u) => u.id === input.counsellor_id);
-  const actor = store.users.find((u) => u.id === performedByUserId);
-
   const net_payable = Math.max(0, input.course_fee - (input.discount || 0));
 
-  // Resolve State and GST metadata
+  if (input.initial_payment_amount !== undefined && input.initial_payment_amount > 0) {
+    if (input.initial_payment_amount > net_payable) {
+      throw new Error(
+        `Initial payment amount (₹${input.initial_payment_amount}) cannot exceed net payable course fee (₹${net_payable}).`
+      );
+    }
+  }
+
+  const course = store.courses.find((c) => c.id === input.course_id);
+  if (!course) {
+    throw new Error(`Invalid Course: Selected course "${input.course_id}" does not exist.`);
+  }
+
+  const normalizedBatchId = input.batch_id ? input.batch_id.replace(/^(btc|bch)-/, 'batch-') : undefined;
+  const batch = input.batch_id
+    ? store.batches.find((b) => b.id === input.batch_id || b.id === normalizedBatchId || b.batch_code === input.batch_id)
+    : undefined;
+  if (input.batch_id && !batch) {
+    throw new Error(`Invalid Batch: Selected batch "${input.batch_id}" does not exist.`);
+  }
+  if (batch) {
+    if (input.course_id && batch.course_id && batch.course_id !== input.course_id) {
+      throw new Error(`Course-Batch Mismatch: Selected batch "${batch.batch_name}" belongs to course "${batch.course_id}", not "${input.course_id}".`);
+    }
+    const maxCapacity = batch.maximum_capacity ?? 25;
+    if ((batch.current_enrolled || 0) >= maxCapacity) {
+      throw new Error(`Batch capacity reached: Selected batch "${batch.batch_name}" is full (${batch.current_enrolled}/${maxCapacity} enrolled).`);
+    }
+    batch.current_enrolled = (batch.current_enrolled || 0) + 1;
+    batch.updated_at = new Date().toISOString();
+  }
+  const trainer = store.users.find((u) => u.id === (input.trainer_id || batch?.trainer_id));
+  const fallbackCounsellor = store.users.find((u) => u.role === 'counsellor' && u.is_active && tenantId(u) === admissionTenant);
+  const counsellor = (input.counsellor_id ? store.users.find((u) => u.id === input.counsellor_id) : undefined)
+    || (performingUser.role === 'counsellor' ? performingUser : fallbackCounsellor)
+    || performingUser;
+  const actor = performingUser;
+
+  // Resolve student location
   const stateVal = input.state || (input.city?.toLowerCase().includes('pune') || input.city?.toLowerCase().includes('mumbai') ? 'Maharashtra' : input.city?.toLowerCase().includes('bengaluru') || input.city?.toLowerCase().includes('bangalore') ? 'Karnataka' : 'Telangana');
   const stateCodeVal = input.state_code || (stateVal === 'Maharashtra' ? '27' : stateVal === 'Karnataka' ? '29' : '36');
 
   // 1. Create Admission Record
   const newAdmission: Admission = {
+    tenant_id: admissionTenant,
     id: `adm-${Date.now()}`,
     admission_number,
     student_name: input.student_name,
@@ -114,7 +195,7 @@ export async function createAdmissionWorkflow(
     current_employment_status: input.current_employment_status,
     course_id: input.course_id,
     course_name: course?.course_name,
-    training_mode: input.training_mode,
+    training_mode: input.training_mode || 'Online',
     batch_id: input.batch_id,
     batch_name: batch?.batch_name,
     trainer_id: trainer?.id,
@@ -124,7 +205,7 @@ export async function createAdmissionWorkflow(
     discount: input.discount || 0,
     discount_reason: input.discount_reason,
     net_payable,
-    payment_plan: input.payment_plan,
+    payment_plan: 'Full Payment',
     counsellor_id: counsellor?.id,
     counsellor_name: counsellor?.full_name,
     status: 'Confirmed',
@@ -137,12 +218,13 @@ export async function createAdmissionWorkflow(
   // 2. Automatically Create Student User Profile & Portal Account
   const studentUserId = `usr-stu-${Date.now()}`;
   store.users.push({
+    tenant_id: admissionTenant,
     id: studentUserId,
     email: input.email,
     full_name: input.student_name,
     role: 'student',
     phone: input.phone,
-    is_active: true,
+    is_active: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -150,6 +232,8 @@ export async function createAdmissionWorkflow(
   // 3. Automatically Create Student Record
   const studentCode = `STU-${course?.course_code?.slice(4, 8) || 'GEN'}-${String(store.students.length + 1).padStart(3, '0')}`;
   const newStudent: Student = {
+    onboarding_required: true,
+    tenant_id: admissionTenant,
     id: `stu-${Date.now()}`,
     user_id: studentUserId,
     admission_id: newAdmission.id,
@@ -181,10 +265,12 @@ export async function createAdmissionWorkflow(
     updated_at: new Date().toISOString(),
   };
 
+  newAdmission.student_id = newStudent.id;
   store.students.unshift(newStudent);
 
   // 4. Automatically Create Student Fee Ledger
   const newFeeAccount: StudentFeeAccount = {
+    tenant_id: admissionTenant,
     id: `fa-${Date.now()}`,
     student_id: newStudent.id,
     student_name: newStudent.full_name,
@@ -197,7 +283,7 @@ export async function createAdmissionWorkflow(
     net_payable,
     paid_amount: 0,
     outstanding_amount: net_payable,
-    payment_plan: input.payment_plan,
+    payment_plan: 'Full Payment',
     status: 'Unpaid',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -205,35 +291,114 @@ export async function createAdmissionWorkflow(
 
   store.feeAccounts.unshift(newFeeAccount);
 
-  // 5. Automatically Generate Payment Installment Schedule
-  let numInstallments = 1;
-  if (input.payment_plan === '2 Installments') numInstallments = 2;
-  else if (input.payment_plan === '3 Installments') numInstallments = 3;
-  else if (input.payment_plan === 'Custom') numInstallments = 4;
-
-  const installmentAmount = Math.round(net_payable / numInstallments);
-  const baseDate = new Date(input.admission_date);
-
+  // Historical schedule rows remain stored; new fees use one balance.
   const newInstallments: Installment[] = [];
-  for (let i = 1; i <= numInstallments; i++) {
-    const dueDate = new Date(baseDate);
-    dueDate.setMonth(dueDate.getMonth() + (i - 1));
+  // 5b. Dual-Ledger Sync: Automatically Generate Approved StudentFee in Advanced Store
+  const discountAmount = input.discount || 0;
+  const courseFee = input.course_fee || 0;
+  const discountPct = courseFee > 0 ? Number(((discountAmount / courseFee) * 100).toFixed(2)) : 0;
+  const taxGstAmount = 0;
+  const nowStr = new Date().toISOString();
 
-    const isLast = i === numInstallments;
-    const finalAmount = isLast ? net_payable - installmentAmount * (numInstallments - 1) : installmentAmount;
+  const newStudentFee: StudentFee = {
+    enrollment_id: newAdmission.id,
+    fee_account_id: newFeeAccount.id,
+    tenant_id: admissionTenant,
+    id: `fee-${newFeeAccount.id}`,
+    student_id: newStudent.id,
+    student_name: newStudent.full_name,
+    student_code: newStudent.student_code || newStudent.id,
+    admission_number: newAdmission.admission_number,
+    fee_category: 'Course Admission Fee',
+    reference_type: 'Course',
+    reference_id: input.course_id,
+    course_id: input.course_id,
+    course_name: course?.course_name,
+    batch_id: input.batch_id,
+    batch_name: store.batches.find((b) => b.id === input.batch_id)?.batch_name,
+    sap_module: course?.category || 'SAP',
+    standard_fee: courseFee,
+    proposed_fee: courseFee,
+    discount_amount: discountAmount,
+    discount_percentage: discountPct,
+    discount_reason: input.discount_reason || 'Admission Discount',
+    discount_approval_level: 'Accountant',
+    tax_gst_amount: taxGstAmount,
+    additional_charges: 0,
+    final_payable: net_payable,
+    paid_amount: 0,
+    outstanding_amount: net_payable,
+    payment_plan: 'Full Payment',
+    number_of_installments: 0,
+    first_due_date: feeDueDate,
+    counsellor_id: counsellor.id,
+    counsellor_name: counsellor.full_name || 'Counsellor Staff',
+    counsellor_notes: `Admission confirmed: ${newAdmission.admission_number}`,
+    approval_status: 'Approved',
+    submitted_by: counsellor.id,
+    submitted_by_name: counsellor.full_name || 'Counsellor Staff',
+    submitted_at: nowStr,
+    approved_by: actor.id,
+    approved_by_name: actor.full_name || 'Administration',
+    approved_at: nowStr,
+    approved_fee: courseFee,
+    approved_discount: discountAmount,
+    approved_tax: taxGstAmount,
+    approved_total: net_payable,
+    approval_notes: 'Auto-approved on admission workflow',
+    version: 1,
+    is_payable: true,
+    created_at: nowStr,
+    updated_at: nowStr,
+  };
 
-    const inst: Installment = {
-      id: `inst-${newFeeAccount.id}-${i}`,
-      fee_account_id: newFeeAccount.id,
-      student_id: newStudent.id,
-      installment_number: i,
-      amount: finalAmount,
-      due_date: dueDate.toISOString().slice(0, 10),
-      paid_amount: 0,
-      status: i === 1 ? 'Due' : 'Upcoming',
-    };
-    newInstallments.push(inst);
-    store.installments.push(inst);
+  if (!store.studentFees) store.studentFees = [];
+  store.studentFees.unshift(newStudentFee);
+
+  // 5c. Post Initial Entry to Student Financial Ledger (Fee Raised)
+  if (!store.studentFinancialLedgers) store.studentFinancialLedgers = [];
+  store.studentFinancialLedgers.push({
+    id: `sfl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    student_id: newStudent.id,
+    entry_date: input.admission_date,
+    entry_type: 'Fee Raised',
+    fee_category: 'Course Admission Fee',
+    reference_type: 'Course',
+    reference_id: newStudentFee.id,
+    debit: net_payable,
+    credit: 0,
+    running_balance: net_payable,
+    description: `Admission Course Fee (${course?.course_name || 'SAP Course'}) - ${newAdmission.admission_number}`,
+    recorded_by: actor.id,
+    created_at: nowStr,
+  });
+
+  // 5d. Record Approval History
+  if (!store.feeApprovalHistories) store.feeApprovalHistories = [];
+  store.feeApprovalHistories.push({
+    id: `fah-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    fee_id: newStudentFee.id,
+    student_id: newStudent.id,
+    action: 'Approved',
+    actor_id: actor.id,
+    actor_name: actor.full_name || 'Administration',
+    actor_role: actor.role || 'admin',
+    new_status: 'Approved',
+    amount_snapshot: net_payable,
+    discount_snapshot: discountAmount,
+    notes: 'Auto-approved on admission creation',
+    timestamp: nowStr,
+  });
+
+  // 5e. Process Initial Admission Payment / Downpayment (if provided)
+  let initialPayment: StudentPaymentRecord | undefined;
+  if (input.initial_payment_amount && input.initial_payment_amount > 0) {
+    initialPayment = feeWorkflowService.recordPayment({
+      fee_id: newStudentFee.id, student_id: newStudent.id, enrollment_id: newAdmission.id,
+      amount_paid: input.initial_payment_amount, payment_mode: input.payment_mode || 'UPI',
+      payment_date: input.admission_date, transaction_reference: input.transaction_reference,
+      payment_proof_url: input.payment_proof_url, notes: input.initial_payment_notes,
+    }, performedByUserId, performingUser.role);
   }
 
   // 6. If converted from CRM lead, mark lead as converted
@@ -250,7 +415,7 @@ export async function createAdmissionWorkflow(
   store.persist();
 
   // Direct Supabase queries utilizing PostgreSQL schema migrations
-  if (isLiveSupabaseEnabled()) {
+  if (isLiveSupabaseEnabled() && !transactional) {
     try {
       const supabase = createClient();
 
@@ -322,22 +487,6 @@ export async function createAdmissionWorkflow(
       status: newFeeAccount.status,
     });
 
-    // 4. Direct insert to installments table
-    if (newInstallments.length > 0) {
-      await supabase.from('installments').insert(
-        newInstallments.map((inst) => ({
-          id: inst.id,
-          fee_account_id: inst.fee_account_id,
-          student_id: inst.student_id,
-          installment_number: inst.installment_number,
-          amount: inst.amount,
-          due_date: inst.due_date,
-          paid_amount: inst.paid_amount,
-          status: inst.status,
-        }))
-      );
-    }
-
     // 5. Direct update to leads table if converted
     if (input.lead_id) {
       await supabase
@@ -355,7 +504,8 @@ export async function createAdmissionWorkflow(
   }
 
   // 7. Audit Log
-  await recordAuditLog({
+  const auditData = {
+    tenant_id: admissionTenant,
     user_id: performedByUserId,
     user_name: actor?.full_name || 'Admin',
     user_role: actor?.role || 'admin',
@@ -367,9 +517,18 @@ export async function createAdmissionWorkflow(
       student: newStudent.full_name,
       course: course?.course_name,
       net_payable,
-      installments: numInstallments,
     },
-  });
+  };
+  if (transactional) store.auditLogs.unshift({ ...auditData, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+  else await recordAuditLog(auditData);
 
-  return { admission: newAdmission, student: newStudent, feeAccount: newFeeAccount };
+  return {
+    admission: newAdmission,
+    student: newStudent,
+    feeAccount: newFeeAccount,
+    studentFee: newStudentFee,
+    installments: newInstallments,
+    payment: initialPayment,
+    receipt: undefined,
+  };
 }

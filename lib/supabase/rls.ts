@@ -133,7 +133,15 @@ export function resolveUserProfile(
 
     // It's a userId or email
     const user = store.users.find((u) => u.id === auth || u.email.toLowerCase() === auth.toLowerCase());
-    if (user) return user;
+    if (user) {
+      return {
+        ...user,
+        is_active:
+          user.is_active !== undefined
+            ? Boolean(user.is_active)
+            : (user as any).status === 'Active' || (user as any).status === undefined,
+      };
+    }
     return {
       id: auth,
       email: `${auth}@next-gen.com`,
@@ -147,13 +155,28 @@ export function resolveUserProfile(
 
   // Already a full UserProfile
   if ('role' in auth && 'email' in auth && 'full_name' in auth) {
-    return auth as UserProfile;
+    const profile = auth as UserProfile;
+    return {
+      ...profile,
+      is_active:
+        profile.is_active !== undefined
+          ? Boolean(profile.is_active)
+          : (profile as any).status === 'Active' || (profile as any).status === undefined,
+    };
   }
 
   // RlsAuthContext object
   if (auth.userId) {
     const user = store.users.find((u) => u.id === auth.userId);
-    if (user) return user;
+    if (user) {
+      return {
+        ...user,
+        is_active:
+          user.is_active !== undefined
+            ? Boolean(user.is_active)
+            : (user as any).status === 'Active' || (user as any).status === undefined,
+      };
+    }
     return {
       id: auth.userId,
       email: auth.email || `${auth.userId}@next-gen.com`,
@@ -178,8 +201,14 @@ export function applyRlsSelectPolicy(
   records: any[],
   user: UserProfile | null
 ): any[] {
+  const isUserActive = user
+    ? user.is_active !== undefined
+      ? Boolean(user.is_active)
+      : (user as any).status === 'Active' || (user as any).status === undefined
+    : false;
+
   // If no user or user is inactive, default-deny all tables except public certificates
-  if (!user || !user.is_active) {
+  if (!user || !isUserActive) {
     if (table === 'certificates') {
       return records.filter((c) => c.is_valid);
     }
@@ -346,7 +375,7 @@ export function applyRlsSelectPolicy(
     // 9. Students
     case 'students': {
       if (
-        ['admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant', 'support'].includes(
+        ['admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant', 'support', 'onboarding_team'].includes(
           user.role
         )
       ) {
@@ -373,11 +402,36 @@ export function applyRlsSelectPolicy(
 
     // 11. Profiles
     case 'profiles': {
-      if (['admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant', 'support'].includes(user.role)) {
+      if (['admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant', 'support', 'onboarding_team'].includes(user.role)) {
         return records.filter((p) => p.role !== 'student' || p.id === user.id);
       }
       if (user.role === 'student') {
         return records.filter((p) => p.id === user.id);
+      }
+      return [];
+    }
+
+    // 12. Onboarding Cases (Assignment-scoped RLS)
+    case 'onboarding_cases': {
+      if (user.role === 'admin') {
+        return [...records];
+      }
+      if (user.role === 'onboarding_team') {
+        return records.filter((c) => c.assigned_staff_id === user.id);
+      }
+      return [];
+    }
+
+    // 13. Onboarding Audit Logs
+    case 'onboarding_audit_logs': {
+      if (user.role === 'admin') {
+        return [...records];
+      }
+      if (user.role === 'onboarding_team') {
+        const myCaseIds = store.onboardingCases
+          .filter((c) => c.assigned_staff_id === user.id)
+          .map((c) => c.id);
+        return records.filter((l) => myCaseIds.includes(l.case_id));
       }
       return [];
     }
@@ -395,7 +449,13 @@ export function checkRlsInsertPolicy(
   record: any,
   user: UserProfile | null
 ): { allowed: boolean; error?: string } {
-  if (!user || !user.is_active) {
+  const isUserActive = user
+    ? user.is_active !== undefined
+      ? Boolean(user.is_active)
+      : (user as any).status === 'Active' || (user as any).status === undefined
+    : false;
+
+  if (!user || !isUserActive) {
     return {
       allowed: false,
       error: `new row violates row-level security policy for table "${table}" (unauthenticated default-deny)`,
@@ -481,6 +541,22 @@ export function checkRlsInsertPolicy(
       };
     }
 
+    case 'onboarding_cases': {
+      if (user.role === 'admin') return { allowed: true };
+      return {
+        allowed: false,
+        error: 'new row violates row-level security policy for table "onboarding_cases" (admin required)',
+      };
+    }
+
+    case 'onboarding_audit_logs': {
+      if (['admin', 'onboarding_team'].includes(user.role)) return { allowed: true };
+      return {
+        allowed: false,
+        error: 'new row violates row-level security policy for table "onboarding_audit_logs"',
+      };
+    }
+
     case 'audit_logs': {
       return { allowed: true };
     }
@@ -500,7 +576,13 @@ export function checkRlsUpdatePolicy(
   existingRecord: any,
   user: UserProfile | null
 ): { allowed: boolean; error?: string } {
-  if (!user || !user.is_active) {
+  const isUserActive = user
+    ? user.is_active !== undefined
+      ? Boolean(user.is_active)
+      : (user as any).status === 'Active' || (user as any).status === undefined
+    : false;
+
+  if (!user || !isUserActive) {
     return {
       allowed: false,
       error: `update violates row-level security policy for table "${table}" (unauthenticated default-deny)`,
@@ -542,6 +624,23 @@ export function checkRlsUpdatePolicy(
       return {
         allowed: false,
         error: 'update violates row-level security policy for table "placement_profiles"',
+      };
+    }
+
+    case 'onboarding_cases': {
+      if (user.role === 'admin') return { allowed: true };
+      if (user.role === 'onboarding_team') {
+        if (existingRecord?.assigned_staff_id === user.id) {
+          return { allowed: true };
+        }
+        return {
+          allowed: false,
+          error: 'update violates row-level security policy for table "onboarding_cases" (assignment scope violation)',
+        };
+      }
+      return {
+        allowed: false,
+        error: 'update violates row-level security policy for table "onboarding_cases"',
       };
     }
 

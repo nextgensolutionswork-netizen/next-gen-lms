@@ -45,14 +45,17 @@ import {
   StudentFinancialLedgerEntry,
   StudentRefundRequest,
   FinanceWorkflowSettings,
+  OnboardingCase,
+  OnboardingAuditEvent,
 } from '@/types';
+import { tenantId } from '@/lib/auth/tenant';
 import { persistentStorage } from './persistent-storage-adapter';
-import { calculateGstBreakdown } from './gst-service';
 
 // In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
   constructor() {
     this.hydrateFromDisk();
+    this.reconcileDualLedgers();
   }
 
   public hydrateFromDisk(): boolean {
@@ -60,7 +63,11 @@ class InstituteDataStore {
       const snapshot = persistentStorage.loadState();
       if (snapshot) {
         if (snapshot.settings) this.settings = snapshot.settings;
-        if (snapshot.users?.length) this.users = snapshot.users;
+        if (snapshot.users?.length) {
+          const existingIds = new Set(snapshot.users.map((u: any) => u.id));
+          const missingSeedUsers = this.users.filter((u) => !existingIds.has(u.id));
+          this.users = [...snapshot.users, ...missingSeedUsers];
+        }
         if (snapshot.admissions?.length) this.admissions = snapshot.admissions;
         if (snapshot.students?.length) this.students = snapshot.students;
         if (snapshot.leads?.length) this.leads = snapshot.leads;
@@ -121,63 +128,6 @@ class InstituteDataStore {
             });
           }
 
-          // Self-healing auto-enrichment: ensure all receipts maintain full GST breakdown & e-invoice IRN
-          for (let i = 0; i < this.receipts.length; i++) {
-            const r = this.receipts[i];
-            if (!r.supply_type || r.taxable_amount === undefined || !r.irn) {
-              const stu = (this.students || []).find((s) => s.id === r.student_id);
-              const adm = (this.admissions || []).find(
-                (a) => a.admission_number === r.admission_number || (stu && a.id === stu.admission_id)
-              );
-              const studentLoc =
-                stu?.state_code ||
-                stu?.state ||
-                adm?.state_code ||
-                adm?.state ||
-                r.place_of_supply_code ||
-                r.place_of_supply ||
-                stu?.address ||
-                adm?.city ||
-                adm?.address;
-
-              const breakdown = calculateGstBreakdown(r.payment_amount, studentLoc, {
-                customDocNumber: r.receipt_number || `REC-${r.id}`,
-                customDocDate:
-                  r.payment_date ||
-                  r.created_at?.split('T')[0] ||
-                  new Date().toISOString().split('T')[0],
-                instituteGstin: this.settings?.gst_number || '36AAACN1234F1Z8',
-                instituteStateCode: '36',
-              });
-
-              this.receipts[i] = {
-                ...r,
-                institute_name: r.institute_name || this.settings?.institute_name || 'Next-Gen ERP Solutions',
-                institute_address:
-                  r.institute_address ||
-                  this.settings?.address ||
-                  'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
-                institute_phone: r.institute_phone || this.settings?.phone || '+91 98765 43210',
-                institute_gst: r.institute_gst || this.settings?.gst_number || '36AAACN1234F1Z8',
-                supply_type: r.supply_type || breakdown.supply_type,
-                place_of_supply: r.place_of_supply || breakdown.place_of_supply,
-                place_of_supply_code: r.place_of_supply_code || breakdown.place_of_supply_code,
-                sac_code: r.sac_code || breakdown.sac_code,
-                taxable_amount: r.taxable_amount ?? breakdown.taxable_amount,
-                cgst_rate: r.cgst_rate ?? breakdown.cgst_rate,
-                cgst_amount: r.cgst_amount ?? breakdown.cgst_amount,
-                sgst_rate: r.sgst_rate ?? breakdown.sgst_rate,
-                sgst_amount: r.sgst_amount ?? breakdown.sgst_amount,
-                igst_rate: r.igst_rate ?? breakdown.igst_rate,
-                igst_amount: r.igst_amount ?? breakdown.igst_amount,
-                total_tax: r.total_tax ?? breakdown.total_tax,
-                is_reverse_charge: r.is_reverse_charge ?? false,
-                irn: r.irn || breakdown.irn,
-                ack_no: r.ack_no || breakdown.ack_no,
-                ack_date: r.ack_date || breakdown.ack_date,
-              };
-            }
-          }
         }
         if (snapshot.expenses?.length) this.expenses = snapshot.expenses;
         if (snapshot.vendors?.length) this.vendors = snapshot.vendors;
@@ -203,12 +153,228 @@ class InstituteDataStore {
         if (snapshot.studentRefunds?.length) this.studentRefunds = snapshot.studentRefunds;
         if (snapshot.studentFinancialLedgers?.length) this.studentFinancialLedgers = snapshot.studentFinancialLedgers;
         if (snapshot.financeSettings) this.financeSettings = snapshot.financeSettings;
+        if (snapshot.onboardingCases?.length) this.onboardingCases = snapshot.onboardingCases;
+        if (snapshot.onboardingAuditLogs?.length) this.onboardingAuditLogs = snapshot.onboardingAuditLogs;
+        this.reconcileDualLedgers();
         return true;
       }
     } catch (err) {
       console.warn('[InstituteDataStore] Error hydrating from disk, using seed defaults:', err);
     }
     return false;
+  }
+
+  public reconcileDualLedgers(): void {
+    if (!this.feeAccounts) this.feeAccounts = [];
+    if (!this.installments) this.installments = [];
+    if (!this.payments) this.payments = [];
+    if (!this.studentFees) this.studentFees = [];
+    if (!this.studentPayments) this.studentPayments = [];
+    if (!this.studentFinancialLedgers) this.studentFinancialLedgers = [];
+
+    // 1. For every legacy feeAccount, ensure an approved StudentFee exists
+    for (const fa of this.feeAccounts) {
+      let sf = this.studentFees.find(
+        (f) =>
+          f.id === `fee-${fa.id}` ||
+          f.id === fa.id.replace('fa-', '') ||
+          (f.student_id === fa.student_id && (f.course_id === fa.course_id || f.reference_id === fa.course_id))
+      );
+
+      if (!sf) {
+        const student = (this.students || []).find((s) => s.id === fa.student_id);
+        const newSf: StudentFee = {
+          tenant_id: fa.tenant_id, enrollment_id: fa.admission_id, fee_account_id: fa.id,
+          id: `fee-${fa.id}`,
+          student_id: fa.student_id,
+          student_name: fa.student_name || student?.full_name || 'Student',
+          student_code: student?.student_code || fa.student_id,
+          admission_number: student?.admission_number || fa.admission_id,
+          fee_category: 'Course Admission Fee',
+          reference_type: 'Course',
+          reference_id: fa.course_id,
+          course_id: fa.course_id,
+          course_name: fa.course_name,
+          standard_fee: fa.original_fee,
+          proposed_fee: fa.original_fee,
+          discount_amount: fa.discount,
+          discount_percentage: fa.original_fee > 0 ? Number(((fa.discount / fa.original_fee) * 100).toFixed(2)) : 0,
+          discount_reason: fa.discount_reason,
+          tax_gst_amount: 0,
+          additional_charges: 0,
+          final_payable: fa.net_payable,
+          paid_amount: fa.paid_amount,
+          outstanding_amount: fa.outstanding_amount,
+          payment_plan: (fa.payment_plan as any) || 'Custom',
+          number_of_installments: 1,
+          first_due_date: fa.created_at ? fa.created_at.split('T')[0] : '2026-01-01',
+          counsellor_id: 'usr-counsellor',
+          counsellor_name: 'Ananya Desai',
+          approval_status: 'Approved',
+          approved_by: 'usr-accounts',
+          approved_by_name: 'Suresh Kumar (Chief Accountant)',
+          approved_at: fa.created_at || new Date().toISOString(),
+          approved_fee: fa.original_fee,
+          approved_discount: fa.discount,
+          approved_tax: 0,
+          approved_total: fa.net_payable,
+          version: 1,
+          is_payable: true,
+          created_at: fa.created_at || new Date().toISOString(),
+          updated_at: fa.updated_at || new Date().toISOString(),
+        };
+        this.studentFees.push(newSf);
+      }
+    }
+
+    // 2. For every approved StudentFee, ensure a StudentFeeAccount exists and is kept in sync
+    for (const sf of this.studentFees) {
+      if (sf.approval_status !== 'Approved') continue;
+      let fa = this.feeAccounts.find(
+        (a) =>
+          a.id === `fa-${sf.id}` ||
+          a.id === sf.id.replace('fee-', '') ||
+          (a.student_id === sf.student_id && a.course_id === sf.course_id) ||
+          a.student_id === sf.student_id
+      );
+
+      if (!fa) {
+        fa = {
+          tenant_id: sf.tenant_id,
+          id: `fa-${sf.id}`,
+          student_id: sf.student_id,
+          student_name: sf.student_name,
+          admission_id: sf.enrollment_id || sf.admission_number,
+          course_id: sf.course_id || 'crs-general',
+          course_name: sf.course_name || sf.fee_category,
+          original_fee: sf.proposed_fee,
+          discount: sf.discount_amount,
+          discount_reason: sf.discount_reason,
+          net_payable: sf.final_payable,
+          paid_amount: sf.paid_amount,
+          outstanding_amount: sf.outstanding_amount,
+          payment_plan: sf.payment_plan,
+          status: sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid'),
+          created_at: sf.created_at,
+          updated_at: sf.updated_at,
+        };
+        this.feeAccounts.push(fa);
+      } else {
+        // Backport approved fee figures so feeAccounts always displays accurate approved financial figures
+        fa.original_fee = sf.proposed_fee;
+        fa.discount = sf.discount_amount;
+        fa.discount_reason = sf.discount_reason || fa.discount_reason;
+        fa.net_payable = sf.final_payable;
+        fa.paid_amount = sf.paid_amount;
+        fa.outstanding_amount = sf.outstanding_amount;
+        fa.payment_plan = sf.payment_plan || fa.payment_plan;
+        fa.status = sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+        fa.updated_at = sf.updated_at || new Date().toISOString();
+      }
+
+      const student = (this.students || []).find((s) => s.id === sf.student_id);
+      if (student) {
+        student.total_fee = sf.final_payable;
+        student.discount = sf.discount_amount;
+        student.paid_amount = sf.paid_amount;
+        student.outstanding_amount = sf.outstanding_amount;
+      }
+
+    }
+
+    // 3. For every legacy Payment, ensure StudentPaymentRecord exists
+    for (const p of this.payments) {
+      const spr = this.studentPayments.find(
+        (sp) => sp.id === p.id || p.id === `pay-${sp.id}` || sp.id === `spr-${p.id}` || (p.receipt_number && sp.receipt_number === p.receipt_number)
+      );
+      if (!spr) {
+        const matchingFee = this.studentFees.find((f) => f.student_id === p.student_id);
+        this.studentPayments.push({
+          tenant_id: p.tenant_id,
+          enrollment_id: matchingFee?.enrollment_id,
+          status: p.status === 'Success' ? 'Approved' : p.status === 'Failed' ? 'Rejected' : 'Pending Approval',
+          id: `spr-${p.id}`,
+          fee_id: matchingFee?.id || `fee-${p.fee_account_id}`,
+          installment_id: p.installment_id,
+          student_id: p.student_id,
+          student_name: p.student_name || 'Student',
+          admission_number: p.admission_number || '',
+          fee_category: matchingFee?.fee_category || 'Course Fee',
+          amount_paid: p.amount,
+          payment_date: p.payment_date,
+          payment_mode: p.payment_mode,
+          transaction_reference: p.transaction_reference,
+          receipt_number: p.receipt_number,
+          notes: p.notes,
+          recorded_by: p.collected_by,
+          recorded_by_name: p.collected_by_name || 'Accounts Staff',
+          recorded_by_role: 'accountant',
+          verification_status: p.status === 'Success' ? 'Verified' : p.status === 'Failed' ? 'Rejected' : 'Pending Verification',
+          verified_by: p.collected_by,
+          verified_by_name: p.collected_by_name || 'Accounts Staff',
+          verified_at: p.created_at,
+          created_at: p.created_at,
+        });
+      }
+    }
+
+    // 4. For every StudentPaymentRecord, ensure legacy Payment exists and stays synchronized
+    for (const sp of this.studentPayments) {
+      const legacyP = this.payments.find(
+        (p) => p.id === sp.id || p.id === `pay-${sp.id}` || `spr-${p.id}` === sp.id || (sp.receipt_number && p.receipt_number === sp.receipt_number)
+      );
+      const paymentStatus: 'Success' | 'Pending' | 'Failed' =
+        sp.verification_status === 'Verified'
+          ? 'Success'
+          : sp.verification_status === 'Rejected'
+          ? 'Failed'
+          : 'Pending';
+
+      if (legacyP) {
+        legacyP.status = paymentStatus;
+        if (sp.receipt_number) legacyP.receipt_number = sp.receipt_number;
+        legacyP.amount = sp.amount_paid;
+        legacyP.payment_date = sp.payment_date;
+        legacyP.payment_mode = sp.payment_mode;
+        legacyP.transaction_reference = sp.transaction_reference || sp.bank_upi_reference || legacyP.transaction_reference;
+      } else {
+        const matchingFa = this.feeAccounts.find((fa) => fa.student_id === sp.student_id);
+        const matchingFee = this.studentFees.find((f) => f.id === sp.fee_id);
+        this.payments.unshift({
+          tenant_id: sp.tenant_id,
+          id: sp.id.startsWith('pay-') ? sp.id : `pay-${sp.id}`,
+          receipt_number: sp.receipt_number || (sp.verification_status === 'Verified' ? `REC-${sp.id}` : `PENDING-${sp.id}`),
+          student_id: sp.student_id,
+          student_name: sp.student_name,
+          admission_number: sp.admission_number,
+          fee_account_id: matchingFa?.id || `fa-${sp.fee_id}`,
+          installment_id: sp.installment_id,
+          course_id: matchingFa?.course_id || matchingFee?.course_id || 'crs-general',
+          course_name: matchingFa?.course_name || matchingFee?.course_name || sp.fee_category,
+          amount: sp.amount_paid,
+          payment_date: sp.payment_date,
+          payment_mode: sp.payment_mode,
+          transaction_reference: sp.transaction_reference || sp.bank_upi_reference,
+          status: paymentStatus,
+          collected_by: sp.recorded_by,
+          collected_by_name: sp.recorded_by_name,
+          notes: sp.notes,
+          created_at: sp.created_at,
+        });
+      }
+    }
+
+    // 5. Ensure Student Profile balances match verified payments
+    for (const student of this.students || []) {
+      const studentPaid = this.payments
+        .filter((p) => p.student_id === student.id && p.status === 'Success')
+        .reduce((sum, p) => sum + p.amount, 0);
+      const studentFeeAcc = this.feeAccounts.find((fa) => fa.student_id === student.id);
+      if (studentFeeAcc) {
+        student.paid_amount = studentPaid;
+        student.outstanding_amount = Math.max(0, studentFeeAcc.net_payable - studentPaid);
+      }
+    }
   }
 
   public persist(): void {
@@ -226,10 +392,22 @@ class InstituteDataStore {
     phone: '+91 98765 43210',
     email: 'admissions@next-generpsolutions.com',
     gst_number: '36AAACN1234F1Z8',
+    bank_account_name: 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED',
+    bank_name: 'HDFC Bank Ltd',
+    bank_account_no: '50200088991122',
+    bank_account_number: '50200088991122',
+    bank_ifsc: 'HDFC0000123',
+    bank_branch: 'Hitec City, Hyderabad',
+    upi_id: 'nextgenerp@hdfcbank',
     default_currency: 'INR',
     academic_year: '2026-2027',
     receipt_prefix: 'REC',
     invoice_prefix: 'INV',
+    admission_prefix: 'ADM',
+    student_code_prefix: 'STU',
+    invoice_terms: 'Full payment required before course completion certificate is generated.',
+    authorized_signatory_name: 'Dr. Rajesh Kumar',
+    authorized_signatory_designation: 'Managing Director & Academic Dean',
     timezone: 'Asia/Kolkata',
     enable_email_notifications: true,
     enable_sms_notifications: false,
@@ -315,6 +493,16 @@ class InstituteDataStore {
       full_name: 'Ananya Deshmukh (SAP Support Lead)',
       role: 'support',
       phone: '+91 98000 00008',
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+    {
+      id: 'usr-onboarding-01',
+      email: 'onboarding@next-generpsolutions.com',
+      full_name: 'Sneha Patel (Student Onboarding Lead)',
+      role: 'onboarding_team',
+      phone: '+91 98000 00009',
       is_active: true,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
@@ -2284,10 +2472,314 @@ class InstituteDataStore {
       updated_at: '2026-03-01T14:00:00Z',
     },
   ];
+
+  public onboardingCases: OnboardingCase[] = [
+    {
+      id: 'onb-01',
+      case_number: 'ONB-2026-0001',
+      admission_id: 'adm-01',
+      admission_number: 'ADM-2026-0001',
+      student_id: 'stu-01',
+      student_name: 'Amit Gupta',
+      student_email: 'amit.gupta@student.next-gen.com',
+      student_phone: '+91 98111 22233',
+      course_id: 'crs-fico-01',
+      course_name: 'SAP S/4HANA Finance (FICO)',
+      batch_id: 'batch-fico-01',
+      batch_name: 'SAP FICO Morning Fast-Track Batch',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao',
+      assigned_staff_id: 'usr-onboarding-01',
+      assigned_staff_name: 'Sneha Patel (Student Onboarding Lead)',
+      assigned_at: '2026-01-25T11:00:00Z',
+      status: 'in_progress',
+      checklist: {
+        admission_confirmation: {
+          key: 'admission_confirmation',
+          title: 'Admission & Enrollment Verification',
+          description: 'Confirm admission number and enrollment status',
+          completed: true,
+          completed_at: '2026-01-25T11:05:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Admission ADM-2026-0001 verified against institute register',
+          mandatory: true,
+        },
+        student_details_verification: {
+          key: 'student_details_verification',
+          title: 'Student Details & Contact Confirmation',
+          description: 'Confirm phone, email, address, and educational qualifications',
+          completed: true,
+          completed_at: '2026-01-25T11:30:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Phone and email verified via welcome call',
+          mandatory: true,
+        },
+        document_verification: {
+          key: 'document_verification',
+          title: 'Document Verification Check',
+          description: 'Check required government ID and degree certificates',
+          completed: true,
+          completed_at: '2026-01-25T14:00:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Aadhaar ID and MBA degree verified',
+          mandatory: true,
+        },
+        course_confirmation: {
+          key: 'course_confirmation',
+          title: 'Course Selection Verification',
+          description: 'Verify registered SAP module and curriculum prerequisites',
+          completed: true,
+          completed_at: '2026-01-25T14:15:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Confirmed SAP S/4HANA Finance (FICO)',
+          mandatory: true,
+        },
+        batch_allocation: {
+          key: 'batch_allocation',
+          title: 'Batch Assignment Coordination',
+          description: 'Coordinate batch timetable and trainer assignment',
+          completed: true,
+          completed_at: '2026-01-25T14:30:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Assigned to Morning Fast-Track Batch',
+          mandatory: true,
+        },
+        fee_clearance_verification: {
+          key: 'fee_clearance_verification',
+          title: 'Financial Clearance Verification',
+          description: 'Verify initial fee payment clearance without modifying accounts',
+          completed: true,
+          completed_at: '2026-01-25T15:00:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Initial fee receipt REC-2026-0001 verified on ledger',
+          mandatory: true,
+        },
+        lms_account_activation: {
+          key: 'lms_account_activation',
+          title: 'LMS Account Provisioning & Activation',
+          description: 'Coordinate LMS portal credentials and ensure active account',
+          completed: true,
+          completed_at: '2026-01-25T15:30:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Student portal account activated with default course access',
+          mandatory: true,
+        },
+        welcome_notification: {
+          key: 'welcome_notification',
+          title: 'Welcome Notification & Guidelines Dispatched',
+          description: 'Send official onboarding kit and login guidelines',
+          completed: true,
+          completed_at: '2026-01-25T16:00:00Z',
+          completed_by: 'usr-onboarding-01',
+          completed_by_name: 'Sneha Patel',
+          notes: 'Welcome kit and schedule emailed to student',
+          mandatory: true,
+        },
+        orientation_confirmation: {
+          key: 'orientation_confirmation',
+          title: 'Student Orientation Confirmation',
+          description: 'Coordinate and confirm student orientation attendance',
+          completed: false,
+          mandatory: true,
+        },
+        first_class_confirmation: {
+          key: 'first_class_confirmation',
+          title: 'First-Class Session Confirmation',
+          description: 'Confirm successful first class attendance and lab connectivity',
+          completed: false,
+          mandatory: true,
+        },
+        academic_handover: {
+          key: 'academic_handover',
+          title: 'Academic Team Handover',
+          description: 'Formal handover to academic operations and mentor desk',
+          completed: false,
+          mandatory: true,
+        },
+      },
+      documents: [
+        {
+          id: 'doc-01',
+          name: 'Aadhaar_ID_Proof.pdf',
+          doc_type: 'id_proof',
+          status: 'verified',
+          file_url: 'https://placehold.co/600x400.png?text=Aadhaar+ID+Proof',
+          uploaded_at: '2026-01-25T10:30:00Z',
+          verified_at: '2026-01-25T14:00:00Z',
+          verified_by: 'Sneha Patel',
+        },
+        {
+          id: 'doc-02',
+          name: 'MBA_Degree_Certificate.pdf',
+          doc_type: 'degree_certificate',
+          status: 'verified',
+          file_url: 'https://placehold.co/600x400.png?text=MBA+Degree+Certificate',
+          uploaded_at: '2026-01-25T10:30:00Z',
+          verified_at: '2026-01-25T14:00:00Z',
+          verified_by: 'Sneha Patel',
+        },
+      ],
+      orientation_date: '2026-02-01',
+      orientation_mode: 'Hybrid',
+      lms_account_created: true,
+      lms_account_activated_at: '2026-01-25T15:30:00Z',
+      portal_access_confirmed: false,
+      academic_handover_confirmed: false,
+      due_date: '2026-02-05',
+      created_at: '2026-01-25T10:00:00Z',
+      updated_at: '2026-01-25T16:00:00Z',
+    },
+    {
+      id: 'onb-02',
+      case_number: 'ONB-2026-0002',
+      admission_id: 'adm-02',
+      admission_number: 'ADM-2026-0002',
+      student_id: 'stu-02',
+      student_name: 'Sneha Kulkarni',
+      student_email: 'sneha.k@student.next-gen.com',
+      student_phone: '+91 98222 33344',
+      course_id: 'crs-mm-01',
+      course_name: 'SAP S/4HANA Materials Management (MM)',
+      batch_id: 'batch-mm-01',
+      batch_name: 'SAP MM Weekend Professional Batch',
+      trainer_id: 'usr-trainer-mm',
+      trainer_name: 'Neha Patel',
+      status: 'pending',
+      checklist: {
+        admission_confirmation: {
+          key: 'admission_confirmation',
+          title: 'Admission & Enrollment Verification',
+          description: 'Confirm admission number and enrollment status',
+          completed: false,
+          mandatory: true,
+        },
+        student_details_verification: {
+          key: 'student_details_verification',
+          title: 'Student Details & Contact Confirmation',
+          description: 'Confirm phone, email, address, and educational qualifications',
+          completed: false,
+          mandatory: true,
+        },
+        document_verification: {
+          key: 'document_verification',
+          title: 'Document Verification Check',
+          description: 'Check required government ID and degree certificates',
+          completed: false,
+          mandatory: true,
+        },
+        course_confirmation: {
+          key: 'course_confirmation',
+          title: 'Course Selection Verification',
+          description: 'Verify registered SAP module and curriculum prerequisites',
+          completed: false,
+          mandatory: true,
+        },
+        batch_allocation: {
+          key: 'batch_allocation',
+          title: 'Batch Assignment Coordination',
+          description: 'Coordinate batch timetable and trainer assignment',
+          completed: false,
+          mandatory: true,
+        },
+        fee_clearance_verification: {
+          key: 'fee_clearance_verification',
+          title: 'Financial Clearance Verification',
+          description: 'Verify initial fee payment clearance without modifying accounts',
+          completed: false,
+          mandatory: true,
+        },
+        lms_account_activation: {
+          key: 'lms_account_activation',
+          title: 'LMS Account Provisioning & Activation',
+          description: 'Coordinate LMS portal credentials and ensure active account',
+          completed: false,
+          mandatory: true,
+        },
+        welcome_notification: {
+          key: 'welcome_notification',
+          title: 'Welcome Notification & Guidelines Dispatched',
+          description: 'Send official onboarding kit and login guidelines',
+          completed: false,
+          mandatory: true,
+        },
+        orientation_confirmation: {
+          key: 'orientation_confirmation',
+          title: 'Student Orientation Confirmation',
+          description: 'Coordinate and confirm student orientation attendance',
+          completed: false,
+          mandatory: true,
+        },
+        first_class_confirmation: {
+          key: 'first_class_confirmation',
+          title: 'First-Class Session Confirmation',
+          description: 'Confirm successful first class attendance and lab connectivity',
+          completed: false,
+          mandatory: true,
+        },
+        academic_handover: {
+          key: 'academic_handover',
+          title: 'Academic Team Handover',
+          description: 'Formal handover to academic operations and mentor desk',
+          completed: false,
+          mandatory: true,
+        },
+      },
+      documents: [
+        {
+          id: 'doc-03',
+          name: 'Govt_ID_PAN.pdf',
+          doc_type: 'id_proof',
+          status: 'pending',
+          file_url: 'https://placehold.co/600x400.png?text=PAN+Card+Doc',
+          uploaded_at: '2026-02-02T11:30:00Z',
+        },
+      ],
+      lms_account_created: false,
+      portal_access_confirmed: false,
+      academic_handover_confirmed: false,
+      due_date: '2026-02-15',
+      created_at: '2026-02-02T11:00:00Z',
+      updated_at: '2026-02-02T11:00:00Z',
+    },
+  ];
+
+  public onboardingAuditLogs: OnboardingAuditEvent[] = [
+    {
+      id: 'onb-aud-01',
+      case_id: 'onb-01',
+      timestamp: '2026-01-25T11:00:00Z',
+      action: 'STAFF_ASSIGNED',
+      actor_id: 'usr-admin',
+      actor_name: 'Priya Nair (Operations Head)',
+      actor_role: 'admin',
+      details: 'Assigned onboarding case to Sneha Patel',
+    },
+    {
+      id: 'onb-aud-02',
+      case_id: 'onb-01',
+      timestamp: '2026-01-25T15:30:00Z',
+      action: 'LMS_ACCOUNT_PROVISIONED',
+      actor_id: 'usr-onboarding-01',
+      actor_name: 'Sneha Patel',
+      actor_role: 'onboarding_team',
+      details: 'Provisioned LMS access for student Amit Gupta (Course: crs-fico-01)',
+    },
+  ];
 }
 
 // Global Singleton to preserve state across Server Actions & Next.js API Routes in dev/preview
 const globalForStore = globalThis as unknown as { instituteStore?: InstituteDataStore };
 
 export const store = globalForStore.instituteStore ?? new InstituteDataStore();
-if (process.env.NODE_ENV !== 'production') globalForStore.instituteStore = store;
+if (process.env.NODE_ENV !== 'production') {
+  // Keep live data across hot reloads while picking up fixes to store methods.
+  Object.setPrototypeOf(store, InstituteDataStore.prototype);
+  globalForStore.instituteStore = store;
+}

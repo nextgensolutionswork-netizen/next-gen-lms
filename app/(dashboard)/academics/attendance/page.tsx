@@ -16,24 +16,57 @@ import {
   BellRing,
   ExternalLink,
   FileSpreadsheet,
+  Users,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
+import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { AttendanceStatus, AttendanceSource, AttendanceRecord, MeetingParticipantLog } from '@/types';
-import { markAttendance } from '@/lib/services/academics-service';
+import { markAttendance, getOrCreateClassSessionForDate } from '@/lib/services/academics-service';
+import { canAccessBatch } from '@/lib/auth/rbac';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { exportAttendanceToExcel } from '@/lib/utils/excel-export';
 import { subscribeRealtimeTopic } from '@/lib/services/realtime-service';
 
 export default function AttendancePage() {
-  const [selectedBatchId, setSelectedBatchId] = React.useState(store.batches[0]?.id || '');
+  const { user, role, hasPermission } = useAuth();
+  const isTrainer = role === 'trainer';
+
+  const accessibleBatches = React.useMemo(() => {
+    return store.batches.filter((b) => canAccessBatch(user, b.id) || b.trainer_id === user?.id);
+  }, [user]);
+
+  const [selectedBatchId, setSelectedBatchId] = React.useState(accessibleBatches[0]?.id || store.batches[0]?.id || '');
   const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().slice(0, 10));
   const [attendanceMap, setAttendanceMap] = React.useState<Record<string, AttendanceStatus>>({});
   const [recordsMap, setRecordsMap] = React.useState<Record<string, AttendanceRecord | undefined>>({});
   const [savedSuccess, setSavedSuccess] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlBatch = params.get('batch') || params.get('batchId');
+      const urlDate = params.get('date');
+      if (urlBatch && store.batches.some((b) => b.id === urlBatch)) {
+        setSelectedBatchId(urlBatch);
+      }
+      if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+        setSelectedDate(urlDate);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (accessibleBatches.length > 0 && !accessibleBatches.some((b) => b.id === selectedBatchId)) {
+      setSelectedBatchId(accessibleBatches[0].id);
+    }
+  }, [accessibleBatches, selectedBatchId]);
+
+  const canMark = hasPermission('attendance:write') || role === 'trainer' || role === 'admin' || role === 'super_admin';
 
   // Sync Meeting Modal state
   const [isSyncModalOpen, setIsSyncModalOpen] = React.useState(false);
@@ -62,7 +95,7 @@ export default function AttendancePage() {
 
     for (const s of students) {
       const rec = store.attendanceRecords.find(
-        (a) => a.student_id === s.id && (a.attendance_date === selectedDate || a.batch_id === selectedBatchId)
+        (a) => a.student_id === s.id && a.attendance_date === selectedDate && a.batch_id === selectedBatchId
       );
       aMap[s.id] = rec ? rec.status : 'Present';
       rMap[s.id] = rec;
@@ -75,6 +108,7 @@ export default function AttendancePage() {
   React.useEffect(() => {
     refreshRecords();
     setSavedSuccess(false);
+    setSaveError(null);
   }, [refreshRecords]);
 
   // Real-time listener for live automated webhook updates
@@ -91,37 +125,78 @@ export default function AttendancePage() {
   }, [refreshRecords]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
+    if (!canMark) return;
     setAttendanceMap((prev) => ({ ...prev, [studentId]: status }));
   };
 
   const handleSaveAttendance = async () => {
-    const session = store.classSessions.find((cs) => cs.batch_id === selectedBatchId) || store.classSessions[0];
-    const records = students.map((s) => ({
-      student_id: s.id,
-      status: attendanceMap[s.id] || 'Present',
-    }));
+    if (!canMark) {
+      setSaveError('Unauthorized: You do not have permission to mark attendance.');
+      return;
+    }
+    if (!selectedBatchId) {
+      setSaveError('Please select a batch to mark attendance.');
+      return;
+    }
+    if (students.length === 0) {
+      setSaveError('No students are enrolled in this batch to mark attendance for.');
+      return;
+    }
+    setSaveError(null);
+    try {
+      const markerId =
+        user?.id ||
+        batch?.trainer_id ||
+        store.users.find((u) => u.role === 'trainer')?.id ||
+        store.users.find((u) => u.role === 'admin')?.id ||
+        'usr-trainer';
 
-    await markAttendance(session?.id || 'sess-01', records, 'usr-trainer-fico');
-    setSavedSuccess(true);
-    refreshRecords();
+      const session = await getOrCreateClassSessionForDate(selectedBatchId, selectedDate, markerId);
+      if (!session || !session.id) {
+        setSaveError('Could not establish or locate a class session for this batch and date.');
+        return;
+      }
+
+      const records = students.map((s) => ({
+        student_id: s.id,
+        status: attendanceMap[s.id] || 'Present',
+      }));
+
+      await markAttendance(session.id, records, markerId, selectedDate);
+      setSavedSuccess(true);
+      setSaveError(null);
+      refreshRecords();
+      setTimeout(() => setSavedSuccess(false), 4000);
+    } catch (err: any) {
+      console.error('Failed to save attendance:', err);
+      setSaveError(err.message || 'Failed to save attendance register.');
+    }
   };
 
   const handleExportAttendance = () => {
-    const rows = store.attendanceRecords.map((r) => ({
-      Student: r.student_name,
-      Date: r.attendance_date,
-      Status: r.status,
-      Source: r.source || 'Manual',
-      DurationMinutes: r.duration_minutes || 0,
-      MeetingId: r.meeting_id || 'N/A',
-      MarkedBy: r.marked_by_name,
-    }));
-    exportToCSV('attendance_register_report', rows);
+    const filtered = store.attendanceRecords.filter(
+      (r) => (!selectedBatchId || r.batch_id === selectedBatchId) && (!selectedDate || r.attendance_date === selectedDate)
+    );
+    const targetRecords = filtered.length > 0 ? filtered : store.attendanceRecords;
+    const rows = targetRecords.map((r) => {
+      const recBatch = store.batches.find((b) => b.id === r.batch_id);
+      return {
+        Student: r.student_name,
+        Batch: recBatch?.batch_name || batch?.batch_name || 'N/A',
+        Date: r.attendance_date,
+        Status: r.status,
+        Source: r.source || 'Manual',
+        DurationMinutes: r.duration_minutes || 0,
+        MeetingId: r.meeting_id || 'N/A',
+        MarkedBy: r.marked_by_name || 'Staff',
+      };
+    });
+    exportToCSV(`attendance_${batch?.batch_code || 'register'}_${selectedDate}`, rows);
   };
 
   const handleExportAttendanceExcel = () => {
     const currentRecords = store.attendanceRecords.filter(
-      (r) => r.batch_id === selectedBatchId || r.attendance_date === selectedDate
+      (r) => r.batch_id === selectedBatchId && r.attendance_date === selectedDate
     );
     exportAttendanceToExcel(
       currentRecords.length > 0 ? currentRecords : store.attendanceRecords,
@@ -189,20 +264,26 @@ export default function AttendancePage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const defaultSession = sessions.find((s) => s.meeting_id) || store.classSessions[0];
-              setSyncMeetingId(defaultSession?.meeting_id || 'xyz-fico-sap');
-              setSyncProvider((defaultSession?.meeting_provider as any) || 'Google Meet');
-              setIsSyncModalOpen(true);
-            }}
-            className="text-xs flex items-center space-x-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
-          >
-            <Video className="h-3.5 w-3.5" />
-            <span>Sync Live Meeting</span>
-          </Button>
+          {canMark && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const defaultSession =
+                  sessions.find((s) => s.meeting_id) ||
+                  sessions[0] ||
+                  store.classSessions.find((s) => s.batch_id === selectedBatchId) ||
+                  store.classSessions[0];
+                setSyncMeetingId(defaultSession?.meeting_id || 'xyz-fico-sap');
+                setSyncProvider((defaultSession?.meeting_provider as any) || 'Google Meet');
+                setIsSyncModalOpen(true);
+              }}
+              className="text-xs flex items-center space-x-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <Video className="h-3.5 w-3.5" />
+              <span>Sync Live Meeting</span>
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -229,10 +310,18 @@ export default function AttendancePage() {
             <span>Export to Excel</span>
           </Button>
 
-          <Button variant="sap" size="sm" onClick={handleSaveAttendance} className="text-xs flex items-center space-x-1">
-            <Save className="h-4 w-4" />
-            <span>Save Attendance</span>
-          </Button>
+          {canMark && (
+            <Button
+              variant="sap"
+              size="sm"
+              onClick={handleSaveAttendance}
+              disabled={!selectedBatchId || students.length === 0}
+              className="text-xs flex items-center space-x-1"
+            >
+              <Save className="h-4 w-4" />
+              <span>Save Attendance</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -248,6 +337,18 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {saveError && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-semibold flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center space-x-2">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <span>{saveError}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setSaveError(null)} className="text-red-700 h-6 px-2 text-xs">
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       {/* Filter & Batch Selection Card */}
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
@@ -259,11 +360,17 @@ export default function AttendancePage() {
                 onChange={(e) => setSelectedBatchId(e.target.value)}
                 className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-slate-800 font-semibold"
               >
-                {store.batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.batch_name} ({b.start_time} - {b.end_time})
+                {accessibleBatches.length === 0 ? (
+                  <option value="" disabled>
+                    No cohorts available
                   </option>
-                ))}
+                ) : (
+                  accessibleBatches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.batch_name} ({b.start_time} - {b.end_time})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -290,24 +397,26 @@ export default function AttendancePage() {
             <Button
               variant="outline"
               size="sm"
+              disabled={students.length === 0 || !canMark}
               onClick={() => {
                 const map: Record<string, AttendanceStatus> = {};
                 students.forEach((s) => (map[s.id] = 'Present'));
                 setAttendanceMap(map);
               }}
-              className="text-xs py-1 px-2.5 text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100"
+              className="text-xs py-1 px-2.5 text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 disabled:opacity-50"
             >
               Mark All Present
             </Button>
             <Button
               variant="outline"
               size="sm"
+              disabled={students.length === 0 || !canMark}
               onClick={() => {
                 const map: Record<string, AttendanceStatus> = {};
                 students.forEach((s) => (map[s.id] = 'Absent'));
                 setAttendanceMap(map);
               }}
-              className="text-xs py-1 px-2.5 text-red-700 bg-red-50 border-red-200 hover:bg-red-100"
+              className="text-xs py-1 px-2.5 text-red-700 bg-red-50 border-red-200 hover:bg-red-100 disabled:opacity-50"
             >
               Mark All Absent
             </Button>
@@ -395,7 +504,39 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map((stu) => {
+                {accessibleBatches.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-16 text-xs text-slate-500">
+                      <div className="flex flex-col items-center justify-center space-y-2 max-w-sm mx-auto">
+                        <div className="p-3 bg-slate-100 rounded-full text-slate-400">
+                          <Calendar className="h-6 w-6" />
+                        </div>
+                        <span className="font-semibold text-slate-700 text-sm">No Batches Available</span>
+                        <p className="text-[11px] text-slate-400">
+                          {isTrainer
+                            ? 'You currently have no cohorts assigned to your trainer profile. An administrator will assign you to active cohorts.'
+                            : 'No academic batches have been scheduled yet. Please create a batch in Cohort Management first.'}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : students.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-16 text-xs text-slate-500">
+                      <div className="flex flex-col items-center justify-center space-y-2 max-w-sm mx-auto">
+                        <div className="p-3 bg-blue-50 rounded-full text-blue-500">
+                          <Users className="h-6 w-6" />
+                        </div>
+                        <span className="font-semibold text-slate-700 text-sm">No Students Enrolled in Cohort</span>
+                        <p className="text-[11px] text-slate-400">
+                          There are currently zero students enrolled in <strong>{batch?.batch_name || 'this batch'}</strong> ({batch?.batch_code || 'Cohort'}). 
+                          Admit new students or transfer students into this batch to begin recording session attendance.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  students.map((stu) => {
                   const currentStatus = attendanceMap[stu.id] || 'Present';
                   const record = recordsMap[stu.id];
                   const source = record?.source || 'Manual';
@@ -483,7 +624,7 @@ export default function AttendancePage() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>

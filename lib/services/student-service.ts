@@ -48,10 +48,10 @@ export async function getStudents(filters?: {
     const s = filters.search.toLowerCase();
     list = list.filter(
       (item) =>
-        item.full_name.toLowerCase().includes(s) ||
-        item.student_code.toLowerCase().includes(s) ||
-        item.email.toLowerCase().includes(s) ||
-        item.phone.includes(s)
+        item.full_name?.toLowerCase().includes(s) ||
+        item.student_code?.toLowerCase().includes(s) ||
+        item.email?.toLowerCase().includes(s) ||
+        item.phone?.includes(s)
     );
   }
 
@@ -76,18 +76,36 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
     }
   }
 
-  return store.students.find((s) => s.id === id || s.student_code === id);
+  const target = decodeURIComponent(String(id)).trim().toLowerCase();
+  return store.students.find(
+    (s) =>
+      s.id?.toLowerCase() === target ||
+      s.student_code?.toLowerCase() === target ||
+      s.admission_id?.toLowerCase() === target ||
+      s.admission_number?.toLowerCase() === target ||
+      (s.email && s.email.toLowerCase() === target) ||
+      (s.phone && s.phone.toLowerCase() === target)
+  );
 }
 
 export async function getStudentProfileFullDetails(studentId: string) {
-  const student = store.students.find((s) => s.id === studentId);
+  if (!studentId) return null;
+  const target = decodeURIComponent(String(studentId)).trim().toLowerCase();
+  const student = store.students.find(
+    (s) =>
+      s.id?.toLowerCase() === target ||
+      s.student_code?.toLowerCase() === target ||
+      s.admission_id?.toLowerCase() === target ||
+      s.admission_number?.toLowerCase() === target ||
+      (s.email && s.email.toLowerCase() === target) ||
+      (s.phone && s.phone.toLowerCase() === target)
+  );
   if (!student) return null;
 
   const admission = store.admissions.find((a) => a.id === student.admission_id);
   const course = store.courses.find((c) => c.id === student.course_id);
   const batch = store.batches.find((b) => b.id === student.batch_id);
   const feeAccount = store.feeAccounts.find((f) => f.student_id === student.id);
-  const installments = store.installments.filter((i) => i.student_id === student.id);
   const payments = store.payments.filter((p) => p.student_id === student.id);
   const receipts = store.receipts.filter((r) => r.student_id === student.id);
   const attendance = store.attendanceRecords.filter((a) => a.student_id === student.id);
@@ -108,7 +126,6 @@ export async function getStudentProfileFullDetails(studentId: string) {
     course,
     batch,
     feeAccount,
-    installments,
     payments,
     receipts,
     attendance,

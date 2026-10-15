@@ -15,6 +15,7 @@ import {
   DoubtMessage,
   AuditLog,
   SystemSettings,
+  OnboardingCase,
 } from '@/types';
 
 /**
@@ -361,6 +362,57 @@ export class CRMRepository {
 }
 
 // ==========================================
+// 9. ONBOARDING REPOSITORY
+// ==========================================
+export class OnboardingRepository {
+  async getAll(): Promise<OnboardingCase[]> {
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const db = getDb();
+        const { data, error } = await db.from('onboarding_cases').select('*').order('created_at', { ascending: false });
+        if (!error && data) return data;
+      } catch (err) {
+        console.warn('OnboardingRepository.getAll Postgres error:', err);
+      }
+    }
+    return [...store.onboardingCases];
+  }
+
+  async getById(id: string): Promise<OnboardingCase | undefined> {
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const db = getDb();
+        const { data, error } = await db.from('onboarding_cases').select('*').eq('id', id).maybeSingle();
+        if (!error && data) return data;
+      } catch (err) {
+        console.warn('OnboardingRepository.getById Postgres error:', err);
+      }
+    }
+    return store.onboardingCases.find((c) => c.id === id);
+  }
+
+  async save(onbCase: OnboardingCase): Promise<OnboardingCase> {
+    const idx = store.onboardingCases.findIndex((c) => c.id === onbCase.id);
+    if (idx >= 0) {
+      store.onboardingCases[idx] = onbCase;
+    } else {
+      store.onboardingCases.unshift(onbCase);
+    }
+    store.persist();
+
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const db = getDb();
+        await db.from('onboarding_cases').upsert(onbCase);
+      } catch (err) {
+        console.warn('OnboardingRepository.save Postgres error:', err);
+      }
+    }
+    return onbCase;
+  }
+}
+
+// ==========================================
 // REPOSITORY SINGLETON INSTANCES
 // ==========================================
 export const admissionsRepo = new AdmissionsRepository();
@@ -371,3 +423,5 @@ export const classSessionsRepo = new ClassSessionsRepository();
 export const attendanceRepo = new AttendanceRepository();
 export const financeRepo = new FinanceRepository();
 export const crmRepo = new CRMRepository();
+export const onboardingRepo = new OnboardingRepository();
+

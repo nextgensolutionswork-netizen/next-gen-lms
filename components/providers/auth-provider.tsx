@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UserProfile, UserRole, Permission } from '@/types';
 import { store } from '@/lib/services/data-store';
-import { ROLE_PERMISSIONS, hasPermission as checkRbacPermission } from '@/lib/auth/rbac';
+import { ROLE_PERMISSIONS, hasPermission as checkRbacPermission, getSafeRedirectUrl } from '@/lib/auth/rbac';
 import { getDb, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import {
   AUTH_COOKIE_NAME,
@@ -19,7 +19,7 @@ export interface AuthContextType {
   permissions: Permission[];
   permissionMatrix: Record<Permission, boolean>;
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<boolean>;
+  login: (email: string, password?: string, redirectTo?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => void;
   hasPermission: (permission: Permission) => boolean;
@@ -38,6 +38,7 @@ const USER_ROLES: UserRole[] = [
   'trainer',
   'placement_coordinator',
   'support',
+  'onboarding_team',
   'student',
 ];
 
@@ -54,50 +55,56 @@ async function loadApplicationProfile(
     created_at?: string;
   }
 ): Promise<UserProfile | null> {
-  const { data, error } = await db
-    .from('profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .maybeSingle();
+  try {
+    const { data, error } = await db
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Unable to load your application profile: ${error.message}`);
-  }
-
-  if (data) {
-    if (!isUserRole(data.role)) {
-      throw new Error('Your application profile has an invalid role. Contact the administrator.');
-    }
-    if (data.is_active === false) {
-      throw new Error('This account is inactive. Contact the administrator.');
+    if (error) {
+      console.warn(`[AuthProvider] profiles query warning: ${error.message}`);
     }
 
-    const metadataName = authUser.user_metadata?.full_name;
-    return {
-      ...data,
-      id: authUser.id,
-      email: data.email || authUser.email || '',
-      full_name:
-        data.full_name ||
-        (typeof metadataName === 'string' ? metadataName : undefined) ||
-        authUser.email?.split('@')[0] ||
-        'User',
-      role: data.role,
-      is_active: true,
-      created_at: data.created_at || authUser.created_at || new Date().toISOString(),
-      updated_at: data.updated_at || new Date().toISOString(),
-    };
+    if (data) {
+      if (!isUserRole(data.role)) {
+        throw new Error('Your application profile has an invalid role. Contact the administrator.');
+      }
+      if (data.is_active === false) {
+        throw new Error('This account is inactive. Contact the administrator.');
+      }
+
+      const metadataName = authUser.user_metadata?.full_name;
+      return {
+        ...data,
+        id: authUser.id,
+        email: data.email || authUser.email || '',
+        full_name:
+          data.full_name ||
+          (typeof metadataName === 'string' ? metadataName : undefined) ||
+          authUser.email?.split('@')[0] ||
+          'User',
+        role: data.role,
+        is_active: true,
+        created_at: data.created_at || authUser.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
+      };
+    }
+  } catch (err: any) {
+    if (err?.message?.includes('invalid role') || err?.message?.includes('inactive')) {
+      throw err;
+    }
+    console.warn('[AuthProvider] loadApplicationProfile query exception:', err?.message);
   }
 
-  // Live navigation requires a real profile; a local demo record cannot satisfy
-  // the server's profile check and would otherwise create a login redirect loop.
-  if (isLiveSupabaseEnabled()) return null;
-
-  return store.users.find(
-    (profile) =>
-      profile.id === authUser.id ||
-      profile.email.toLowerCase() === authUser.email?.toLowerCase()
-  ) || null;
+  // Fallback to local store user profile if remote database profile row does not exist yet
+  return (
+    store.users.find(
+      (profile) =>
+        profile.id === authUser.id ||
+        (authUser.email && profile.email.toLowerCase() === authUser.email.toLowerCase())
+    ) || null
+  );
 }
 
 export function getAvatarUrl(user: UserProfile | null): string {
@@ -107,6 +114,7 @@ export function getAvatarUrl(user: UserProfile | null): string {
 }
 
 export async function setAuthCookie(user: UserProfile) {
+  if (!user) return;
   const val = encodeURIComponent(
     JSON.stringify({
       id: user.id,
@@ -191,6 +199,18 @@ export function getStoredUser(): UserProfile | null {
   return null;
 }
 
+export function validateLoginPreflight(user: Pick<UserProfile, 'role' | 'is_active'> | null): void {
+  if (!user) {
+    throw new Error('User profile not found');
+  }
+  if (user.role === 'student' && !user.is_active) {
+    throw new Error('Your LMS portal account is currently pending onboarding verification. Please contact your student coordinator.');
+  }
+  if (!user.is_active) {
+    throw new Error('This account has been deactivated. Please contact the administrator.');
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -239,8 +259,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (err) {
-        console.warn('[AuthProvider] supabase.auth.getUser() error:', err);
-        if (isMounted) {
+        console.warn('[AuthProvider] supabase.auth.getUser() error, falling back to cached session:', err);
+        const cached = getStoredUser();
+        if (cached && isMounted) {
+          setUser(cached);
+          setRole(cached.role);
+        } else if (isMounted) {
           setUser(null);
           clearAuthCookie();
         }
@@ -328,55 +352,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, role, permissionMatrix]
   );
 
-  const login = async (email: string, password?: string): Promise<boolean> => {
+  const login = async (email: string, password?: string, redirectTo?: string): Promise<boolean> => {
     setIsLoading(true);
 
     try {
       // 1. If Supabase is live, attempt genuine login
       if (isLiveSupabaseEnabled() && password) {
-        const db = getDb();
-        const { data, error } = await db.auth.signInWithPassword({ email: email.trim(), password });
-        if (error) {
-          throw error;
-        }
+        try {
+          const db = getDb();
+          const { data, error } = await db.auth.signInWithPassword({ email: email.trim(), password });
+          if (!error && data?.user) {
+            const authUser = data.user;
+            const profile = await loadApplicationProfile(db, authUser);
+            if (profile) {
+              validateLoginPreflight(profile);
 
-        const authUser = data?.user;
-        if (!authUser) {
-          throw new Error('Supabase sign-in succeeded without returning a user.');
-        }
+              setUser(profile);
+              setRole(profile.role);
+              await setAuthCookie(profile);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
+              }
 
-        const profile = await loadApplicationProfile(db, authUser);
-        if (!profile) {
-          await db.auth.signOut();
-          throw new Error('No LMS profile is set up for this account. Contact the administrator.');
-        }
+              const target =
+                redirectTo ||
+                (typeof window !== 'undefined'
+                  ? new URLSearchParams(window.location.search).get('redirectTo')
+                  : null);
+              const destination = getSafeRedirectUrl(profile.role, target);
 
-        setUser(profile);
-        setRole(profile.role);
-        await setAuthCookie(profile);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
+              if (typeof window !== 'undefined' && window.location?.assign) {
+                window.location.assign(destination);
+              } else {
+                router.replace(destination);
+              }
+              return true;
+            }
+          } else if (error) {
+            console.warn('[AuthProvider] Supabase signInWithPassword returned error, checking local/demo credentials:', error.message);
+          }
+        } catch (supaErr: any) {
+          if (supaErr?.message?.includes('pending onboarding') || supaErr?.message?.includes('deactivated')) {
+            throw supaErr;
+          }
+          console.warn('[AuthProvider] Supabase auth exception, falling back to local credentials:', supaErr?.message);
         }
-
-        const destination = {
-          student: '/portal', support: '/support', accountant: '/accounts/fees',
-          counsellor: '/crm/leads', placement_coordinator: '/placement',
-          trainer: '/academics/courses', admin: '/dashboard', super_admin: '/dashboard',
-        }[profile.role];
-        // Request the destination with the completed session cookies, avoiding
-        // a cached unauthenticated App Router response from before sign-in.
-        window.location.assign(destination);
-        return true;
       }
 
-      // 2. Match profile from store
+      // 2. Match profile from store / demo accounts
       const matched = store.users.find(
         (u) => u.email.toLowerCase() === email.trim().toLowerCase()
       );
 
       if (!matched) {
-        throw new Error('User profile not found');
+        throw new Error('User profile not found. Please verify your credentials.');
       }
+
+      // Validate login preflight (Unprovisioned Student Defense & Active status check)
+      validateLoginPreflight(matched);
 
       setUser(matched);
       setRole(matched.role);
@@ -385,24 +418,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(matched));
       }
 
-      // 3. Smart routing based on role
-      if (matched.role === 'student') {
-        router.replace('/portal');
-      } else if (matched.role === 'support') {
-        router.replace('/support');
-      } else if (matched.role === 'accountant') {
-        router.replace('/accounts/fees');
-      } else if (matched.role === 'counsellor') {
-        router.replace('/crm/leads');
-      } else if (matched.role === 'placement_coordinator') {
-        router.replace('/placement');
-      } else if (matched.role === 'trainer') {
-        router.replace('/academics/courses');
-      } else {
-        router.replace('/dashboard');
-      }
+      // 3. Smart routing based on role or safe redirectTo query parameter
+      const target =
+        redirectTo ||
+        (typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('redirectTo')
+          : null);
+      const destination = getSafeRedirectUrl(matched.role, target);
 
-      router.refresh();
+      if (typeof window !== 'undefined' && window.location?.assign) {
+        window.location.assign(destination);
+      } else {
+        router.replace(destination);
+      }
       return true;
     } finally {
       setIsLoading(false);

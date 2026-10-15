@@ -17,6 +17,9 @@ import { UserProfile } from '@/types';
  * Checks whether live Supabase credentials are configured (non-mock).
  */
 export function isLiveSupabaseEnabled(): boolean {
+  if (process.env.VITEST && typeof window === 'undefined') {
+    return false;
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -103,6 +106,10 @@ function getStoreTableRecords(table: string): any[] {
       return store.users;
     case 'audit_logs':
       return store.auditLogs;
+    case 'onboarding_cases':
+      return store.onboardingCases;
+    case 'onboarding_audit_logs':
+      return store.onboardingAuditLogs;
     default:
       return [];
   }

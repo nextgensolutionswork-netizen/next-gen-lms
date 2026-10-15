@@ -2,12 +2,14 @@ import crypto from 'crypto';
 import { getDb, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export type StorageBucket =
+  | 'payment-proofs'
   | 'resumes'
   | 'assignments'
   | 'doubt-attachments'
   | 'receipts'
   | 'screenshots'
-  | 'avatars';
+  | 'avatars'
+  | 'documents';
 
 export interface BucketConfig {
   name: StorageBucket;
@@ -19,6 +21,12 @@ export interface BucketConfig {
 }
 
 export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
+  'payment-proofs': {
+    name: 'payment-proofs', public: false, maxSizeBytes: 10 * 1024 * 1024,
+    allowedMimes: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
+    allowedExtensions: ['.png', '.jpg', '.jpeg', '.webp', '.pdf'],
+    description: 'Private payment evidence, accessible only through the tenant-authorized payment API',
+  },
   resumes: {
     name: 'resumes',
     public: true,
@@ -96,6 +104,20 @@ export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
     allowedMimes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
     allowedExtensions: ['.png', '.jpg', '.jpeg', '.webp'],
     description: 'User and student profile display pictures',
+  },
+  documents: {
+    name: 'documents',
+    public: true,
+    maxSizeBytes: 20 * 1024 * 1024, // 20MB
+    allowedMimes: [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+    ],
+    allowedExtensions: ['.pdf', '.png', '.jpg', '.jpeg', '.webp'],
+    description: 'Student onboarding verification documents: government IDs, marksheets, degree certificates, and photos',
   },
 };
 
@@ -285,6 +307,7 @@ export async function createSignedUrl(
   path: string,
   expiresInSeconds: number = 3600
 ): Promise<{ signedUrl: string; token?: string; expiresAt?: number; error?: string }> {
+  if (bucket === 'payment-proofs') throw new Error('Use the authenticated payment proof endpoint.');
   if (isLiveSupabaseEnabled()) {
     try {
       const db = getDb();

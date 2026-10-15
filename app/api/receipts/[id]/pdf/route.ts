@@ -1,3 +1,6 @@
+import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
+import { paymentTransaction } from '@/lib/services/payment-workflow-transaction';
+import { tenantId } from '@/lib/auth/tenant';
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/services/data-store';
 import { generateReceiptPdfBuffer } from '@/lib/services/pdf-service';
@@ -10,6 +13,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const actor = await authenticatePaymentRequest(request);
+    return await paymentTransaction(actor, async () => {
     const rawId = params?.id;
     if (!rawId) {
       return NextResponse.json(
@@ -41,6 +46,8 @@ export async function GET(
       );
     }
 
+    const ownStudent = store.students.find((s) => s.id === receipt.student_id && s.user_id === actor.id);
+    if (tenantId(receipt) !== tenantId(actor) || !['student', 'counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role) || (actor.role === 'student' && !ownStudent)) return NextResponse.json({ error: 'Receipt access denied.' }, { status: 403 });
     const pdfBuffer = await generateReceiptPdfBuffer(receipt);
 
     const { searchParams } = new URL(request.url);
@@ -54,9 +61,10 @@ export async function GET(
         'Content-Type': 'application/pdf',
         'Content-Disposition': `${dispositionType}; filename="${filename}"`,
         'Content-Length': String(pdfBuffer.length),
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        'Cache-Control': 'private, no-store',
       },
     });
+    }, true);
   } catch (error: any) {
     console.error('Error generating receipt PDF:', error);
     return NextResponse.json(
@@ -64,7 +72,7 @@ export async function GET(
         success: false,
         error: error.message || 'Failed to generate receipt PDF',
       },
-      { status: 500 }
+      { status: error?.message?.startsWith('Unauthorized') ? 401 : 500 }
     );
   }
 }

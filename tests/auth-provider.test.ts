@@ -4,9 +4,10 @@ import {
   setAuthCookie,
   clearAuthCookie,
   getStoredUser,
+  validateLoginPreflight,
 } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
-import { ROLE_PERMISSIONS, hasPermission } from '@/lib/auth/rbac';
+import { ROLE_PERMISSIONS, hasPermission, getSafeRedirectUrl, DEFAULT_ROLE_ROUTES } from '@/lib/auth/rbac';
 import { UserProfile, UserRole, Permission } from '@/types';
 import { getDb } from '@/lib/supabase/db';
 
@@ -218,4 +219,145 @@ describe('15. Global Auth Context (useAuth & AuthProvider) Tests', () => {
       expect(matched?.assigned_course_ids).toContain('crs-fico-01');
     });
   });
+
+  // =========================================================================
+  // 5. UNPROVISIONED STUDENT LOGIN DEFENSE & PRE-FLIGHT VALIDATION (GAP 3)
+  // =========================================================================
+  describe('Unprovisioned Student Login Defense & Pre-flight Validation', () => {
+    it('blocks unprovisioned student (is_active === false) with exact pending onboarding verification error', () => {
+      const unprovisionedStudent: UserProfile = {
+        id: 'usr-unprovisioned-test',
+        email: 'unprovisioned.student@test.com',
+        full_name: 'Pending Onboarding Student',
+        role: 'student',
+        is_active: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      expect(() => validateLoginPreflight(unprovisionedStudent)).toThrowError(
+        'Your LMS portal account is currently pending onboarding verification. Please contact your student coordinator.'
+      );
+    });
+
+    it('allows active provisioned student (is_active === true) to pass pre-flight check', () => {
+      const activeStudent: UserProfile = {
+        id: 'usr-active-student',
+        email: 'active.student@test.com',
+        full_name: 'Active Student',
+        role: 'student',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      expect(() => validateLoginPreflight(activeStudent)).not.toThrow();
+    });
+
+    it('blocks deactivated non-student staff with generic deactivation error', () => {
+      const deactivatedStaff: UserProfile = {
+        id: 'usr-deactivated-staff',
+        email: 'staff@test.com',
+        full_name: 'Former Trainer',
+        role: 'trainer',
+        is_active: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      expect(() => validateLoginPreflight(deactivatedStaff)).toThrowError(
+        'This account has been deactivated. Please contact the administrator.'
+      );
+    });
+
+    it('throws error when user profile is null or not found', () => {
+      expect(() => validateLoginPreflight(null)).toThrowError('User profile not found');
+    });
+  });
+
+  // =========================================================================
+  // 6. SAFE REDIRECT & DEEP LINK BOUNDARY HANDLING (MODULE 34)
+  // =========================================================================
+  describe('Safe Redirect & Deep Link Boundary Handling (getSafeRedirectUrl)', () => {
+    it('returns default role route when redirectTo is missing, empty, or not a string', () => {
+      expect(getSafeRedirectUrl('student', null)).toBe('/portal');
+      expect(getSafeRedirectUrl('accountant', undefined)).toBe('/accounts/fees');
+      expect(getSafeRedirectUrl('super_admin', '')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('trainer', '   ')).toBe('/academics/courses');
+    });
+
+    it('honors valid deep links for authorized roles and preserves query parameters & hashes', () => {
+      expect(getSafeRedirectUrl('accountant', '/accounts/payments')).toBe('/accounts/payments');
+      expect(getSafeRedirectUrl('trainer', '/academics/batches?filter=active')).toBe('/academics/batches?filter=active');
+      expect(getSafeRedirectUrl('counsellor', '/crm/leads?status=hot#list')).toBe('/crm/leads?status=hot#list');
+      expect(getSafeRedirectUrl('super_admin', '/settings')).toBe('/settings');
+      expect(getSafeRedirectUrl('admin', '/audit-logs')).toBe('/audit-logs');
+    });
+
+    it('enforces student isolation boundary (blocks /dashboard, /settings, /accounts/expenses; allows /portal, /certificate/verify, /accounts/receipts)', () => {
+      // Prohibited routes fall back to /portal
+      expect(getSafeRedirectUrl('student', '/dashboard')).toBe('/portal');
+      expect(getSafeRedirectUrl('student', '/settings')).toBe('/portal');
+      expect(getSafeRedirectUrl('student', '/accounts/expenses')).toBe('/portal');
+      expect(getSafeRedirectUrl('student', '/users')).toBe('/portal');
+      expect(getSafeRedirectUrl('student', '/crm/leads')).toBe('/portal');
+
+      // Permitted student routes are honored
+      expect(getSafeRedirectUrl('student', '/portal')).toBe('/portal');
+      expect(getSafeRedirectUrl('student', '/portal/assignments')).toBe('/portal/assignments');
+      expect(getSafeRedirectUrl('student', '/certificate/verify/CRT-SAP-2026-001')).toBe('/certificate/verify/CRT-SAP-2026-001');
+      expect(getSafeRedirectUrl('student', '/accounts/receipts/REC-2026-001')).toBe('/accounts/receipts/REC-2026-001');
+    });
+
+    it('enforces onboarding team isolation boundary', () => {
+      expect(getSafeRedirectUrl('onboarding_team', '/dashboard')).toBe('/onboarding');
+      expect(getSafeRedirectUrl('onboarding_team', '/accounts/fees')).toBe('/onboarding');
+      expect(getSafeRedirectUrl('onboarding_team', '/onboarding')).toBe('/onboarding');
+      expect(getSafeRedirectUrl('onboarding_team', '/onboarding/tasks?id=123')).toBe('/onboarding/tasks?id=123');
+    });
+
+    it('enforces admin-only boundary for /settings, /audit-logs, and /users', () => {
+      // Super Admin and Admin allowed
+      expect(getSafeRedirectUrl('super_admin', '/settings')).toBe('/settings');
+      expect(getSafeRedirectUrl('admin', '/settings')).toBe('/settings');
+      expect(getSafeRedirectUrl('super_admin', '/audit-logs')).toBe('/audit-logs');
+      expect(getSafeRedirectUrl('admin', '/users')).toBe('/users');
+
+      // Non-admins denied and fall back to their role workspace
+      expect(getSafeRedirectUrl('accountant', '/settings')).toBe('/accounts/fees');
+      expect(getSafeRedirectUrl('trainer', '/audit-logs')).toBe('/academics/courses');
+      expect(getSafeRedirectUrl('counsellor', '/users')).toBe('/crm/leads');
+      expect(getSafeRedirectUrl('support', '/settings')).toBe('/support');
+    });
+
+    it('enforces super-admin only boundary for /todos probe console', () => {
+      expect(getSafeRedirectUrl('super_admin', '/todos')).toBe('/todos');
+      expect(getSafeRedirectUrl('admin', '/todos')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('accountant', '/todos')).toBe('/accounts/fees');
+      expect(getSafeRedirectUrl('trainer', '/todos')).toBe('/academics/courses');
+      expect(getSafeRedirectUrl('student', '/todos')).toBe('/portal');
+    });
+
+    it('defends against open redirect attacks and external protocols', () => {
+      expect(getSafeRedirectUrl('super_admin', 'https://malicious.com')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('super_admin', 'http://malicious.com')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('super_admin', '//malicious.com')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('super_admin', '/\\malicious.com')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('super_admin', '/test\\malicious.com')).toBe('/dashboard');
+      expect(getSafeRedirectUrl('super_admin', 'javascript:alert(1)')).toBe('/dashboard');
+    });
+
+    it('prevents redirect loops back to /login or /', () => {
+      expect(getSafeRedirectUrl('trainer', '/login')).toBe('/academics/courses');
+      expect(getSafeRedirectUrl('trainer', '/login?redirectTo=/dashboard')).toBe('/academics/courses');
+      expect(getSafeRedirectUrl('trainer', '/login/reset')).toBe('/academics/courses');
+      expect(getSafeRedirectUrl('trainer', '/')).toBe('/academics/courses');
+    });
+
+    it('prevents redirection to internal API endpoints', () => {
+      expect(getSafeRedirectUrl('accountant', '/api/settings')).toBe('/accounts/fees');
+      expect(getSafeRedirectUrl('trainer', '/api/courses')).toBe('/academics/courses');
+    });
+  });
 });
+

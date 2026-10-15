@@ -174,6 +174,20 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(res.status).toBe(200);
   });
 
+  it('allows authenticated student to access /accounts/receipts/:id for their payment receipt', async () => {
+    const cookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-student-01',
+        email: 'amit.gupta@student.next-gen.com',
+        role: 'student',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/accounts/receipts/rec-01', cookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(200);
+  });
+
   it('redirects authenticated student attempting to access /dashboard to /portal', async () => {
     const cookie = encodeURIComponent(
       JSON.stringify({
@@ -236,6 +250,132 @@ describe('8. Middleware & Session Verification Tests', () => {
     expect(res.status).toBe(307);
     const location = res.headers.get('location');
     expect(location).toContain('/support');
+  });
+
+  // =========================================================================
+  // 4b. FORENSIC AUDIT LOGS RBAC ISOLATION (/audit-logs)
+  // =========================================================================
+  it.each([
+    { role: 'trainer', expectedRedirect: '/academics/courses' },
+    { role: 'accountant', expectedRedirect: '/accounts/fees' },
+    { role: 'counsellor', expectedRedirect: '/crm/leads' },
+    { role: 'placement_coordinator', expectedRedirect: '/placement' },
+    { role: 'support', expectedRedirect: '/support' },
+    { role: 'student', expectedRedirect: '/portal' },
+    { role: 'onboarding_team', expectedRedirect: '/onboarding' },
+  ])(
+    'strictly prevents $role from accessing /audit-logs and redirects to $expectedRedirect',
+    async ({ role, expectedRedirect }) => {
+      const cookie = encodeURIComponent(
+        JSON.stringify({
+          id: `usr-${role}-test`,
+          email: `${role}@next-generpsolutions.com`,
+          role,
+        })
+      );
+      const req = createMockRequest('http://localhost:3000/audit-logs', cookie);
+      const res = await middleware(req);
+
+      expect(res.status).toBe(307);
+      const location = res.headers.get('location');
+      expect(location).toContain(expectedRedirect);
+    }
+  );
+
+  it.each(['admin', 'super_admin'])(
+    'allows authorized %s to access /audit-logs forensic system trail',
+    async (role) => {
+      const cookie = encodeURIComponent(
+        JSON.stringify({
+          id: `usr-${role}-test`,
+          email: `${role}@next-generpsolutions.com`,
+          role,
+        })
+      );
+      const req = createMockRequest('http://localhost:3000/audit-logs', cookie);
+      const res = await middleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('location')).toBeNull();
+    }
+  );
+
+  it('redirects unauthenticated visitor from /audit-logs to /login with redirectTo', async () => {
+    const req = createMockRequest('http://localhost:3000/audit-logs');
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+    expect(location).toContain('redirectTo=%2Faudit-logs');
+  });
+
+  // =========================================================================
+  // 4c. SUPER ADMIN DIAGNOSTIC PROBE CONSOLE (/todos)
+  // =========================================================================
+  it('allows authenticated super_admin to access /todos diagnostic probe console', async () => {
+    const cookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-super-01',
+        email: 'superadmin@next-generpsolutions.com',
+        role: 'super_admin',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/todos', cookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('redirects operational admin attempting to access /todos to /dashboard', async () => {
+    const cookie = encodeURIComponent(
+      JSON.stringify({
+        id: 'usr-admin-01',
+        email: 'admin@next-generpsolutions.com',
+        role: 'admin',
+      })
+    );
+    const req = createMockRequest('http://localhost:3000/todos', cookie);
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/dashboard');
+  });
+
+  it.each([
+    { role: 'trainer', expectedRedirect: '/academics/courses' },
+    { role: 'accountant', expectedRedirect: '/accounts/fees' },
+    { role: 'counsellor', expectedRedirect: '/crm/leads' },
+    { role: 'student', expectedRedirect: '/portal' },
+  ])(
+    'strictly prevents $role from accessing /todos and redirects to $expectedRedirect',
+    async ({ role, expectedRedirect }) => {
+      const cookie = encodeURIComponent(
+        JSON.stringify({
+          id: `usr-${role}-test`,
+          email: `${role}@next-generpsolutions.com`,
+          role,
+        })
+      );
+      const req = createMockRequest('http://localhost:3000/todos', cookie);
+      const res = await middleware(req);
+
+      expect(res.status).toBe(307);
+      const location = res.headers.get('location');
+      expect(location).toContain(expectedRedirect);
+    }
+  );
+
+  it('redirects unauthenticated visitor from /todos to /login with redirectTo', async () => {
+    const req = createMockRequest('http://localhost:3000/todos');
+    const res = await middleware(req);
+
+    expect(res.status).toBe(307);
+    const location = res.headers.get('location');
+    expect(location).toContain('/login');
+    expect(location).toContain('redirectTo=%2Ftodos');
   });
 
   // =========================================================================

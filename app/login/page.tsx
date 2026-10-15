@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, BookOpen, Eye, EyeOff, GraduationCap } from 'lucide-react';
+import { ArrowRight, BookOpen, Eye, EyeOff, GraduationCap, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
+import { getSafeRedirectUrl } from '@/lib/auth/rbac';
 import {
   generateAuthCookieSignature,
   AUTH_COOKIE_NAME,
@@ -95,6 +96,15 @@ const DEMO_ACCOUNTS = [
     badge: 'bg-cyan-100 text-cyan-800 border-cyan-300',
   },
   {
+    role: 'onboarding_team' as const,
+    label: 'Onboarding Team',
+    name: 'Sneha Patel (Student Onboarding Lead)',
+    email: 'onboarding@next-generpsolutions.com',
+    password: 'OnboardPass#2026',
+    route: '/onboarding',
+    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  },
+  {
     role: 'student' as const,
     label: 'Enrolled Student',
     name: 'Amit Gupta (SAP Student)',
@@ -107,7 +117,7 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -123,10 +133,16 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [activeRole, setActiveRole] = useState<string | null>(null);
+  const [targetRedirect, setTargetRedirect] = useState<string | null>(null);
 
   useEffect(() => {
     // Capture the callback before the auth client consumes its URL parameters.
     const query = new URLSearchParams(window.location.search);
+    const redirectToParam = query.get('redirectTo');
+    if (redirectToParam) {
+      setTargetRedirect(redirectToParam);
+    }
+
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const authError = query.get('error_description') || hash.get('error_description');
     const authErrorCode = query.get('error_code') || hash.get('error_code');
@@ -154,21 +170,27 @@ export default function LoginPage() {
 
     void supabase.auth.getSession().then(({ data, error: sessionError }) => {
       if (sessionError) {
-        setRecoveryMode(false);
-        setForgotPasswordMode(true);
-        setError(`Unable to verify the password reset link: ${sessionError.message}`);
+        if (isPasswordLink) {
+          setRecoveryMode(false);
+          setForgotPasswordMode(true);
+          setError(`Unable to verify the password reset link: ${sessionError.message}`);
+        } else {
+          console.warn('[Login] getSession warning:', sessionError.message);
+        }
         return;
       }
       if (authError || authErrorCode) return;
-      if (data.session && isPasswordLink) {
+      if (data?.session && isPasswordLink) {
         setRecoveryMode(true);
         setForgotPasswordMode(false);
         setAccountSetupMode(authType === 'invite');
-      } else if (isPasswordLink && !data.session) {
+      } else if (isPasswordLink && !data?.session) {
         setRecoveryMode(false);
         setForgotPasswordMode(true);
         setError('This reset link could not be verified. Request a fresh link and open it in the same browser.');
       }
+    }).catch((err) => {
+      console.warn('[Login] getSession exception:', err);
     });
 
     return () => authListener.subscription.unsubscribe();
@@ -186,7 +208,7 @@ export default function LoginPage() {
     setError('');
     setBusy(true);
     try {
-      await login(account.email, account.password);
+      await login(account.email, account.password, targetRedirect || undefined);
       await signCurrentAuthCookie();
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in. Please try again.');
@@ -201,7 +223,7 @@ export default function LoginPage() {
     setBusy(true);
 
     try {
-      const ok = await login(email, password);
+      const ok = await login(email, password, targetRedirect || undefined);
       if (!ok) {
         setError('Unable to sign in. Check your email and password and try again.');
       } else {
@@ -385,6 +407,63 @@ export default function LoginPage() {
           <>
           {notice && <p role="status" className="mt-3 rounded-lg bg-green-50 p-2.5 text-xs text-green-700">{notice}</p>}
 
+          {/* Deep link indicator banner */}
+          {targetRedirect && !user && (
+            <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs animate-in fade-in">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+                <div className="truncate">
+                  <p className="font-semibold text-amber-900 text-[11px]">Deep Link Redirection</p>
+                  <p className="text-[10px] text-amber-700 truncate">
+                    Signing in will open: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[10px] text-amber-900">{targetRedirect}</code>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetRedirect(null);
+                  if (typeof window !== 'undefined') {
+                    window.history.replaceState(null, '', '/login');
+                  }
+                }}
+                className="text-[10px] text-amber-800 hover:text-amber-950 font-medium underline px-1 shrink-0"
+                title="Dismiss deep link and navigate to default workspace on sign-in"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Active Session Indicator */}
+          {user && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs animate-in fade-in">
+              <div>
+                <p className="font-semibold text-blue-900 text-xs">Active Session Detected</p>
+                <p className="text-[11px] text-blue-700">
+                  Signed in as <strong>{user.full_name}</strong> ({user.role.replace('_', ' ')})
+                </p>
+                {targetRedirect && (
+                  <p className="text-[10px] text-blue-600 mt-0.5 truncate max-w-[220px]">
+                    Target: <code className="bg-blue-100/80 px-1 py-0.5 rounded font-mono text-[10px]">{getSafeRedirectUrl(user.role, targetRedirect)}</code>
+                  </p>
+                )}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="sap"
+                onClick={() => {
+                  const dest = getSafeRedirectUrl(user.role, targetRedirect);
+                  router.push(dest);
+                }}
+                className="text-xs py-1 h-8 shrink-0"
+              >
+                {targetRedirect ? 'Continue to Page \u2192' : 'Go to Workspace \u2192'}
+              </Button>
+            </div>
+          )}
+
           {/* Quick Demo Fill Buttons for ALL 8 ROLES */}
           <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
@@ -415,16 +494,21 @@ export default function LoginPage() {
 
             {activeRole && (
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px]">
-                <span className="text-slate-600">
-                  Ready as <strong className="text-blue-700">{DEMO_ACCOUNTS.find(a => a.role === activeRole)?.label}</strong>
-                </span>
+                <div className="text-slate-600 truncate mr-2">
+                  <span>Ready as <strong className="text-blue-700">{DEMO_ACCOUNTS.find(a => a.role === activeRole)?.label}</strong></span>
+                  {targetRedirect && (
+                    <span className="text-[10px] text-slate-500 block truncate">
+                      Redirect: <code className="text-blue-600 font-mono text-[10px]">{getSafeRedirectUrl(activeRole, targetRedirect)}</code>
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     const acc = DEMO_ACCOUNTS.find(a => a.role === activeRole);
                     if (acc) directLogin(acc);
                   }}
-                  className="font-bold text-blue-600 hover:text-blue-800 underline text-[11px]"
+                  className="font-bold text-blue-600 hover:text-blue-800 underline text-[11px] shrink-0"
                 >
                   Instant 1-Click Launch &rarr;
                 </button>
@@ -487,7 +571,25 @@ export default function LoginPage() {
                 Forgot password?
               </button>
             </div>
-            {error && <p role="alert" className="rounded-lg bg-red-50 p-2.5 text-xs text-red-700">{error}</p>}
+            {error && (
+              (error.startsWith('ONBOARDING_PENDING:') || error.includes('pending onboarding verification')) ? (
+                <div role="alert" className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-2 shadow-sm text-left animate-in fade-in duration-200">
+                  <div className="flex items-center space-x-2 font-bold text-amber-900 text-xs">
+                    <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                    <span>LMS Portal Account Pending Onboarding</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    {error.replace('ONBOARDING_PENDING:', '').trim()}
+                  </p>
+                  <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[10px] text-amber-700 font-medium">
+                    <span>Desk: onboarding@next-generpsolutions.com</span>
+                    <span>Student Helpline: +91 98765 43210</span>
+                  </div>
+                </div>
+              ) : (
+                <p role="alert" className="rounded-lg bg-red-50 p-2.5 text-xs text-red-700">{error}</p>
+              )
+            )}
             <Button type="submit" disabled={busy} className="h-11 w-full gap-2 rounded-xl text-xs">{busy ? 'Signing in…' : 'Sign in'}{!busy && <ArrowRight aria-hidden="true" size={16} />}</Button>
           </form>
           <p className="mt-5 text-center text-xs leading-5 text-slate-500">Need assistance or access issue?<br />Contact institute administrator at <span className="font-mono text-slate-700">admin@next-generpsolutions.com</span></p>

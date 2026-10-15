@@ -1,7 +1,6 @@
 import { store } from './data-store';
 import {
   StudentFeeAccount,
-  Installment,
   Payment,
   Receipt,
   Expense,
@@ -9,16 +8,24 @@ import {
   PaymentMethod,
   ExpenseCategory,
   ExpenseStatus,
+  StudentFee,
+  StudentPaymentRecord,
+  StudentFinancialLedgerEntry,
 } from '@/types';
 import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
-import { calculateGstBreakdown } from './gst-service';
+import { receiptAmounts } from './receipt-amounts';
 import { generateAndSaveReceiptPdf } from './pdf-service';
 import { dispatchMultiChannelNotification, buildReceiptEmailHtml } from './notification-service';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
+  if (typeof window !== 'undefined') {
+    const { paymentWorkflowClient } = await import('./payment-workflow-client');
+    await paymentWorkflowClient.refresh();
+    return [...store.feeAccounts];
+  }
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
@@ -39,6 +46,11 @@ export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
 }
 
 export async function getFeeAccountForStudent(studentId: string): Promise<StudentFeeAccount | undefined> {
+  if (typeof window !== 'undefined') {
+    const { paymentWorkflowClient } = await import('./payment-workflow-client');
+    await paymentWorkflowClient.refresh();
+    return store.feeAccounts.find((f) => f.student_id === studentId);
+  }
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
@@ -56,28 +68,6 @@ export async function getFeeAccountForStudent(studentId: string): Promise<Studen
     }
   }
   return store.feeAccounts.find((f) => f.student_id === studentId);
-}
-
-export async function getInstallmentsForAccount(feeAccountId: string): Promise<Installment[]> {
-  if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('installments')
-        .select('*')
-        .eq('fee_account_id', feeAccountId)
-        .order('installment_number', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        return data as Installment[];
-      }
-    } catch (err) {
-      console.warn('Supabase installments query error, checking local store:', err);
-    }
-  }
-  return store.installments
-    .filter((i) => i.fee_account_id === feeAccountId)
-    .sort((a, b) => a.installment_number - b.installment_number);
 }
 
 export async function getPayments(): Promise<Payment[]> {
@@ -149,6 +139,7 @@ export async function getReceiptById(receiptId: string): Promise<Receipt | undef
 
 // --- Atomic Payment Transaction ---
 export interface RecordPaymentInput {
+  payment_proof_url?: string;
   student_id: string;
   course_id: string;
   fee_account_id: string;
@@ -210,7 +201,7 @@ export async function recordPaymentAtomic(
     student_name: student.full_name,
     admission_number: student.admission_number,
     fee_account_id: feeAccount.id,
-    installment_id: input.installment_id,
+    installment_id: undefined,
     course_id: course?.id || feeAccount.course_id,
     course_name: course?.course_name || feeAccount.course_name,
     amount: input.amount,
@@ -243,55 +234,11 @@ export async function recordPaymentAtomic(
   student.outstanding_amount = newOutstandingAmount;
   student.updated_at = new Date().toISOString();
 
-  // 3. Update Installments
-  if (input.installment_id) {
-    const installment = store.installments.find((i) => i.id === input.installment_id);
-    if (installment) {
-      installment.paid_amount += input.amount;
-      installment.paid_date = input.payment_date;
-      installment.status = installment.paid_amount >= installment.amount ? 'Paid' : 'Partial';
-    }
-  } else {
-    // Automatically apply to oldest unpaid/due installment
-    let unapplied = input.amount;
-    const installments = store.installments
-      .filter((i) => i.fee_account_id === feeAccount.id && i.status !== 'Paid')
-      .sort((a, b) => a.installment_number - b.installment_number);
-
-    for (const inst of installments) {
-      const remainingForInst = inst.amount - inst.paid_amount;
-      if (unapplied >= remainingForInst) {
-        inst.paid_amount = inst.amount;
-        inst.paid_date = input.payment_date;
-        inst.status = 'Paid';
-        unapplied -= remainingForInst;
-      } else {
-        inst.paid_amount += unapplied;
-        inst.status = 'Partial';
-        unapplied = 0;
-        break;
-      }
-      if (unapplied <= 0) break;
-    }
-  }
-
-  // 4. Calculate GST Tax Breakdown & Generate Official Receipt
+  // Generate a receipt for the amount paid.
   const admission = store.admissions.find(
     (a) => a.id === student.admission_id || a.admission_number === student.admission_number
   );
-  const studentLoc =
-    student.state_code ||
-    student.state ||
-    admission?.state_code ||
-    admission?.state ||
-    admission?.city ||
-    admission?.address ||
-    student.address ||
-    'Telangana';
-  const gstDetails = calculateGstBreakdown(input.amount, studentLoc, {
-    customDocNumber: receiptNumber,
-    customDocDate: input.payment_date,
-  });
+  const receiptDetails = receiptAmounts(input.amount);
 
   const newReceipt: Receipt = {
     id: `rcpt-${Date.now()}`,
@@ -310,26 +257,26 @@ export async function recordPaymentAtomic(
     institute_name: store.settings.institute_name,
     institute_address: store.settings.address,
     institute_phone: store.settings.phone,
-    institute_gst: store.settings.gst_number,
+    institute_gst: '',
     created_at: new Date().toISOString(),
 
     // GST & e-Invoice Compliance
-    supply_type: gstDetails.supply_type,
-    place_of_supply: gstDetails.place_of_supply,
-    place_of_supply_code: gstDetails.place_of_supply_code,
-    sac_code: gstDetails.sac_code,
-    taxable_amount: gstDetails.taxable_amount,
-    cgst_rate: gstDetails.cgst_rate,
-    cgst_amount: gstDetails.cgst_amount,
-    sgst_rate: gstDetails.sgst_rate,
-    sgst_amount: gstDetails.sgst_amount,
-    igst_rate: gstDetails.igst_rate,
-    igst_amount: gstDetails.igst_amount,
-    total_tax: gstDetails.total_tax,
-    is_reverse_charge: gstDetails.is_reverse_charge,
-    irn: gstDetails.irn,
-    ack_no: gstDetails.ack_no,
-    ack_date: gstDetails.ack_date,
+    supply_type: receiptDetails.supply_type,
+    place_of_supply: receiptDetails.place_of_supply,
+    place_of_supply_code: receiptDetails.place_of_supply_code,
+    sac_code: receiptDetails.sac_code,
+    taxable_amount: receiptDetails.taxable_amount,
+    cgst_rate: receiptDetails.cgst_rate,
+    cgst_amount: receiptDetails.cgst_amount,
+    sgst_rate: receiptDetails.sgst_rate,
+    sgst_amount: receiptDetails.sgst_amount,
+    igst_rate: receiptDetails.igst_rate,
+    igst_amount: receiptDetails.igst_amount,
+    total_tax: receiptDetails.total_tax,
+    is_reverse_charge: receiptDetails.is_reverse_charge,
+    irn: receiptDetails.irn,
+    ack_no: receiptDetails.ack_no,
+    ack_date: receiptDetails.ack_date,
     pdf_url: `/api/receipts/${receiptNumber}/pdf`,
   };
 
@@ -346,6 +293,118 @@ export async function recordPaymentAtomic(
   // 6. Commit to Store & schedule persistence
   store.payments.unshift(newPayment);
   store.receipts.unshift(newReceipt);
+
+  // 6b. Dual-Ledger Sync: Synchronize with Advanced StudentFees, StudentPayments, and StudentFinancialLedgers
+  if (!store.studentFees) store.studentFees = [];
+  let matchingStudentFee = store.studentFees.find(
+    (sf) =>
+      sf.student_id === student.id &&
+      (sf.course_id === feeAccount.course_id || sf.id === `fee-${feeAccount.id}` || sf.id === feeAccount.id.replace('fa-', ''))
+  );
+
+  if (!matchingStudentFee) {
+    matchingStudentFee = store.studentFees.find((sf) => sf.student_id === student.id);
+  }
+
+  if (matchingStudentFee) {
+    matchingStudentFee.paid_amount = Number((matchingStudentFee.paid_amount + input.amount).toFixed(2));
+    matchingStudentFee.outstanding_amount = Math.max(0, Number((matchingStudentFee.final_payable - matchingStudentFee.paid_amount).toFixed(2)));
+    matchingStudentFee.updated_at = new Date().toISOString();
+  } else {
+    matchingStudentFee = {
+      id: `fee-${feeAccount.id}`,
+      student_id: student.id,
+      student_name: student.full_name,
+      student_code: student.student_code || student.id,
+      admission_number: student.admission_number,
+      fee_category: 'Course Fee',
+      reference_type: 'Course',
+      reference_id: feeAccount.course_id,
+      course_id: feeAccount.course_id,
+      course_name: feeAccount.course_name,
+      standard_fee: feeAccount.original_fee,
+      proposed_fee: feeAccount.original_fee,
+      discount_amount: feeAccount.discount,
+      discount_percentage: feeAccount.original_fee > 0 ? Number(((feeAccount.discount / feeAccount.original_fee) * 100).toFixed(2)) : 0,
+      discount_reason: feeAccount.discount_reason,
+      tax_gst_amount: 0,
+      additional_charges: 0,
+      final_payable: feeAccount.net_payable,
+      paid_amount: newPaidAmount,
+      outstanding_amount: newOutstandingAmount,
+      payment_plan: (feeAccount.payment_plan as any) || 'Custom',
+      number_of_installments: 0,
+      first_due_date: new Date().toISOString().slice(0, 10),
+      counsellor_id: 'usr-counsellor',
+      counsellor_name: 'Counsellor Staff',
+      approval_status: 'Approved',
+      approved_by: collectorUserId,
+      approved_by_name: collector?.full_name || 'Accounts Staff',
+      approved_at: new Date().toISOString(),
+      approved_fee: feeAccount.original_fee,
+      approved_discount: feeAccount.discount,
+      approved_tax: 0,
+      approved_total: feeAccount.net_payable,
+      version: 1,
+      is_payable: true,
+      created_at: feeAccount.created_at,
+      updated_at: new Date().toISOString(),
+    };
+    store.studentFees.unshift(matchingStudentFee);
+  }
+
+  // Record in store.studentPayments as Verified
+  if (!store.studentPayments) store.studentPayments = [];
+  const existingSpr = store.studentPayments.find(
+    (sp) => sp.id === newPayment.id || (sp.receipt_number && sp.receipt_number === receiptNumber)
+  );
+  if (!existingSpr) {
+    const studentPaymentRec: StudentPaymentRecord = {
+      id: `spr-${newPayment.id}`,
+      fee_id: matchingStudentFee.id,
+      installment_id: undefined,
+      student_id: student.id,
+      student_name: student.full_name,
+      admission_number: student.admission_number,
+      fee_category: matchingStudentFee.fee_category || 'Course Fee',
+      amount_paid: input.amount,
+      payment_date: input.payment_date,
+      payment_mode: input.payment_mode,
+      transaction_reference: input.transaction_reference,
+      receipt_number: receiptNumber,
+      notes: input.notes,
+      payment_proof_url: input.payment_proof_url,
+      recorded_by: collectorUserId,
+      recorded_by_name: collector?.full_name || 'Accounts Department',
+      recorded_by_role: collector?.role || 'accountant',
+      verification_status: 'Verified',
+      verified_by: collectorUserId,
+      verified_by_name: collector?.full_name || 'Accounts Department',
+      verified_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+    store.studentPayments.unshift(studentPaymentRec);
+  }
+
+  // Record in store.studentFinancialLedgers
+  if (!store.studentFinancialLedgers) store.studentFinancialLedgers = [];
+  store.studentFinancialLedgers.push({
+    id: `sfl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    student_id: student.id,
+    entry_date: input.payment_date,
+    entry_type: 'Payment Verified',
+    fee_category: matchingStudentFee.fee_category || 'Course Fee',
+    reference_type: 'Course',
+    reference_id: newPayment.id,
+    debit: 0,
+    credit: input.amount,
+    running_balance: newOutstandingAmount,
+    description: `Verified ${input.payment_mode} payment (${receiptNumber}) for ${matchingStudentFee.fee_category || 'Course Fee'}`,
+    recorded_by: collectorUserId,
+    receipt_id: newReceipt.id,
+    created_at: new Date().toISOString(),
+  });
+
   store.persist();
 
   // Direct Supabase queries utilizing PostgreSQL schema migrations
@@ -559,6 +618,26 @@ export async function approveExpense(
   if (!exp) throw new Error('Expense not found');
 
   const approver = store.users.find((u) => u.id === approverUserId);
+  if (!approver) {
+    throw new Error('Approver user profile not found');
+  }
+
+  // Multi-Level Approval SOP:
+  // Expenses <= 50,000: Accountant / Admin / Super Admin
+  // Expenses > 50,000: Super Admin (Director) strictly required
+  if (exp.amount > 50000 && approver.role !== 'super_admin') {
+    throw new Error(
+      `Approval Policy Violation: Expenses exceeding ₹50,000 (₹${exp.amount.toLocaleString(
+        'en-IN'
+      )}) require Super Admin (Director) authorization.`
+    );
+  }
+
+  const allowedRoles = ['super_admin', 'admin', 'accountant'];
+  if (!allowedRoles.includes(approver.role)) {
+    throw new Error('Access Denied: Only accounts staff or administrators can approve expenditures.');
+  }
+
   exp.status = 'Approved';
   exp.approved_by = approverUserId;
   exp.approved_by_name = approver?.full_name;
@@ -588,7 +667,171 @@ export async function approveExpense(
     action: 'EXPENSE_APPROVED',
     module: 'FINANCE',
     record_id: expenseId,
-    new_value: { status: 'Approved' },
+    new_value: { status: 'Approved', amount: exp.amount },
+  });
+
+  return exp;
+}
+
+export async function markExpenseAsPaid(
+  expenseId: string,
+  disburserUserId: string,
+  details: {
+    payment_mode: PaymentMethod;
+    reference: string;
+    expense_date?: string;
+  }
+): Promise<Expense> {
+  const exp = store.expenses.find((e) => e.id === expenseId);
+  if (!exp) throw new Error('Expense not found');
+
+  const disburser = store.users.find((u) => u.id === disburserUserId);
+  if (!disburser) {
+    throw new Error('Disburser user profile not found');
+  }
+
+  const allowedRoles = ['super_admin', 'admin', 'accountant'];
+  if (!allowedRoles.includes(disburser.role)) {
+    throw new Error('Access Denied: Only accounts staff or administrators can disburse expenditures.');
+  }
+
+  if (!details.reference || !details.reference.trim()) {
+    throw new Error('Mandatory reference: Bank UTR or transaction reference is required for payment disbursement.');
+  }
+
+  const prevStatus = exp.status;
+  exp.status = 'Paid';
+  exp.payment_mode = details.payment_mode;
+  exp.reference = details.reference.trim();
+  if (details.expense_date) {
+    exp.expense_date = details.expense_date;
+  }
+  exp.paid_by = disburserUserId;
+  exp.paid_by_name = disburser.full_name;
+  exp.updated_at = new Date().toISOString();
+
+  // If tagged to a vendor, update vendor total_paid
+  if (exp.vendor_id) {
+    const vendor = store.vendors.find((v) => v.id === exp.vendor_id);
+    if (vendor) {
+      vendor.total_paid = (vendor.total_paid || 0) + exp.amount;
+    }
+  }
+
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('expenses')
+        .update({
+          status: 'Paid',
+          payment_mode: exp.payment_mode,
+          reference: exp.reference,
+          paid_by: exp.paid_by,
+          updated_at: exp.updated_at,
+        })
+        .eq('id', expenseId);
+    } catch (err) {
+      console.warn('Supabase markExpenseAsPaid warning, preserved locally:', err);
+    }
+  }
+
+  await recordAuditLog({
+    user_id: disburserUserId,
+    user_name: disburser.full_name || 'Accounts Staff',
+    user_role: disburser.role || 'accountant',
+    action: 'EXPENSE_PAID',
+    module: 'FINANCE',
+    record_id: expenseId,
+    old_value: { status: prevStatus },
+    new_value: {
+      status: 'Paid',
+      amount: exp.amount,
+      mode: exp.payment_mode,
+      reference: exp.reference,
+    },
+  });
+
+  return exp;
+}
+
+export async function rejectExpense(
+  expenseId: string,
+  reviewerUserId: string,
+  reason: string
+): Promise<Expense> {
+  const exp = store.expenses.find((e) => e.id === expenseId);
+  if (!exp) throw new Error('Expense not found');
+
+  const reviewer = store.users.find((u) => u.id === reviewerUserId);
+  if (!reviewer) {
+    throw new Error('Reviewer user profile not found');
+  }
+
+  const allowedRoles = ['super_admin', 'admin', 'accountant'];
+  if (!allowedRoles.includes(reviewer.role)) {
+    throw new Error('Access Denied: Only accounts staff or administrators can reject expenditures.');
+  }
+
+  const prevStatus = exp.status;
+  exp.status = 'Rejected';
+  exp.updated_at = new Date().toISOString();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('expenses')
+        .update({
+          status: 'Rejected',
+          updated_at: exp.updated_at,
+        })
+        .eq('id', expenseId);
+    } catch (err) {
+      console.warn('Supabase rejectExpense warning, preserved locally:', err);
+    }
+  }
+
+  await recordAuditLog({
+    user_id: reviewerUserId,
+    user_name: reviewer.full_name || 'Reviewer',
+    user_role: reviewer.role || 'super_admin',
+    action: 'EXPENSE_REJECTED',
+    module: 'FINANCE',
+    record_id: expenseId,
+    old_value: { status: prevStatus },
+    new_value: { status: 'Rejected', reason },
+  });
+
+  return exp;
+}
+
+export async function submitExpenseForApproval(
+  expenseId: string,
+  userId: string
+): Promise<Expense> {
+  const exp = store.expenses.find((e) => e.id === expenseId);
+  if (!exp) throw new Error('Expense not found');
+  if (exp.status !== 'Draft') {
+    throw new Error('Only draft expenses can be submitted for approval.');
+  }
+
+  const user = store.users.find((u) => u.id === userId);
+  exp.status = 'Pending Approval';
+  exp.updated_at = new Date().toISOString();
+  store.persist();
+
+  await recordAuditLog({
+    user_id: userId,
+    user_name: user?.full_name || 'Staff',
+    user_role: user?.role || 'staff',
+    action: 'EXPENSE_SUBMITTED',
+    module: 'FINANCE',
+    record_id: expenseId,
+    new_value: { status: 'Pending Approval', amount: exp.amount },
   });
 
   return exp;
@@ -615,7 +858,10 @@ export async function getVendors(): Promise<Vendor[]> {
   return [...store.vendors];
 }
 
-export async function createVendor(data: Omit<Vendor, 'id' | 'total_paid' | 'created_at'>): Promise<Vendor> {
+export async function createVendor(
+  data: Omit<Vendor, 'id' | 'total_paid' | 'created_at'>,
+  userId?: string
+): Promise<Vendor> {
   const vendor: Vendor = {
     ...data,
     id: `ven-${Date.now()}`,
@@ -625,28 +871,189 @@ export async function createVendor(data: Omit<Vendor, 'id' | 'total_paid' | 'cre
   store.vendors.push(vendor);
   store.persist();
 
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const supabase = createClient();
+        await supabase.from('vendors').insert({
+          id: vendor.id,
+          vendor_name: vendor.vendor_name,
+          contact_person: vendor.contact_person,
+          phone: vendor.phone,
+          email: vendor.email,
+          address: vendor.address,
+          gst_number: vendor.gst_number,
+          pan_number: vendor.pan_number,
+          tds_section: vendor.tds_section,
+          tds_rate: vendor.tds_rate,
+          bank_name: vendor.bank_name,
+          bank_account_number: vendor.bank_account_number,
+          bank_ifsc: vendor.bank_ifsc,
+          notes: vendor.notes,
+          is_active: vendor.is_active ?? true,
+          status: vendor.status || 'Active',
+        });
+      } catch (err) {
+        console.warn('Supabase vendor direct insert warning, preserved locally:', err);
+      }
+    }
+
+    const user = userId ? store.users.find((u) => u.id === userId) : undefined;
+    await recordAuditLog({
+      user_id: userId || 'system',
+      user_name: user?.full_name || 'Accounts Staff',
+      user_role: user?.role || 'accountant',
+      action: 'VENDOR_CREATED',
+      module: 'FINANCE',
+      record_id: vendor.id,
+      new_value: {
+        vendor_name: vendor.vendor_name,
+        gst_number: vendor.gst_number,
+        pan_number: vendor.pan_number,
+        tds_section: vendor.tds_section,
+        tds_rate: vendor.tds_rate,
+      },
+    });
+
+    return vendor;
+  }
+
+  export async function updateVendor(
+    id: string,
+    data: Partial<Vendor>,
+    userId?: string
+  ): Promise<Vendor> {
+    const vendor = store.vendors.find((v) => v.id === id);
+    if (!vendor) throw new Error('Vendor not found');
+
+    const oldValues = { ...vendor };
+    Object.assign(vendor, data, { updated_at: new Date().toISOString() });
+    store.persist();
+
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const supabase = createClient();
+        await supabase.from('vendors').update({
+          vendor_name: vendor.vendor_name,
+          contact_person: vendor.contact_person,
+          phone: vendor.phone,
+          email: vendor.email,
+          address: vendor.address,
+          gst_number: vendor.gst_number,
+          pan_number: vendor.pan_number,
+          tds_section: vendor.tds_section,
+          tds_rate: vendor.tds_rate,
+          bank_name: vendor.bank_name,
+          bank_account_number: vendor.bank_account_number,
+          bank_ifsc: vendor.bank_ifsc,
+          notes: vendor.notes,
+          is_active: vendor.is_active,
+          status: vendor.status,
+          updated_at: vendor.updated_at,
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Supabase vendor update warning, preserved locally:', err);
+      }
+    }
+
+  const user = userId ? store.users.find((u) => u.id === userId) : undefined;
+  await recordAuditLog({
+    user_id: userId || 'system',
+    user_name: user?.full_name || 'Accounts Staff',
+    user_role: user?.role || 'accountant',
+    action: 'VENDOR_UPDATED',
+    module: 'FINANCE',
+    record_id: vendor.id,
+    old_value: oldValues,
+    new_value: data,
+  });
+
+  return vendor;
+}
+
+export async function archiveVendor(
+  id: string,
+  archive: boolean = true,
+  userId?: string
+): Promise<Vendor> {
+  const vendor = store.vendors.find((v) => v.id === id);
+  if (!vendor) throw new Error('Vendor not found');
+
+  vendor.status = archive ? 'Archived' : 'Active';
+  vendor.is_active = !archive;
+  vendor.updated_at = new Date().toISOString();
+  store.persist();
+
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      await supabase.from('vendors').insert({
-        id: vendor.id,
-        vendor_name: vendor.vendor_name,
-        contact_person: vendor.contact_person,
-        phone: vendor.phone,
-        email: vendor.email,
-        address: vendor.address,
-        gst_number: vendor.gst_number,
-        bank_name: vendor.bank_name,
-        bank_account_number: vendor.bank_account_number,
-        bank_ifsc: vendor.bank_ifsc,
-        notes: vendor.notes,
-      });
+      await supabase.from('vendors').update({
+        status: vendor.status,
+        is_active: vendor.is_active,
+        updated_at: vendor.updated_at,
+      }).eq('id', id);
     } catch (err) {
-      console.warn('Supabase vendor direct insert warning, preserved locally:', err);
+      console.warn('Supabase vendor archive warning, preserved locally:', err);
     }
   }
 
+  const user = userId ? store.users.find((u) => u.id === userId) : undefined;
+  await recordAuditLog({
+    user_id: userId || 'system',
+    user_name: user?.full_name || 'Accounts Staff',
+    user_role: user?.role || 'accountant',
+    action: archive ? 'VENDOR_ARCHIVED' : 'VENDOR_RESTORED',
+    module: 'FINANCE',
+    record_id: vendor.id,
+    new_value: { status: vendor.status },
+  });
+
   return vendor;
+}
+
+export async function deleteVendor(id: string, userId?: string): Promise<boolean> {
+  const index = store.vendors.findIndex((v) => v.id === id);
+  if (index === -1) return false;
+
+  const vendor = store.vendors[index];
+  const hasExpenses = (store.expenses || []).some((e) => e.vendor_id === id);
+  if (hasExpenses) {
+    store.vendors[index].status = 'Archived';
+    store.vendors[index].is_active = false;
+    store.vendors[index].updated_at = new Date().toISOString();
+  } else {
+    store.vendors.splice(index, 1);
+  }
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      if (hasExpenses) {
+        await supabase.from('vendors').update({
+          status: 'Archived',
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        }).eq('id', id);
+      } else {
+        await supabase.from('vendors').delete().eq('id', id);
+      }
+    } catch (err) {
+      console.warn('Supabase vendor delete warning, preserved locally:', err);
+    }
+  }
+
+  const user = userId ? store.users.find((u) => u.id === userId) : undefined;
+  await recordAuditLog({
+    user_id: userId || 'system',
+    user_name: user?.full_name || 'Accounts Staff',
+    user_role: user?.role || 'accountant',
+    action: hasExpenses ? 'VENDOR_SOFT_ARCHIVED' : 'VENDOR_DELETED',
+    module: 'FINANCE',
+    record_id: id,
+    old_value: { vendor_name: vendor.vendor_name, had_expenses: hasExpenses },
+  });
+
+  return true;
 }
 
 // --- Finance Analytics & Dashboard Aggregations ---
@@ -667,10 +1074,6 @@ export async function getFinanceDashboardMetrics() {
   const monthlyCollections = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
 
   const totalOutstanding = store.feeAccounts.reduce((sum, f) => sum + f.outstanding_amount, 0);
-
-  const overdueInstallments = store.installments
-    .filter((i) => i.status === 'Overdue' || (i.status === 'Due' && i.due_date < todayStr))
-    .reduce((sum, i) => sum + (i.amount - i.paid_amount), 0);
 
   // Expenses
   const monthlyExpensesList = store.expenses.filter((e) => {
@@ -698,7 +1101,6 @@ export async function getFinanceDashboardMetrics() {
     todayCollections,
     monthlyCollections,
     totalOutstanding,
-    overdueInstallments,
     monthlyExpenses,
     totalRefunds: 0,
     netCashFlow,
@@ -706,3 +1108,77 @@ export async function getFinanceDashboardMetrics() {
     paymentModeMap,
   };
 }
+
+export type TemporalPeriod =
+  | 'ALL_TIME'
+  | 'CURRENT_MONTH'
+  | 'LAST_MONTH'
+  | 'FY_2025_26'
+  | 'FY_2026_27'
+  | 'Q1'
+  | 'Q2'
+  | 'Q3'
+  | 'Q4'
+  | 'CUSTOM';
+
+export function getDateRangeForPeriod(
+  period: TemporalPeriod,
+  customStart?: string,
+  customEnd?: string
+): { start?: string; end?: string; label: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  switch (period) {
+    case 'CURRENT_MONTH': {
+      const start = new Date(year, month, 1).toISOString().slice(0, 10);
+      const end = new Date(year, month + 1, 0).toISOString().slice(0, 10);
+      return {
+        start,
+        end,
+        label: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      };
+    }
+    case 'LAST_MONTH': {
+      const start = new Date(year, month - 1, 1).toISOString().slice(0, 10);
+      const end = new Date(year, month, 0).toISOString().slice(0, 10);
+      const lastMonthDate = new Date(year, month - 1, 1);
+      return {
+        start,
+        end,
+        label: lastMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      };
+    }
+    case 'FY_2025_26':
+      return { start: '2025-04-01', end: '2026-03-31', label: 'FY 2025-26 (Apr 2025 - Mar 2026)' };
+    case 'FY_2026_27':
+      return { start: '2026-04-01', end: '2027-03-31', label: 'FY 2026-27 (Apr 2026 - Mar 2027)' };
+    case 'Q1': {
+      const fyYear = month < 3 ? year - 1 : year;
+      return { start: `${fyYear}-04-01`, end: `${fyYear}-06-30`, label: `Q1 (${fyYear}) Apr - Jun` };
+    }
+    case 'Q2': {
+      const fyYear = month < 3 ? year - 1 : year;
+      return { start: `${fyYear}-07-01`, end: `${fyYear}-09-30`, label: `Q2 (${fyYear}) Jul - Sep` };
+    }
+    case 'Q3': {
+      const fyYear = month < 3 ? year - 1 : year;
+      return { start: `${fyYear}-10-01`, end: `${fyYear}-12-31`, label: `Q3 (${fyYear}) Oct - Dec` };
+    }
+    case 'Q4': {
+      const fyYear = month < 3 ? year : year + 1;
+      return { start: `${fyYear}-01-01`, end: `${fyYear}-03-31`, label: `Q4 (${fyYear}) Jan - Mar` };
+    }
+    case 'CUSTOM':
+      return {
+        start: customStart,
+        end: customEnd,
+        label: `Custom (${customStart || 'Earliest'} to ${customEnd || 'Latest'})`,
+      };
+    case 'ALL_TIME':
+    default:
+      return { label: 'All-Time Records' };
+  }
+}
+

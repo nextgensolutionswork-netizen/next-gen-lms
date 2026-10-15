@@ -29,6 +29,7 @@ interface FileUploadProps {
   value?: string;
   onChange?: (url: string, result?: UploadResult) => void;
   onRemove?: () => void;
+  onUploadingChange?: (uploading: boolean) => void;
   className?: string;
   compact?: boolean;
 }
@@ -41,6 +42,7 @@ export function FileUpload({
   value,
   onChange,
   onRemove,
+  onUploadingChange,
   className = '',
   compact = false,
 }: FileUploadProps) {
@@ -58,6 +60,7 @@ export function FileUpload({
   }, [value]);
 
   const handleFileProcess = async (file: File) => {
+    if (isUploading) return;
     setUploadError(null);
 
     // Client-side validation
@@ -68,6 +71,7 @@ export function FileUpload({
     }
 
     setIsUploading(true);
+    onUploadingChange?.(true);
 
     try {
       // 1. Try uploading via /api/upload
@@ -76,7 +80,7 @@ export function FileUpload({
       formData.append('bucket', bucket);
       if (entityId) formData.append('entityId', entityId);
 
-      const res = await fetch('/api/upload', {
+      const res = await fetch(bucket === 'payment-proofs' ? '/api/fees/proof' : '/api/upload', {
         method: 'POST',
         body: formData,
       });
@@ -88,6 +92,11 @@ export function FileUpload({
           onChange?.(data.url, data);
           return;
         }
+      }
+
+      if (bucket === 'payment-proofs') {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Payment proof upload failed. Please retry.');
       }
 
       // 2. Direct client fallback via storage-service
@@ -106,6 +115,7 @@ export function FileUpload({
       setUploadError(err?.message || 'Failed to upload file. Please try again.');
     } finally {
       setIsUploading(false);
+      onUploadingChange?.(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -211,6 +221,16 @@ export function FileUpload({
         </label>
       )}
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={bucketConfig.allowedExtensions.join(',')}
+        onChange={handleInputChange}
+        className="hidden"
+        disabled={isUploading}
+        aria-label={label || 'Attach file'}
+      />
+
       {currentUrl ? (
         // Active Uploaded Preview Box
         <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
@@ -243,6 +263,7 @@ export function FileUpload({
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
               className="text-xs h-7"
             >
               Replace
@@ -250,6 +271,7 @@ export function FileUpload({
             <button
               type="button"
               onClick={handleClear}
+              disabled={isUploading}
               className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
               title="Remove file"
             >
@@ -270,15 +292,6 @@ export function FileUpload({
               : 'border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50'
           }`}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={bucketConfig.allowedExtensions.join(',')}
-            onChange={handleInputChange}
-            className="hidden"
-            disabled={isUploading}
-          />
-
           <div className="flex flex-col items-center justify-center space-y-2">
             <div className="h-10 w-10 rounded-full bg-blue-100 text-[#0A6ED1] flex items-center justify-center">
               {isUploading ? (

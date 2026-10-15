@@ -4,6 +4,12 @@ import {
   recordQuizAttempt,
   submitQuizAnswers,
   isLessonUnlocked,
+  createQuiz,
+  updateQuiz,
+  deleteQuiz,
+  createQuizQuestion,
+  updateQuizQuestion,
+  deleteQuizQuestion,
 } from '@/lib/services/academics-service';
 import { store } from '@/lib/services/data-store';
 import { Quiz, QuizQuestion, LessonProgress, Lesson } from '@/types';
@@ -460,6 +466,271 @@ describe('Portal Assessments & Prerequisite Locking System', () => {
 
       // Bob has NOT completed Lesson 1; Lesson 2 must be LOCKED for Bob
       expect(isLessonUnlocked(1, mockLessons, studentB, progressList)).toBe(false);
+    });
+  });
+
+  describe('5. Assessment & Question Management (CRUD & Persistence)', () => {
+    it('creates a new quiz with auto-generated id, questions_count 0, and persists to store', async () => {
+      const created = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'New S/4HANA Asset Accounting Quiz',
+        description: 'Covers depreciation keys, asset classes, and AUC settlement.',
+        duration_minutes: 40,
+        pass_percentage: 80,
+        attempts_allowed: 2,
+        randomize_questions: true,
+        show_answers_after: true,
+        status: 'Published',
+      });
+
+      expect(created.id).toBeDefined();
+      expect(created.questions_count).toBe(0);
+      expect(created.title).toBe('New S/4HANA Asset Accounting Quiz');
+      const inStore = store.quizzes.find((q) => q.id === created.id);
+      expect(inStore).toBeDefined();
+      expect(inStore?.duration_minutes).toBe(40);
+    });
+
+    it('updates quiz metadata and persists changes', async () => {
+      const quiz = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'Draft Quiz',
+        description: 'Draft notes',
+        duration_minutes: 30,
+        pass_percentage: 70,
+        attempts_allowed: 1,
+        randomize_questions: false,
+        show_answers_after: false,
+        status: 'Draft',
+      });
+
+      const updated = await updateQuiz(quiz.id, {
+        title: 'Published Quiz V2',
+        duration_minutes: 60,
+        pass_percentage: 75,
+        status: 'Published',
+      });
+
+      expect(updated.title).toBe('Published Quiz V2');
+      expect(updated.duration_minutes).toBe(60);
+      expect(updated.pass_percentage).toBe(75);
+      expect(updated.status).toBe('Published');
+
+      const inStore = store.quizzes.find((q) => q.id === quiz.id);
+      expect(inStore?.title).toBe('Published Quiz V2');
+    });
+
+    it('creates MCQ questions with point weightage, increments quiz.questions_count, and persists', async () => {
+      const quiz = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'Controlling & Cost Center Quiz',
+        description: 'CO-OM testing',
+        duration_minutes: 25,
+        pass_percentage: 70,
+        attempts_allowed: 2,
+        randomize_questions: true,
+        show_answers_after: true,
+        status: 'Published',
+      });
+
+      const q1 = await createQuizQuestion(
+        quiz.id,
+        'Which transaction is used to create a Cost Center in SAP?',
+        [
+          { id: 'opt-a', text: 'KS01', is_correct: true },
+          { id: 'opt-b', text: 'FS00', is_correct: false },
+          { id: 'opt-c', text: 'MM01', is_correct: false },
+          { id: 'opt-d', text: 'VA01', is_correct: false },
+        ],
+        5,
+        'KS01 is the standard tcode for creating cost centers in SAP CO.'
+      );
+
+      expect(q1.id).toBeDefined();
+      expect(q1.quiz_id).toBe(quiz.id);
+      expect(q1.points).toBe(5);
+      expect(q1.options).toHaveLength(4);
+      expect(quiz.questions_count).toBe(1);
+
+      const inStoreQ = store.quizQuestions.find((q) => q.id === q1.id);
+      expect(inStoreQ).toBeDefined();
+      expect(inStoreQ?.question_text).toContain('Cost Center');
+    });
+
+    it('updates quiz question options, points, and explanation', async () => {
+      const quiz = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'CO-PA Assessment',
+        description: 'Profitability analysis',
+        duration_minutes: 30,
+        pass_percentage: 70,
+        attempts_allowed: 2,
+        randomize_questions: true,
+        show_answers_after: true,
+        status: 'Published',
+      });
+
+      const q = await createQuizQuestion(
+        quiz.id,
+        'What are the two forms of CO-PA?',
+        [
+          { id: 'opt-a', text: 'Costing-based and Account-based', is_correct: true },
+          { id: 'opt-b', text: 'Internal and External', is_correct: false },
+        ],
+        2
+      );
+
+      const updatedQ = await updateQuizQuestion(q.id, {
+        points: 10,
+        explanation: 'S/4HANA recommends account-based CO-PA with extension ledger integration.',
+      });
+
+      expect(updatedQ.points).toBe(10);
+      expect(updatedQ.explanation).toContain('extension ledger');
+
+      const inStoreQ = store.quizQuestions.find((item) => item.id === q.id);
+      expect(inStoreQ?.points).toBe(10);
+      expect(inStoreQ?.explanation).toContain('extension ledger');
+    });
+
+    it('deletes a quiz question, decrements quiz.questions_count, and removes from store', async () => {
+      const quiz = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'Temporary Quiz',
+        description: 'Temp',
+        duration_minutes: 15,
+        pass_percentage: 60,
+        attempts_allowed: 1,
+        randomize_questions: false,
+        show_answers_after: true,
+        status: 'Published',
+      });
+
+      const q = await createQuizQuestion(
+        quiz.id,
+        'Temporary question to delete',
+        [
+          { id: 'opt-a', text: 'Yes', is_correct: true },
+          { id: 'opt-b', text: 'No', is_correct: false },
+        ],
+        1
+      );
+
+      expect(quiz.questions_count).toBe(1);
+
+      const deleted = await deleteQuizQuestion(q.id);
+      expect(deleted).toBe(true);
+      expect(quiz.questions_count).toBe(0);
+      expect(store.quizQuestions.find((item) => item.id === q.id)).toBeUndefined();
+    });
+
+    it('deletes a quiz and cascade-deletes all associated questions and attempts', async () => {
+      const quiz = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'Cascade Deletion Test Quiz',
+        description: 'Testing cascade removal',
+        duration_minutes: 20,
+        pass_percentage: 70,
+        attempts_allowed: 1,
+        randomize_questions: false,
+        show_answers_after: true,
+        status: 'Published',
+      });
+
+      const q1 = await createQuizQuestion(quiz.id, 'Q1', [{ id: '1', text: 'A', is_correct: true }]);
+      const q2 = await createQuizQuestion(quiz.id, 'Q2', [{ id: '2', text: 'B', is_correct: true }]);
+
+      expect(store.quizQuestions.filter((q) => q.quiz_id === quiz.id)).toHaveLength(2);
+
+      const deleted = await deleteQuiz(quiz.id);
+      expect(deleted).toBe(true);
+      expect(store.quizzes.find((qz) => qz.id === quiz.id)).toBeUndefined();
+      expect(store.quizQuestions.filter((q) => q.quiz_id === quiz.id)).toHaveLength(0);
+    });
+
+    it('rejects createQuiz when title or course are missing or invalid', async () => {
+      // Missing title
+      await expect(
+        createQuiz({
+          course_id: 'crs-fico-01',
+          title: '   ',
+          duration_minutes: 20,
+          pass_percentage: 70,
+        })
+      ).rejects.toThrow(/title is required/i);
+
+      // Missing course_id
+      await expect(
+        createQuiz({
+          course_id: '',
+          title: 'Valid Title',
+          duration_minutes: 20,
+          pass_percentage: 70,
+        })
+      ).rejects.toThrow(/course is required/i);
+
+      // Non-existent course_id
+      await expect(
+        createQuiz({
+          course_id: 'crs-nonexistent-999',
+          title: 'Valid Title',
+          duration_minutes: 20,
+          pass_percentage: 70,
+        })
+      ).rejects.toThrow(/course not found/i);
+    });
+
+    it('rejects createQuizQuestion when text is empty or no options are marked correct', async () => {
+      const quiz = await createQuiz({
+        course_id: 'crs-fico-01',
+        title: 'Validation Test Quiz',
+        duration_minutes: 15,
+        pass_percentage: 70,
+      });
+
+      // Missing text
+      await expect(
+        createQuizQuestion(quiz.id, '  ', [{ id: '1', text: 'A', is_correct: true }])
+      ).rejects.toThrow(/question text is required/i);
+
+      // Empty options
+      await expect(
+        createQuizQuestion(quiz.id, 'Valid text', [])
+      ).rejects.toThrow(/at least one option is required/i);
+
+      // No option marked correct
+      await expect(
+        createQuizQuestion(quiz.id, 'Valid text', [
+          { id: '1', text: 'A', is_correct: false },
+          { id: '2', text: 'B', is_correct: false },
+        ])
+      ).rejects.toThrow(/at least one option must be marked as correct/i);
+    });
+
+    it('advances student course progress when passing an assessment', async () => {
+      const student = store.students[0];
+      const initialProgress = student.course_progress || 0;
+
+      const quiz = await createQuiz({
+        course_id: student.course_id || 'crs-fico-01',
+        title: 'Progress Milestone Exam',
+        duration_minutes: 15,
+        pass_percentage: 50,
+      });
+
+      await createQuizQuestion(quiz.id, 'Question 1', [
+        { id: 'opt-a', text: 'Correct Answer', is_correct: true },
+        { id: 'opt-b', text: 'Wrong Answer', is_correct: false },
+      ]);
+
+      const attempt = await submitQuizAnswers(quiz.id, student.id, {
+        [store.quizQuestions.find((q) => q.quiz_id === quiz.id)!.id]: 'opt-a',
+      });
+
+      expect(attempt.passed).toBe(true);
+      expect(attempt.question_results).toBeDefined();
+      expect(attempt.question_results!.length).toBeGreaterThan(0);
+      expect(student.course_progress).toBeGreaterThanOrEqual(initialProgress);
     });
   });
 });

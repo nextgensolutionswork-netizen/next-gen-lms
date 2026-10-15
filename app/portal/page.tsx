@@ -38,6 +38,7 @@ import {
   UploadCloud,
   Lock,
   AlertTriangle,
+  AlertCircle,
   X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -57,6 +58,7 @@ import {
 } from '@/lib/services/academics-service';
 import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
+import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
 import { uploadStudentResume } from '@/lib/services/placement-service';
 import { useRealtime } from '@/lib/hooks/use-realtime';
@@ -76,28 +78,34 @@ import { StudentPlacementHub } from '@/components/portal/student-placement-hub';
 export default function StudentPortalPage() {
   const { user, logout } = useAuth();
   const [activePortalTab, setActivePortalTab] = React.useState<'curriculum' | 'placement'>('curriculum');
-  const student =
-    (user &&
-      store.students.find(
-        (s) =>
-          s.email?.toLowerCase() === user.email?.toLowerCase() ||
-          s.id === user.id ||
-          s.user_id === user.id
-      )) ||
-    store.students[0];
-  const studentEnrollment = store.placementEnrollments.find((e) => e.student_id === student.id);
-  const course = store.courses.find((c) => c.id === student.course_id);
-  const modules = store.modules.filter((m) => m.course_id === student.course_id);
-  const lessons = store.lessons.filter((l) => l.course_id === student.course_id && l.is_published);
-  const feeAccount = store.feeAccounts.find((f) => f.student_id === student.id);
-  const payments = store.payments.filter((p) => p.student_id === student.id);
-  const assignments = store.assignments.filter((a) => a.course_id === student.course_id);
-  const submissions = store.submissions.filter((s) => s.student_id === student.id);
-  const certificate = store.certificates.find((c) => c.student_id === student.id);
-  const sessions = store.classSessions.filter((cs) => cs.course_id === student.course_id);
-  const placementProfile = store.placementProfiles.find((p) => p.student_id === student.id);
+  const student = React.useMemo(() => {
+    return (
+      (user &&
+        (store.students || []).find(
+          (s) =>
+            s.email?.toLowerCase() === user.email?.toLowerCase() ||
+            s.id === user.id ||
+            s.user_id === user.id
+        )) ||
+      (user?.role !== 'student' ? store.students?.[0] : null) ||
+      store.students?.[0] ||
+      null
+    );
+  }, [user]);
+
+  const studentEnrollment = (store.placementEnrollments || []).find((e) => e.student_id === student?.id);
+  const course = (store.courses || []).find((c) => c.id === student?.course_id);
+  const modules = (store.modules || []).filter((m) => m.course_id === student?.course_id);
+  const lessons = (store.lessons || []).filter((l) => l.course_id === student?.course_id && l.is_published);
+  const feeAccount = (store.feeAccounts || []).find((f) => f.student_id === student?.id);
+  const payments = (store.payments || []).filter((p) => p.student_id === student?.id);
+  const assignments = (store.assignments || []).filter((a) => a.course_id === student?.course_id);
+  const submissions = (store.submissions || []).filter((s) => s.student_id === student?.id);
+  const certificate = (store.certificates || []).find((c) => c.student_id === student?.id);
+  const sessions = (store.classSessions || []).filter((cs) => cs.course_id === student?.course_id);
+  const placementProfile = (store.placementProfiles || []).find((p) => p.student_id === student?.id);
   const [studentResumeUrl, setStudentResumeUrl] = React.useState<string>(
-    placementProfile?.resume_url || (student as any).resume_url || ''
+    placementProfile?.resume_url || (student as any)?.resume_url || ''
   );
   const [isResumeModalOpen, setIsResumeModalOpen] = React.useState(false);
 
@@ -110,12 +118,19 @@ export default function StudentPortalPage() {
   const [videoPosition, setVideoPosition] = React.useState(0);
   const [videoDuration, setVideoDuration] = React.useState(2700); // 45 mins
   const [isPlaying, setIsPlaying] = React.useState(false);
-  const [courseProgress, setCourseProgress] = React.useState(student.course_progress);
+  const [courseProgress, setCourseProgress] = React.useState(student?.course_progress ?? 0);
+
+  // Keep activeLesson updated when sortedLessons changes
+  React.useEffect(() => {
+    if (!activeLesson && sortedLessons.length > 0) {
+      setActiveLesson(sortedLessons[0]);
+    }
+  }, [sortedLessons, activeLesson]);
 
   // Quizzes & Academic Assessments
-  const courseQuizzes = store.quizzes.filter((q) => q.course_id === student.course_id);
+  const courseQuizzes = (store.quizzes || []).filter((q) => q.course_id === student?.course_id);
   const [quizAttemptsList, setQuizAttemptsList] = React.useState<QuizAttempt[]>(
-    store.quizAttempts.filter((a) => a.student_id === student.id)
+    (store.quizAttempts || []).filter((a) => a.student_id === student?.id)
   );
   const [selectedQuizForRunner, setSelectedQuizForRunner] = React.useState<Quiz | null>(null);
   const [isQuizModalOpen, setIsQuizModalOpen] = React.useState(false);
@@ -129,15 +144,22 @@ export default function StudentPortalPage() {
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
-  const [paymentsList, setPaymentsList] = React.useState(store.payments.filter((p) => p.student_id === student.id));
-  const [outstandingAmount, setOutstandingAmount] = React.useState(student.outstanding_amount);
-  const [paidAmount, setPaidAmount] = React.useState(student.paid_amount);
+  const [paymentsList, setPaymentsList] = React.useState(
+    (store.payments || []).filter((p) => p.student_id === student?.id)
+  );
+  const [outstandingAmount, setOutstandingAmount] = React.useState(student?.outstanding_amount ?? 0);
+  const [paidAmount, setPaidAmount] = React.useState(student?.paid_amount ?? 0);
   const [isPayModalOpen, setIsPayModalOpen] = React.useState(false);
   const [payAmount, setPayAmount] = React.useState(10000);
   const [payMode, setPayMode] = React.useState<'UPI' | 'Card' | 'Net Banking'>('UPI');
   const [upiId, setUpiId] = React.useState('amit.gupta@okaxis');
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [successReceipt, setSuccessReceipt] = React.useState<any>(null);
+  const [payType, setPayType] = React.useState<'online' | 'offline'>('online');
+  const [offlineTxnRef, setOfflineTxnRef] = React.useState('');
+  const [offlineDate, setOfflineDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [offlineNotes, setOfflineNotes] = React.useState('');
+  const [offlineSubmittedMsg, setOfflineSubmittedMsg] = React.useState<string | null>(null);
 
   // Student Doubts & Academic Support
   const [doubtsList, setDoubtsList] = React.useState<StudentDoubt[]>([]);
@@ -156,7 +178,7 @@ export default function StudentPortalPage() {
 
   // Homework Submissions Desk
   const [submissionsList, setSubmissionsList] = React.useState<AssignmentSubmission[]>(
-    store.submissions.filter((s) => s.student_id === student.id)
+    (store.submissions || []).filter((s) => s.student_id === student?.id)
   );
   const [activeAssignmentToSubmit, setActiveAssignmentToSubmit] = React.useState<Assignment | null>(null);
   const [homeworkText, setHomeworkText] = React.useState('');
@@ -165,7 +187,7 @@ export default function StudentPortalPage() {
 
   const handleSubmitHomework = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeAssignmentToSubmit) return;
+    if (!activeAssignmentToSubmit || !student) return;
     setIsSubmittingHomework(true);
     try {
       const sub = await submitAssignment(
@@ -189,6 +211,7 @@ export default function StudentPortalPage() {
   };
 
   const fetchStudentDoubts = async () => {
+    if (!student?.id) return;
     const list = await getDoubts({ student_id: student.id });
     setDoubtsList(list);
     if (!expandedDoubtId && list.length > 0) {
@@ -197,12 +220,14 @@ export default function StudentPortalPage() {
   };
 
   React.useEffect(() => {
-    fetchStudentDoubts();
-  }, [student.id]);
+    if (student?.id) {
+      fetchStudentDoubts();
+    }
+  }, [student?.id]);
 
   // Realtime Live Stream for Student Helpdesk
   const { isConnected: isRealtimeConnected } = useRealtime({
-    topics: ['doubts', `doubt:${expandedDoubtId || ''}`, `notifications:${student.user_id || student.id}`],
+    topics: student ? ['doubts', `doubt:${expandedDoubtId || ''}`, `notifications:${student.user_id || student.id}`] : [],
     onEvent: (event) => {
       if (event.event === 'doubt_reply') {
         const { doubtId, message, status } = event.payload;
@@ -423,7 +448,52 @@ export default function StudentPortalPage() {
     }
   };
 
-  const sapAllocation = store.sapAllocations.find((a) => a.student_id === student.id && a.status === 'Active');
+  const handleOfflinePaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student || payAmount <= 0) return;
+    setIsProcessing(true);
+    try {
+      const targetFee =
+        (store.studentFees || []).find(
+          (f) => f.student_id === student.id && f.approval_status === 'Approved' && f.outstanding_amount > 0
+        ) ||
+        (store.studentFees || []).find((f) => f.student_id === student.id) ||
+        (store.studentFees || [])[0];
+
+      if (!targetFee) {
+        throw new Error('No active fee record found for payment allocation.');
+      }
+
+      const rec = feeWorkflowService.recordPayment(
+        {
+          fee_id: targetFee.id,
+          amount_paid: Math.min(payAmount, outstandingAmount > 0 ? outstandingAmount : payAmount),
+          payment_mode: payMode === 'UPI' ? 'UPI' : payMode === 'Card' ? 'Card' : 'Bank Transfer',
+          transaction_reference: offlineTxnRef.trim(),
+          payment_date: offlineDate,
+          notes: offlineNotes.trim() || 'Direct bank/UPI transfer submitted by student',
+        },
+        student.user_id || student.id,
+        'student'
+      );
+
+      store.reconcileDualLedgers();
+      store.persist();
+
+      setPaymentsList([...(store.payments || []).filter((p) => p.student_id === student.id)]);
+      setOfflineSubmittedMsg(
+        `Payment record of ${formatINR(rec.amount_paid)} submitted successfully!\n\nStatus: Pending Verification.\nOur admissions counsellor will review the transaction details (${rec.transaction_reference || 'N/A'}), and the accountant will approve it to issue your official payment receipt.`
+      );
+      setOfflineTxnRef('');
+      setOfflineNotes('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit payment details');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const sapAllocation = (store.sapAllocations || []).find((a) => a.student_id === student?.id && a.status === 'Active');
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
 
   const handleCopy = (text: string, key: string) => {
@@ -452,11 +522,39 @@ export default function StudentPortalPage() {
       return;
     }
     setActiveLesson(les);
-    const existingProgress = store.lessonProgress.find(
-      (lp) => lp.student_id === student.id && lp.lesson_id === les.id
-    );
+    const existingProgress = student
+      ? (store.lessonProgress || []).find(
+          (lp) => lp.student_id === student.id && lp.lesson_id === les.id
+        )
+      : null;
     setVideoPosition(existingProgress?.last_watched_seconds || 0);
   };
+
+  if (!student) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white p-6 text-center space-y-4">
+          <div className="h-14 w-14 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+            <AlertCircle className="h-7 w-7" />
+          </div>
+          <h2 className="text-xl font-bold">No Active Enrollment Found</h2>
+          <p className="text-xs text-slate-300">
+            Your user account is not currently associated with an active student enrollment. If you recently registered or enrolled, please contact admissions or administrative support to activate your portal.
+          </p>
+          <div className="pt-2 flex justify-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => logout()} className="text-xs text-slate-300 border-slate-700 hover:bg-slate-800">
+              Sign Out
+            </Button>
+            <Link href="/login">
+              <Button variant="sap" size="sm" className="text-xs">
+                Back to Login
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-12">
@@ -653,72 +751,91 @@ export default function StudentPortalPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Video Player Column */}
           <div className="lg:col-span-2 space-y-4">
-            <Card className="overflow-hidden shadow-md border-slate-200">
-              {/* Dynamic Watermarked HLS Video Player */}
-              <HlsVideoPlayer
-                src={
-                  activeLesson?.content_url ||
-                  'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
-                }
-                title={activeLesson?.title}
-                student={{
-                  id: student.id,
-                  full_name: student.full_name,
-                  admission_number: student.admission_number,
-                  student_code: student.student_code,
-                  email: student.email,
-                  phone: student.phone,
-                  ip: '103.24.120.45',
-                }}
-                initialPosition={videoPosition}
-                onProgress={async (currTime, dur, pct) => {
-                  setVideoPosition(currTime);
-                  setVideoDuration(dur);
-                  if (Math.floor(currTime) % 5 === 0 || pct >= 90) {
-                    await updateVideoProgress(
-                      student.id,
-                      activeLesson.id,
-                      student.course_id,
-                      Math.floor(currTime),
-                      Math.floor(dur)
-                    );
-                    const updated = await getStudentCourseProgress(student.id, student.course_id);
-                    setCourseProgress(updated.overallProgress);
-                  }
-                }}
-                onComplete={async () => {
-                  await updateVideoProgress(
-                    student.id,
-                    activeLesson.id,
-                    student.course_id,
-                    Math.floor(videoDuration),
-                    Math.floor(videoDuration)
-                  );
-                  const updated = await getStudentCourseProgress(student.id, student.course_id);
-                  setCourseProgress(updated.overallProgress);
-                }}
-              />
-
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">{activeLesson?.title}</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Duration: {activeLesson?.duration_minutes} Minutes | Module: Enterprise Structure
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="success">Published</Badge>
-                  </div>
+            {!activeLesson ? (
+              <Card className="overflow-hidden shadow-md border-slate-200">
+                <div className="bg-slate-900 text-white aspect-video flex flex-col items-center justify-center p-8 text-center">
+                  <PlayCircle className="h-14 w-14 text-slate-600 mb-3" />
+                  <h4 className="text-base font-semibold text-slate-200">No Video Lessons Available</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md">
+                    There are currently no published video lectures for this course curriculum. Please check back later or consult your batch trainer.
+                  </p>
                 </div>
-                {activeLesson?.text_content && (
-                  <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed border border-slate-100">
-                    <p className="font-bold text-slate-800 mb-1">Lesson Brief:</p>
-                    {activeLesson.text_content}
+                <CardContent className="p-5">
+                  <p className="text-xs text-slate-500">
+                    Course curriculum modules will appear here as soon as your trainer publishes lecture content.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="overflow-hidden shadow-md border-slate-200">
+                {/* Dynamic Watermarked HLS Video Player */}
+                <HlsVideoPlayer
+                  src={
+                    activeLesson.content_url ||
+                    'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+                  }
+                  title={activeLesson.title}
+                  student={{
+                    id: student.id,
+                    full_name: student.full_name,
+                    admission_number: student.admission_number,
+                    student_code: student.student_code,
+                    email: student.email,
+                    phone: student.phone,
+                    ip: '103.24.120.45',
+                  }}
+                  initialPosition={videoPosition}
+                  onProgress={async (currTime, dur, pct) => {
+                    setVideoPosition(currTime);
+                    setVideoDuration(dur);
+                    if (activeLesson && (Math.floor(currTime) % 5 === 0 || pct >= 90)) {
+                      await updateVideoProgress(
+                        student.id,
+                        activeLesson.id,
+                        student.course_id,
+                        Math.floor(currTime),
+                        Math.floor(dur)
+                      );
+                      const updated = await getStudentCourseProgress(student.id, student.course_id);
+                      setCourseProgress(updated.overallProgress);
+                    }
+                  }}
+                  onComplete={async () => {
+                    if (activeLesson) {
+                      await updateVideoProgress(
+                        student.id,
+                        activeLesson.id,
+                        student.course_id,
+                        Math.floor(videoDuration),
+                        Math.floor(videoDuration)
+                      );
+                      const updated = await getStudentCourseProgress(student.id, student.course_id);
+                      setCourseProgress(updated.overallProgress);
+                    }
+                  }}
+                />
+
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">{activeLesson.title}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Duration: {activeLesson.duration_minutes ?? 0} Minutes | Module: Enterprise Structure
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="success">Published</Badge>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  {activeLesson.text_content && (
+                    <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed border border-slate-100">
+                      <p className="font-bold text-slate-800 mb-1">Lesson Brief:</p>
+                      {activeLesson.text_content}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Course Playlist / Curriculum Sidebar */}
@@ -728,8 +845,13 @@ export default function StudentPortalPage() {
                 <CardTitle className="text-sm">Course Syllabus & Lessons</CardTitle>
               </CardHeader>
               <CardContent className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
-                {sortedLessons.map((les, idx) => {
-                  const prog = store.lessonProgress.find(
+                {sortedLessons.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    No curriculum lessons published yet for this course.
+                  </div>
+                ) : (
+                  sortedLessons.map((les, idx) => {
+                  const prog = (store.lessonProgress || []).find(
                     (lp) => lp.student_id === student.id && lp.lesson_id === les.id
                   );
                   const isCompleted = Boolean(
@@ -788,7 +910,7 @@ export default function StudentPortalPage() {
                       ) : null}
                     </div>
                   );
-                })}
+                }))}
               </CardContent>
             </Card>
           </div>
@@ -803,7 +925,12 @@ export default function StudentPortalPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-slate-100 text-xs">
-                {sessions.map((sess) => (
+                {sessions.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No scheduled live classes or labs for your batch at this time.
+                  </div>
+                ) : (
+                  sessions.map((sess) => (
                   <div key={sess.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
                     <div>
                       <h4 className="font-bold text-slate-800">{sess.topic}</h4>
@@ -820,7 +947,7 @@ export default function StudentPortalPage() {
                       </a>
                     )}
                   </div>
-                ))}
+                )))}
               </div>
             </CardContent>
           </Card>
@@ -832,35 +959,67 @@ export default function StudentPortalPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-slate-100 text-xs">
-                {paymentsList.map((p) => {
-                  const r = store.receipts.find((rec) => rec.payment_id === p.id);
-                  return (
-                    <div key={p.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
-                      <div>
-                        <p className="font-bold text-blue-600">{p.receipt_number}</p>
-                        <p className="text-slate-500 mt-0.5">Date: {formatDate(p.payment_date)} | Mode: {p.payment_mode}</p>
-                        <p className="font-bold text-emerald-600 mt-0.5">{formatINR(p.amount)}</p>
+                {paymentsList.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No fee payment records found.
+                  </div>
+                ) : (
+                  paymentsList.map((p) => {
+                    const r = (store.receipts || []).find((rec) => rec.payment_id === p.id);
+                    const isPending = p.status === 'Pending' || p.receipt_number === 'PENDING-VERIFY';
+                    const isFailed = p.status === 'Failed';
+                    return (
+                      <div key={p.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-bold text-blue-600">
+                              {isPending ? 'Payment Reference (Under Review)' : p.receipt_number}
+                            </p>
+                            {isPending ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                Pending Approval
+                              </span>
+                            ) : isFailed ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                                Rejected
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Verified
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-500 mt-0.5">Date: {formatDate(p.payment_date)} | Mode: {p.payment_mode}</p>
+                          <p className="font-bold text-emerald-600 mt-0.5">{formatINR(p.amount)}</p>
+                          {isPending && (
+                            <p className="text-[11px] text-amber-700 mt-0.5">
+                              Payment submitted. Our accounts team will verify bank credit and issue the official payment receipt.
+                            </p>
+                          )}
+                        </div>
+                        {!isPending && !isFailed && (
+                          <div className="flex items-center space-x-1.5">
+                            <a
+                              href={`/api/receipts/${r?.id || p.id}/pdf?download=true`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1 shadow-xs">
+                                <Download className="h-3 w-3" />
+                                <span>Download PDF</span>
+                              </Button>
+                            </a>
+                            <Link href={`/accounts/receipts/${r?.id || p.id}`}>
+                              <Button variant="outline" size="sm" className="text-xs px-2 py-1">
+                                View
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center space-x-1.5">
-                        <a
-                          href={`/api/receipts/${r?.id || p.id}/pdf?download=true`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1 shadow-xs">
-                            <Download className="h-3 w-3" />
-                            <span>Download PDF</span>
-                          </Button>
-                        </a>
-                        <Link href={`/accounts/receipts/${r?.id || p.id}`}>
-                          <Button variant="outline" size="sm" className="text-xs px-2 py-1">
-                            View
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1577,9 +1736,33 @@ export default function StudentPortalPage() {
           isOpen={isPayModalOpen}
           onClose={() => setIsPayModalOpen(false)}
           title="Student Fee Self-Service Payment"
-          description="Pay your tuition installment online via UPI, Credit/Debit Card, or Net Banking."
+          description="Pay your tuition payment online via UPI, Credit/Debit Card, or Net Banking."
         >
-          {successReceipt ? (
+          {offlineSubmittedMsg ? (
+            <div className="space-y-4 text-xs text-center py-4">
+              <div className="h-14 w-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+                <Clock className="h-8 w-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Payment Reference Submitted!</h3>
+                <p className="text-xs text-slate-600 mt-2 whitespace-pre-line leading-relaxed">
+                  {offlineSubmittedMsg}
+                </p>
+              </div>
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="sap"
+                  size="sm"
+                  onClick={() => {
+                    setOfflineSubmittedMsg(null);
+                    setIsPayModalOpen(false);
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          ) : successReceipt ? (
             <div className="space-y-4 text-xs text-center py-4">
               <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="h-8 w-8" />
@@ -1587,7 +1770,7 @@ export default function StudentPortalPage() {
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Payment Successfully Processed!</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Your tuition installment has been recorded and credited to your ledger.
+                  Your tuition payment has been recorded and credited to your ledger.
                 </p>
               </div>
 
@@ -1608,20 +1791,8 @@ export default function StudentPortalPage() {
                   <span className="text-slate-500">Transaction Ref:</span>
                   <span className="font-mono text-slate-700">{successReceipt.transaction_reference}</span>
                 </div>
-                {successReceipt.place_of_supply && (
-                  <div className="flex justify-between border-t border-slate-200 pt-1 text-[11px]">
-                    <span className="text-slate-500">Place of Supply (GST):</span>
-                    <span className="font-bold text-slate-800">{successReceipt.place_of_supply}</span>
-                  </div>
-                )}
-                {successReceipt.total_tax !== undefined && (
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500">GST Tax (18%):</span>
-                    <span className="font-medium text-emerald-700">
-                      {formatINR(successReceipt.total_tax)} ({successReceipt.supply_type === 'INTER_STATE' ? 'IGST 18%' : 'CGST 9% + SGST 9%'})
-                    </span>
-                  </div>
-                )}
+                
+                
               </div>
 
               <div className="flex flex-wrap justify-center gap-2 pt-2">
@@ -1646,130 +1817,242 @@ export default function StudentPortalPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleOnlinePayment} className="space-y-4 text-xs">
-              {/* Outstanding Summary */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] text-blue-600 uppercase font-bold">Total Remaining Balance</p>
-                  <p className="text-base font-extrabold text-slate-900">{formatINR(outstandingAmount)}</p>
-                </div>
-                <span className="text-xs bg-white text-blue-800 px-2 py-1 rounded font-semibold border border-blue-200">
-                  {student.admission_number}
-                </span>
+            <div>
+              {/* Pay Mode Tabs: Online Gateway vs Offline Transfer Proof */}
+              <div className="flex border-b border-slate-200 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setPayType('online')}
+                  className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all ${
+                    payType === 'online'
+                      ? 'border-[#0A6ED1] text-[#0A6ED1]'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  ⚡ Pay Online (Instant Gateway)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayType('offline')}
+                  className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all ${
+                    payType === 'offline'
+                      ? 'border-[#0A6ED1] text-[#0A6ED1]'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🏦 Submit Direct Transfer / UTR Proof
+                </button>
               </div>
 
-              {/* Amount Selection */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Payment Amount (₹) *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(Math.min(outstandingAmount, Math.max(100, Number(e.target.value))))}
-                    min={100}
-                    max={outstandingAmount}
-                    className="w-full text-sm font-bold bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
-                    required
-                  />
-                </div>
-                <div className="flex gap-2 mt-2">
-                  {[5000, 10000, outstandingAmount].map((amt) => (
-                    <button
-                      type="button"
-                      key={amt}
-                      onClick={() => setPayAmount(amt)}
-                      className="px-2.5 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium"
-                    >
-                      {amt === outstandingAmount ? `Full Balance (${formatINR(amt)})` : formatINR(amt)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payment Mode Selector */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Select Payment Method *
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['UPI', 'Card', 'Net Banking'] as const).map((mode) => (
-                    <button
-                      type="button"
-                      key={mode}
-                      onClick={() => setPayMode(mode)}
-                      className={`p-2.5 rounded-lg border text-center transition-all ${
-                        payMode === mode
-                          ? 'border-[#0A6ED1] bg-blue-50 text-[#0A6ED1] font-bold shadow-xs'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Conditional Mode Inputs */}
-              {payMode === 'UPI' && (
-                <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div className="flex items-center space-x-2">
-                    <QrCode className="h-4 w-4 text-blue-600" />
-                    <span className="font-semibold text-slate-800">Instant UPI Checkout</span>
+              {payType === 'online' ? (
+                <form onSubmit={handleOnlinePayment} className="space-y-4 text-xs">
+                  {/* Outstanding Summary */}
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-blue-600 uppercase font-bold">Total Remaining Balance</p>
+                      <p className="text-base font-extrabold text-slate-900">{formatINR(outstandingAmount)}</p>
+                    </div>
+                    <span className="text-xs bg-white text-blue-800 px-2 py-1 rounded font-semibold border border-blue-200">
+                      {student.admission_number}
+                    </span>
                   </div>
-                  <Input
-                    label="Enter VPA / UPI ID"
-                    placeholder="student@okaxis / phone@upi"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    required
-                  />
-                  <p className="text-[10px] text-slate-400">
-                    Supports Google Pay, PhonePe, Paytm, BHIM, and Cred UPI.
-                  </p>
-                </div>
-              )}
 
-              {payMode === 'Card' && (
-                <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <Input label="Card Number" placeholder="4111 2222 3333 4444" defaultValue="4111 •••• •••• 4242" required />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input label="Expiry Date" placeholder="MM/YY" defaultValue="12/28" required />
-                    <Input label="CVV" placeholder="123" defaultValue="888" type="password" required />
+                  {/* Amount Selection */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                      Payment Amount (₹) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(Math.min(outstandingAmount, Math.max(100, Number(e.target.value))))}
+                        min={100}
+                        max={outstandingAmount}
+                        className="w-full text-sm font-bold bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-[#0A6ED1]"
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      {[5000, 10000, outstandingAmount].map((amt) => (
+                        <button
+                          type="button"
+                          key={amt}
+                          onClick={() => setPayAmount(amt)}
+                          className="px-2.5 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium"
+                        >
+                          {amt === outstandingAmount ? `Full Balance (${formatINR(amt)})` : formatINR(amt)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {payMode === 'Net Banking' && (
-                <div className="space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <label className="block text-[11px] font-semibold text-slate-600">Popular Banks</label>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank'].map((bank, idx) => (
-                      <label key={bank} className="flex items-center space-x-2 p-2 rounded border border-slate-200 bg-white cursor-pointer">
-                        <input type="radio" name="bank" defaultChecked={idx === 0} />
-                        <span className="text-slate-700">{bank}</span>
+                  {/* Payment Mode Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                      Select Payment Method *
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['UPI', 'Card', 'Net Banking'] as const).map((mode) => (
+                        <button
+                          type="button"
+                          key={mode}
+                          onClick={() => setPayMode(mode)}
+                          className={`p-2.5 rounded-lg border text-center transition-all ${
+                            payMode === mode
+                              ? 'border-[#0A6ED1] bg-blue-50 text-[#0A6ED1] font-bold shadow-xs'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Conditional Mode Inputs */}
+                  {payMode === 'UPI' && (
+                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="flex items-center space-x-2">
+                        <QrCode className="h-4 w-4 text-blue-600" />
+                        <span className="font-semibold text-slate-800">Instant UPI Checkout</span>
+                      </div>
+                      <Input
+                        label="Enter VPA / UPI ID"
+                        placeholder="student@okaxis / phone@upi"
+                        value={upiId}
+                        onChange={(e) => setUpiId(e.target.value)}
+                        required
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        Supports Google Pay, PhonePe, Paytm, BHIM, and Cred UPI.
+                      </p>
+                    </div>
+                  )}
+
+                  {payMode === 'Card' && (
+                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <Input label="Card Number" placeholder="4111 2222 3333 4444" defaultValue="4111 •••• •••• 4242" required />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input label="Expiry Date" placeholder="MM/YY" defaultValue="12/28" required />
+                        <Input label="CVV" placeholder="123" defaultValue="888" type="password" required />
+                      </div>
+                    </div>
+                  )}
+
+                  {payMode === 'Net Banking' && (
+                    <div className="space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <label className="block text-[11px] font-semibold text-slate-600">Popular Banks</label>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank'].map((bank, idx) => (
+                          <label key={bank} className="flex items-center space-x-2 p-2 rounded border border-slate-200 bg-white cursor-pointer">
+                            <input type="radio" name="bank" defaultChecked={idx === 0} />
+                            <span className="text-slate-700">{bank}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                    <span className="flex items-center space-x-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>256-Bit SSL Encrypted</span>
+                    </span>
+                    <div className="flex space-x-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setIsPayModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" variant="sap" size="sm" disabled={isProcessing}>
+                        {isProcessing ? 'Processing Payment...' : `Pay ${formatINR(payAmount)}`}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleOfflinePaymentSubmit} className="space-y-4 text-xs">
+                  {/* Outstanding Summary */}
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-amber-700 uppercase font-bold">Outstanding Tuition Balance</p>
+                      <p className="text-base font-extrabold text-slate-900">{formatINR(outstandingAmount)}</p>
+                    </div>
+                    <span className="text-xs bg-white text-amber-800 px-2 py-1 rounded font-semibold border border-amber-200">
+                      {student.admission_number}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label="Amount Paid (₹) *"
+                      type="number"
+                      min={100}
+                      max={outstandingAmount > 0 ? outstandingAmount : 100000}
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(Number(e.target.value))}
+                      required
+                    />
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                        Transfer Mode *
                       </label>
-                    ))}
+                      <select
+                        value={payMode}
+                        onChange={(e) => setPayMode(e.target.value as any)}
+                        className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+                      >
+                        <option value="UPI">Direct UPI (PhonePe / GPay / Paytm)</option>
+                        <option value="Net Banking">Bank Transfer (NEFT / IMPS / RTGS)</option>
+                        <option value="Card">Debit / Credit Card</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-                <span className="flex items-center space-x-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>256-Bit SSL Encrypted</span>
-                </span>
-                <div className="flex space-x-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setIsPayModalOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="sap" size="sm" disabled={isProcessing}>
-                    {isProcessing ? 'Processing Payment...' : `Pay ${formatINR(payAmount)}`}
-                  </Button>
-                </div>
-              </div>
-            </form>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label="UTR / Transaction Reference *"
+                      placeholder="e.g. UPI/429188291012 or NEFT-..."
+                      value={offlineTxnRef}
+                      onChange={(e) => setOfflineTxnRef(e.target.value)}
+                      required
+                    />
+                    <Input
+                      label="Transfer Date *"
+                      type="date"
+                      value={offlineDate}
+                      onChange={(e) => setOfflineDate(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <Input
+                    label="Bank / Account Notes"
+                    placeholder="e.g. Transferred from HDFC A/C ending in 4019"
+                    value={offlineNotes}
+                    onChange={(e) => setOfflineNotes(e.target.value)}
+                  />
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] leading-relaxed">
+                    ℹ️ <strong>Workflow Verification:</strong> Your payment submission will be marked as &ldquo;Pending Verification&rdquo;. Your admissions counsellor will review the transaction details, and our finance team will verify the bank deposit to generate your official payment receipt.
+                  </div>
+
+                  <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setIsPayModalOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="sap"
+                      size="sm"
+                      disabled={isProcessing || !offlineTxnRef.trim()}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      {isProcessing ? 'Submitting...' : 'Submit for Verification'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
         </Modal>
 

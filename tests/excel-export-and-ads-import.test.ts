@@ -9,12 +9,12 @@ import {
   escapeXml,
   generateAttendanceExcelXml,
   generateFeeLedgerExcelXml,
-  generateGstReportExcelXml,
+  generateReceiptsExcelXml,
   generateCollectionsExcelXml,
   generateExpensesExcelXml,
   exportAttendanceToExcel,
   exportFeeLedgerToExcel,
-  exportGstReportToExcel,
+  exportReceiptsToExcel,
   exportCollectionsToExcel,
   exportExpensesToExcel,
 } from '@/lib/utils/excel-export';
@@ -178,15 +178,12 @@ describe('13. Excel Export Engine & Meta/Google Ads CSV Import Integration', () 
       expect(xml).toContain('TOTAL SUMMARY');
     });
 
-    it('generateGstReportExcelXml outputs 3-sheet audit: B2C Invoices, GSTR-1 Summary, and State Distribution', () => {
-      const xml = generateGstReportExcelXml();
-
-      expect(xml).toContain('<Worksheet ss:Name="B2C Tax Invoices">');
-      expect(xml).toContain('<Worksheet ss:Name="GSTR-1 Tax Summary">');
-      expect(xml).toContain('<Worksheet ss:Name="State-wise Tax Distribution">');
-      expect(xml).toContain('999293');
-      expect(xml).toContain('Intra-State Supplies (Within Telangana)');
-      expect(xml).toContain('Inter-State Supplies (Out of State)');
+    it('exports receipt payments and balances without tax columns', () => {
+      const xml = generateReceiptsExcelXml([{ ...store.receipts[0], receipt_number: 'REC-1', student_name: 'Student One', course_name: 'Course', transaction_reference: 'PAY-REF' }]);
+      expect(xml).toContain('<Worksheet ss:Name="Payment Receipts">');
+      expect(xml).toContain('Amount Paid');
+      expect(xml).toContain('Remaining Balance');
+      expect(xml).not.toMatch(/GST|Tax|IRN|Installment/);
     });
 
     it('generateCollectionsExcelXml and generateExpensesExcelXml produce valid XML ledgers', () => {
@@ -208,7 +205,7 @@ describe('13. Excel Export Engine & Meta/Google Ads CSV Import Integration', () 
     it('export functions safely execute without errors when window/document are undefined', () => {
       expect(() => exportAttendanceToExcel()).not.toThrow();
       expect(() => exportFeeLedgerToExcel()).not.toThrow();
-      expect(() => exportGstReportToExcel()).not.toThrow();
+      expect(() => exportReceiptsToExcel(store.receipts)).not.toThrow();
       expect(() => exportCollectionsToExcel()).not.toThrow();
       expect(() => exportExpensesToExcel()).not.toThrow();
     });

@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const bucket = (formData.get('bucket') as StorageBucket) || 'screenshots';
+    if (bucket === 'payment-proofs') return NextResponse.json({ success: false, error: 'Use the authenticated payment proof endpoint.' }, { status: 403 });
     const entityId = (formData.get('entityId') as string) || undefined;
 
     if (!file) {

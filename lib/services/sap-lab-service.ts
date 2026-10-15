@@ -19,7 +19,25 @@ export async function getSapSystems(): Promise<SapServerSystem[]> {
   return [...store.sapSystems];
 }
 
+export function syncSapAllocationExpirations(): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  let updated = false;
+  for (const alloc of store.sapAllocations) {
+    if (alloc.status === 'Active' && alloc.valid_to < today) {
+      alloc.status = 'Expired';
+      alloc.updated_at = new Date().toISOString();
+      updated = true;
+    }
+  }
+  if (updated) {
+    store.persist();
+  }
+  return updated;
+}
+
 export async function getSapAllocations(): Promise<SapServerAllocation[]> {
+  syncSapAllocationExpirations();
+
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
@@ -30,6 +48,7 @@ export async function getSapAllocations(): Promise<SapServerAllocation[]> {
 
       if (!error && data && data.length > 0) {
         store.sapAllocations = data as SapServerAllocation[];
+        syncSapAllocationExpirations();
         return data as SapServerAllocation[];
       }
     } catch (err) {
@@ -84,6 +103,17 @@ export async function provisionSapAccess(
 
   const system = store.sapSystems.find((sys) => sys.id === input.system_id);
   if (!system) throw new Error('SAP Server System not found');
+
+  // Enforce system quota and active capacity
+  const activeSysCount = store.sapAllocations.filter(
+    (a) => a.system_id === input.system_id && a.status === 'Active'
+  ).length;
+  const maxCapacity = (system as any).capacity || 50;
+  if (activeSysCount >= maxCapacity) {
+    throw new Error(
+      `SAP Server "${system.sid}" is at maximum capacity (${activeSysCount}/${maxCapacity} active users). Cannot provision additional sandbox access.`
+    );
+  }
 
   // Prevent multiple active allocations on same system
   const existingActive = store.sapAllocations.find(
@@ -265,11 +295,112 @@ export async function revokeSapAccess(
   return alloc;
 }
 
+export async function resetSapPassword(
+  allocationId: string,
+  newPassword?: string,
+  actionByUserId?: string
+): Promise<{ allocation: SapServerAllocation; generatedPassword: string }> {
+  const alloc = store.sapAllocations.find((a) => a.id === allocationId);
+  if (!alloc) throw new Error('Allocation not found');
+
+  const generatedPassword = newPassword || `Welcome#${Math.floor(1000 + Math.random() * 9000)}`;
+  alloc.sap_password = generatedPassword;
+  alloc.updated_at = new Date().toISOString();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('sap_server_allocations')
+        .update({
+          sap_password: generatedPassword,
+          updated_at: alloc.updated_at,
+        })
+        .eq('id', allocationId);
+    } catch (err) {
+      console.warn('Supabase resetSapPassword warning, preserved locally:', err);
+    }
+  }
+
+  const actor = actionByUserId ? store.users.find((u) => u.id === actionByUserId) : undefined;
+  await recordAuditLog({
+    user_id: actionByUserId || 'admin',
+    user_name: actor?.full_name || 'Admin',
+    user_role: actor?.role || 'admin',
+    action: 'SAP_PASSWORD_RESET',
+    module: 'ACADEMICS',
+    record_id: alloc.id,
+    new_value: { sap_user_id: alloc.sap_user_id, student: alloc.student_name },
+  });
+
+  return { allocation: alloc, generatedPassword };
+}
+
+export async function logSapCredentialAccess(
+  allocationId: string,
+  accessType: 'REVEAL' | 'COPY_PASSWORD' | 'COPY_USER_ID',
+  actionByUserId: string
+): Promise<void> {
+  const alloc = store.sapAllocations.find((a) => a.id === allocationId);
+  const actor = store.users.find((u) => u.id === actionByUserId);
+  await recordAuditLog({
+    user_id: actionByUserId || 'system',
+    user_name: actor?.full_name || 'Staff User',
+    user_role: actor?.role || 'staff',
+    action: 'SAP_CREDENTIALS_ACCESSED',
+    module: 'ACADEMICS',
+    record_id: allocationId,
+    new_value: {
+      access_type: accessType,
+      student_id: alloc?.student_id,
+      student_name: alloc?.student_name,
+      sap_user_id: alloc?.sap_user_id,
+      system_name: alloc?.system_name,
+      sid: alloc?.sid,
+    },
+  });
+}
+
+export async function testSapConnection(
+  systemId: string
+): Promise<{ success: boolean; latencyMs: number; message: string }> {
+  const sys = store.sapSystems.find((s) => s.id === systemId);
+  if (!sys) throw new Error('SAP system not found');
+
+  if (sys.status === 'Offline') {
+    return {
+      success: false,
+      latencyMs: 0,
+      message: `System ${sys.sid} is Offline. Gateway port 32${sys.instance_number} is unreachable.`,
+    };
+  }
+
+  const latency = Math.floor(25 + Math.random() * 45);
+  return {
+    success: true,
+    latencyMs: latency,
+    message: `System ${sys.sid} online. CPIC/RFC ping responded in ${latency}ms (host: ${sys.server_host}:32${sys.instance_number}).`,
+  };
+}
+
 /**
  * Generates official SAP GUI Logon shortcut (.sap) file content.
  * Double clicking this file opens SAP GUI and pre-fills the server parameters.
  */
 export function generateSapGuiShortcutContent(allocation: SapServerAllocation): string {
+  const system = store.sapSystems.find((s) => s.id === allocation.system_id);
+  const routerPrefix = system?.sap_router
+    ? `${system.sap_router.trim()}${system.sap_router.trim().endsWith('/') ? '' : '/'}`
+    : '';
+
+  let guiParm = allocation.server_host;
+  if (!guiParm.startsWith('/H/') && !guiParm.startsWith('/M/')) {
+    guiParm = `${routerPrefix}/M/${allocation.server_host}/S/36${allocation.instance_number}/G/SPACE`;
+  } else if (routerPrefix && !guiParm.startsWith(routerPrefix)) {
+    guiParm = `${routerPrefix}${guiParm}`;
+  }
+
   return `[System]
 Name=${allocation.sid}
 Description=${allocation.system_name}
@@ -281,6 +412,128 @@ Language=EN
 Title=SAP Easy Access
 Command=SESSION_MANAGER
 [Configuration]
-GuiParm=/M/${allocation.server_host}/S/36${allocation.instance_number}/G/SPACE
+GuiParm=${guiParm}
 `;
+}
+
+export async function createSapServerSystem(
+  data: Omit<SapServerSystem, 'id'>,
+  actionByUserId: string
+): Promise<SapServerSystem> {
+  const newId = `sap-sys-${Date.now().toString().slice(-4)}`;
+  const newSystem: SapServerSystem = {
+    id: newId,
+    system_name: data.system_name.trim(),
+    sid: data.sid.toUpperCase().trim(),
+    instance_number: data.instance_number.trim(),
+    server_host: data.server_host.trim(),
+    sap_router: data.sap_router?.trim() || undefined,
+    default_client: data.default_client.trim() || '800',
+    description: data.description.trim(),
+    status: data.status || 'Online',
+  };
+
+  store.sapSystems.push(newSystem);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('sap_server_systems').insert(newSystem);
+    } catch (err) {
+      console.warn('Supabase createSapServerSystem warning, preserved locally:', err);
+    }
+  }
+
+  const actor = store.users.find((u) => u.id === actionByUserId);
+  await recordAuditLog({
+    user_id: actionByUserId,
+    user_name: actor?.full_name || 'Administrator',
+    user_role: actor?.role || 'admin',
+    action: 'SAP_SYSTEM_CREATED',
+    module: 'ACADEMICS',
+    record_id: newSystem.id,
+    new_value: newSystem,
+  });
+
+  return newSystem;
+}
+
+export async function updateSapServerSystem(
+  systemId: string,
+  data: Partial<Omit<SapServerSystem, 'id'>>,
+  actionByUserId: string
+): Promise<SapServerSystem> {
+  const sys = store.sapSystems.find((s) => s.id === systemId);
+  if (!sys) throw new Error(`SAP Server System not found: ${systemId}`);
+
+  const oldVal = { ...sys };
+  Object.assign(sys, data);
+  if (data.sid) sys.sid = data.sid.toUpperCase().trim();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('sap_server_systems').update(data).eq('id', systemId);
+    } catch (err) {
+      console.warn('Supabase updateSapServerSystem warning, preserved locally:', err);
+    }
+  }
+
+  const actor = store.users.find((u) => u.id === actionByUserId);
+  await recordAuditLog({
+    user_id: actionByUserId,
+    user_name: actor?.full_name || 'Administrator',
+    user_role: actor?.role || 'admin',
+    action: 'SAP_SYSTEM_UPDATED',
+    module: 'ACADEMICS',
+    record_id: systemId,
+    old_value: oldVal,
+    new_value: sys,
+  });
+
+  return sys;
+}
+
+export async function deleteSapServerSystem(
+  systemId: string,
+  actionByUserId: string
+): Promise<boolean> {
+  const idx = store.sapSystems.findIndex((s) => s.id === systemId);
+  if (idx === -1) return false;
+
+  const activeAllocations = store.sapAllocations.filter(
+    (a) => a.system_id === systemId && a.status === 'Active'
+  );
+  if (activeAllocations.length > 0) {
+    throw new Error(
+      `Cannot delete SAP Server System while ${activeAllocations.length} active trainee sandbox allocation(s) exist. Revoke active allocations first.`
+    );
+  }
+
+  const removed = store.sapSystems.splice(idx, 1)[0];
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('sap_server_systems').delete().eq('id', systemId);
+    } catch (err) {
+      console.warn('Supabase deleteSapServerSystem warning, preserved locally:', err);
+    }
+  }
+
+  const actor = store.users.find((u) => u.id === actionByUserId);
+  await recordAuditLog({
+    user_id: actionByUserId,
+    user_name: actor?.full_name || 'Administrator',
+    user_role: actor?.role || 'admin',
+    action: 'SAP_SYSTEM_DELETED',
+    module: 'ACADEMICS',
+    record_id: systemId,
+    old_value: removed,
+  });
+
+  return true;
 }

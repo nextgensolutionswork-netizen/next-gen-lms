@@ -1,5 +1,8 @@
 import { store } from './data-store';
-import { calculateGstBreakdown } from './gst-service';
+import { assertSameTenant, isAccountsUser, tenantId } from '@/lib/auth/tenant';
+import { paymentAudit, paymentNotification } from './payment-events';
+import { forwardApprovedPaymentToOnboarding } from './onboarding-service';
+import { receiptAmounts } from './receipt-amounts';
 import {
   StudentFee,
   FeeCategoryItem,
@@ -10,11 +13,13 @@ import {
   StudentRefundRequest,
   FinanceWorkflowSettings,
   FeeApprovalStatus,
-  PaymentVerificationStatus,
   StudentFinancialStatus,
   GlobalFeeCategory,
   FeeReferenceType,
   PaymentMethod,
+  StudentFeeAccount,
+  Payment,
+  Receipt,
 } from '@/types';
 
 export class FeeWorkflowService {
@@ -40,6 +45,8 @@ export class FeeWorkflowService {
 
     const newCategory: FeeCategoryItem = {
       ...input,
+      is_taxable: false,
+      gst_rate: 0,
       id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       created_at: new Date().toISOString(),
     };
@@ -134,11 +141,7 @@ export class FeeWorkflowService {
     }
 
     const netFee = Math.max(0, proposed_fee - discount_amount);
-    // Standard 18% GST calculation unless specified
-    const tax_gst_amount =
-      input.tax_gst_amount !== undefined
-        ? Number(input.tax_gst_amount)
-        : Number((netFee * 0.18).toFixed(2));
+    const tax_gst_amount = 0;
     const additional_charges = Number(input.additional_charges) || 0;
     const final_payable = netFee + tax_gst_amount + additional_charges;
 
@@ -167,6 +170,8 @@ export class FeeWorkflowService {
     const status: FeeApprovalStatus = isSubmitted ? 'Pending Accountant Approval' : 'Draft';
 
     const newFee: StudentFee = {
+      tenant_id: tenantId(student),
+      enrollment_id: student.admission_id,
       id: feeId,
       student_id: student.id,
       student_name: student.full_name,
@@ -194,8 +199,8 @@ export class FeeWorkflowService {
       paid_amount: 0,
       outstanding_amount: final_payable,
 
-      payment_plan: input.payment_plan || 'Full Payment',
-      number_of_installments: input.number_of_installments || 1,
+      payment_plan: 'Full Payment',
+      number_of_installments: 0,
       first_due_date: input.first_due_date || now.split('T')[0],
 
       counsellor_id: counsellorUserId,
@@ -315,6 +320,12 @@ export class FeeWorkflowService {
     const oldStatus = fee.approval_status;
     const now = new Date().toISOString();
 
+    // Approval establishes a fee balance without tax or a scheduled plan.
+    fee.tax_gst_amount = 0;
+    fee.payment_plan = 'Full Payment';
+    fee.number_of_installments = 0;
+    fee.final_payable = Number((Math.max(0, fee.proposed_fee - fee.discount_amount) + (fee.additional_charges || 0)).toFixed(2));
+    fee.outstanding_amount = Math.max(0, Number((fee.final_payable - fee.paid_amount).toFixed(2)));
     fee.approval_status = 'Approved';
     fee.approved_by = accountantUserId;
     fee.approved_by_name = accountantName;
@@ -352,12 +363,77 @@ export class FeeWorkflowService {
       reference_id: fee.id,
       debit: fee.final_payable,
       credit: 0,
-      description: `Approved ${fee.fee_category} (Gross: ₹${fee.proposed_fee.toLocaleString('en-IN')}, Discount: ₹${fee.discount_amount.toLocaleString('en-IN')}, GST: ₹${fee.tax_gst_amount.toLocaleString('en-IN')})`,
+      description: `Approved ${fee.fee_category} (Gross: ₹${fee.proposed_fee.toLocaleString('en-IN')}, Discount: ₹${fee.discount_amount.toLocaleString('en-IN')})`,
       recorded_by: accountantUserId,
     });
 
+    // Dual-Ledger Sync: Ensure legacy StudentFeeAccount exists and is strictly updated/backported
+    if (!store.feeAccounts) store.feeAccounts = [];
+    let feeAccount = store.feeAccounts.find(
+      (fa) =>
+        fa.id === `fa-${fee.id}` ||
+        fa.id === fee.id.replace('fee-', '') ||
+        (fee.course_id && fa.course_id === fee.course_id && fa.student_id === fee.student_id)
+    );
+
+    if (feeAccount) {
+      feeAccount.original_fee = fee.proposed_fee;
+      feeAccount.discount = fee.discount_amount;
+      feeAccount.discount_reason = fee.discount_reason || feeAccount.discount_reason;
+      feeAccount.net_payable = fee.final_payable;
+      feeAccount.outstanding_amount = Math.max(0, fee.final_payable - feeAccount.paid_amount);
+      feeAccount.payment_plan = fee.payment_plan || feeAccount.payment_plan;
+      feeAccount.status = feeAccount.outstanding_amount === 0 ? 'Paid' : (feeAccount.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+      feeAccount.updated_at = now;
+
+    } else {
+      feeAccount = {
+        tenant_id: tenantId(fee),
+        id: `fa-${fee.id}`,
+        student_id: fee.student_id,
+        student_name: fee.student_name,
+        admission_id: fee.enrollment_id || fee.admission_number,
+        course_id: fee.course_id || 'crs-general',
+        course_name: fee.course_name || fee.fee_category,
+        original_fee: fee.proposed_fee,
+        discount: fee.discount_amount,
+        discount_reason: fee.discount_reason,
+        net_payable: fee.final_payable,
+        paid_amount: fee.paid_amount,
+        outstanding_amount: fee.outstanding_amount,
+        payment_plan: fee.payment_plan,
+        status: fee.outstanding_amount === 0 ? 'Paid' : (fee.paid_amount > 0 ? 'Partially Paid' : 'Unpaid'),
+        created_at: fee.created_at,
+        updated_at: now,
+      };
+      store.feeAccounts.push(feeAccount);
+
+    }
+
+    fee.fee_account_id = feeAccount.id;
+
+    // Sync student record
+    const student = store.students.find((s) => s.id === fee.student_id);
+    if (student) {
+      student.total_fee = fee.final_payable;
+      student.discount = fee.discount_amount;
+      student.outstanding_amount = Math.max(0, fee.final_payable - (student.paid_amount || 0));
+      student.updated_at = now;
+    }
+
     store.persist();
     return fee;
+  }
+
+  /**
+   * Alias for approveFee to support approveFeeProposal naming convention
+   */
+  public approveFeeProposal(
+    feeId: string,
+    accountantUserId: string,
+    notes?: string
+  ): StudentFee {
+    return this.approveFee(feeId, accountantUserId, notes);
   }
 
   /**
@@ -473,7 +549,9 @@ export class FeeWorkflowService {
       additional_charges?: number;
       counsellor_notes?: string;
       payment_plan?: 'Full Payment' | '2 Installments' | '3 Installments' | 'Custom';
+      number_of_installments?: number;
       first_due_date?: string;
+      fee_category?: string;
     }
   ): StudentFee {
     const fee = this.getStudentFeeById(feeId);
@@ -494,10 +572,7 @@ export class FeeWorkflowService {
     }
 
     const netFee = Math.max(0, proposed_fee - discount_amount);
-    const tax_gst_amount =
-      updates.tax_gst_amount !== undefined
-        ? Number(updates.tax_gst_amount)
-        : Number((netFee * 0.18).toFixed(2));
+    const tax_gst_amount = 0;
     const additional_charges =
       updates.additional_charges !== undefined
         ? Number(updates.additional_charges)
@@ -511,13 +586,15 @@ export class FeeWorkflowService {
     fee.proposed_fee = proposed_fee;
     fee.discount_amount = discount_amount;
     fee.discount_percentage = discount_percentage;
-    if (updates.discount_reason) fee.discount_reason = updates.discount_reason;
+    if (updates.discount_reason !== undefined) fee.discount_reason = updates.discount_reason;
     fee.tax_gst_amount = tax_gst_amount;
     fee.additional_charges = additional_charges;
     fee.final_payable = final_payable;
     fee.outstanding_amount = final_payable - fee.paid_amount;
-    if (updates.payment_plan) fee.payment_plan = updates.payment_plan;
+    fee.payment_plan = 'Full Payment';
+    fee.number_of_installments = 0;
     if (updates.first_due_date) fee.first_due_date = updates.first_due_date;
+    if (updates.fee_category) fee.fee_category = updates.fee_category;
     if (updates.counsellor_notes) fee.counsellor_notes = updates.counsellor_notes;
 
     fee.approval_status = 'Pending Accountant Approval';
@@ -628,6 +705,14 @@ export class FeeWorkflowService {
       updated_at: now,
     };
 
+    newVersionFee.tax_gst_amount = 0;
+    newVersionFee.approved_tax = 0;
+    newVersionFee.payment_plan = 'Full Payment';
+    newVersionFee.number_of_installments = 0;
+    newVersionFee.final_payable = Number((Math.max(0, newVersionFee.proposed_fee - newVersionFee.discount_amount) + (newVersionFee.additional_charges || 0)).toFixed(2));
+    newVersionFee.outstanding_amount = Math.max(0, Number((newVersionFee.final_payable - newVersionFee.paid_amount).toFixed(2)));
+    newVersionFee.approved_total = newVersionFee.final_payable;
+
     if (!store.studentFees) store.studentFees = [];
     store.studentFees.unshift(newVersionFee);
 
@@ -654,6 +739,34 @@ export class FeeWorkflowService {
       });
     }
 
+    // Backport revision changes to legacy feeAccount and student
+    if (!store.feeAccounts) store.feeAccounts = [];
+    const revFeeAccount = store.feeAccounts.find(
+      (fa) =>
+        fa.id === `fa-${originalFee.id}` ||
+        fa.id === originalFee.id.replace('fee-', '') ||
+        (originalFee.course_id && fa.course_id === originalFee.course_id && fa.student_id === originalFee.student_id) ||
+        fa.student_id === originalFee.student_id
+    );
+    if (revFeeAccount) {
+      revFeeAccount.original_fee = newVersionFee.proposed_fee;
+      revFeeAccount.discount = newVersionFee.discount_amount;
+      revFeeAccount.discount_reason = newVersionFee.discount_reason || revFeeAccount.discount_reason;
+      revFeeAccount.net_payable = newVersionFee.final_payable;
+      revFeeAccount.paid_amount = newVersionFee.paid_amount;
+      revFeeAccount.outstanding_amount = Math.max(0, newVersionFee.final_payable - revFeeAccount.paid_amount);
+      revFeeAccount.updated_at = now;
+      revFeeAccount.status = revFeeAccount.outstanding_amount === 0 ? 'Paid' : (revFeeAccount.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+    }
+
+    const revStudent = store.students.find((s) => s.id === originalFee.student_id);
+    if (revStudent) {
+      revStudent.total_fee = newVersionFee.final_payable;
+      revStudent.discount = newVersionFee.discount_amount;
+      revStudent.outstanding_amount = Math.max(0, newVersionFee.final_payable - (revStudent.paid_amount || 0));
+      revStudent.updated_at = now;
+    }
+
     store.persist();
     return { originalFee, newFee: newVersionFee, revision };
   }
@@ -661,11 +774,13 @@ export class FeeWorkflowService {
   /**
    * Record Fee Payment
    * Strict Rule: Non-approved fees CANNOT receive payments!
-   * Non-accountants create payments with 'Pending Verification'
-   * Accountants can record direct verified payments.
+   * All manual entries remain pending until a different Accounts user approves.
    */
   public recordPayment(
     input: {
+      student_id?: string;
+      enrollment_id?: string;
+      idempotency_key?: string;
       fee_id: string;
       amount_paid: number;
       payment_mode: PaymentMethod;
@@ -681,6 +796,25 @@ export class FeeWorkflowService {
   ): StudentPaymentRecord {
     const fee = this.getStudentFeeById(input.fee_id);
     if (!fee) throw new Error(`Fee with ID ${input.fee_id} not found.`);
+    const recorder = store.users.find((u) => u.id === recorderUserId);
+    if (!recorder || recorder.is_active === false || !['counsellor', 'accountant', 'admin', 'super_admin'].includes(recorder.role)) {
+      throw new Error('Unauthorized: This user cannot record payments.');
+    }
+    assertSameTenant(recorder, fee);
+    recorderRole = recorder.role;
+    const student = store.students.find((s) => s.id === fee.student_id);
+    if (!student) throw new Error('Student not found.');
+    assertSameTenant(recorder, student);
+    const enrollmentId = fee.enrollment_id || student.admission_id;
+    if (input.student_id && input.student_id !== fee.student_id) throw new Error('Student does not match fee account.');
+    if (input.enrollment_id && input.enrollment_id !== enrollmentId) throw new Error('Enrollment does not match fee account.');
+    if (input.idempotency_key) {
+      const previous = store.studentPayments.find((p) => tenantId(p) === tenantId(recorder) && p.recorded_by === recorder.id && p.idempotency_key === input.idempotency_key);
+      if (previous) {
+        if (previous.fee_id !== fee.id || previous.amount_paid !== Number(input.amount_paid) || previous.payment_mode !== input.payment_mode || previous.transaction_reference !== input.transaction_reference || previous.payment_proof_url !== input.payment_proof_url || (input.payment_date && previous.payment_date !== input.payment_date)) throw new Error('Conflict: Idempotency key already used for another payment.');
+        return previous;
+      }
+    }
 
     if (!fee.is_payable || fee.approval_status !== 'Approved') {
       throw new Error(
@@ -689,27 +823,28 @@ export class FeeWorkflowService {
     }
 
     const amountPaid = Number(input.amount_paid);
-    if (isNaN(amountPaid) || amountPaid <= 0) {
+    if (!Number.isFinite(amountPaid) || amountPaid <= 0 || Math.abs(amountPaid * 100 - Math.round(amountPaid * 100)) > 0.000001) {
       throw new Error('Payment amount must be greater than zero.');
     }
+    this.validatePaymentDetails(fee, amountPaid, input.transaction_reference || input.bank_upi_reference);
 
     const recorderUser = store.users.find((u) => u.id === recorderUserId);
     const recorderName = recorderUser?.full_name || 'Staff User';
     const now = new Date().toISOString();
     const paymentDate = input.payment_date || now.split('T')[0];
 
-    // Determine verification status based on role and settings
-    const isAccountant = recorderRole === 'accountant' || recorderRole === 'super_admin';
-    const verificationStatus: PaymentVerificationStatus = isAccountant
-      ? 'Verified'
-      : 'Pending Verification';
+    // Manual entries are cleared only by a separate Accounts decision.
 
     const paymentId = `spr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
     const paymentRecord: StudentPaymentRecord = {
+      tenant_id: tenantId(recorder),
+      status: 'Pending Approval',
+      enrollment_id: enrollmentId,
+      idempotency_key: input.idempotency_key,
       id: paymentId,
       fee_id: fee.id,
-      installment_id: input.installment_id,
+      installment_id: undefined,
       student_id: fee.student_id,
       student_name: fee.student_name,
       admission_number: fee.admission_number,
@@ -724,23 +859,122 @@ export class FeeWorkflowService {
       recorded_by: recorderUserId,
       recorded_by_name: recorderName,
       recorded_by_role: recorderRole,
-      verification_status: verificationStatus,
-      verified_by: isAccountant ? recorderUserId : undefined,
-      verified_by_name: isAccountant ? recorderName : undefined,
-      verified_at: isAccountant ? now : undefined,
+      verification_status: 'Pending Verification',
       created_at: now,
     };
 
     if (!store.studentPayments) store.studentPayments = [];
     store.studentPayments.unshift(paymentRecord);
-
-    // If accountant recorded directly, complete the financial clearing & receipt generation
-    if (isAccountant) {
-      this.finalizeVerifiedPayment(paymentRecord, fee, recorderUserId, recorderName);
-    }
+    paymentAudit('PAYMENT_SUBMITTED', paymentRecord, recorder);
+    store.users.filter((u) => isAccountsUser(u) && tenantId(u) === tenantId(recorder)).forEach((u) =>
+      paymentNotification(u, 'Payment awaiting approval', `${fee.student_name}: ${amountPaid} submitted by ${recorder.full_name}.`, '/accounts/approvals?desk=payments', `payment-submitted:${paymentId}`));
 
     store.persist();
     return paymentRecord;
+  }
+
+  /**
+   * Counsellor or Staff Updates an Existing Pending Payment
+   * Counsellors can update payment details (amount, payment mode, transaction reference, UTR, proof, notes)
+   * while the payment is pending accountant approval.
+   */
+  public updatePayment(
+    paymentId: string,
+    updates: {
+      amount_paid?: number;
+      payment_mode?: PaymentMethod;
+      payment_date?: string;
+      transaction_reference?: string;
+      bank_upi_reference?: string;
+      payment_proof_url?: string;
+      notes?: string;
+      installment_id?: string;
+    },
+    updaterUserId: string,
+    updaterRole = 'counsellor'
+  ): StudentPaymentRecord {
+    const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
+    if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
+
+    const updater = store.users.find((u) => u.id === updaterUserId);
+    if (!updater || updater.is_active === false || (payment.recorded_by !== updater.id && !isAccountsUser(updater))) throw new Error('Unauthorized: Only the submitter or Accounts can update this payment.');
+    assertSameTenant(updater, payment);
+    updaterRole = updater.role;
+    const before = structuredClone(payment);
+
+    if (payment.verification_status === 'Verified') {
+      throw new Error('Cannot modify an already verified payment. Official receipts and general ledger entries cannot be edited directly.');
+    }
+
+    const fee = this.getStudentFeeById(payment.fee_id);
+    if (!fee) throw new Error('Associated fee not found.');
+    this.validatePaymentDetails(fee, updates.amount_paid ?? payment.amount_paid,
+      updates.transaction_reference ?? payment.transaction_reference ?? updates.bank_upi_reference ?? payment.bank_upi_reference,
+      payment.id);
+
+    const updaterUser = store.users.find((u) => u.id === updaterUserId);
+    const updaterName = updaterUser?.full_name || 'Counsellor';
+    const now = new Date().toISOString();
+
+    if (updates.amount_paid !== undefined) {
+      const amt = Number(updates.amount_paid);
+      if (isNaN(amt) || amt <= 0) {
+        throw new Error('Payment amount must be greater than zero.');
+      }
+      const fee = this.getStudentFeeById(payment.fee_id);
+      if (fee && amt > fee.final_payable) {
+        throw new Error(`Payment amount (₹${amt}) cannot exceed net payable course fee (₹${fee.final_payable}).`);
+      }
+      payment.amount_paid = amt;
+    }
+
+    if (updates.payment_mode) {
+      payment.payment_mode = updates.payment_mode;
+    }
+    if (updates.payment_date) {
+      payment.payment_date = updates.payment_date;
+    }
+    if (updates.transaction_reference !== undefined) {
+      payment.transaction_reference = updates.transaction_reference;
+    }
+    if (updates.bank_upi_reference !== undefined) {
+      payment.bank_upi_reference = updates.bank_upi_reference;
+    }
+    if (updates.payment_proof_url !== undefined) {
+      payment.payment_proof_url = updates.payment_proof_url;
+    }
+    if (updates.notes !== undefined) {
+      payment.notes = updates.notes;
+    }
+    payment.installment_id = undefined;
+
+    payment.verification_status = 'Pending Verification';
+    payment.status = 'Pending Approval';
+    payment.updated_at = now;
+    payment.updated_by = updaterUserId;
+    payment.updated_by_name = updaterName;
+    payment.updated_by_role = updaterRole;
+    paymentAudit(before.verification_status === 'Rejected' ? 'PAYMENT_RESUBMITTED' : 'PAYMENT_UPDATED', payment, updater, before);
+    store.users.filter((u) => isAccountsUser(u) && tenantId(u) === tenantId(updater)).forEach((u) =>
+      paymentNotification(u, 'Payment updated for approval', `${payment.student_name}: payment details updated.`, '/accounts/approvals?desk=payments', `payment-updated:${payment.id}:${now}`));
+
+    // Synchronize to legacy store.payments if present
+    const legacyP = (store.payments || []).find(
+      (p) => p.id === payment.id || `spr-${p.id}` === payment.id || (payment.receipt_number && p.receipt_number === payment.receipt_number)
+    );
+    if (legacyP) {
+      legacyP.amount = payment.amount_paid;
+      legacyP.payment_mode = payment.payment_mode;
+      legacyP.payment_date = payment.payment_date;
+      legacyP.transaction_reference = payment.transaction_reference || payment.bank_upi_reference || legacyP.transaction_reference;
+      legacyP.notes = payment.notes;
+      legacyP.status = 'Pending';
+    }
+
+    store.reconcileDualLedgers();
+    store.persist();
+
+    return payment;
   }
 
   /**
@@ -755,37 +989,46 @@ export class FeeWorkflowService {
     const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
 
-    if (payment.verification_status === 'Verified') {
-      throw new Error('This payment has already been verified.');
-    }
+    if (payment.verification_status !== 'Pending Verification') throw new Error('Only a payment pending approval can be approved; it may already be verified or rejected.');
 
     // Separation of duties: If recorded by a counsellor/staff who happens to be this user, enforce check
-    if (payment.recorded_by === accountantUserId && payment.recorded_by_role !== 'accountant') {
+    if (payment.recorded_by === accountantUserId) {
       throw new Error('Separation of duties violation: Payment recorder cannot verify their own payment entry.');
     }
 
     const accountantUser = store.users.find((u) => u.id === accountantUserId);
     if (
-      accountantUser &&
-      accountantUser.role !== 'accountant' &&
-      accountantUser.role !== 'super_admin'
+      !accountantUser || accountantUser.is_active === false ||
+      (accountantUser.role !== 'accountant' &&
+        accountantUser.role !== 'admin' &&
+        accountantUser.role !== 'super_admin')
     ) {
       throw new Error('Unauthorized: Only an Accountant can verify student payments.');
     }
 
     const fee = this.getStudentFeeById(payment.fee_id);
     if (!fee) throw new Error(`Associated fee ${payment.fee_id} not found.`);
+    assertSameTenant(accountantUser, payment);
+    assertSameTenant(accountantUser, fee);
+    this.validatePaymentDetails(fee, payment.amount_paid, payment.transaction_reference || payment.bank_upi_reference, payment.id);
+    if (store.receipts.some((r) => r.payment_id === payment.id) || store.studentFinancialLedgers.some((l) => l.reference_id === payment.id && l.entry_type === 'Payment Verified')) throw new Error('Payment already has financial entries.');
+    const before = structuredClone(payment);
 
     const accountantName = accountantUser?.full_name || 'Accountant';
     const now = new Date().toISOString();
 
     payment.verification_status = 'Verified';
+    payment.status = 'Approved';
     payment.verified_by = accountantUserId;
     payment.verified_by_name = accountantName;
     payment.verified_at = now;
     payment.verification_notes = verificationNotes;
 
     this.finalizeVerifiedPayment(payment, fee, accountantUserId, accountantName);
+    paymentAudit('PAYMENT_APPROVED', payment, accountantUser, before);
+    forwardApprovedPaymentToOnboarding(payment, accountantUser);
+    const recorder = store.users.find((u) => u.id === payment.recorded_by && tenantId(u) === tenantId(payment));
+    if (recorder) paymentNotification(recorder, 'Payment approved', `${payment.student_name}: payment approved and receipt ${payment.receipt_number} generated.`, '/accounts/payments', `payment-approved:${payment.id}`);
 
     store.persist();
     return payment;
@@ -806,23 +1049,53 @@ export class FeeWorkflowService {
     const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
 
-    if (payment.verification_status === 'Verified') {
+    if (payment.verification_status !== 'Pending Verification') {
       throw new Error('Cannot reject an already verified payment. Please process a refund or adjustment note.');
     }
 
     const accountantUser = store.users.find((u) => u.id === accountantUserId);
+    if (
+      !accountantUser || accountantUser.is_active === false ||
+      (accountantUser.role !== 'accountant' &&
+        accountantUser.role !== 'admin' &&
+        accountantUser.role !== 'super_admin')
+    ) {
+      throw new Error('Unauthorized: Only an Accountant can reject student payments.');
+    }
     const accountantName = accountantUser?.full_name || 'Accountant';
 
+    assertSameTenant(accountantUser, payment);
+    if (payment.recorded_by === accountantUserId) throw new Error('Separation of duties violation: Submitter cannot reject their own payment.');
+    const before = structuredClone(payment);
+
     payment.verification_status = 'Rejected';
+    payment.status = 'Rejected';
+    payment.rejection_reason = rejectionReason.trim();
+    payment.rejected_by = accountantUserId;
+    payment.rejected_at = new Date().toISOString();
     payment.verification_notes = `Rejected by ${accountantName}: ${rejectionReason}`;
+    paymentAudit('PAYMENT_REJECTED', payment, accountantUser, before);
+    const recorder = store.users.find((u) => u.id === payment.recorded_by && tenantId(u) === tenantId(payment));
+    if (recorder) paymentNotification(recorder, 'Payment returned for correction', `${payment.student_name}: ${rejectionReason.trim()}`, '/accounts/payments', `payment-rejected:${payment.id}:${payment.rejected_at}`);
 
     store.persist();
     return payment;
   }
 
   /**
-   * Finalize a verified payment: update fee paid/outstanding, ledger, and issue GST receipt
+   * Finalize a verified payment: update fee paid/outstanding, ledger, and issue a payment receipt
    */
+  private validatePaymentDetails(fee: StudentFee, amount: number, reference?: string, excludeId?: string): void {
+    const student = store.students.find((s) => s.id === fee.student_id);
+    if (!student || tenantId(student) !== tenantId(fee)) throw new Error('Student does not belong to this tenant.');
+    if (!fee.is_payable || fee.approval_status !== 'Approved') throw new Error('Fee must be approved before collecting payment.');
+    if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) throw new Error('Payment amount must be positive with at most two decimal places.');
+    if (amount > Number((fee.final_payable - fee.paid_amount).toFixed(2))) throw new Error('Payment exceeds the outstanding fee balance.');
+    const normalizedRef = reference?.trim().toLowerCase();
+    if (normalizedRef && store.studentPayments.some((p) => p.id !== excludeId && tenantId(p) === tenantId(fee) && p.verification_status !== 'Rejected' && (p.transaction_reference || p.bank_upi_reference)?.trim().toLowerCase() === normalizedRef)) throw new Error('Duplicate transaction reference.');
+
+  }
+
   private finalizeVerifiedPayment(
     payment: StudentPaymentRecord,
     fee: StudentFee,
@@ -836,24 +1109,60 @@ export class FeeWorkflowService {
     fee.outstanding_amount = Math.max(0, Number((fee.final_payable - fee.paid_amount).toFixed(2)));
     fee.updated_at = now;
 
+    // 1b. Synchronize with Legacy StudentFeeAccount
+    if (!store.feeAccounts) store.feeAccounts = [];
+    let feeAccount = store.feeAccounts.find(
+      (fa) =>
+        tenantId(fa) === tenantId(fee) && fa.student_id === fee.student_id &&
+        (fee.fee_account_id ? fa.id === fee.fee_account_id :
+          fee.enrollment_id ? fa.admission_id === fee.enrollment_id :
+            fee.course_id ? fa.course_id === fee.course_id : fa.id === `fa-${fee.id}`)
+    );
+
+    if (feeAccount) {
+      feeAccount.paid_amount = Number((feeAccount.paid_amount + payment.amount_paid).toFixed(2));
+      feeAccount.outstanding_amount = Math.max(0, Number((feeAccount.net_payable - feeAccount.paid_amount).toFixed(2)));
+      feeAccount.status = feeAccount.outstanding_amount === 0 ? 'Paid' : 'Partially Paid';
+      feeAccount.updated_at = now;
+    } else {
+      feeAccount = {
+        tenant_id: tenantId(fee),
+        id: `fa-${fee.id}`,
+        student_id: fee.student_id,
+        student_name: fee.student_name,
+        admission_id: fee.enrollment_id || fee.admission_number,
+        course_id: fee.course_id || 'crs-general',
+        course_name: fee.course_name || fee.fee_category,
+        original_fee: fee.proposed_fee,
+        discount: fee.discount_amount,
+        discount_reason: fee.discount_reason,
+        net_payable: fee.final_payable,
+        paid_amount: fee.paid_amount,
+        outstanding_amount: fee.outstanding_amount,
+        payment_plan: fee.payment_plan,
+        status: fee.outstanding_amount === 0 ? 'Paid' : 'Partially Paid',
+        created_at: fee.created_at,
+        updated_at: now,
+      };
+      store.feeAccounts.push(feeAccount);
+    }
+
+    // 1d. Synchronize with Student Profile
+    const student = store.students.find((s) => s.id === fee.student_id);
+    if (student) {
+      student.paid_amount = Number(((student.paid_amount || 0) + payment.amount_paid).toFixed(2));
+      student.outstanding_amount = Math.max(0, Number(((student.outstanding_amount || 0) - payment.amount_paid).toFixed(2)));
+      student.updated_at = now;
+    }
+
     // 2. Generate Official Receipt
-    const receiptNumber = `REC-${new Date().getFullYear()}-${String(
-      (store.receipts?.length || 0) + 1
-    ).padStart(4, '0')}`;
+    const receiptNumber = `REC-${new Date().getFullYear()}-${String(store.receipts.filter((r) => tenantId(r) === tenantId(fee)).length + 1).padStart(6, '0')}`;
     payment.receipt_number = receiptNumber;
 
-    const student = store.students.find((s) => s.id === fee.student_id);
-    const studentLocation =
-      student?.state_code || student?.state || student?.address || 'Telangana (36)';
-
-    const gstBreakdown = calculateGstBreakdown(payment.amount_paid, studentLocation, {
-      customDocNumber: receiptNumber,
-      customDocDate: payment.payment_date,
-      instituteGstin: store.settings?.gst_number || '36AAACN1234F1Z8',
-      instituteStateCode: '36',
-    });
+    const receiptDetails = receiptAmounts(payment.amount_paid);
 
     const receipt = {
+      tenant_id: tenantId(fee),
       id: `rcpt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       receipt_number: receiptNumber,
       payment_id: payment.id,
@@ -871,28 +1180,65 @@ export class FeeWorkflowService {
       institute_address:
         store.settings?.address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
       institute_phone: store.settings?.phone || '+91 98765 43210',
-      institute_gst: store.settings?.gst_number || '36AAACN1234F1Z8',
-      supply_type: gstBreakdown.supply_type,
-      place_of_supply: gstBreakdown.place_of_supply,
-      place_of_supply_code: gstBreakdown.place_of_supply_code,
-      sac_code: gstBreakdown.sac_code,
-      taxable_amount: gstBreakdown.taxable_amount,
-      cgst_rate: gstBreakdown.cgst_rate,
-      cgst_amount: gstBreakdown.cgst_amount,
-      sgst_rate: gstBreakdown.sgst_rate,
-      sgst_amount: gstBreakdown.sgst_amount,
-      igst_rate: gstBreakdown.igst_rate,
-      igst_amount: gstBreakdown.igst_amount,
-      total_tax: gstBreakdown.total_tax,
+      institute_gst: '',
+      supply_type: receiptDetails.supply_type,
+      place_of_supply: receiptDetails.place_of_supply,
+      place_of_supply_code: receiptDetails.place_of_supply_code,
+      sac_code: receiptDetails.sac_code,
+      taxable_amount: receiptDetails.taxable_amount,
+      cgst_rate: receiptDetails.cgst_rate,
+      cgst_amount: receiptDetails.cgst_amount,
+      sgst_rate: receiptDetails.sgst_rate,
+      sgst_amount: receiptDetails.sgst_amount,
+      igst_rate: receiptDetails.igst_rate,
+      igst_amount: receiptDetails.igst_amount,
+      total_tax: receiptDetails.total_tax,
       is_reverse_charge: false,
-      irn: gstBreakdown.irn,
-      ack_no: gstBreakdown.ack_no,
-      ack_date: gstBreakdown.ack_date,
+      irn: receiptDetails.irn,
+      ack_no: receiptDetails.ack_no,
+      ack_date: receiptDetails.ack_date,
       created_at: now,
     };
 
     if (!store.receipts) store.receipts = [];
     store.receipts.push(receipt);
+
+    // 2b. Synchronize with Legacy Payments Store
+    if (!store.payments) store.payments = [];
+    const existingLegacyPayment = store.payments.find(
+      (p) => p.id === payment.id || p.id === `pay-${payment.id}` || (payment.receipt_number && p.receipt_number === payment.receipt_number)
+    );
+    if (!existingLegacyPayment) {
+      const legacyPayment: Payment = {
+        tenant_id: tenantId(fee),
+        id: payment.id.startsWith('pay-') ? payment.id : `pay-${payment.id}`,
+        receipt_number: receiptNumber,
+        student_id: fee.student_id,
+        student_name: fee.student_name,
+        admission_number: fee.admission_number,
+        fee_account_id: feeAccount.id,
+        installment_id: undefined,
+        course_id: fee.course_id || feeAccount.course_id,
+        course_name: fee.course_name || feeAccount.course_name,
+        amount: payment.amount_paid,
+        payment_date: payment.payment_date,
+        payment_mode: payment.payment_mode,
+        transaction_reference: payment.transaction_reference || payment.bank_upi_reference,
+        status: 'Success',
+        collected_by: payment.recorded_by,
+        collected_by_name: payment.recorded_by_name,
+        notes: payment.notes,
+        created_at: now,
+      };
+      store.payments.unshift(legacyPayment);
+    } else {
+      Object.assign(existingLegacyPayment, {
+        amount: payment.amount_paid, receipt_number: receiptNumber, status: 'Success',
+        payment_mode: payment.payment_mode, payment_date: payment.payment_date,
+        transaction_reference: payment.transaction_reference || payment.bank_upi_reference,
+        notes: payment.notes,
+      });
+    }
 
     // 3. Post to Student Financial Ledger
     this.recordLedgerEntry({
@@ -988,6 +1334,27 @@ export class FeeWorkflowService {
       description: `Refund processed: ${refund.refund_reason} (Txn: ${transactionReference})`,
       recorded_by: accountantUserId,
     });
+
+    // Dual-Ledger Sync: Adjust balances on StudentFee, StudentFeeAccount, and Student Profile
+    const fee = (store.studentFees || []).find((f) => f.id === refund.fee_id);
+    if (fee) {
+      fee.paid_amount = Math.max(0, Number((fee.paid_amount - refund.refund_amount).toFixed(2)));
+      fee.outstanding_amount = Math.min(fee.final_payable, Number((fee.outstanding_amount + refund.refund_amount).toFixed(2)));
+      fee.updated_at = now;
+    }
+    const feeAccount = (store.feeAccounts || []).find((fa) => fa.student_id === refund.student_id);
+    if (feeAccount) {
+      feeAccount.paid_amount = Math.max(0, Number((feeAccount.paid_amount - refund.refund_amount).toFixed(2)));
+      feeAccount.outstanding_amount = Math.min(feeAccount.net_payable, Number((feeAccount.outstanding_amount + refund.refund_amount).toFixed(2)));
+      feeAccount.status = feeAccount.paid_amount === 0 ? 'Unpaid' : 'Partially Paid';
+      feeAccount.updated_at = now;
+    }
+    const student = (store.students || []).find((s) => s.id === refund.student_id);
+    if (student) {
+      student.paid_amount = Math.max(0, Number(((student.paid_amount || 0) - refund.refund_amount).toFixed(2)));
+      student.outstanding_amount = Math.min(student.total_fee || 0, Number(((student.outstanding_amount || 0) + refund.refund_amount).toFixed(2)));
+      student.updated_at = now;
+    }
 
     store.persist();
     return refund;
@@ -1145,6 +1512,7 @@ export class FeeWorkflowService {
   }): StudentFinancialLedgerEntry {
     const id = `sfl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newEntry: StudentFinancialLedgerEntry = {
+      tenant_id: tenantId(store.students.find((s) => s.id === entry.student_id) || {}),
       id,
       ...entry,
       running_balance: 0, // Computed dynamically in getStudentLedgerEntries
@@ -1182,6 +1550,111 @@ export class FeeWorkflowService {
 
     if (!store.feeApprovalHistories) store.feeApprovalHistories = [];
     store.feeApprovalHistories.push(historyItem);
+  }
+
+  /**
+   * Void Receipt & Issue Credit Note
+   * Reverses financial payment, restores student outstanding balance, updates ledger, and issues Credit Note.
+   */
+  public voidReceipt(
+    receiptId: string,
+    accountantUserId: string,
+    reason: string
+  ): { receipt: Receipt; creditNoteNumber: string } {
+    if (!reason || !reason.trim()) {
+      throw new Error('A mandatory reason is required to void an official receipt and issue a Credit Note.');
+    }
+
+    const accountantUser = store.users.find((u) => u.id === accountantUserId);
+    if (
+      accountantUser &&
+      accountantUser.role !== 'accountant' &&
+      accountantUser.role !== 'admin' &&
+      accountantUser.role !== 'super_admin'
+    ) {
+      throw new Error('Unauthorized: Only an Accountant or Administrator can void official receipts.');
+    }
+
+    const receipt = (store.receipts || []).find((r) => r.id === receiptId || r.receipt_number === receiptId);
+    if (!receipt) throw new Error(`Receipt with ID ${receiptId} not found.`);
+
+    if (receipt.status === 'Void') {
+      throw new Error('This receipt has already been voided.');
+    }
+
+    const now = new Date().toISOString();
+    const accountantName = accountantUser?.full_name || 'Accountant';
+    const creditNoteNumber = `CN-${new Date().getFullYear()}-${String(
+      ((store.receipts || []).filter((r) => r.status === 'Void').length) + 1
+    ).padStart(4, '0')}`;
+
+    receipt.status = 'Void';
+    receipt.void_at = now;
+    receipt.void_by = accountantName;
+    receipt.void_reason = reason.trim();
+    receipt.credit_note_number = creditNoteNumber;
+
+    // 1. Mark associated payment as Refunded / Failed
+    const studentPayment = (store.studentPayments || []).find(
+      (sp) => sp.id === receipt.payment_id || sp.receipt_number === receipt.receipt_number
+    );
+    if (studentPayment) {
+      studentPayment.verification_status = 'Rejected';
+      studentPayment.notes = `Voided / Reversed via Credit Note ${creditNoteNumber}: ${reason}`;
+    }
+
+    const legacyPayment = (store.payments || []).find(
+      (p) => p.id === receipt.payment_id || p.receipt_number === receipt.receipt_number
+    );
+    if (legacyPayment) {
+      legacyPayment.status = 'Refunded';
+      legacyPayment.notes = `Voided / Reversed via Credit Note ${creditNoteNumber}: ${reason}`;
+    }
+
+    // 2. Reverse balances on StudentFee & StudentFeeAccount
+    const fee = studentPayment
+      ? (store.studentFees || []).find((f) => f.id === studentPayment.fee_id)
+      : (store.studentFees || []).find((f) => f.student_id === receipt.student_id);
+
+    if (fee) {
+      fee.paid_amount = Math.max(0, Number((fee.paid_amount - receipt.payment_amount).toFixed(2)));
+      fee.outstanding_amount = Number((fee.final_payable - fee.paid_amount).toFixed(2));
+      fee.updated_at = now;
+    }
+
+    const feeAccount = (store.feeAccounts || []).find((fa) => fa.student_id === receipt.student_id);
+    if (feeAccount) {
+      feeAccount.paid_amount = Math.max(0, Number((feeAccount.paid_amount - receipt.payment_amount).toFixed(2)));
+      feeAccount.outstanding_amount = Number((feeAccount.net_payable - feeAccount.paid_amount).toFixed(2));
+      feeAccount.status = feeAccount.paid_amount === 0 ? 'Unpaid' : 'Partially Paid';
+      feeAccount.updated_at = now;
+    }
+
+    const student = (store.students || []).find((s) => s.id === receipt.student_id);
+    if (student) {
+      student.paid_amount = Math.max(0, Number(((student.paid_amount || 0) - receipt.payment_amount).toFixed(2)));
+      student.outstanding_amount = Number(((student.outstanding_amount || 0) + receipt.payment_amount).toFixed(2));
+      student.updated_at = now;
+    }
+
+    // 4. Record Credit Note entry in Student Financial Ledger
+    this.recordLedgerEntry({
+      student_id: receipt.student_id,
+      entry_date: now.split('T')[0],
+      entry_type: 'Credit Note',
+      fee_category: fee?.fee_category || 'Tuition Fee',
+      reference_type: 'Credit Note',
+      reference_id: creditNoteNumber,
+      debit: receipt.payment_amount,
+      credit: 0,
+      description: `Credit Note ${creditNoteNumber} issued for voided receipt ${receipt.receipt_number}: ${reason}`,
+      recorded_by: accountantUserId,
+    });
+
+    store.reconcileDualLedgers();
+    store.persist();
+
+    return { receipt, creditNoteNumber };
   }
 }
 

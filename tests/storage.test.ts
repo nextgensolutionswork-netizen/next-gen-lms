@@ -121,6 +121,31 @@ describe('9. Storage & File Upload Tests (Resumes, Screenshots, Assignments)', (
       expect(res.valid).toBe(false);
       expect(res.error).toContain('Invalid file format');
     });
+
+    it('approves PDF and image identity documents for onboarding documents bucket', () => {
+      const docPdf = {
+        name: 'aadhaar_card.pdf',
+        size: 2 * 1024 * 1024,
+        type: 'application/pdf',
+      };
+      expect(validateFile(docPdf, 'documents').valid).toBe(true);
+
+      const docImage = {
+        name: 'degree_certificate.jpg',
+        size: 4 * 1024 * 1024,
+        type: 'image/jpeg',
+      };
+      expect(validateFile(docImage, 'documents').valid).toBe(true);
+
+      const invalidDoc = {
+        name: 'malware.bat',
+        size: 5 * 1024,
+        type: 'application/x-bat',
+      };
+      const res = validateFile(invalidDoc, 'documents');
+      expect(res.valid).toBe(false);
+      expect(res.error).toContain('Invalid file format');
+    });
   });
 
   describe('Storage Path Generation', () => {

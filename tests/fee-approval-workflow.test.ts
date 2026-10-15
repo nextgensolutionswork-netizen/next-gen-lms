@@ -16,6 +16,8 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
     store.studentPayments = [];
     store.studentFinancialLedgers = [];
     store.feeRevisionRequests = [];
+    store.feeAccounts = [];
+    store.installments = [];
   });
 
   describe('1. Fee Category Management & Proposal Creation', () => {
@@ -32,7 +34,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       expect(placementCategory?.reference_type).toBe('Placement');
     });
 
-    it('creates a new fee proposal with auto-calculated GST and discounts', () => {
+    it('creates a new fee proposal with discounts without adding tax', () => {
       const proposal = feeWorkflowService.createFeeProposal(
         {
           student_id: testStudentId,
@@ -44,6 +46,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           discount_reason: 'Merit scholarship',
           payment_plan: '2 Installments',
           number_of_installments: 2,
+          tax_gst_amount: 9000, // Retired inputs cannot re-enable tax or schedules.
           auto_submit: false,
         },
         counsellorId,
@@ -57,9 +60,9 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       expect(proposal.discount_amount).toBe(10000);
       expect(proposal.discount_percentage).toBeCloseTo(16.67, 1);
       // Net fee = 50,000, 18% GST = 9,000, Final payable = 59,000
-      expect(proposal.tax_gst_amount).toBe(9000);
-      expect(proposal.final_payable).toBe(59000);
-      expect(proposal.outstanding_amount).toBe(59000);
+      expect(proposal.tax_gst_amount).toBe(0);
+      expect(proposal.final_payable).toBe(50000);
+      expect(proposal.outstanding_amount).toBe(50000);
       expect(proposal.approval_status).toBe('Draft');
       expect(proposal.is_payable).toBe(false);
       expect(proposal.counsellor_id).toBe(counsellorId);
@@ -213,7 +216,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       expect(resubmitted.approval_status).toBe('Pending Accountant Approval');
       expect(resubmitted.discount_amount).toBe(1500);
       // Net fee = 8,500, GST = 1,530, Final = 10,030
-      expect(resubmitted.final_payable).toBe(10030);
+      expect(resubmitted.final_payable).toBe(8500);
     });
   });
 
@@ -279,7 +282,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       // Invariant: Unverified payment does NOT update fee paid_amount yet!
       const feeCheck = feeWorkflowService.getStudentFeeById(approvedFee.id);
       expect(feeCheck?.paid_amount).toBe(0);
-      expect(feeCheck?.outstanding_amount).toBe(59000);
+      expect(feeCheck?.outstanding_amount).toBe(50000);
     });
 
     it('enforces separation of duties on payment verification', () => {
@@ -329,7 +332,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       // Check fee balances were updated
       const updatedFee = feeWorkflowService.getStudentFeeById(approvedFee.id);
       expect(updatedFee?.paid_amount).toBe(20000);
-      expect(updatedFee?.outstanding_amount).toBe(39000); // 59000 - 20000
+      expect(updatedFee?.outstanding_amount).toBe(30000); // 50000 - 20000
 
       // Check receipt was issued in store
       const receipt = (store.receipts || []).find((r) => r.payment_id === payment.id);
@@ -343,7 +346,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       expect(paymentEntry).toBeDefined();
       expect(paymentEntry?.entry_type).toBe('Payment Verified');
       expect(paymentEntry?.credit).toBe(20000);
-      expect(paymentEntry?.running_balance).toBe(39000);
+      expect(paymentEntry?.running_balance).toBe(30000);
     });
   });
 
@@ -371,7 +374,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
         'Student granted additional ₹5,000 scholarship by director',
         {
           discount_amount: 10000,
-          final_payable: 59000,
+          final_payable: 50000,
         }
       );
 
@@ -437,7 +440,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       const approved = feeWorkflowService.approveFee(fee.id, accountantId);
 
       // Accountant records full payment directly
-      feeWorkflowService.recordPayment(
+      const payment = feeWorkflowService.recordPayment(
         {
           fee_id: approved.id,
           amount_paid: approved.final_payable,
@@ -446,6 +449,10 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
         accountantId,
         'accountant'
       );
+
+      const secondAccountant = { ...store.users.find((u) => u.id === accountantId)!, id: 'accounts-second-reviewer' };
+      store.users.push(secondAccountant);
+      feeWorkflowService.verifyPayment(payment.id, secondAccountant.id);
 
       const summary = feeWorkflowService.getStudentFinancialSummary(testStudentId);
       expect(summary.outstanding_balance).toBe(0);
@@ -457,6 +464,101 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       );
       expect(clearance.is_cleared).toBe(true);
       expect(clearance.outstanding_balance).toBe(0);
+    });
+  });
+
+  describe('7. Single Balance & Resubmission Integration', () => {
+    it('ignores retired schedule inputs and approves one fee balance', () => {
+      const proposal = feeWorkflowService.createFeeProposal(
+        {
+          student_id: testStudentId,
+          fee_category: 'Course Fee',
+          standard_fee: 60000,
+          proposed_fee: 60000,
+          discount_amount: 10000,
+          discount_reason: 'Early admission scholarship',
+          payment_plan: '3 Installments',
+          number_of_installments: 3,
+          first_due_date: '2026-03-01',
+          auto_submit: true,
+        },
+        counsellorId,
+        'counsellor'
+      );
+
+      // Proposal is Pending Accountant Approval, no installments yet
+      expect(store.installments.length).toBe(0);
+
+      // Independent accountant approves proposal
+      const approved = feeWorkflowService.approveFee(
+        proposal.id,
+        accountantId,
+        'Approved with 3 installment plan'
+      );
+
+      expect(approved.approval_status).toBe('Approved');
+      expect(approved.fee_account_id).toBeDefined();
+
+      expect(store.installments).toHaveLength(0);
+      expect(approved.number_of_installments).toBe(0);
+      expect(approved.tax_gst_amount).toBe(0);
+      expect(approved.final_payable).toBe(50000);
+    });
+
+    it('keeps a corrected proposal as one fee balance despite legacy schedule inputs', () => {
+      const initialProposal = feeWorkflowService.createFeeProposal(
+        {
+          student_id: testStudentId,
+          fee_category: 'Course Fee',
+          standard_fee: 50000,
+          proposed_fee: 50000,
+          discount_amount: 10000,
+          payment_plan: '2 Installments',
+          number_of_installments: 2,
+          first_due_date: '2026-04-01',
+          auto_submit: true,
+        },
+        counsellorId,
+        'counsellor'
+      );
+
+      // Accountant requests correction
+      feeWorkflowService.requestFeeCorrection(
+        initialProposal.id,
+        accountantId,
+        'Please split into 3 installments with max 5000 discount',
+        'Company policy caps standard discounts at 5k'
+      );
+
+      // Counsellor updates and resubmits
+      const resubmitted = feeWorkflowService.updateAndResubmitFee(
+        initialProposal.id,
+        counsellorId,
+        {
+          discount_amount: 5000,
+          discount_reason: 'Adjusted to compliant 5,000 policy',
+          payment_plan: '3 Installments',
+          number_of_installments: 3,
+          first_due_date: '2026-04-15',
+          fee_category: 'Course Fee',
+        }
+      );
+
+      expect(resubmitted.approval_status).toBe('Pending Accountant Approval');
+      expect(resubmitted.number_of_installments).toBe(0);
+
+      // Accountant approves the resubmitted proposal
+      const approved = feeWorkflowService.approveFeeProposal(
+        resubmitted.id,
+        accountantId,
+        'Approved after correction'
+      );
+
+      expect(approved.approval_status).toBe('Approved');
+      const insts = store.installments.filter((i) => i.fee_account_id === approved.fee_account_id);
+      expect(insts).toHaveLength(0);
+      expect(approved.final_payable).toBe(45000);
+      expect(approved.outstanding_amount).toBe(45000);
     });
   });
 });

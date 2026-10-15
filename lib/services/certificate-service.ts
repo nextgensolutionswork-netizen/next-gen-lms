@@ -13,8 +13,9 @@ export async function getCertificates(): Promise<Certificate[]> {
 }
 
 export async function getCertificateByVerificationId(idOrCode: string): Promise<Certificate | undefined> {
-  return store.certificates.find(
-    (c) => c.certificate_id.toLowerCase() === idOrCode.toLowerCase() || c.id === idOrCode
+  if (!idOrCode) return undefined;
+  return (store.certificates || []).find(
+    (c) => c.certificate_id?.toLowerCase() === idOrCode?.toLowerCase() || c.id === idOrCode
   );
 }
 
@@ -128,4 +129,34 @@ export async function verifyAndGenerateCertificate(
   }).catch((err) => console.warn('Certificate notification dispatch error:', err));
 
   return { eligible: true, reasons: [], certificate: cert };
+}
+
+export async function revokeCertificate(
+  certificateId: string,
+  revokedByUserId: string,
+  reason: string = 'Administrative Revocation'
+): Promise<Certificate | null> {
+  const cert = (store.certificates || []).find(
+    (c) => c.certificate_id?.toLowerCase() === certificateId?.toLowerCase() || c.id === certificateId
+  );
+  if (!cert) return null;
+  cert.is_valid = false;
+  cert.status = 'Revoked';
+  cert.revocation_reason = reason;
+  cert.revoked_at = new Date().toISOString();
+  cert.revoked_by = revokedByUserId;
+  store.persist();
+
+  const revoker = (store.users || []).find((u) => u.id === revokedByUserId);
+  await recordAuditLog({
+    user_id: revokedByUserId,
+    user_name: revoker?.full_name || 'Admin',
+    user_role: revoker?.role || 'admin',
+    action: 'CERTIFICATE_REVOKED',
+    module: 'CERTIFICATES',
+    record_id: cert.id,
+    new_value: { certificate_id: cert.certificate_id, reason, is_valid: false },
+  });
+
+  return cert;
 }

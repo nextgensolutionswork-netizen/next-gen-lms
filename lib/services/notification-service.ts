@@ -271,6 +271,69 @@ export function buildCertificateEmailHtml(data: {
   `;
 }
 
+export function buildStudentWelcomeEmailHtml(data: {
+  studentName: string;
+  courseName: string;
+  admissionNumber: string;
+  batchName?: string;
+  orientationDate?: string;
+  orientationMode?: string;
+  portalUrl: string;
+  coordinatorName?: string;
+  coordinatorPhone?: string;
+  helpdeskEmail?: string;
+}): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+      <div style="background-color: #0A6ED1; padding: 26px; text-align: center; color: #ffffff;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;">NEXT-GEN ERP SOLUTIONS</h1>
+        <p style="margin: 6px 0 0; font-size: 14px; opacity: 0.95;">Welcome to Your Professional SAP Learning Journey!</p>
+      </div>
+      <div style="padding: 26px; color: #1e293b; line-height: 1.6;">
+        <p style="font-size: 16px; margin-top: 0;">Dear <strong>${data.studentName}</strong>,</p>
+        <p style="font-size: 14px; color: #475569;">
+          We are thrilled to welcome you to Next-Gen ERP Solutions Academy! Your enrollment for <strong>${data.courseName}</strong> has been officially confirmed (Admission Number: <strong style="font-family: monospace;">${data.admissionNumber}</strong>).
+        </p>
+
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin: 22px 0; font-size: 13px;">
+          <h3 style="margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #0A6ED1; font-weight: 700;">
+            Orientation & Batch Information
+          </h3>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #64748b;">Assigned Batch:</span>
+            <strong style="color: #0f172a;">${data.batchName || 'Allocated prior to induction'}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #64748b;">Orientation Schedule:</span>
+            <strong style="color: #059669;">${data.orientationDate ? `${data.orientationDate} (${data.orientationMode || 'Online'})` : 'Scheduled soon by coordinator'}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">Onboarding Coordinator:</span>
+            <strong style="color: #0f172a;">${data.coordinatorName || 'Student Success Desk'}${data.coordinatorPhone ? ` (${data.coordinatorPhone})` : ''}</strong>
+          </div>
+        </div>
+
+        <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 6px; padding: 16px; margin: 20px 0; font-size: 13px; color: #14532d;">
+          <p style="margin: 0; font-weight: 700;">LMS Student Portal Access:</p>
+          <p style="margin: 6px 0 0;">
+            Your portal account gives you access to live classes, SAP GUI lab server credentials, course curricula, and mentor doubt resolution desks.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${data.portalUrl}" style="background-color: #0A6ED1; color: #ffffff; padding: 13px 32px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 8px; display: inline-block;">
+            Log In to Student Portal
+          </a>
+        </div>
+
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">
+          Need support? Reach out to your coordinator or email us at ${data.helpdeskEmail || 'support@next-generpsolutions.com'}.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
 /**
  * Unified Multi-Channel Dispatcher
  * Sends in-app notification, triggers real-time SSE/WebSocket broadcast,
@@ -283,6 +346,7 @@ export async function dispatchMultiChannelNotification(
   realtimeEvent: any;
   emailResult?: { success: boolean; id?: string; simulated?: boolean; error?: string };
   whatsAppResult?: { success: boolean; id?: string; simulated?: boolean; error?: string };
+  smsResult?: { success: boolean; id?: string; simulated?: boolean; error?: string };
 }> {
   const channels = payload.channels || ['in_app', 'email', 'whatsapp'];
 
@@ -362,13 +426,33 @@ export async function dispatchMultiChannelNotification(
     });
   }
 
+  // 5. SMS Dispatch (GSM Gateway Simulation)
+  let smsResult: { success: boolean; id?: string; simulated?: boolean; error?: string } | undefined;
+  if (channels.includes('sms') && payload.recipientPhone) {
+    const normalizedPhone = normalizePhoneNumber(payload.recipientPhone);
+    console.log(
+      `[SMS Gateway Mock] (To: ${normalizedPhone} | Message: "${payload.message.slice(0, 120)}...")`
+    );
+    smsResult = {
+      success: true,
+      id: `sim_sms_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      simulated: true,
+    };
+  }
+
   return {
     notification,
     realtimeEvent,
     emailResult,
     whatsAppResult,
+    smsResult,
   };
 }
+
+/**
+ * Alias for dispatchMultiChannelNotification
+ */
+export const sendMultiChannelNotification = dispatchMultiChannelNotification;
 
 /**
  * Fetch notifications for a specific user ID

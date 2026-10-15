@@ -72,7 +72,13 @@ export function exportToCSV<T extends Record<string, any>>(filename: string, row
         return keys
           .map((k) => {
             let cell = row[k] === null || row[k] === undefined ? '' : row[k];
-            cell = cell instanceof Date ? cell.toLocaleString() : cell.toString();
+            if (cell instanceof Date) {
+              cell = cell.toLocaleString();
+            } else if (typeof cell === 'object') {
+              cell = JSON.stringify(cell);
+            } else {
+              cell = cell.toString();
+            }
             cell = cell.replace(/"/g, '""');
             if (cell.search(/("|,|\n)/g) >= 0) {
               cell = `"${cell}"`;

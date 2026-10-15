@@ -141,7 +141,8 @@ export async function updateLeadStage(
   leadId: string,
   stage: LeadStage,
   notes: string,
-  counsellorId: string
+  counsellorId: string,
+  followUpDate?: string | null
 ): Promise<Lead> {
   const lead = store.leads.find((l) => l.id === leadId);
   if (!lead) throw new Error('Lead not found');
@@ -149,6 +150,9 @@ export async function updateLeadStage(
   const oldStage = lead.stage;
   lead.stage = stage;
   lead.updated_at = new Date().toISOString();
+  if (followUpDate !== undefined) {
+    lead.follow_up_date = followUpDate ? followUpDate : undefined;
+  }
   if (notes) {
     lead.notes = `${lead.notes ? lead.notes + '\n' : ''}[${new Date().toLocaleDateString('en-IN')}] ${notes}`;
   }
@@ -162,6 +166,7 @@ export async function updateLeadStage(
         .update({
           stage,
           notes: lead.notes,
+          follow_up_date: lead.follow_up_date || null,
           updated_at: lead.updated_at,
         })
         .eq('id', leadId);
@@ -189,10 +194,29 @@ export async function updateLeadStage(
     module: 'CRM',
     record_id: leadId,
     old_value: { stage: oldStage },
-    new_value: { stage, notes },
+    new_value: { stage, notes, follow_up_date: lead.follow_up_date },
   });
 
   return lead;
+}
+
+/**
+ * Mark a follow-up or demo completed.
+ * Clears the active follow-up date and transitions stage to 'Demo Attended' or 'Interested'.
+ */
+export async function completeFollowup(
+  leadId: string,
+  counsellorId: string,
+  notes: string = 'Follow-up marked as completed',
+  nextStage?: LeadStage
+): Promise<Lead> {
+  const lead = store.leads.find((l) => l.id === leadId);
+  if (!lead) throw new Error('Lead not found');
+
+  const resolvedStage: LeadStage =
+    nextStage || (lead.stage === 'Demo Scheduled' ? 'Demo Attended' : 'Interested');
+
+  return updateLeadStage(leadId, resolvedStage, `[COMPLETED] ${notes}`, counsellorId, null);
 }
 
 /**
@@ -217,7 +241,7 @@ export function convertLeadToAdmission(leadId: string): {
     email: lead.email,
     phone: lead.phone,
     city: 'Hyderabad',
-    education: lead.current_status || 'Graduate / B.Tech / MBA',
+    education: lead.education || lead.current_status || 'Graduate / B.Tech / MBA',
     experience_years: lead.experience_years ?? 1,
     course_id: lead.interested_course_id || (store.courses[0]?.id ?? ''),
     counsellor_id: lead.counsellor_id,
@@ -227,4 +251,109 @@ export function convertLeadToAdmission(leadId: string): {
   };
 
   return { lead, admissionPrefill };
+}
+
+export async function bulkAssignLeads(
+  leadIds: string[],
+  counsellorId: string,
+  assignedByUserId: string
+): Promise<number> {
+  const counsellor = store.users.find((u) => u.id === counsellorId);
+  const counsellorName = counsellor?.full_name || 'Assigned Counsellor';
+  let count = 0;
+
+  for (const id of leadIds) {
+    const lead = store.leads.find((l) => l.id === id);
+    if (lead) {
+      lead.counsellor_id = counsellorId;
+      lead.counsellor_name = counsellorName;
+      lead.updated_at = new Date().toISOString();
+      count++;
+    }
+  }
+
+  if (count > 0) {
+    store.persist();
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const supabase = createClient();
+        await supabase
+          .from('leads')
+          .update({
+            counsellor_id: counsellorId,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', leadIds);
+      } catch (err) {
+        console.warn('Supabase bulkAssignLeads warning:', err);
+      }
+    }
+
+    const assignedBy = store.users.find((u) => u.id === assignedByUserId);
+    await recordAuditLog({
+      user_id: assignedByUserId,
+      user_name: assignedBy?.full_name || 'Staff',
+      user_role: 'counsellor',
+      action: 'LEADS_BULK_ASSIGNED',
+      module: 'CRM',
+      record_id: leadIds.join(','),
+      new_value: { count, counsellorId, counsellorName, leadIds },
+    });
+  }
+
+  return count;
+}
+
+export async function bulkUpdateLeadStage(
+  leadIds: string[],
+  stage: LeadStage,
+  updatedByUserId: string,
+  notes?: string
+): Promise<number> {
+  let count = 0;
+  const now = new Date().toISOString();
+  const dateLabel = new Date().toLocaleDateString('en-IN');
+
+  for (const id of leadIds) {
+    const lead = store.leads.find((l) => l.id === id);
+    if (lead) {
+      lead.stage = stage;
+      lead.updated_at = now;
+      if (notes) {
+        lead.notes = `${lead.notes ? lead.notes + '\n' : ''}[${dateLabel}] [Bulk Stage Update]: ${notes}`;
+      }
+      count++;
+    }
+  }
+
+  if (count > 0) {
+    store.persist();
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const supabase = createClient();
+        await supabase
+          .from('leads')
+          .update({
+            stage,
+            updated_at: now,
+          })
+          .in('id', leadIds);
+      } catch (err) {
+        console.warn('Supabase bulkUpdateLeadStage warning:', err);
+      }
+    }
+
+    const updatedBy = store.users.find((u) => u.id === updatedByUserId);
+    await recordAuditLog({
+      user_id: updatedByUserId,
+      user_name: updatedBy?.full_name || 'Staff',
+      user_role: 'counsellor',
+      action: 'LEADS_BULK_STAGE_UPDATED',
+      module: 'CRM',
+      record_id: leadIds.join(','),
+      new_value: { count, stage, leadIds },
+    });
+  }
+
+  return count;
 }

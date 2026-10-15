@@ -10,10 +10,12 @@ import {
   requestReEnrollment,
   verifyEnrollmentDocument,
   applyForJob,
+  updateJobApplicationStatus,
   getPlacementEligibilitySettings,
   updatePlacementEligibilitySettings,
+  updatePlacementProfile,
 } from '@/lib/services/placement-service';
-import { PlacementEnrollment } from '@/types';
+import { PlacementEnrollment, PlacementProfile } from '@/types';
 
 describe('Placement Enrollment & Eligibility Architecture', () => {
   const testStudentId = 'stu-01'; // Amit Gupta (initially Not Enrolled in seeds)
@@ -288,7 +290,7 @@ describe('Placement Enrollment & Eligibility Architecture', () => {
       // 3. Complete mock interview with >= 75 score
       let profile = store.placementProfiles.find((p) => p.student_id === testStudentId);
       if (!profile) {
-        profile = {
+        const newProfile: PlacementProfile = {
           id: `pp-${Date.now()}`,
           student_id: testStudentId,
           student_name: 'Amit Gupta',
@@ -300,11 +302,12 @@ describe('Placement Enrollment & Eligibility Architecture', () => {
           experience_years: 0,
           preferred_location: 'Delhi',
           expected_salary_lpa: 7,
-          placement_status: 'In Progress',
+          placement_status: 'Job Search',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        store.placementProfiles.push(profile);
+        store.placementProfiles.push(newProfile);
+        profile = newProfile;
       } else {
         profile.resume_status = 'Reviewed & Approved';
         profile.mock_interview_status = 'Completed';
@@ -408,6 +411,86 @@ describe('Placement Enrollment & Eligibility Architecture', () => {
       expect(histories.length).toBeGreaterThanOrEqual(3);
       expect(histories.some((h) => h.new_status === 'Student Withdrawn')).toBe(true);
       expect(histories.some((h) => h.new_status === 'Re-enrollment Requested')).toBe(true);
+    });
+
+    it('allows placement coordinator to refer eligible student and manage application status lifecycle', async () => {
+      // Set student as eligible via coordinator override
+      await overridePlacementEligibility(
+        enrollment.id,
+        'usr-placement',
+        'Coordinator referred candidate for enterprise drive.'
+      );
+
+      const job = store.jobOpenings[0];
+      const coordinatorId = 'usr-placement';
+
+      // Coordinator applies candidate to open job
+      const application = await applyForJob(job.id, testStudentId, coordinatorId);
+      expect(application).toBeDefined();
+      expect(application.status).toBe('Applied');
+      expect(application.job_id).toBe(job.id);
+      expect(application.student_id).toBe(testStudentId);
+
+      // Coordinator advances application to Shortlisted
+      const shortlisted = await updateJobApplicationStatus(application.id, 'Shortlisted', coordinatorId);
+      expect(shortlisted.status).toBe('Shortlisted');
+
+      // Coordinator advances application to Selected
+      const selected = await updateJobApplicationStatus(application.id, 'Selected', coordinatorId);
+      expect(selected.status).toBe('Selected');
+    });
+
+    it('accurately stores and preserves legitimate interview score of 0 without resetting to defaults', async () => {
+      const coordinatorId = 'usr-placement';
+
+      // Ensure placement profile exists for student
+      let profile = store.placementProfiles.find((p) => p.student_id === testStudentId);
+      if (!profile) {
+        profile = {
+          id: `pp-${testStudentId}`,
+          student_id: testStudentId,
+          student_name: 'Amit Gupta',
+          resume_status: 'Reviewed & Approved',
+          mock_interview_status: 'Completed',
+          placement_status: 'Mock Interview',
+          skills: ['SAP FICO', 'General Ledger'],
+          experience_years: 1,
+          preferred_location: 'Hyderabad',
+          expected_salary_lpa: 6,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        store.placementProfiles.push(profile);
+      }
+
+      // Update with score 0
+      const updated = await updatePlacementProfile(
+        testStudentId,
+        {
+          technical_interview_score: 0,
+          hr_interview_score: 0,
+          mock_interview_status: 'Needs Retake',
+        },
+        coordinatorId
+      );
+
+      expect(updated.technical_interview_score).toBe(0);
+      expect(updated.hr_interview_score).toBe(0);
+      expect(typeof updated.technical_interview_score).toBe('number');
+      expect(typeof updated.hr_interview_score).toBe('number');
+
+      // Update with score clearing (undefined)
+      const cleared = await updatePlacementProfile(
+        testStudentId,
+        {
+          technical_interview_score: undefined,
+          hr_interview_score: undefined,
+        },
+        coordinatorId
+      );
+
+      expect(cleared.technical_interview_score).toBeUndefined();
+      expect(cleared.hr_interview_score).toBeUndefined();
     });
   });
 });

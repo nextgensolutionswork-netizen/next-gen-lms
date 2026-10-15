@@ -23,8 +23,24 @@ export default function CertificateVerifyPage() {
   const params = useParams();
   const id = params?.id as string;
 
-  const cert = store.certificates.find(
-    (c) => c.certificate_id.toLowerCase() === id?.toLowerCase() || c.id === id
+  const normalizedId = id ? decodeURIComponent(String(id)).trim().toLowerCase() : '';
+
+  const cert = normalizedId
+    ? (store.certificates || []).find((c) => {
+        if (!c) return false;
+        const certCode = c.certificate_id ? String(c.certificate_id).trim().toLowerCase() : '';
+        const internalId = c.id ? String(c.id).trim().toLowerCase() : '';
+        return certCode === normalizedId || internalId === normalizedId;
+      })
+    : undefined;
+
+  const isRevoked = Boolean(
+    cert &&
+      (cert.is_valid === false ||
+        cert.status === 'Revoked' ||
+        cert.status === 'Suspended' ||
+        Boolean(cert.revoked_at) ||
+        Boolean(cert.revocation_reason))
   );
 
   return (
@@ -42,7 +58,7 @@ export default function CertificateVerifyPage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          {cert && (
+          {cert && !isRevoked && (
             <>
               <a
                 href={`/api/certificates/${cert.certificate_id}/pdf`}
@@ -66,7 +82,7 @@ export default function CertificateVerifyPage() {
               </a>
             </>
           )}
-          <Link href="/dashboard">
+          <Link href="/login">
             <Button variant="outline" size="sm" className="text-xs">
               Institute Portal
             </Button>
@@ -89,39 +105,79 @@ export default function CertificateVerifyPage() {
         ) : (
           <div className="space-y-4">
             {/* Authenticity Banner */}
-            <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3">
-                <ShieldCheck className="h-6 w-6 text-white shrink-0" />
-                <div>
-                  <h3 className="font-bold text-sm">Authentic & Verified Certificate</h3>
-                  <p className="text-xs text-emerald-100">
-                    Officially minted by Next-Gen ERP Solutions with verified institutional records.
-                  </p>
+            {isRevoked ? (
+              <div className="bg-rose-600 text-white p-5 rounded-xl shadow-sm space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center space-x-3">
+                    <AlertTriangle className="h-6 w-6 text-white shrink-0" />
+                    <div>
+                      <h3 className="font-bold text-sm">Certificate Revoked / Invalidated</h3>
+                      <p className="text-xs text-rose-100">
+                        This credential is no longer valid and has been revoked from the institutional ledger.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="bg-rose-900/90 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider self-start sm:self-center border border-rose-300/40">
+                    STATUS: {cert.status ? cert.status.toUpperCase() : 'REVOKED'}
+                  </span>
+                </div>
+                {(cert.revocation_reason || cert.revoked_at) && (
+                  <div className="pt-2 border-t border-rose-500/50 text-xs text-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    {cert.revocation_reason && (
+                      <p>
+                        Reason: <strong className="text-white">{cert.revocation_reason}</strong>
+                      </p>
+                    )}
+                    {cert.revoked_at && (
+                      <p>
+                        Revocation Date: <strong className="text-white">{formatDate(cert.revoked_at)}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <ShieldCheck className="h-6 w-6 text-white shrink-0" />
+                  <div>
+                    <h3 className="font-bold text-sm">Authentic & Verified Certificate</h3>
+                    <p className="text-xs text-emerald-100">
+                      Officially minted by Next-Gen ERP Solutions with verified institutional records.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 self-end sm:self-center">
+                  <a
+                    href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-white/10 hover:bg-white/20 text-white border-white/30 flex items-center space-x-1"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Download PDF</span>
+                    </Button>
+                  </a>
+                  <span className="bg-emerald-700/60 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider">
+                    VALID
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center space-x-2 self-end sm:self-center">
-                <a
-                  href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs bg-white/10 hover:bg-white/20 text-white border-white/30 flex items-center space-x-1"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    <span>Download PDF</span>
-                  </Button>
-                </a>
-                <span className="bg-emerald-700/60 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider">
-                  VALID
-                </span>
-              </div>
-            </div>
+            )}
 
             {/* Certificate Canvas / Card */}
-            <div className="bg-white p-8 md:p-12 rounded-2xl shadow-xl border-4 border-slate-900 text-center relative overflow-hidden">
+            <div className={`bg-white p-8 md:p-12 rounded-2xl shadow-xl border-4 ${isRevoked ? 'border-rose-400 opacity-90' : 'border-slate-900'} text-center relative overflow-hidden`}>
+              {isRevoked && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none">
+                  <div className="border-4 border-rose-600 text-rose-600 px-8 py-3 rounded-2xl rotate-[-15deg] font-black text-3xl tracking-widest uppercase opacity-90 shadow-lg">
+                    REVOKED / VOID
+                  </div>
+                </div>
+              )}
               {/* Watermark / Badge */}
               <div className="absolute right-6 top-6 opacity-10 pointer-events-none">
                 <Award className="h-48 w-48 text-[#0A6ED1]" />
@@ -147,12 +203,12 @@ export default function CertificateVerifyPage() {
                   </p>
                 </div>
 
-                <div className="bg-blue-50/70 border border-blue-200 py-3 px-6 rounded-xl inline-block">
+                <div className={`${isRevoked ? 'bg-rose-50 border-rose-200' : 'bg-blue-50/70 border-blue-200'} border py-3 px-6 rounded-xl inline-block`}>
                   <h4 className="text-lg md:text-xl font-bold text-slate-900">
                     {cert.course_name}
                   </h4>
-                  <p className="text-xs font-bold text-emerald-700 mt-0.5">
-                    Grade Achieved: {cert.grade}
+                  <p className={`text-xs font-bold ${isRevoked ? 'text-rose-700' : 'text-emerald-700'} mt-0.5`}>
+                    {isRevoked ? `STATUS: REVOKED (Originally Grade ${cert.grade})` : `Grade Achieved: ${cert.grade}`}
                   </p>
                 </div>
 
@@ -160,15 +216,15 @@ export default function CertificateVerifyPage() {
                 <div className="grid grid-cols-3 gap-3 max-w-md mx-auto pt-2 text-xs">
                   <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-400 font-semibold uppercase">Attendance</p>
-                    <p className="font-bold text-slate-800 text-sm mt-0.5">{cert.attendance_percentage}%</p>
+                    <p className="font-bold text-slate-800 text-sm mt-0.5">{cert.attendance_percentage ?? 0}%</p>
                   </div>
                   <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-400 font-semibold uppercase">Lab Assignments</p>
-                    <p className="font-bold text-slate-800 text-sm mt-0.5">{cert.assignment_completion_rate}%</p>
+                    <p className="font-bold text-slate-800 text-sm mt-0.5">{cert.assignment_completion_rate ?? 0}%</p>
                   </div>
                   <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-400 font-semibold uppercase">Final Exam</p>
-                    <p className="font-bold text-blue-700 text-sm mt-0.5">{cert.exam_score_percentage}%</p>
+                    <p className="font-bold text-blue-700 text-sm mt-0.5">{cert.exam_score_percentage ?? 0}%</p>
                   </div>
                 </div>
 
@@ -177,6 +233,11 @@ export default function CertificateVerifyPage() {
                   <div className="text-left space-y-0.5">
                     <p>Certificate Serial: <strong className="font-mono text-slate-800">{cert.certificate_id}</strong></p>
                     <p>Issue Date: <strong className="text-slate-800">{formatDate(cert.issue_date)}</strong></p>
+                    {isRevoked && (
+                      <p className="text-rose-600 font-bold">
+                        Credential Validity: VOID & REVOKED
+                      </p>
+                    )}
                   </div>
 
                   <div className="text-center sm:text-right">
