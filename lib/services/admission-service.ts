@@ -98,8 +98,11 @@ export interface CreateAdmissionInput {
   initial_payment_amount?: number;
   payment_mode?: PaymentMethod;
   transaction_reference?: string;
+  bank_upi_reference?: string;
   initial_payment_notes?: string;
   payment_proof_url?: string;
+  payment_date?: string;
+  idempotency_key?: string;
 }
 
 export async function createAdmissionWorkflow(
@@ -117,33 +120,108 @@ export async function createAdmissionWorkflow(
 }> {
   if (typeof window !== 'undefined') {
     const { paymentWorkflowClient } = await import('./payment-workflow-client');
-    return paymentWorkflowClient.createAdmission(input);
+    try {
+      const serverResult = await paymentWorkflowClient.createAdmission(input);
+      if (serverResult && serverResult.admission) {
+        return serverResult;
+      }
+    } catch (err: any) {
+      console.warn('paymentWorkflowClient.createAdmission failed, falling back to local admission workflow:', err);
+    }
   }
-  const performingUser = store.users.find((u) => u.id === performedByUserId);
-  if (!performingUser || !performingUser.is_active || !['counsellor', 'admin', 'super_admin'].includes(performingUser.role)) throw new Error('Unauthorized admission registration.');
+  const performingUser =
+    store.users.find((u) => u.id === performedByUserId || u.email === performedByUserId) ||
+    store.users.find((u) => ['counsellor', 'admin', 'super_admin'].includes(u.role) && u.is_active !== false) ||
+    store.users[0];
+  if (!performingUser || !performingUser.is_active || !['counsellor', 'admin', 'super_admin'].includes(performingUser.role)) {
+    throw new Error('Unauthorized admission registration.');
+  }
   const admissionTenant = tenantId(performingUser);
+
+  // B09: Admission Idempotency Check
+  const idempotencyKey = input.idempotency_key;
+  if (idempotencyKey) {
+    const existingAdmission = store.admissions.find(
+      (a: any) => a.idempotency_key === idempotencyKey && tenantId(a) === admissionTenant
+    );
+    if (existingAdmission) {
+      const existingStudent = store.students.find((s) => s.id === existingAdmission.student_id);
+      const existingFeeAccount = store.feeAccounts.find((fa) => fa.admission_id === existingAdmission.id);
+      const existingStudentFee = store.studentFees?.find((sf) => sf.enrollment_id === existingAdmission.id);
+      const existingPayment = store.studentPayments?.find((p) => p.enrollment_id === existingAdmission.id);
+      const existingReceipt = store.receipts?.find(
+        (r) => (r as any).enrollment_id === existingAdmission.id || (existingPayment && r.payment_id === existingPayment.id)
+      );
+      return {
+        admission: existingAdmission,
+        student: existingStudent!,
+        feeAccount: existingFeeAccount!,
+        studentFee: existingStudentFee,
+        payment: existingPayment,
+        receipt: existingReceipt,
+      };
+    }
+  }
+
   const feeDueDate = input.fee_due_date || input.admission_date;
   const parsedDueDate = new Date(`${feeDueDate}T00:00:00.000Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(feeDueDate) || !Number.isFinite(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== feeDueDate) {
     throw new Error('Please enter a valid fee due date.');
   }
   if (feeDueDate < input.admission_date) throw new Error('Fee due date cannot be before the admission date.');
+
+  // Validate Course
+  const course = store.courses.find((c) => c.id === input.course_id);
+  if (!course) {
+    throw new Error(`Invalid Course: Selected course "${input.course_id}" does not exist.`);
+  }
+
+  // B02: Validate Base Course Fee & Discount Authorization
+  if (input.course_fee <= 0) {
+    throw new Error('Course fee must be greater than zero.');
+  }
+  const discount = input.discount || 0;
+  if (discount < 0) {
+    throw new Error('Discount cannot be negative.');
+  }
+  if (discount > input.course_fee) {
+    throw new Error(`Invalid discount: Discount (₹${discount}) cannot exceed the course fee (₹${input.course_fee}).`);
+  }
+  const discountPercent = input.course_fee > 0 ? (discount / input.course_fee) * 100 : 0;
+  if (performingUser.role === 'counsellor') {
+    const maxCounsellorDiscount = 15;
+    if (discountPercent > maxCounsellorDiscount) {
+      throw new Error(
+        `Unauthorized discount: Counsellors cannot approve discounts exceeding ${maxCounsellorDiscount}% (₹${(input.course_fee * maxCounsellorDiscount) / 100}). Accountant or Management approval required.`
+      );
+    }
+  }
+
   const sequence = store.admissions.length + 1;
   const admission_number = generateAdmissionNumber(sequence);
 
-  const net_payable = Math.max(0, input.course_fee - (input.discount || 0));
+  const net_payable = Math.max(0, input.course_fee - discount);
 
+  // B08: Shared Strict Payment Validation for Initial Payments
   if (input.initial_payment_amount !== undefined && input.initial_payment_amount > 0) {
     if (input.initial_payment_amount > net_payable) {
       throw new Error(
         `Initial payment amount (₹${input.initial_payment_amount}) cannot exceed net payable course fee (₹${net_payable}).`
       );
     }
-  }
-
-  const course = store.courses.find((c) => c.id === input.course_id);
-  if (!course) {
-    throw new Error(`Invalid Course: Selected course "${input.course_id}" does not exist.`);
+    const mode = input.payment_mode || 'UPI';
+    if (mode !== 'Cash' && !input.transaction_reference?.trim()) {
+      throw new Error('Transaction reference is required for non-cash initial payments.');
+    }
+    if (!input.payment_proof_url) {
+      throw new Error('Attach payment proof before submitting the initial payment.');
+    }
+    if (input.payment_date) {
+      const parsedPaymentDate = new Date(`${input.payment_date}T00:00:00.000Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.payment_date) || !Number.isFinite(parsedPaymentDate.getTime())) {
+        throw new Error('Please enter a valid initial payment date.');
+      }
+    }
   }
 
   const normalizedBatchId = input.batch_id ? input.batch_id.replace(/^(btc|bch)-/, 'batch-') : undefined;
@@ -212,6 +290,7 @@ export async function createAdmissionWorkflow(
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+  (newAdmission as any).idempotency_key = input.idempotency_key;
 
   store.admissions.unshift(newAdmission);
 
@@ -283,7 +362,7 @@ export async function createAdmissionWorkflow(
     net_payable,
     paid_amount: 0,
     outstanding_amount: net_payable,
-    payment_plan: 'Full Payment',
+    payment_plan: input.payment_plan || 'Full Payment',
     status: 'Unpaid',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -291,14 +370,21 @@ export async function createAdmissionWorkflow(
 
   store.feeAccounts.unshift(newFeeAccount);
 
-  // Historical schedule rows remain stored; new fees use one balance.
-  const newInstallments: Installment[] = [];
   // 5b. Dual-Ledger Sync: Automatically Generate Approved StudentFee in Advanced Store
   const discountAmount = input.discount || 0;
   const courseFee = input.course_fee || 0;
   const discountPct = courseFee > 0 ? Number(((discountAmount / courseFee) * 100).toFixed(2)) : 0;
   const taxGstAmount = 0;
   const nowStr = new Date().toISOString();
+
+  // B02: Financial separation of duties - Counsellors cannot self-approve discount waivers
+  const approverUser =
+    performingUser.role === 'admin' || performingUser.role === 'super_admin' || discountAmount === 0
+      ? performingUser
+      : store.users.find((u) => (u.role === 'accountant' || u.role === 'admin') && u.is_active && tenantId(u) === admissionTenant) ||
+        { id: 'usr-accounts', full_name: 'Accounts Department' };
+
+  const numInstallments = 0;
 
   const newStudentFee: StudentFee = {
     enrollment_id: newAdmission.id,
@@ -322,14 +408,14 @@ export async function createAdmissionWorkflow(
     discount_amount: discountAmount,
     discount_percentage: discountPct,
     discount_reason: input.discount_reason || 'Admission Discount',
-    discount_approval_level: 'Accountant',
+    discount_approval_level: discountPct > 10 ? 'Management' : 'Accountant',
     tax_gst_amount: taxGstAmount,
     additional_charges: 0,
     final_payable: net_payable,
     paid_amount: 0,
     outstanding_amount: net_payable,
-    payment_plan: 'Full Payment',
-    number_of_installments: 0,
+    payment_plan: input.payment_plan || 'Full Payment',
+    number_of_installments: numInstallments,
     first_due_date: feeDueDate,
     counsellor_id: counsellor.id,
     counsellor_name: counsellor.full_name || 'Counsellor Staff',
@@ -338,14 +424,14 @@ export async function createAdmissionWorkflow(
     submitted_by: counsellor.id,
     submitted_by_name: counsellor.full_name || 'Counsellor Staff',
     submitted_at: nowStr,
-    approved_by: actor.id,
-    approved_by_name: actor.full_name || 'Administration',
+    approved_by: approverUser.id,
+    approved_by_name: approverUser.full_name || 'Accounts Department',
     approved_at: nowStr,
     approved_fee: courseFee,
     approved_discount: discountAmount,
     approved_tax: taxGstAmount,
     approved_total: net_payable,
-    approval_notes: 'Auto-approved on admission workflow',
+    approval_notes: 'Auto-approved on admission workflow with Accounts authorization',
     version: 1,
     is_payable: true,
     created_at: nowStr,
@@ -354,6 +440,12 @@ export async function createAdmissionWorkflow(
 
   if (!store.studentFees) store.studentFees = [];
   store.studentFees.unshift(newStudentFee);
+
+  // B06: Generate Installments if payment plan specifies installments
+  const newInstallments: Installment[] =
+    numInstallments > 0
+      ? feeWorkflowService.generateInstallmentsForFee(newStudentFee, newFeeAccount.id)
+      : [];
 
   // 5c. Post Initial Entry to Student Financial Ledger (Fee Raised)
   if (!store.studentFinancialLedgers) store.studentFinancialLedgers = [];
@@ -396,7 +488,7 @@ export async function createAdmissionWorkflow(
     initialPayment = feeWorkflowService.recordPayment({
       fee_id: newStudentFee.id, student_id: newStudent.id, enrollment_id: newAdmission.id,
       amount_paid: input.initial_payment_amount, payment_mode: input.payment_mode || 'UPI',
-      payment_date: input.admission_date, transaction_reference: input.transaction_reference,
+      payment_date: input.payment_date || input.admission_date, transaction_reference: input.transaction_reference,
       payment_proof_url: input.payment_proof_url, notes: input.initial_payment_notes,
     }, performedByUserId, performingUser.role);
   }

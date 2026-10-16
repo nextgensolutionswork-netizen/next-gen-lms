@@ -1,0 +1,143 @@
+[
+  {
+    "role": "counsellor",
+    "/api/fees/payments": {
+      "status": 200,
+      "success": true
+    },
+    "/api/fees/receipts": {
+      "status": 200,
+      "success": true
+    },
+    "/api/onboarding/cases": {
+      "status": 403,
+      "success": false,
+      "error": "Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint."
+    },
+    "approveNonexistent": {
+      "status": 400,
+      "error": "Payment not found."
+    },
+    "directSnapshot": {
+      "status": 403,
+      "error": "42501"
+    }
+  },
+  {
+    "role": "accountant",
+    "/api/fees/payments": {
+      "status": 200,
+      "success": true
+    },
+    "/api/fees/receipts": {
+      "status": 200,
+      "success": true
+    },
+    "/api/onboarding/cases": {
+      "status": 403,
+      "success": false,
+      "error": "Forbidden: Role 'accountant' is not authorized to access this onboarding endpoint."
+    },
+    "approveNonexistent": {
+      "status": 400,
+      "error": "Payment not found."
+    },
+    "directSnapshot": {
+      "status": 403,
+      "error": "42501"
+    }
+  },
+  {
+    "role": "onboarding_team",
+    "/api/fees/payments": {
+      "status": 200,
+      "success": true
+    },
+    "/api/fees/receipts": {
+      "status": 403,
+      "success": false
+    },
+    "/api/onboarding/cases": {
+      "status": 200,
+      "success": true
+    },
+    "approveNonexistent": {
+      "status": 403,
+      "error": "Forbidden: Payment staff access required."
+    },
+    "directSnapshot": {
+      "status": 403,
+      "error": "42501"
+    }
+  },
+  {
+    "role": "admin",
+    "/api/fees/payments": {
+      "status": 200,
+      "success": true
+    },
+    "/api/fees/receipts": {
+      "status": 200,
+      "success": true
+    },
+    "/api/onboarding/cases": {
+      "status": 200,
+      "success": true
+    },
+    "approveNonexistent": {
+      "status": 400,
+      "error": "Payment not found."
+    },
+    "directSnapshot": {
+      "status": 403,
+      "error": "42501"
+    }
+  },
+  {
+    "role": "super_admin",
+    "/api/fees/payments": {
+      "status": 200,
+      "success": true
+    },
+    "/api/fees/receipts": {
+      "status": 200,
+      "success": true
+    },
+    "/api/onboarding/cases": {
+      "status": 200,
+      "success": true
+    },
+    "approveNonexistent": {
+      "status": 400,
+      "error": "Payment not found."
+    },
+    "directSnapshot": {
+      "status": 403,
+      "error": "42501"
+    }
+  },
+  {
+    "role": "student",
+    "/api/fees/payments": {
+      "status": 200,
+      "success": true
+    },
+    "/api/fees/receipts": {
+      "status": 200,
+      "success": true
+    },
+    "/api/onboarding/cases": {
+      "status": 403,
+      "success": false,
+      "error": "Forbidden: Role 'student' is not authorized to access this onboarding endpoint."
+    },
+    "approveNonexistent": {
+      "status": 403,
+      "error": "Forbidden: Payment staff access required."
+    },
+    "directSnapshot": {
+      "status": 403,
+      "error": "42501"
+    }
+  }
+]

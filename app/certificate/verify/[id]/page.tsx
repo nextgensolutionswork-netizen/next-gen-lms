@@ -111,14 +111,20 @@ export default function CertificateVerifyPage() {
                   <div className="flex items-center space-x-3">
                     <AlertTriangle className="h-6 w-6 text-white shrink-0" />
                     <div>
-                      <h3 className="font-bold text-sm">Certificate Revoked / Invalidated</h3>
+                      <h3 className="font-bold text-sm">
+                        {cert.status === 'Fraudulent'
+                          ? 'SECURITY ALERT: CERTIFICATE FLAGGED AS FRAUDULENT'
+                          : 'Certificate Revoked / Invalidated'}
+                      </h3>
                       <p className="text-xs text-rose-100">
-                        This credential is no longer valid and has been revoked from the institutional ledger.
+                        {cert.status === 'Fraudulent'
+                          ? 'This credential has been flagged by institutional security for forgery, unauthorized alteration, or fraudulent activity.'
+                          : 'This credential is no longer valid and has been revoked from the institutional ledger.'}
                       </p>
                     </div>
                   </div>
-                  <span className="bg-rose-900/90 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider self-start sm:self-center border border-rose-300/40">
-                    STATUS: {cert.status ? cert.status.toUpperCase() : 'REVOKED'}
+                  <span className="bg-rose-950 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider self-start sm:self-center border border-rose-300/40">
+                    STATUS: {cert.status === 'Fraudulent' ? 'FRAUDULENT / INVALID' : (cert.status ? cert.status.toUpperCase() : 'REVOKED')}
                   </span>
                 </div>
                 {(cert.revocation_reason || cert.revoked_at) && (

@@ -1,0 +1,373 @@
+{
+  "timestamp": "2026-10-16T09:11:19.760Z",
+  "environment": {
+    "hostCpu": "8 cores @ Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+    "baseSpeedMHz": 2208,
+    "totalRamGB": "15.76",
+    "freeRamGB": "7.48",
+    "osPlatform": "win32 (10.0.26300 x64)",
+    "nodeVersion": "v24.19.0",
+    "nextVersion": "14.2.24 (App Router, Turbopack compatible)",
+    "reactVersion": "18.3.1",
+    "sharedFirstLoadJsKB": 87.5,
+    "middlewareSizeKB": 87.5,
+    "totalProductionRoutes": 51
+  },
+  "dataset": {
+    "registeredStudents": 550,
+    "admissions": 1026,
+    "studentFees": 1000,
+    "studentPayments": 1049,
+    "onboardingCases": 546
+  },
+  "frontend": [
+    {
+      "page": "1. Login Page (/login)",
+      "routeSizeKB": 6.13,
+      "firstLoadKB": 318,
+      "estLcpMs": 420,
+      "estCls": 0.002,
+      "estInpMs": 28,
+      "reRenderRisk": "Low"
+    },
+    {
+      "page": "2. Admin Dashboard (/dashboard)",
+      "routeSizeKB": 7.04,
+      "firstLoadKB": 326,
+      "estLcpMs": 650,
+      "estCls": 0.005,
+      "estInpMs": 45,
+      "reRenderRisk": "Medium (Stat cards)"
+    },
+    {
+      "page": "3. CRM Leads (/crm/leads)",
+      "routeSizeKB": 8.73,
+      "firstLoadKB": 352,
+      "estLcpMs": 720,
+      "estCls": 0.008,
+      "estInpMs": 52,
+      "reRenderRisk": "Low"
+    },
+    {
+      "page": "4. Counsellor Dashboard (/crm/followups)",
+      "routeSizeKB": 13.2,
+      "firstLoadKB": 332,
+      "estLcpMs": 680,
+      "estCls": 0.004,
+      "estInpMs": 42,
+      "reRenderRisk": "Low"
+    },
+    {
+      "page": "5. Accounts Fees (/accounts/fees)",
+      "routeSizeKB": 4.96,
+      "firstLoadKB": 327,
+      "estLcpMs": 610,
+      "estCls": 0.003,
+      "estInpMs": 38,
+      "reRenderRisk": "Low"
+    },
+    {
+      "page": "6. Fee Approvals (/accounts/approvals)",
+      "routeSizeKB": 18.3,
+      "firstLoadKB": 340,
+      "estLcpMs": 790,
+      "estCls": 0.01,
+      "estInpMs": 58,
+      "reRenderRisk": "Medium (Live pending queue)"
+    },
+    {
+      "page": "7. Onboarding Dashboard (/onboarding)",
+      "routeSizeKB": 14.4,
+      "firstLoadKB": 337,
+      "estLcpMs": 740,
+      "estCls": 0.007,
+      "estInpMs": 50,
+      "reRenderRisk": "Medium (SLA timer badge)"
+    },
+    {
+      "page": "8. Trainer Batches (/academics/batches)",
+      "routeSizeKB": 9.16,
+      "firstLoadKB": 336,
+      "estLcpMs": 690,
+      "estCls": 0.004,
+      "estInpMs": 44,
+      "reRenderRisk": "Low"
+    },
+    {
+      "page": "9. Student Directory (/students)",
+      "routeSizeKB": 4,
+      "firstLoadKB": 329,
+      "estLcpMs": 580,
+      "estCls": 0.002,
+      "estInpMs": 35,
+      "reRenderRisk": "Low"
+    },
+    {
+      "page": "10. Student Portal & Video (/portal)",
+      "routeSizeKB": 219,
+      "firstLoadKB": 576,
+      "estLcpMs": 1250,
+      "estCls": 0.015,
+      "estInpMs": 82,
+      "reRenderRisk": "High (HLS player + Quizzes)"
+    }
+  ],
+  "apis": {
+    "1. Auth Session Check": {
+      "samples": 150,
+      "min": 0,
+      "max": 0.07,
+      "mean": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0.02,
+      "rps": 462249.6,
+      "errors": 0
+    },
+    "2. Student Admission (Create)": {
+      "samples": 150,
+      "min": 0,
+      "max": 1.07,
+      "mean": 0.02,
+      "p50": 0.01,
+      "p95": 0.02,
+      "p99": 0.86,
+      "rps": 47499.9,
+      "errors": 0
+    },
+    "3. CRM Leads Query & Filter": {
+      "samples": 150,
+      "min": 0,
+      "max": 0.1,
+      "mean": 0.01,
+      "p50": 0,
+      "p95": 0.01,
+      "p99": 0.03,
+      "rps": 158011.2,
+      "errors": 0
+    },
+    "4. Fee Proposal Creation": {
+      "samples": 150,
+      "min": 0.01,
+      "max": 0.75,
+      "mean": 0.03,
+      "p50": 0.02,
+      "p95": 0.07,
+      "p99": 0.13,
+      "rps": 32526.7,
+      "errors": 0
+    },
+    "5. Fee Payment Approval (Verify)": {
+      "samples": 150,
+      "min": 0.44,
+      "max": 35.55,
+      "mean": 1.02,
+      "p50": 0.64,
+      "p95": 1.76,
+      "p99": 3.8,
+      "rps": 667,
+      "errors": 0
+    },
+    "6. Payment History Retrieval": {
+      "samples": 150,
+      "min": 0.02,
+      "max": 0.16,
+      "mean": 0.03,
+      "p50": 0.03,
+      "p95": 0.06,
+      "p99": 0.09,
+      "rps": 29417.5,
+      "errors": 0
+    },
+    "7. Onboarding Cases & SLA": {
+      "samples": 150,
+      "min": 0.02,
+      "max": 0.12,
+      "mean": 0.02,
+      "p50": 0.02,
+      "p95": 0.02,
+      "p99": 0.07,
+      "rps": 53361.8,
+      "errors": 0
+    },
+    "8. Batch Assignment & Roster": {
+      "samples": 150,
+      "min": 0.02,
+      "max": 0.11,
+      "mean": 0.02,
+      "p50": 0.02,
+      "p95": 0.03,
+      "p99": 0.05,
+      "rps": 46733.3,
+      "errors": 0
+    },
+    "9. Course & Lesson Manifest": {
+      "samples": 150,
+      "min": 0,
+      "max": 0.08,
+      "mean": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0.04,
+      "rps": 602893.9,
+      "errors": 0
+    },
+    "10. Student Progress Update": {
+      "samples": 150,
+      "min": 0,
+      "max": 0.05,
+      "mean": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0.02,
+      "rps": 676284.9,
+      "errors": 0
+    },
+    "11. Dashboard Analytics Summary": {
+      "samples": 150,
+      "min": 0.08,
+      "max": 1.09,
+      "mean": 0.1,
+      "p50": 0.09,
+      "p95": 0.1,
+      "p99": 0.6,
+      "rps": 10007.3,
+      "errors": 0
+    }
+  },
+  "database": {
+    "1. Full Linear Scan (1000 iterations)": {
+      "durationMs": 28.01,
+      "complexity": "O(N)",
+      "assessment": "Optimal (In-Memory cache)"
+    },
+    "2. Hash Index Map Lookup (1000 iterations)": {
+      "durationMs": 0.04,
+      "complexity": "O(1)",
+      "assessment": "Ultra Fast (< 1ms)"
+    },
+    "3. Student 360 Relational Aggregation (200 ops)": {
+      "durationMs": 39.9,
+      "complexity": "O(17 * N)",
+      "assessment": "Acceptable"
+    },
+    "4. Financial Ledger Scan (500 ops)": {
+      "durationMs": 8.91,
+      "complexity": "O(L)",
+      "assessment": "Optimal"
+    }
+  },
+  "concurrency": [
+    {
+      "concurrency": 10,
+      "scenario": "Baseline",
+      "totalRequests": 100,
+      "durationMs": 0.83,
+      "rps": 121153.4,
+      "p50Ms": 0,
+      "p95Ms": 0.02,
+      "p99Ms": 0.05,
+      "errorRatePct": 0,
+      "status": "PASS"
+    },
+    {
+      "concurrency": 50,
+      "scenario": "Light Load",
+      "totalRequests": 500,
+      "durationMs": 3.33,
+      "rps": 150132.1,
+      "p50Ms": 0,
+      "p95Ms": 0.02,
+      "p99Ms": 0.06,
+      "errorRatePct": 0,
+      "status": "PASS"
+    },
+    {
+      "concurrency": 100,
+      "scenario": "Moderate Load",
+      "totalRequests": 1000,
+      "durationMs": 5.32,
+      "rps": 187811.1,
+      "p50Ms": 0,
+      "p95Ms": 0.02,
+      "p99Ms": 0.03,
+      "errorRatePct": 0,
+      "status": "PASS"
+    },
+    {
+      "concurrency": 250,
+      "scenario": "High Load",
+      "totalRequests": 2500,
+      "durationMs": 25.3,
+      "rps": 98823.2,
+      "p50Ms": 0,
+      "p95Ms": 0.03,
+      "p99Ms": 0.04,
+      "errorRatePct": 0,
+      "status": "PASS"
+    },
+    {
+      "concurrency": 500,
+      "scenario": "Target 500 Stress Load",
+      "totalRequests": 5000,
+      "durationMs": 82.59,
+      "rps": 60542.7,
+      "p50Ms": 0.02,
+      "p95Ms": 0.04,
+      "p99Ms": 0.05,
+      "errorRatePct": 0,
+      "status": "PASS"
+    }
+  ],
+  "financialIntegrity": {
+    "paymentId": "spr-1792141878494-66y0",
+    "amount": 5000,
+    "concurrentAttempts": 20,
+    "successfulApprovals": 1,
+    "rejectedConflicts": 19,
+    "receiptsGenerated": 1,
+    "ledgerEntriesCreated": 1,
+    "dataIntegrity": "VERIFIED (Zero Duplicates / Zero Drift)"
+  },
+  "videoStorage": {
+    "signedUrl": {
+      "samples": 100,
+      "min": 0,
+      "max": 0.02,
+      "mean": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0.02,
+      "rps": 1000,
+      "errors": 0
+    },
+    "hlsManifest": {
+      "samples": 100,
+      "min": 0,
+      "max": 0.03,
+      "mean": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0.03,
+      "rps": 1000,
+      "errors": 0
+    }
+  },
+  "spikeTest": {
+    "samples": 500,
+    "min": 0,
+    "max": 0.13,
+    "mean": 0.01,
+    "p50": 0.01,
+    "p95": 0.02,
+    "p99": 0.05,
+    "rps": 66507,
+    "errors": 0
+  },
+  "soakTest": {
+    "requests": 10000,
+    "heapDeltaMB": 0,
+    "rssDeltaMB": 0,
+    "durationMs": 1.223000000000411
+  }
+}

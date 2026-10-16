@@ -1,0 +1,322 @@
+{
+  "timestamp": "2026-10-16T10:46:31.067Z",
+  "environment": "isolated local mock; no real Supabase",
+  "pages": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900,
+      "status": 200,
+      "url": "http://localhost:3000/login",
+      "horizontalOverflow": false,
+      "emailVisible": true,
+      "passwordVisible": true
+    },
+    {
+      "name": "laptop",
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "url": "http://localhost:3000/login",
+      "horizontalOverflow": false,
+      "emailVisible": true,
+      "passwordVisible": true
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "url": "http://localhost:3000/login",
+      "horizontalOverflow": false,
+      "emailVisible": true,
+      "passwordVisible": true
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "url": "http://localhost:3000/login",
+      "horizontalOverflow": false,
+      "emailVisible": true,
+      "passwordVisible": true
+    }
+  ],
+  "checks": [
+    {
+      "check": "invalid email browser validation",
+      "pass": true
+    },
+    {
+      "check": "unknown user rejection",
+      "alert": [
+        "User profile not found. Please verify your credentials.",
+        ""
+      ],
+      "remainedOnLogin": true
+    },
+    {
+      "check": "password recovery form opens",
+      "pass": true
+    },
+    {
+      "check": "back to login",
+      "pass": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/assessments",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fassessments",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/assignments",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fassignments",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/attendance",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fattendance",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/batches",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fbatches",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/courses",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fcourses",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/sap-servers",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fsap-servers",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/academics/schedule",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Facademics%2Fschedule",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/approvals",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Fapprovals",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/expenses",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Fexpenses",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/fees",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Ffees",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/installments",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Finstallments",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/payments",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Fpayments",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/receipts",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Freceipts",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/reports",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Freports",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/accounts/vendors",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faccounts%2Fvendors",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/admissions",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fadmissions",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/audit-logs",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Faudit-logs",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/certificates",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fcertificates",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/crm/followups",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fcrm%2Ffollowups",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/crm/leads",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fcrm%2Fleads",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/dashboard",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fdashboard",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/onboarding",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fonboarding",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/placement",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fplacement",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/placement/enrollments",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fplacement%2Fenrollments",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/portal",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fportal",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/settings",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fsettings",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/students",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fstudents",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/support",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fsupport",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/todos",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Ftodos",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unauthenticated route",
+      "route": "/users",
+      "status": 200,
+      "finalUrl": "http://localhost:3000/login?redirectTo=%2Fusers",
+      "redirectedToLogin": true
+    },
+    {
+      "check": "unsigned payment API",
+      "status": 401
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: net::ERR_FAILED"
+  ],
+  "pageErrors": [],
+  "blockedExternalHosts": [
+    "tgohtdzwehhjfahtgovq.supabase.co"
+  ],
+  "inputs": [
+    {
+      "id": "email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "id": "password",
+      "type": "password",
+      "required": true
+    }
+  ],
+  "buttons": [
+    "Super Admin/dashboardsuperadmin@next-generpsolutions.com",
+    "Operations Admin/dashboardadmin@next-generpsolutions.com",
+    "Accountant/accounts/feesaccounts@next-generpsolutions.com",
+    "Counsellor/crm/leadscounsellor@next-generpsolutions.com",
+    "Trainer / Faculty/academics/coursesvikram.fico@next-generpsolutions.com",
+    "Placement Head/placementplacement@next-generpsolutions.com",
+    "Academic Support/supportsupport@next-generpsolutions.com",
+    "Onboarding Team/onboardingonboarding@next-generpsolutions.com",
+    "Enrolled Student/portalamit.gupta@student.next-gen.com",
+    "",
+    "Forgot password?",
+    "Sign in"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "native": {
+    "students": {
+      "count": 2
+    },
+    "admissions": {
+      "count": 2
+    },
+    "payments": {
+      "count": 2
+    },
+    "receipts": {
+      "count": 2
+    },
+    "onboarding_cases": {
+      "count": 0
+    }
+  },
+  "tenants": [
+    {
+      "tenant": "default",
+      "revision": 8,
+      "counts": {
+        "leads": 75,
+        "users": 25,
+        "batches": 2,
+        "payments": 5,
+        "receipts": 5,
+        "students": 5,
+        "auditLogs": 9,
+        "admissions": 5,
+        "feeAccounts": 5,
+        "studentFees": 5,
+        "installments": 5,
+        "feeCategories": 15,
+        "notifications": 25,
+        "onboardingCases": 5,
+        "studentPayments": 5,
+        "feeRevisionRequests": 0,
+        "onboardingAuditLogs": 63,
+        "feeApprovalHistories": 3,
+        "studentFinancialLedgers": 6
+      },
+      "studentProfilesMissing": 3,
+      "feeBalanceMismatches": 0,
+      "approvedPaymentsWithoutReceipt": 2,
+      "duplicatePaymentIds": 0,
+      "duplicateReceiptNumbers": 0,
+      "orphanCases": 0
+    }
+  ],
+  "notes": [
+    "Two apparent missing receipt links resolve through legacy spr-/pay- aliases and matching receipt numbers; they are not confirmed missing receipts.",
+    "Read-only inspection of the configured project. No live financial mutation performed."
+  ]
+}

@@ -265,6 +265,8 @@ export default function PaymentsPage() {
       const paymentRec = await paymentWorkflowClient.recordPayment(
         {
           fee_id: selectedFee.id,
+          student_id: selectedFee.student_id,
+          enrollment_id: selectedFee.enrollment_id || selectedFee.admission_number,
           amount_paid: amount,
           payment_mode: paymentMode,
           payment_date: date,
@@ -274,7 +276,7 @@ export default function PaymentsPage() {
           notes,
         },
         user.id,
-        (role as any) || 'accountant'
+        (role as any) || (user.role as any) || 'counsellor'
       );
 
       store.reconcileDualLedgers();
@@ -298,7 +300,7 @@ export default function PaymentsPage() {
         }
       } else {
         alert(
-          `Payment of ₹${amount.toLocaleString('en-IN')} recorded successfully!\n\nStatus: Pending Approval.\nAs per finance separation of duties policy, this payment will clear balance and generate official receipt once verified by an Accountant.`
+          `Payment of ₹${amount.toLocaleString('en-IN')} recorded successfully!\n\nStatus: Pending Approval.\nAs per finance separation of duties policy, this payment will clear balance and generate official receipt once verified by an independent Accountant at /accounts/approvals.`
         );
       }
     } catch (err: any) {

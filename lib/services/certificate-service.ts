@@ -9,7 +9,7 @@ import {
 import { generateAndSaveCertificatePdf } from './pdf-service';
 
 export async function getCertificates(): Promise<Certificate[]> {
-  return [...store.certificates];
+  return [...(store.certificates || [])];
 }
 
 export async function getCertificateByVerificationId(idOrCode: string): Promise<Certificate | undefined> {
@@ -24,26 +24,28 @@ export async function verifyAndGenerateCertificate(
   courseId: string,
   issuedByUserId: string
 ): Promise<{ eligible: boolean; reasons: string[]; certificate?: Certificate }> {
-  const student = store.students.find((s) => s.id === studentId);
-  const course = store.courses.find((c) => c.id === courseId);
+  const student = (store.students || []).find((s) => s.id === studentId);
+  const course = (store.courses || []).find((c) => c.id === courseId);
   if (!student || !course) throw new Error('Student or Course not found');
 
   const reasons: string[] = [];
 
   // Criteria 1: Attendance >= 80%
-  if (student.attendance_percentage < 80) {
-    reasons.push(`Attendance is ${student.attendance_percentage}%, minimum 80% required`);
+  if ((student.attendance_percentage ?? 0) < 80) {
+    reasons.push(`Attendance is ${student.attendance_percentage ?? 0}%, minimum 80% required`);
   }
 
   // Criteria 2: Course Progress >= 80%
-  if (student.course_progress < 80) {
-    reasons.push(`Course completion is ${student.course_progress}%, minimum 80% required`);
+  if ((student.course_progress ?? 0) < 80) {
+    reasons.push(`Course completion is ${student.course_progress ?? 0}%, minimum 80% required`);
   }
 
   // Criteria 3: Outstanding fee cleared
-  if (student.outstanding_amount > 0) {
+  if ((student.outstanding_amount ?? 0) > 0) {
     reasons.push(`Outstanding balance of ₹${student.outstanding_amount} must be settled`);
   }
+
+  if (!store.certificates) store.certificates = [];
 
   // If already issued, return existing
   const existing = store.certificates.find(
@@ -131,17 +133,21 @@ export async function verifyAndGenerateCertificate(
   return { eligible: true, reasons: [], certificate: cert };
 }
 
+export const issueCertificate = verifyAndGenerateCertificate;
+
 export async function revokeCertificate(
   certificateId: string,
   revokedByUserId: string,
-  reason: string = 'Administrative Revocation'
+  reason: string = 'Administrative Revocation',
+  status: 'Revoked' | 'Suspended' | 'Fraudulent' = 'Revoked'
 ): Promise<Certificate | null> {
+  if (!store.certificates) store.certificates = [];
   const cert = (store.certificates || []).find(
     (c) => c.certificate_id?.toLowerCase() === certificateId?.toLowerCase() || c.id === certificateId
   );
   if (!cert) return null;
   cert.is_valid = false;
-  cert.status = 'Revoked';
+  cert.status = status;
   cert.revocation_reason = reason;
   cert.revoked_at = new Date().toISOString();
   cert.revoked_by = revokedByUserId;
@@ -152,11 +158,19 @@ export async function revokeCertificate(
     user_id: revokedByUserId,
     user_name: revoker?.full_name || 'Admin',
     user_role: revoker?.role || 'admin',
-    action: 'CERTIFICATE_REVOKED',
+    action: status === 'Fraudulent' ? 'CERTIFICATE_FLAGGED_FRAUDULENT' : 'CERTIFICATE_REVOKED',
     module: 'CERTIFICATES',
     record_id: cert.id,
-    new_value: { certificate_id: cert.certificate_id, reason, is_valid: false },
+    new_value: { certificate_id: cert.certificate_id, reason, status, is_valid: false },
   });
 
   return cert;
+}
+
+export async function flagCertificateAsFraudulent(
+  certificateId: string,
+  flaggedByUserId: string,
+  reason: string = 'Flagged as fraudulent / forged credential'
+): Promise<Certificate | null> {
+  return revokeCertificate(certificateId, flaggedByUserId, reason, 'Fraudulent');
 }

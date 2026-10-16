@@ -20,6 +20,7 @@ import {
   StudentFeeAccount,
   Payment,
   Receipt,
+  Installment,
 } from '@/types';
 
 export class FeeWorkflowService {
@@ -199,8 +200,15 @@ export class FeeWorkflowService {
       paid_amount: 0,
       outstanding_amount: final_payable,
 
-      payment_plan: 'Full Payment',
-      number_of_installments: 0,
+      payment_plan: input.payment_plan || 'Full Payment',
+      number_of_installments:
+        input.number_of_installments !== undefined
+          ? input.number_of_installments
+          : (input.payment_plan === '2 Installments'
+          ? 2
+          : input.payment_plan === '3 Installments'
+          ? 3
+          : 1),
       first_due_date: input.first_due_date || now.split('T')[0],
 
       counsellor_id: counsellorUserId,
@@ -311,7 +319,8 @@ export class FeeWorkflowService {
     if (
       accountantUser &&
       accountantUser.role !== 'accountant' &&
-      accountantUser.role !== 'super_admin'
+      accountantUser.role !== 'super_admin' &&
+      accountantUser.role !== 'admin'
     ) {
       throw new Error('Unauthorized: Only an Accountant or Finance Director can approve fees.');
     }
@@ -320,10 +329,17 @@ export class FeeWorkflowService {
     const oldStatus = fee.approval_status;
     const now = new Date().toISOString();
 
-    // Approval establishes a fee balance without tax or a scheduled plan.
+    // Approval establishes a fee balance
     fee.tax_gst_amount = 0;
-    fee.payment_plan = 'Full Payment';
-    fee.number_of_installments = 0;
+    if (!fee.payment_plan) fee.payment_plan = 'Full Payment';
+    if (fee.number_of_installments === undefined || fee.number_of_installments === null || fee.number_of_installments === 0) {
+      fee.number_of_installments =
+        fee.payment_plan === '2 Installments'
+          ? 2
+          : fee.payment_plan === '3 Installments'
+          ? 3
+          : 1;
+    }
     fee.final_payable = Number((Math.max(0, fee.proposed_fee - fee.discount_amount) + (fee.additional_charges || 0)).toFixed(2));
     fee.outstanding_amount = Math.max(0, Number((fee.final_payable - fee.paid_amount).toFixed(2)));
     fee.approval_status = 'Approved';
@@ -412,6 +428,9 @@ export class FeeWorkflowService {
 
     fee.fee_account_id = feeAccount.id;
 
+    // Generate or synchronize installment records in store.installments
+    this.generateInstallmentsForFee(fee, feeAccount.id);
+
     // Sync student record
     const student = store.students.find((s) => s.id === fee.student_id);
     if (student) {
@@ -423,6 +442,84 @@ export class FeeWorkflowService {
 
     store.persist();
     return fee;
+  }
+
+  /**
+   * Generates or synchronizes installment records in store.installments for an approved fee
+   */
+  public generateInstallmentsForFee(fee: StudentFee, feeAccountId: string): Installment[] {
+    if (!store.installments) store.installments = [];
+
+    // Determine number of installments
+    let count = fee.number_of_installments || 1;
+    if (fee.payment_plan === 'Full Payment') {
+      count = 1;
+    } else if (fee.payment_plan === '2 Installments') {
+      count = 2;
+    } else if (fee.payment_plan === '3 Installments') {
+      count = 3;
+    } else if (fee.payment_plan === 'Custom' && count < 1) {
+      count = 2;
+    }
+
+    const totalAmount = fee.final_payable;
+    const baseDueDate = fee.first_due_date ? new Date(fee.first_due_date) : new Date();
+
+    // Calculate per-installment amounts
+    const baseAmount = Math.floor(totalAmount / count);
+    const remainder = totalAmount - baseAmount * count;
+
+    const generated: Installment[] = [];
+    let remainingPaid = fee.paid_amount || 0;
+
+    for (let i = 1; i <= count; i++) {
+      const instAmount = i === count ? baseAmount + remainder : baseAmount;
+      const dueDateObj = new Date(baseDueDate);
+      dueDateObj.setDate(dueDateObj.getDate() + (i - 1) * 30);
+      const dueDateStr = dueDateObj.toISOString().split('T')[0];
+
+      const paidForThis = Math.min(remainingPaid, instAmount);
+      remainingPaid = Math.max(0, remainingPaid - paidForThis);
+
+      let status: 'Upcoming' | 'Due' | 'Paid' | 'Partial' | 'Overdue';
+      if (paidForThis >= instAmount && instAmount > 0) {
+        status = 'Paid';
+      } else if (paidForThis > 0) {
+        status = 'Partial';
+      } else {
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (dueDateStr < todayStr) {
+          status = 'Overdue';
+        } else if (i === 1 || dueDateStr <= new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]) {
+          status = 'Due';
+        } else {
+          status = 'Upcoming';
+        }
+      }
+
+      const instRecord: Installment = {
+        tenant_id: tenantId(fee),
+        id: `inst-${fee.id}-${i}`,
+        fee_account_id: feeAccountId,
+        student_id: fee.student_id,
+        installment_number: i,
+        amount: instAmount,
+        due_date: dueDateStr,
+        paid_amount: paidForThis,
+        paid_date: paidForThis >= instAmount ? (fee.updated_at?.split('T')[0] || new Date().toISOString().split('T')[0]) : undefined,
+        status,
+      };
+
+      generated.push(instRecord);
+    }
+
+    // Filter out old installments for this fee account and add the new ones
+    store.installments = store.installments.filter(
+      (inst) => inst.fee_account_id !== feeAccountId && !(inst.student_id === fee.student_id && inst.id.startsWith(`inst-${fee.id}-`))
+    );
+    store.installments.push(...generated);
+
+    return generated;
   }
 
   /**
@@ -591,8 +688,17 @@ export class FeeWorkflowService {
     fee.additional_charges = additional_charges;
     fee.final_payable = final_payable;
     fee.outstanding_amount = final_payable - fee.paid_amount;
-    fee.payment_plan = 'Full Payment';
-    fee.number_of_installments = 0;
+    if (updates.payment_plan) fee.payment_plan = updates.payment_plan;
+    if (updates.number_of_installments !== undefined) {
+      fee.number_of_installments = updates.number_of_installments;
+    } else if (updates.payment_plan) {
+      fee.number_of_installments =
+        updates.payment_plan === '2 Installments'
+          ? 2
+          : updates.payment_plan === '3 Installments'
+          ? 3
+          : 1;
+    }
     if (updates.first_due_date) fee.first_due_date = updates.first_due_date;
     if (updates.fee_category) fee.fee_category = updates.fee_category;
     if (updates.counsellor_notes) fee.counsellor_notes = updates.counsellor_notes;
@@ -805,9 +911,17 @@ export class FeeWorkflowService {
     const student = store.students.find((s) => s.id === fee.student_id);
     if (!student) throw new Error('Student not found.');
     assertSameTenant(recorder, student);
-    const enrollmentId = fee.enrollment_id || student.admission_id;
+    const validEnrollmentIds = [
+      fee.enrollment_id,
+      student.admission_id,
+      student.admission_number,
+      fee.admission_number,
+    ].filter(Boolean);
+    const enrollmentId = fee.enrollment_id || student.admission_id || student.admission_number || student.id;
     if (input.student_id && input.student_id !== fee.student_id) throw new Error('Student does not match fee account.');
-    if (input.enrollment_id && input.enrollment_id !== enrollmentId) throw new Error('Enrollment does not match fee account.');
+    if (input.enrollment_id && validEnrollmentIds.length > 0 && !validEnrollmentIds.includes(input.enrollment_id)) {
+      throw new Error('Enrollment does not match fee account.');
+    }
     if (input.idempotency_key) {
       const previous = store.studentPayments.find((p) => tenantId(p) === tenantId(recorder) && p.recorded_by === recorder.id && p.idempotency_key === input.idempotency_key);
       if (previous) {
@@ -837,6 +951,10 @@ export class FeeWorkflowService {
 
     const paymentId = `spr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
+    const matchedInstallment = input.installment_id
+      ? store.installments?.find((i) => i.id === input.installment_id)
+      : undefined;
+
     const paymentRecord: StudentPaymentRecord = {
       tenant_id: tenantId(recorder),
       status: 'Pending Approval',
@@ -844,7 +962,7 @@ export class FeeWorkflowService {
       idempotency_key: input.idempotency_key,
       id: paymentId,
       fee_id: fee.id,
-      installment_id: undefined,
+      installment_id: matchedInstallment?.id,
       student_id: fee.student_id,
       student_name: fee.student_name,
       admission_number: fee.admission_number,
@@ -1147,6 +1265,17 @@ export class FeeWorkflowService {
       store.feeAccounts.push(feeAccount);
     }
 
+    // 1c. Reconcile Installments (B06)
+    if (!store.installments) store.installments = [];
+    if (payment.installment_id) {
+      const targetInst = store.installments.find((i) => i.id === payment.installment_id);
+      if (targetInst) {
+        targetInst.paid_amount = Number(((targetInst.paid_amount || 0) + payment.amount_paid).toFixed(2));
+        targetInst.status = targetInst.paid_amount >= targetInst.amount ? 'Paid' : 'Partial';
+        targetInst.paid_date = payment.payment_date;
+      }
+    }
+
     // 1d. Synchronize with Student Profile
     const student = store.students.find((s) => s.id === fee.student_id);
     if (student) {
@@ -1155,8 +1284,24 @@ export class FeeWorkflowService {
       student.updated_at = now;
     }
 
-    // 2. Generate Official Receipt
-    const receiptNumber = `REC-${new Date().getFullYear()}-${String(store.receipts.filter((r) => tenantId(r) === tenantId(fee)).length + 1).padStart(6, '0')}`;
+    // 2. Generate Official Receipt with monotonic collision-proof sequence (B10)
+    const receiptYear = new Date().getFullYear();
+    const receiptPrefix = `REC-${receiptYear}-`;
+    let maxReceiptSeq = 0;
+    for (const r of store.receipts || []) {
+      if (tenantId(r) === tenantId(fee) && r.receipt_number?.startsWith(receiptPrefix)) {
+        const numPart = parseInt(r.receipt_number.slice(receiptPrefix.length), 10);
+        if (!Number.isNaN(numPart) && numPart > maxReceiptSeq) {
+          maxReceiptSeq = numPart;
+        }
+      }
+    }
+    let nextSeq = maxReceiptSeq + 1;
+    let receiptNumber = `${receiptPrefix}${String(nextSeq).padStart(6, '0')}`;
+    while ((store.receipts || []).some((r) => r.receipt_number === receiptNumber && tenantId(r) === tenantId(fee))) {
+      nextSeq++;
+      receiptNumber = `${receiptPrefix}${String(nextSeq).padStart(6, '0')}`;
+    }
     payment.receipt_number = receiptNumber;
 
     const receiptDetails = receiptAmounts(payment.amount_paid);
@@ -1567,10 +1712,10 @@ export class FeeWorkflowService {
 
     const accountantUser = store.users.find((u) => u.id === accountantUserId);
     if (
-      accountantUser &&
-      accountantUser.role !== 'accountant' &&
-      accountantUser.role !== 'admin' &&
-      accountantUser.role !== 'super_admin'
+      !accountantUser ||
+      (accountantUser.role !== 'accountant' &&
+        accountantUser.role !== 'admin' &&
+        accountantUser.role !== 'super_admin')
     ) {
       throw new Error('Unauthorized: Only an Accountant or Administrator can void official receipts.');
     }
@@ -1583,10 +1728,18 @@ export class FeeWorkflowService {
     }
 
     const now = new Date().toISOString();
-    const accountantName = accountantUser?.full_name || 'Accountant';
-    const creditNoteNumber = `CN-${new Date().getFullYear()}-${String(
-      ((store.receipts || []).filter((r) => r.status === 'Void').length) + 1
-    ).padStart(4, '0')}`;
+    const accountantName = accountantUser.full_name || 'Accountant';
+    const cnPrefix = `CN-${new Date().getFullYear()}-`;
+    let maxCnSeq = 0;
+    for (const r of store.receipts || []) {
+      if (r.credit_note_number?.startsWith(cnPrefix)) {
+        const numPart = parseInt(r.credit_note_number.slice(cnPrefix.length), 10);
+        if (!Number.isNaN(numPart) && numPart > maxCnSeq) {
+          maxCnSeq = numPart;
+        }
+      }
+    }
+    const creditNoteNumber = `${cnPrefix}${String(maxCnSeq + 1).padStart(4, '0')}`;
 
     receipt.status = 'Void';
     receipt.void_at = now;
@@ -1594,11 +1747,12 @@ export class FeeWorkflowService {
     receipt.void_reason = reason.trim();
     receipt.credit_note_number = creditNoteNumber;
 
-    // 1. Mark associated payment as Refunded / Failed
+    // 1. Mark associated payment as Voided / Failed and sync dual status (B07)
     const studentPayment = (store.studentPayments || []).find(
       (sp) => sp.id === receipt.payment_id || sp.receipt_number === receipt.receipt_number
     );
     if (studentPayment) {
+      studentPayment.status = 'Voided';
       studentPayment.verification_status = 'Rejected';
       studentPayment.notes = `Voided / Reversed via Credit Note ${creditNoteNumber}: ${reason}`;
     }
@@ -1650,6 +1804,23 @@ export class FeeWorkflowService {
       description: `Credit Note ${creditNoteNumber} issued for voided receipt ${receipt.receipt_number}: ${reason}`,
       recorded_by: accountantUserId,
     });
+
+    // 5. Re-evaluate onboarding financial clearance (B07)
+    const studentCase = (store.onboardingCases || []).find(
+      (c) => c.student_id === receipt.student_id && tenantId(c) === tenantId(receipt)
+    );
+    if (studentCase && studentCase.checklist?.fee_clearance_verification) {
+      const remainingVerified = (store.studentPayments || [])
+        .filter((sp) => sp.student_id === receipt.student_id && sp.verification_status === 'Verified' && sp.status === 'Approved')
+        .reduce((sum, p) => sum + p.amount_paid, 0);
+      const feePayable = fee ? fee.final_payable : 0;
+      const minThresholdPct = store.financeSettings?.minimum_down_payment_percent ?? 50;
+      const minClearance = feePayable > 0 ? (feePayable * minThresholdPct) / 100 : 0;
+      if (feePayable > 0 && remainingVerified < minClearance) {
+        studentCase.checklist.fee_clearance_verification.completed = false;
+        studentCase.checklist.fee_clearance_verification.notes = `Financial clearance revoked: receipt ${receipt.receipt_number} voided via Credit Note ${creditNoteNumber}. Verified paid (₹${remainingVerified}) below threshold (₹${minClearance}).`;
+      }
+    }
 
     store.reconcileDualLedgers();
     store.persist();

@@ -56,6 +56,8 @@ import {
   verifyEnrollmentDocument,
   getPlacementEnrollmentHistory,
   createPlacementEnrollment,
+  evaluateEnrollmentPrerequisites,
+  DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS,
 } from '@/lib/services/placement-service';
 import { formatDate, formatDateTime, formatINR } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -116,8 +118,12 @@ export default function PlacementEnrollmentsPage() {
   const [selectedOfficerId, setSelectedOfficerId] = React.useState(user?.id || 'usr-admin');
 
   // Eligibility Settings state
-  const [settings, setSettings] = React.useState<PlacementEligibilitySettings>(store.placementEligibilitySettings);
-  const [settingsForm, setSettingsForm] = React.useState<PlacementEligibilitySettings>(store.placementEligibilitySettings);
+  const [settings, setSettings] = React.useState<PlacementEligibilitySettings>(
+    store.placementEligibilitySettings || DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS
+  );
+  const [settingsForm, setSettingsForm] = React.useState<PlacementEligibilitySettings>(
+    store.placementEligibilitySettings || DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS
+  );
 
   // Live Automated Pre-requisite Audit Calculation for Candidate Enrollment
   React.useEffect(() => {
@@ -130,30 +136,21 @@ export default function PlacementEnrollmentsPage() {
       setCandidateAuditResult(null);
       return;
     }
-    const attendance = student.attendance_percentage ?? 0;
-    const progress = student.course_progress ?? 0;
-    const outstanding = student.outstanding_amount ?? 0;
-    const minAtt = settings.min_attendance_percentage ?? 80;
-    const minProg = settings.min_course_progress_percentage ?? 80;
-    const requireFees = settings.require_fees_cleared ?? true;
-
-    const passesAttendance = attendance >= minAtt;
-    const passesProgress = progress >= minProg;
-    const passesFees = !requireFees || outstanding <= 0;
-    const allPassed = passesAttendance && passesProgress && passesFees;
+    const audit = evaluateEnrollmentPrerequisites(candidateStudentId);
 
     setCandidateAuditResult({
       student,
-      attendance,
-      passesAttendance,
-      minAtt,
-      progress,
-      passesProgress,
-      minProg,
-      outstanding,
-      passesFees,
-      requireFees,
-      allPassed,
+      attendance: audit.attendance_percentage,
+      passesAttendance: audit.passes_attendance,
+      minAtt: audit.min_attendance_percentage,
+      progress: audit.course_progress,
+      passesProgress: audit.passes_progress,
+      minProg: audit.min_course_progress,
+      outstanding: audit.outstanding_amount,
+      passesFees: audit.passes_fees,
+      requireFees: audit.require_fees_cleared,
+      allPassed: audit.all_passed,
+      unmetCriteria: audit.unmet_criteria,
     });
   }, [candidateStudentId, settings]);
 
@@ -191,18 +188,14 @@ export default function PlacementEnrollmentsPage() {
     if (!selectedEnrollment) return;
 
     // Automated Eligibility Audit Validation Before Approval
-    const student = (store.students || []).find((s) => s.id === selectedEnrollment.student_id);
-    const attendance = student?.attendance_percentage ?? 0;
-    const minAtt = settings.min_attendance_percentage ?? 80;
-    const outstanding = student?.outstanding_amount ?? 0;
-    const passesAttendance = attendance >= minAtt;
-    const passesFees = !settings.require_fees_cleared || outstanding <= 0;
+    const audit = evaluateEnrollmentPrerequisites(selectedEnrollment.student_id);
 
-    if ((!passesAttendance || !passesFees) && !selectedEnrollment.eligibility_overridden) {
+    if (!audit.all_passed && !selectedEnrollment.eligibility_overridden) {
       alert(
         `Automated Eligibility Audit Warning: Candidate has not fulfilled mandatory institutional prerequisites:\n` +
-          (!passesAttendance ? `• Attendance is ${attendance}% (Required: ≥ ${minAtt}%)\n` : '') +
-          (!passesFees ? `• Outstanding fee balance is ₹${formatINR(outstanding)} (Required: ₹0 No Dues)\n` : '') +
+          (!audit.passes_attendance ? `• Attendance is ${audit.attendance_percentage}% (Required: ≥ ${audit.min_attendance_percentage}%)\n` : '') +
+          (!audit.passes_progress ? `• Course progress is ${audit.course_progress}% (Required: ≥ ${audit.min_course_progress}%)\n` : '') +
+          (!audit.passes_fees ? `• Outstanding fee balance is ₹${formatINR(audit.outstanding_amount)} (Required: ₹0 No Dues)\n` : '') +
           `\nTo approve this student, please grant an Authorized Admin Override with mandatory justification.`
       );
       return;
@@ -231,11 +224,12 @@ export default function PlacementEnrollmentsPage() {
     if (!candidateStudentId || !candidateAuditResult) return;
     setCandidateEnrollError(null);
 
-    const { allPassed, student, passesAttendance, passesFees, attendance, minAtt, outstanding } = candidateAuditResult;
+    const { allPassed, student, passesAttendance, passesProgress, passesFees, attendance, progress, minAtt, minProg, outstanding } = candidateAuditResult;
     if (!allPassed && !candidateOverride) {
       setCandidateEnrollError(
         `Automated Eligibility Audit Failed: Candidate does not meet mandatory prerequisites (` +
           (!passesAttendance ? `Attendance ${attendance}% < ${minAtt}%; ` : '') +
+          (!passesProgress ? `Course Progress ${progress}% < ${minProg}%; ` : '') +
           (!passesFees ? `Fee Arrears: ₹${formatINR(outstanding)}; ` : '') +
           `). Check "Grant Authorized Administrative Override" with justification to proceed.`
       );
@@ -455,19 +449,23 @@ export default function PlacementEnrollmentsPage() {
   };
 
   // KPI Calculations
-  const placementList = store.placementEnrollments || [];
-  const totalCount = placementList.length;
-  const underReviewCount = placementList.filter(
-    (e) => e.enrollment_status === 'Application Submitted' || e.enrollment_status === 'Under Review'
-  ).length;
-  const approvedCount = placementList.filter(
-    (e) =>
-      e.enrollment_status === 'Enrollment Approved' ||
-      e.enrollment_status === 'Placement Eligible' ||
-      e.enrollment_status === 'Active Placement'
-  ).length;
-  const eligibleCount = placementList.filter((e) => e.is_placement_eligible).length;
-  const onHoldCount = placementList.filter((e) => e.enrollment_status === 'Enrollment On Hold').length;
+  const { totalCount, underReviewCount, approvedCount, eligibleCount, onHoldCount } = React.useMemo(() => {
+    const placementList = store.placementEnrollments || [];
+    return {
+      totalCount: placementList.length,
+      underReviewCount: placementList.filter(
+        (e) => e.enrollment_status === 'Application Submitted' || e.enrollment_status === 'Under Review'
+      ).length,
+      approvedCount: placementList.filter(
+        (e) =>
+          e.enrollment_status === 'Enrollment Approved' ||
+          e.enrollment_status === 'Placement Eligible' ||
+          e.enrollment_status === 'Active Placement'
+      ).length,
+      eligibleCount: placementList.filter((e) => e.is_placement_eligible).length,
+      onHoldCount: placementList.filter((e) => e.enrollment_status === 'Enrollment On Hold').length,
+    };
+  }, [enrollments]);
 
   const canAccess =
     ['super_admin', 'admin', 'placement_coordinator'].includes(role || '') ||
@@ -542,7 +540,7 @@ export default function PlacementEnrollmentsPage() {
           <Briefcase className="h-4 w-4 text-slate-500" />
           <span>Drives & Openings</span>
           <Badge variant="secondary" className="ml-1 text-[10px]">
-            {store.jobOpenings.length}
+            {store.jobOpenings?.length || 0}
           </Badge>
         </Link>
         <Link
@@ -1479,7 +1477,7 @@ export default function PlacementEnrollmentsPage() {
               onChange={(e) => setSelectedOfficerId(e.target.value)}
               className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
             >
-              {store.users
+              {(store.users || [])
                 .filter((u) => u.role === 'placement_coordinator' || u.role === 'admin' || u.role === 'super_admin' || u.role === 'counsellor')
                 .map((u) => (
                   <option key={u.id} value={u.id}>

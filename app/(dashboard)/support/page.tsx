@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   UserCheck,
+  UserPlus,
+  ArrowUpRight,
   Paperclip,
   ExternalLink,
   ImageIcon,
@@ -55,6 +57,10 @@ export default function SupportDeskPage() {
   const [isResolving, setIsResolving] = React.useState(false);
   const [resolutionNotes, setResolutionNotes] = React.useState('');
   const [isSubmittingReply, setIsSubmittingReply] = React.useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = React.useState(false);
+  const [targetMentorId, setTargetMentorId] = React.useState('');
+  const [delegationNote, setDelegationNote] = React.useState('');
+  const [isAssigning, setIsAssigning] = React.useState(false);
 
   // Auto-switch to My Batches when viewing as trainer
   React.useEffect(() => {
@@ -318,6 +324,72 @@ export default function SupportDeskPage() {
     const assignId = user?.id || activeUser.id;
     await assignDoubt(doubtId, assignId, assignId);
     await refreshList();
+  };
+
+  const eligibleStaff = React.useMemo(() => {
+    return (store.users || []).filter(
+      (u) => u.role === 'support' || u.role === 'trainer' || u.role === 'admin' || u.role === 'super_admin'
+    );
+  }, []);
+
+  const handleAssignMentor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDoubt || !targetMentorId) return;
+    setIsAssigning(true);
+    try {
+      const actorId = user?.id || activeUser.id;
+      await assignDoubt(selectedDoubt.id, targetMentorId, actorId);
+      if (delegationNote.trim()) {
+        const mentorObj = (store.users || []).find((u) => u.id === targetMentorId);
+        await replyToDoubt(
+          selectedDoubt.id,
+          `[Ticket Re-assigned to ${mentorObj?.full_name || 'Staff'}] Note: ${delegationNote.trim()}`,
+          actorId,
+          user?.role || activeUser.role,
+          `${user?.full_name || activeUser.full_name} (Academic Support)`
+        );
+      }
+      setIsAssignModalOpen(false);
+      setDelegationNote('');
+      setTargetMentorId('');
+      await refreshList();
+    } catch (err: any) {
+      alert(err.message || 'Error delegating doubt ticket');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleEscalateToFaculty = async (doubtId: string) => {
+    const ticket = doubts.find((d) => d.id === doubtId);
+    if (!ticket) return;
+    const courseTrainer =
+      (store.users || []).find(
+        (u) =>
+          u.role === 'trainer' &&
+          (u.assigned_course_ids?.includes(ticket.course_id) || (ticket.batch_id && trainerBatchIds.has(ticket.batch_id)))
+      ) || (store.users || []).find((u) => u.role === 'trainer');
+
+    if (!courseTrainer) {
+      alert('No faculty trainer available for escalation.');
+      return;
+    }
+
+    const actorId = user?.id || activeUser.id;
+    try {
+      ticket.priority = 'High';
+      await assignDoubt(doubtId, courseTrainer.id, actorId);
+      await replyToDoubt(
+        doubtId,
+        `[ESCALATED TO FACULTY] Ticket escalated to senior faculty trainer ${courseTrainer.full_name}. Priority upgraded to High.`,
+        actorId,
+        user?.role || activeUser.role,
+        `${user?.full_name || activeUser.full_name} (Academic Support)`
+      );
+      await refreshList();
+    } catch (err: any) {
+      alert(err.message || 'Error escalating ticket');
+    }
   };
 
   const openCount = doubts.filter((d) => d.status === 'Open' || d.status === 'Assigned').length;
@@ -667,7 +739,7 @@ export default function SupportDeskPage() {
                   </div>
 
                   {canRespond && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {selectedDoubt.status !== 'Resolved' && (
                         <Button
                           variant="sap"
@@ -699,6 +771,37 @@ export default function SupportDeskPage() {
                           Assign to Me
                         </Button>
                       ) : null}
+
+                      {selectedDoubt.status !== 'Resolved' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setTargetMentorId(selectedDoubt.assigned_to_id || '');
+                              setDelegationNote('');
+                              setIsAssignModalOpen(true);
+                            }}
+                            className="text-xs py-1 px-2.5 h-7 text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center space-x-1"
+                            title="Delegate or reassign to another faculty or support mentor"
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            <span>Assign / Delegate</span>
+                          </Button>
+                          {selectedDoubt.assigned_to_role !== 'trainer' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEscalateToFaculty(selectedDoubt.id)}
+                              className="text-xs py-1 px-2.5 h-7 text-purple-700 border-purple-200 bg-purple-50 hover:bg-purple-100 flex items-center space-x-1"
+                              title="Escalate ticket to faculty trainer with High priority"
+                            >
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                              <span>Escalate to Faculty</span>
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -873,6 +976,57 @@ export default function SupportDeskPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Assign / Delegate Modal */}
+      <Modal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        title="Delegate / Reassign Support Ticket"
+        description={`Reassign ticket ${selectedDoubt?.ticket_number} to a faculty trainer or academic support mentor.`}
+      >
+        <form onSubmit={handleAssignMentor} className="space-y-4 text-xs">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Select Mentor / Faculty Member *
+            </label>
+            <select
+              value={targetMentorId}
+              onChange={(e) => setTargetMentorId(e.target.value)}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1]"
+              required
+            >
+              <option value="">-- Choose Staff Member --</option>
+              {eligibleStaff.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.full_name} ({staff.role.toUpperCase()}) - {staff.email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Handover Notes / Delegation Instructions (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={delegationNote}
+              onChange={(e) => setDelegationNote(e.target.value)}
+              placeholder="e.g. Trainee requires help with SAP FICO document splitting configuration in client 800."
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1]"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+            <Button variant="outline" size="sm" type="button" onClick={() => setIsAssignModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="sap" size="sm" type="submit" disabled={isAssigning || !targetMentorId}>
+              {isAssigning ? 'Reassigning...' : 'Confirm Assignment'}
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

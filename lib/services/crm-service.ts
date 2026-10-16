@@ -77,10 +77,11 @@ export async function getLeadById(id: string): Promise<Lead | undefined> {
 }
 
 export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_at' | 'updated_at'>): Promise<Lead> {
+  store.leads = store.leads || [];
   const count = store.leads.length + 1;
   const lead_code = `LD-2026-${String(count).padStart(3, '0')}`;
-  const course = store.courses.find((c) => c.id === data.interested_course_id);
-  const counsellor = store.users.find((u) => u.id === data.counsellor_id);
+  const course = (store.courses || []).find((c) => c.id === data.interested_course_id);
+  const counsellor = (store.users || []).find((u) => u.id === data.counsellor_id);
 
   const newLead: Lead = {
     ...data,
@@ -234,20 +235,20 @@ export function convertLeadToAdmission(leadId: string): {
   lead.updated_at = new Date().toISOString();
   store.persist();
 
-  const course = store.courses.find((c) => c.id === lead.interested_course_id);
+  const course = (store.courses || []).find((c) => c.id === lead.interested_course_id) || store.courses?.[0];
 
   const admissionPrefill: Partial<CreateAdmissionInput> = {
     student_name: lead.full_name,
     email: lead.email,
     phone: lead.phone,
-    city: 'Hyderabad',
-    education: lead.education || lead.current_status || 'Graduate / B.Tech / MBA',
-    experience_years: lead.experience_years ?? 1,
-    course_id: lead.interested_course_id || (store.courses[0]?.id ?? ''),
+    city: '',
+    education: lead.education || lead.current_status || '',
+    experience_years: lead.experience_years ?? 0,
+    course_id: lead.interested_course_id || (store.courses?.[0]?.id ?? ''),
     counsellor_id: lead.counsellor_id,
     lead_id: lead.id,
     training_mode: (lead.training_preference as any) || 'Hybrid',
-    course_fee: course?.price ?? 45000,
+    course_fee: course?.price ?? 0,
   };
 
   return { lead, admissionPrefill };
@@ -308,7 +309,8 @@ export async function bulkUpdateLeadStage(
   leadIds: string[],
   stage: LeadStage,
   updatedByUserId: string,
-  notes?: string
+  notes?: string,
+  followUpDate?: string | null
 ): Promise<number> {
   let count = 0;
   const now = new Date().toISOString();
@@ -319,6 +321,9 @@ export async function bulkUpdateLeadStage(
     if (lead) {
       lead.stage = stage;
       lead.updated_at = now;
+      if (followUpDate !== undefined) {
+        lead.follow_up_date = followUpDate ? followUpDate : undefined;
+      }
       if (notes) {
         lead.notes = `${lead.notes ? lead.notes + '\n' : ''}[${dateLabel}] [Bulk Stage Update]: ${notes}`;
       }
@@ -331,12 +336,16 @@ export async function bulkUpdateLeadStage(
     if (isLiveSupabaseEnabled()) {
       try {
         const supabase = createClient();
+        const updatePayload: Record<string, any> = {
+          stage,
+          updated_at: now,
+        };
+        if (followUpDate !== undefined) {
+          updatePayload.follow_up_date = followUpDate || null;
+        }
         await supabase
           .from('leads')
-          .update({
-            stage,
-            updated_at: now,
-          })
+          .update(updatePayload)
           .in('id', leadIds);
       } catch (err) {
         console.warn('Supabase bulkUpdateLeadStage warning:', err);
@@ -351,7 +360,7 @@ export async function bulkUpdateLeadStage(
       action: 'LEADS_BULK_STAGE_UPDATED',
       module: 'CRM',
       record_id: leadIds.join(','),
-      new_value: { count, stage, leadIds },
+      new_value: { count, stage, leadIds, follow_up_date: followUpDate },
     });
   }
 

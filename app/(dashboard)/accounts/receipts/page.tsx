@@ -95,7 +95,7 @@ export default function ReceiptsListPage() {
   const voidedReceipts = allReceipts.filter((r) => r.status === 'Void');
   const totalCollected = activeReceipts.reduce((sum, r) => sum + safeAmount(r.payment_amount), 0);
 
-  const handleConfirmVoid = () => {
+  const handleConfirmVoid = async () => {
     if (!selectedReceiptForVoid || !user || !canVoidReceipt) return;
     setVoidError(null);
     const finalReason = voidReasonDetails.trim()
@@ -103,9 +103,22 @@ export default function ReceiptsListPage() {
       : voidReasonCategory;
 
     try {
-      const result = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason);
+      let creditNoteNumber = '';
+      if (typeof window !== 'undefined') {
+        const { paymentWorkflowClient } = await import('@/lib/services/payment-workflow-client');
+        try {
+          const res = await paymentWorkflowClient.voidReceipt(selectedReceiptForVoid.id, finalReason);
+          creditNoteNumber = res?.creditNoteNumber || '';
+        } catch {
+          const res = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason);
+          creditNoteNumber = res.creditNoteNumber;
+        }
+      } else {
+        const res = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason);
+        creditNoteNumber = res.creditNoteNumber;
+      }
       setVoidSuccessMsg(
-        `Receipt ${selectedReceiptForVoid.receipt_number} has been voided. Official Credit Note ${result.creditNoteNumber} issued and student ledger restored.`
+        `Receipt ${selectedReceiptForVoid.receipt_number} has been voided. Official Credit Note ${creditNoteNumber} issued and student ledger restored.`
       );
       setVoidModalOpen(false);
       setSelectedReceiptForVoid(null);

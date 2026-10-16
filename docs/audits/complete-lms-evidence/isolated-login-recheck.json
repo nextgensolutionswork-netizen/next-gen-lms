@@ -1,0 +1,19 @@
+{
+  "url": "http://127.0.0.1:3106/login?email=audit-nonexistent%40example.test&password=SyntheticOnly%212026",
+  "blockedExternalHosts": [],
+  "alerts": [],
+  "passwordButtons": [
+    "Super Admin/dashboardsuperadmin@next-generpsolutions.com",
+    "Operations Admin/dashboardadmin@next-generpsolutions.com",
+    "Accountant/accounts/feesaccounts@next-generpsolutions.com",
+    "Counsellor/crm/leadscounsellor@next-generpsolutions.com",
+    "Trainer / Faculty/academics/coursesvikram.fico@next-generpsolutions.com",
+    "Placement Head/placementplacement@next-generpsolutions.com",
+    "Academic Support/supportsupport@next-generpsolutions.com",
+    "Onboarding Team/onboardingonboarding@next-generpsolutions.com",
+    "Enrolled Student/portalamit.gupta@student.next-gen.com",
+    "",
+    "Forgot password?",
+    "Sign in"
+  ]
+}

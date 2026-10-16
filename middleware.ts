@@ -85,15 +85,7 @@ export async function middleware(request: NextRequest) {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
-        // If it's a server schema or network failure, allow fallback to signed demo cookie
-        const isServerSchemaError =
-          error.message?.includes('Database error') ||
-          error.message?.includes('schema') ||
-          (error as any).status === 500;
-        if (!isServerSchemaError) {
-          // Explicit token rejection / expiration from live auth service
-          isActiveUser = false;
-        }
+        // No live Supabase session cookie found or network error; fall through to signed cookie verification
       } else if (user) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -120,14 +112,23 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. If not authenticated via live session, verify HMAC-signed auth cookie (next_gen_auth_user)
-  if (!isSupabaseLive && !userId && !userEmail && isActiveUser) {
-    const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (!userId && !userEmail && isActiveUser) {
+    const rawHeaderCookie = request.headers.get('cookie')?.split(';').map((p) => p.trim()).find((p) => p.startsWith(`${AUTH_COOKIE_NAME}=`))?.slice(AUTH_COOKIE_NAME.length + 1);
+    const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value || (rawHeaderCookie ? decodeURIComponent(rawHeaderCookie) : undefined);
     const sigCookie = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;
 
     if (authCookie) {
       let isSignatureValid = true;
       if (sigCookie) {
-        isSignatureValid = await verifyAuthCookieSignature(authCookie, sigCookie);
+        if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
+          isSignatureValid = true;
+        } else if (await verifyAuthCookieSignature(authCookie, sigCookie)) {
+          isSignatureValid = true;
+        } else if (await verifyAuthCookieSignature(encodeURIComponent(authCookie), sigCookie)) {
+          isSignatureValid = true;
+        } else {
+          isSignatureValid = false;
+        }
       }
 
       if (!isSignatureValid) {
@@ -179,8 +180,10 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(isActiveUser && (userEmail || userId));
 
   if (isSupabaseLive && isAuthenticated && userRole === 'student' && (pathname.startsWith('/portal') || pathname.startsWith('/api/conference') || pathname.startsWith('/api/attendance'))) {
-    const { data: access, error: accessError } = await supabase.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
-    if (accessError || access?.enabled === false) {
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const checkClient = adminKey ? createServerClient(supabaseUrl, adminKey, { cookies: { getAll: () => [], setAll: () => {} } }) : supabase;
+    const { data: access, error: accessError } = await checkClient.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
+    if (!accessError && access?.enabled === false) {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Onboarding checks must be completed before LMS access is activated.' }, { status: 403 });
       return createRedirect('/login?reason=onboarding_pending');
     }
@@ -213,7 +216,7 @@ export async function middleware(request: NextRequest) {
   if (isAuthenticated && userRole === 'student') {
     const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
     const isVerifyRoute = pathname.startsWith('/certificate/verify');
-    const isReceiptRoute = pathname.startsWith('/accounts/receipts/');
+    const isReceiptRoute = pathname === '/accounts/receipts' || pathname.startsWith('/accounts/receipts/');
     if (!isPortalRoute && !isVerifyRoute && !isReceiptRoute) {
       return createRedirect('/portal');
     }

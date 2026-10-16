@@ -99,7 +99,8 @@ export default function LeadsPage() {
   const [fullName, setFullName] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
-  const [courseId, setCourseId] = React.useState(store.courses[0]?.id || '');
+  const [courseId, setCourseId] = React.useState(store.courses?.[0]?.id || '');
+  const [counsellorId, setCounsellorId] = React.useState<string>(user?.id || '');
   const [status, setStatus] = React.useState('Working Professional');
   const [trainingPref, setTrainingPref] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Hybrid');
   const [source, setSource] = React.useState<'Website' | 'Google Ads' | 'Meta Ads' | 'Referral' | 'Walk-in' | 'Other'>('Website');
@@ -112,19 +113,28 @@ export default function LeadsPage() {
     new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10)
   );
   const [followUpTime, setFollowUpTime] = React.useState('11:00');
+  const [bulkFollowUpDate, setBulkFollowUpDate] = React.useState(
+    new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+  );
 
   // Convert to Admission state
-  const [convertCourseId, setConvertCourseId] = React.useState(store.courses[0]?.id || '');
+  const [convertCourseId, setConvertCourseId] = React.useState(store.courses?.[0]?.id || '');
   const [convertBatchId, setConvertBatchId] = React.useState('');
-  const [convertCourseFee, setConvertCourseFee] = React.useState<number>(store.courses[0]?.price || 45000);
-  const [convertDob, setConvertDob] = React.useState('2001-06-15');
-  const [convertGender, setConvertGender] = React.useState<'Male' | 'Female' | 'Other'>('Male');
-  const [convertCity, setConvertCity] = React.useState('Hyderabad');
-  const [convertAddress, setConvertAddress] = React.useState('Plot 12, Madhapur');
-  const [convertEducation, setConvertEducation] = React.useState('Graduate / B.Tech / MBA');
-  const [convertExperience, setConvertExperience] = React.useState<number>(1);
+  const [convertCourseFee, setConvertCourseFee] = React.useState<number>(store.courses?.[0]?.price ?? 0);
+  const [convertDob, setConvertDob] = React.useState('');
+  const [convertGender, setConvertGender] = React.useState<'Male' | 'Female' | 'Other' | ''>('');
+  const [convertCity, setConvertCity] = React.useState('');
+  const [convertAddress, setConvertAddress] = React.useState('');
+  const [convertEducation, setConvertEducation] = React.useState('');
+  const [convertExperience, setConvertExperience] = React.useState<number>(0);
   const [discount, setDiscount] = React.useState(0);
   const [discountReason, setDiscountReason] = React.useState('');
+
+  React.useEffect(() => {
+    if (user?.id && !counsellorId) {
+      setCounsellorId(user.id);
+    }
+  }, [user?.id]);
 
   const refreshLeads = () => {
     let list = [...(store.leads || [])];
@@ -174,6 +184,12 @@ export default function LeadsPage() {
       return;
     }
 
+    const assignedCounsellorId = counsellorId || user.id || availableCounsellors[0]?.id;
+    if (!assignedCounsellorId) {
+      alert('Please select an assigned counsellor.');
+      return;
+    }
+
     await createLead({
       full_name: fullName,
       phone,
@@ -183,7 +199,7 @@ export default function LeadsPage() {
       experience_years: 1,
       training_preference: trainingPref,
       lead_source: source,
-      counsellor_id: user.id,
+      counsellor_id: assignedCounsellorId,
       notes,
       stage: 'New',
     });
@@ -202,35 +218,51 @@ export default function LeadsPage() {
       alert('Authentication required: Please sign in to update lead stages.');
       return;
     }
-    await updateLeadStage(selectedLead.id, nextStage, updateNotes, user.id);
-    if (followUpDate && (nextStage === 'Follow-up' || nextStage === 'Demo Scheduled')) {
+    if ((nextStage === 'Follow-up' || nextStage === 'Demo Scheduled') && !followUpDate) {
+      alert('Please select a valid follow-up or demo date.');
+      return;
+    }
+
+    const scheduledDate = followUpDate
+      ? (followUpTime ? `${followUpDate}T${followUpTime}:00` : followUpDate)
+      : null;
+
+    const actorId = user.id;
+    await updateLeadStage(selectedLead.id, nextStage, updateNotes, actorId, scheduledDate);
+
+    if (nextStage === 'Demo Scheduled') {
       const l = (store.leads || []).find((lead) => lead.id === selectedLead.id);
       if (l) {
-        l.follow_up_date = followUpTime ? `${followUpDate}T${followUpTime}:00` : followUpDate;
+        l.demo_date = scheduledDate || undefined;
+        l.demo_preference = true;
         store.persist();
       }
     }
+
     setUpdateNotes('');
     setSelectedLead(null);
     refreshLeads();
   };
 
   const handleOpenConvert = (lead: Lead) => {
+    if (!store.courses || store.courses.length === 0) {
+      alert('No courses available in the system. Please configure courses in Academic management first before converting leads.');
+      return;
+    }
     setSelectedLead(lead);
-    const defaultEdu =
-      lead.education || lead.current_status || 'Graduate / B.Tech / MBA';
+    const defaultEdu = lead.education || lead.current_status || '';
     setConvertEducation(defaultEdu);
-    setConvertExperience(lead.experience_years ?? 1);
-    const matchedCourse = (store.courses || []).find((c) => c.id === lead.interested_course_id) || store.courses?.[0];
+    setConvertExperience(lead.experience_years ?? 0);
+    const matchedCourse = (store.courses || []).find((c) => c.id === lead.interested_course_id) || store.courses[0];
     const initialCourseId = matchedCourse?.id || '';
     setConvertCourseId(initialCourseId);
     const matchedBatch = (store.batches || []).find((b) => b.course_id === initialCourseId);
     setConvertBatchId(matchedBatch?.id || '');
-    setConvertCourseFee(matchedCourse?.price || 45000);
-    setConvertDob('2001-06-15');
-    setConvertGender('Male');
-    setConvertCity('Hyderabad');
-    setConvertAddress('Plot 12, Madhapur');
+    setConvertCourseFee(matchedCourse?.price ?? 0);
+    setConvertDob('');
+    setConvertGender('');
+    setConvertCity('');
+    setConvertAddress('');
     setDiscount(0);
     setDiscountReason('');
     setIsConvertModalOpen(true);
@@ -275,13 +307,21 @@ export default function LeadsPage() {
       alert('Authentication required: Please sign in.');
       return;
     }
+    if ((bulkStage === 'Follow-up' || bulkStage === 'Demo Scheduled') && !bulkFollowUpDate) {
+      alert('Please select a valid scheduled date for bulk follow-up / demo.');
+      return;
+    }
     setIsBulkProcessing(true);
     try {
+      const scheduledDate = (bulkStage === 'Follow-up' || bulkStage === 'Demo Scheduled')
+        ? bulkFollowUpDate
+        : null;
       const count = await bulkUpdateLeadStage(
         selectedLeadIds,
         bulkStage,
         user.id,
-        `Bulk stage update to ${bulkStage}`
+        `Bulk stage update to ${bulkStage}`,
+        scheduledDate
       );
       setSelectedLeadIds([]);
       refreshLeads();
@@ -301,12 +341,40 @@ export default function LeadsPage() {
     }
     const course = (store.courses || []).find((c) => c.id === convertCourseId) || store.courses?.[0];
     if (!course) {
-      alert('No courses available to convert lead into admission.');
+      alert('No courses available to convert lead into admission. Please configure courses first.');
       return;
     }
+    if (!convertDob) {
+      alert('Please specify the student Date of Birth.');
+      return;
+    }
+    if (!convertGender) {
+      alert('Please select student Gender.');
+      return;
+    }
+    if (!convertCity.trim()) {
+      alert('Please enter student City.');
+      return;
+    }
+    if (!convertAddress.trim()) {
+      alert('Please enter student Address.');
+      return;
+    }
+    if (!convertEducation.trim()) {
+      alert('Please specify student Education/Qualification.');
+      return;
+    }
+    if (convertCourseFee <= 0) {
+      alert('Please specify a valid Course Fee.');
+      return;
+    }
+
     const defaultBatch = convertBatchId
       ? (store.batches || []).find((b) => b.id === convertBatchId)
       : (store.batches || []).find((b) => b.course_id === course.id);
+
+    const actorId = user.id;
+    const assignedCounsellorId = selectedLead.counsellor_id || actorId;
 
     try {
       await createAdmissionWorkflow(
@@ -314,11 +382,11 @@ export default function LeadsPage() {
           student_name: selectedLead.full_name,
           phone: selectedLead.phone,
           email: selectedLead.email,
-          dob: convertDob || '2001-06-15',
-          gender: convertGender,
-          address: convertAddress || 'Hitec City, Madhapur',
-          city: convertCity || 'Hyderabad',
-          education: convertEducation || 'Graduate / B.Tech / MBA',
+          dob: convertDob,
+          gender: convertGender as 'Male' | 'Female' | 'Other',
+          address: convertAddress.trim(),
+          city: convertCity.trim(),
+          education: convertEducation.trim(),
           experience_years: Number(convertExperience) || 0,
           current_employment_status: (['Employed', 'Unemployed', 'Student', 'Career Gap'].includes(selectedLead.current_status || '')
             ? (selectedLead.current_status as any)
@@ -327,14 +395,14 @@ export default function LeadsPage() {
           training_mode: selectedLead.training_preference,
           batch_id: defaultBatch?.id,
           admission_date: new Date().toISOString().slice(0, 10),
-          course_fee: Number(convertCourseFee) || course.price || 45000,
+          course_fee: Number(convertCourseFee),
           discount: Number(discount) || 0,
           discount_reason: discountReason || 'Counsellor approved discount',
           payment_plan: 'Full Payment',
-          counsellor_id: user.id,
+          counsellor_id: assignedCounsellorId,
           lead_id: selectedLead.id,
         },
-        user.id
+        actorId
       );
 
       setIsConvertModalOpen(false);
@@ -513,6 +581,15 @@ export default function LeadsPage() {
                   </option>
                 ))}
               </select>
+              {(bulkStage === 'Follow-up' || bulkStage === 'Demo Scheduled') && (
+                <input
+                  type="date"
+                  value={bulkFollowUpDate}
+                  onChange={(e) => setBulkFollowUpDate(e.target.value)}
+                  className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
+                  title="Scheduled Date"
+                />
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -611,7 +688,15 @@ export default function LeadsPage() {
                         <td className="px-4 py-3">
                           <Badge variant="outline">{lead.lead_source}</Badge>
                         </td>
-                        <td className="px-4 py-3">{getStageBadge(lead.stage)}</td>
+                        <td className="px-4 py-3">
+                          <div>{getStageBadge(lead.stage)}</div>
+                          {lead.follow_up_date && (
+                            <div className="flex items-center space-x-1 text-[10px] text-amber-700 font-medium mt-1">
+                              <Calendar className="h-3 w-3 shrink-0" />
+                              <span>{formatDate(lead.follow_up_date)}</span>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-slate-500">{formatDate(lead.created_at)}</td>
                         <td className="px-4 py-3 text-right space-x-1">
                           {canCreateLead && (
@@ -621,6 +706,16 @@ export default function LeadsPage() {
                               onClick={() => {
                                 setSelectedLead(lead);
                                 setNextStage(lead.stage);
+                                if (lead.follow_up_date) {
+                                  const parts = lead.follow_up_date.split('T');
+                                  setFollowUpDate(parts[0]);
+                                  if (parts[1]) {
+                                    setFollowUpTime(parts[1].slice(0, 5));
+                                  }
+                                } else {
+                                  setFollowUpDate(new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10));
+                                  setFollowUpTime('11:00');
+                                }
                               }}
                               className="text-xs px-2 py-1"
                             >
@@ -693,21 +788,47 @@ export default function LeadsPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-              Interested SAP Course *
-            </label>
-            <select
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
-            >
-              {store.courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.course_name} ({formatDate(c.created_at)})
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Interested SAP Course *
+              </label>
+              <select
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
+              >
+                {(store.courses || []).length === 0 ? (
+                  <option value="">No courses available</option>
+                ) : (
+                  (store.courses || []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.course_name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Assigned Counsellor *
+              </label>
+              <select
+                value={counsellorId}
+                onChange={(e) => setCounsellorId(e.target.value)}
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
+              >
+                {availableCounsellors.length === 0 ? (
+                  <option value={user?.id || ''}>{user?.full_name || 'Current User'} (Staff)</option>
+                ) : (
+                  availableCounsellors.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name} ({c.role})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -803,33 +924,48 @@ export default function LeadsPage() {
               </select>
             </div>
 
-            {(nextStage === 'Follow-up' || nextStage === 'Demo Scheduled') && (
+            <div className={`p-3 rounded-lg border transition-colors ${
+              nextStage === 'Follow-up' || nextStage === 'Demo Scheduled'
+                ? 'bg-amber-50/80 border-amber-300'
+                : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-[#0A6ED1]" />
+                  <span>
+                    Follow-up & Demo Schedule {(nextStage === 'Follow-up' || nextStage === 'Demo Scheduled') ? '(Required)' : '(Optional)'}
+                  </span>
+                </span>
+                {(nextStage === 'Follow-up' || nextStage === 'Demo Scheduled') && (
+                  <Badge variant="warning" className="text-[10px]">Date Required</Badge>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Follow-up Date *
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Scheduled Date {(nextStage === 'Follow-up' || nextStage === 'Demo Scheduled') ? '*' : ''}
                   </label>
                   <Input
                     type="date"
                     value={followUpDate}
                     onChange={(e) => setFollowUpDate(e.target.value)}
-                    className="w-full text-xs"
-                    required
+                    className="w-full text-xs bg-white"
+                    required={nextStage === 'Follow-up' || nextStage === 'Demo Scheduled'}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
                     Scheduled Time
                   </label>
                   <Input
                     type="time"
                     value={followUpTime}
                     onChange={(e) => setFollowUpTime(e.target.value)}
-                    className="w-full text-xs"
+                    className="w-full text-xs bg-white"
                   />
                 </div>
               </div>
-            )}
+            </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
@@ -888,23 +1024,31 @@ export default function LeadsPage() {
                 </label>
                 <select
                   value={convertCourseId}
+                  disabled={(store.courses || []).length === 0}
                   onChange={(e) => {
                     const newCId = e.target.value;
                     setConvertCourseId(newCId);
-                    const c = store.courses.find((x) => x.id === newCId);
+                    const c = (store.courses || []).find((x) => x.id === newCId);
                     if (c) {
-                      setConvertCourseFee(c.price || 45000);
+                      setConvertCourseFee(c.price ?? 0);
                       const matchingBatches = (store.batches || []).filter((b) => b.course_id === newCId);
                       setConvertBatchId(matchingBatches[0]?.id || '');
+                    } else {
+                      setConvertCourseFee(0);
+                      setConvertBatchId('');
                     }
                   }}
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800 disabled:bg-slate-100 disabled:text-slate-400"
                 >
-                  {(store.courses || []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.course_name}
-                    </option>
-                  ))}
+                  {(store.courses || []).length === 0 ? (
+                    <option value="">No courses available</option>
+                  ) : (
+                    (store.courses || []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.course_name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -957,7 +1101,9 @@ export default function LeadsPage() {
                   value={convertGender}
                   onChange={(e) => setConvertGender(e.target.value as any)}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                  required
                 >
+                  <option value="">Select Gender *</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
@@ -965,12 +1111,14 @@ export default function LeadsPage() {
               </div>
               <Input
                 label="City *"
+                placeholder="e.g. Hyderabad"
                 value={convertCity}
                 onChange={(e) => setConvertCity(e.target.value)}
                 required
               />
               <Input
                 label="Address *"
+                placeholder="e.g. Plot 12, Madhapur"
                 value={convertAddress}
                 onChange={(e) => setConvertAddress(e.target.value)}
                 required
@@ -1031,7 +1179,12 @@ export default function LeadsPage() {
               <Button variant="outline" size="sm" onClick={() => setIsConvertModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="sap" size="sm" onClick={handleConvertLead}>
+              <Button
+                variant="sap"
+                size="sm"
+                onClick={handleConvertLead}
+                disabled={(store.courses || []).length === 0}
+              >
                 Confirm Admission & Create Profile
               </Button>
             </div>

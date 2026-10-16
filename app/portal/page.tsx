@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   BookOpen,
   PlayCircle,
@@ -40,6 +41,8 @@ import {
   AlertTriangle,
   AlertCircle,
   X,
+  Receipt as ReceiptIcon,
+  Printer,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +50,6 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { FileUpload } from '@/components/ui/file-upload';
-import { HlsVideoPlayer } from '@/components/ui/hls-video-player';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import {
@@ -70,10 +72,42 @@ import {
   AssignmentSubmission,
   Quiz,
   QuizAttempt,
+  Payment,
+  Receipt,
 } from '@/types';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
-import { QuizRunnerModal } from '@/components/portal/quiz-runner-modal';
-import { StudentPlacementHub } from '@/components/portal/student-placement-hub';
+
+const HlsVideoPlayer = dynamic(
+  () => import('@/components/ui/hls-video-player').then((mod) => mod.HlsVideoPlayer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="aspect-video w-full bg-slate-900 rounded-xl flex items-center justify-center text-slate-400">
+        <div className="flex flex-col items-center space-y-2">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Loading player...</span>
+        </div>
+      </div>
+    ),
+  }
+);
+
+const QuizRunnerModal = dynamic(
+  () => import('@/components/portal/quiz-runner-modal').then((mod) => mod.QuizRunnerModal),
+  { ssr: false }
+);
+
+const StudentPlacementHub = dynamic(
+  () => import('@/components/portal/student-placement-hub').then((mod) => mod.StudentPlacementHub),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-xl animate-pulse">
+        Loading placement hub...
+      </div>
+    ),
+  }
+);
 
 export default function StudentPortalPage() {
   const { user, logout } = useAuth();
@@ -87,23 +121,45 @@ export default function StudentPortalPage() {
             s.id === user.id ||
             s.user_id === user.id
         )) ||
-      (user?.role !== 'student' ? store.students?.[0] : null) ||
-      store.students?.[0] ||
+      (user?.role !== 'student' && store.students && store.students.length > 0 ? store.students[0] : null) ||
+      (store.students && store.students.length > 0 ? store.students[0] : null) ||
       null
     );
   }, [user]);
 
-  const studentEnrollment = (store.placementEnrollments || []).find((e) => e.student_id === student?.id);
-  const course = (store.courses || []).find((c) => c.id === student?.course_id);
-  const modules = (store.modules || []).filter((m) => m.course_id === student?.course_id);
-  const lessons = (store.lessons || []).filter((l) => l.course_id === student?.course_id && l.is_published);
-  const feeAccount = (store.feeAccounts || []).find((f) => f.student_id === student?.id);
-  const payments = (store.payments || []).filter((p) => p.student_id === student?.id);
-  const assignments = (store.assignments || []).filter((a) => a.course_id === student?.course_id);
-  const submissions = (store.submissions || []).filter((s) => s.student_id === student?.id);
-  const certificate = (store.certificates || []).find((c) => c.student_id === student?.id);
-  const sessions = (store.classSessions || []).filter((cs) => cs.course_id === student?.course_id);
-  const placementProfile = (store.placementProfiles || []).find((p) => p.student_id === student?.id);
+  const studentEnrollment = student
+    ? (store.placementEnrollments || []).find((e) => e.student_id === student.id)
+    : undefined;
+  const course = student?.course_id
+    ? (store.courses || []).find((c) => c.id === student.course_id)
+    : undefined;
+  const modules = student?.course_id
+    ? (store.modules || []).filter((m) => m.course_id === student.course_id)
+    : [];
+  const lessons = student?.course_id
+    ? (store.lessons || []).filter((l) => l.course_id === student.course_id && l.is_published)
+    : [];
+  const feeAccount = student
+    ? (store.feeAccounts || []).find((f) => f.student_id === student.id)
+    : undefined;
+  const payments = student
+    ? (store.payments || []).filter((p) => p.student_id === student.id)
+    : [];
+  const assignments = student?.course_id
+    ? (store.assignments || []).filter((a) => a.course_id === student.course_id)
+    : [];
+  const submissions = student
+    ? (store.submissions || []).filter((s) => s.student_id === student.id)
+    : [];
+  const certificate = student
+    ? (store.certificates || []).find((c) => c.student_id === student.id)
+    : undefined;
+  const sessions = student?.course_id
+    ? (store.classSessions || []).filter((cs) => cs.course_id === student.course_id)
+    : [];
+  const placementProfile = student
+    ? (store.placementProfiles || []).find((p) => p.student_id === student.id)
+    : undefined;
   const [studentResumeUrl, setStudentResumeUrl] = React.useState<string>(
     placementProfile?.resume_url || (student as any)?.resume_url || ''
   );
@@ -114,7 +170,7 @@ export default function StudentPortalPage() {
     return [...lessons].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
   }, [lessons]);
 
-  const [activeLesson, setActiveLesson] = React.useState(sortedLessons[0] || lessons[0]);
+  const [activeLesson, setActiveLesson] = React.useState<any>(() => sortedLessons[0] || lessons[0] || null);
   const [videoPosition, setVideoPosition] = React.useState(0);
   const [videoDuration, setVideoDuration] = React.useState(2700); // 45 mins
   const [isPlaying, setIsPlaying] = React.useState(false);
@@ -124,6 +180,8 @@ export default function StudentPortalPage() {
   React.useEffect(() => {
     if (!activeLesson && sortedLessons.length > 0) {
       setActiveLesson(sortedLessons[0]);
+    } else if (activeLesson && !sortedLessons.some((l) => l.id === activeLesson.id)) {
+      setActiveLesson(sortedLessons[0] || null);
     }
   }, [sortedLessons, activeLesson]);
 
@@ -160,6 +218,39 @@ export default function StudentPortalPage() {
   const [offlineDate, setOfflineDate] = React.useState(new Date().toISOString().slice(0, 10));
   const [offlineNotes, setOfflineNotes] = React.useState('');
   const [offlineSubmittedMsg, setOfflineSubmittedMsg] = React.useState<string | null>(null);
+
+  // In-Portal Fee Receipt Viewer Modal state
+  const [selectedReceiptForModal, setSelectedReceiptForModal] = React.useState<{
+    id: string;
+    receipt_number: string;
+    student_name: string;
+    student_email?: string;
+    admission_number: string;
+    course_name: string;
+    payment_amount: number;
+    payment_mode: string;
+    transaction_reference?: string;
+    payment_date: string;
+    remaining_balance: number;
+    authorized_by: string;
+  } | null>(null);
+
+  const handleOpenReceiptModal = (p: Payment, r?: Receipt) => {
+    setSelectedReceiptForModal({
+      id: r?.id || p.id,
+      receipt_number: r?.receipt_number || p.receipt_number || `REC-${p.id.slice(-6)}`,
+      student_name: r?.student_name || student?.full_name || 'Enrolled Student',
+      student_email: r?.student_email || student?.email,
+      admission_number: r?.admission_number || student?.admission_number || student?.student_code || 'N/A',
+      course_name: r?.course_name || p.course_name || student?.course_name || 'SAP Enterprise Program',
+      payment_amount: r?.payment_amount ?? p.amount ?? 0,
+      payment_mode: r?.payment_mode || p.payment_mode || 'UPI',
+      transaction_reference: r?.transaction_reference || p.transaction_reference || 'N/A',
+      payment_date: r?.payment_date || p.payment_date || new Date().toISOString(),
+      remaining_balance: r?.remaining_balance ?? student?.outstanding_amount ?? 0,
+      authorized_by: r?.authorized_by || 'Finance & Accounts Office',
+    });
+  };
 
   // Student Doubts & Academic Support
   const [doubtsList, setDoubtsList] = React.useState<StudentDoubt[]>([]);
@@ -255,7 +346,7 @@ export default function StudentPortalPage() {
 
   const handleAskDoubtSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!doubtTitle.trim() || !doubtDescription.trim()) return;
+    if (!student || !doubtTitle.trim() || !doubtDescription.trim()) return;
     setIsSubmittingDoubt(true);
     try {
       const created = await createStudentDoubt(
@@ -268,7 +359,7 @@ export default function StudentPortalPage() {
           sap_tcode: doubtSapTcode.trim() ? doubtSapTcode.trim() : undefined,
           attachment_url: doubtAttachmentUrl || undefined,
         },
-        student.user_id
+        student.user_id || student.id
       );
       setDoubtTitle('');
       setDoubtDescription('');
@@ -285,13 +376,13 @@ export default function StudentPortalPage() {
   };
 
   const handleSendStudentReply = async (doubtId: string) => {
-    if (!replyText.trim() && !replyAttachmentUrl) return;
+    if (!student || (!replyText.trim() && !replyAttachmentUrl)) return;
     setIsReplying(true);
     try {
       await replyToDoubt(
         doubtId,
         replyText.trim() || 'Attachment shared:',
-        student.user_id,
+        student.user_id || student.id,
         'student',
         student.full_name,
         replyAttachmentUrl || undefined
@@ -343,7 +434,9 @@ export default function StudentPortalPage() {
 
       setOutstandingAmount(verifyData.feeAccount.outstanding_amount);
       setPaidAmount(verifyData.feeAccount.paid_amount);
-      setPaymentsList([...store.payments.filter((p) => p.student_id === student.id)]);
+      if (student?.id) {
+        setPaymentsList([...store.payments.filter((p) => p.student_id === student.id)]);
+      }
       setSuccessReceipt(verifyData.receipt);
     } catch (err: any) {
       alert(err.message || 'Payment verification failed');
@@ -354,7 +447,7 @@ export default function StudentPortalPage() {
 
   const handleOnlinePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feeAccount || payAmount <= 0) return;
+    if (!student || !feeAccount || payAmount <= 0) return;
     setIsProcessing(true);
     try {
       const chargeAmount = Math.min(payAmount, outstandingAmount);
@@ -771,46 +864,50 @@ export default function StudentPortalPage() {
                 {/* Dynamic Watermarked HLS Video Player */}
                 <HlsVideoPlayer
                   src={
-                    activeLesson.content_url ||
+                    activeLesson?.content_url ||
                     'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
                   }
-                  title={activeLesson.title}
+                  title={activeLesson?.title || 'Course Lecture'}
                   student={{
-                    id: student.id,
-                    full_name: student.full_name,
-                    admission_number: student.admission_number,
-                    student_code: student.student_code,
-                    email: student.email,
-                    phone: student.phone,
+                    id: student?.id || '',
+                    full_name: student?.full_name || 'Student',
+                    admission_number: student?.admission_number || '',
+                    student_code: student?.student_code || '',
+                    email: student?.email || '',
+                    phone: student?.phone || '',
                     ip: '103.24.120.45',
                   }}
                   initialPosition={videoPosition}
                   onProgress={async (currTime, dur, pct) => {
                     setVideoPosition(currTime);
                     setVideoDuration(dur);
-                    if (activeLesson && (Math.floor(currTime) % 5 === 0 || pct >= 90)) {
+                    if (activeLesson?.id && student?.id && (Math.floor(currTime) % 5 === 0 || pct >= 90)) {
                       await updateVideoProgress(
                         student.id,
                         activeLesson.id,
-                        student.course_id,
+                        student.course_id || activeLesson.course_id || '',
                         Math.floor(currTime),
                         Math.floor(dur)
                       );
-                      const updated = await getStudentCourseProgress(student.id, student.course_id);
-                      setCourseProgress(updated.overallProgress);
+                      if (student.course_id) {
+                        const updated = await getStudentCourseProgress(student.id, student.course_id);
+                        setCourseProgress(updated.overallProgress);
+                      }
                     }
                   }}
                   onComplete={async () => {
-                    if (activeLesson) {
+                    if (activeLesson?.id && student?.id) {
                       await updateVideoProgress(
                         student.id,
                         activeLesson.id,
-                        student.course_id,
+                        student.course_id || activeLesson.course_id || '',
                         Math.floor(videoDuration),
                         Math.floor(videoDuration)
                       );
-                      const updated = await getStudentCourseProgress(student.id, student.course_id);
-                      setCourseProgress(updated.overallProgress);
+                      if (student.course_id) {
+                        const updated = await getStudentCourseProgress(student.id, student.course_id);
+                        setCourseProgress(updated.overallProgress);
+                      }
                     }
                   }}
                 />
@@ -818,16 +915,16 @@ export default function StudentPortalPage() {
                 <CardContent className="p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">{activeLesson.title}</h3>
+                      <h3 className="text-base font-bold text-slate-900">{activeLesson?.title || 'Course Lecture'}</h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Duration: {activeLesson.duration_minutes ?? 0} Minutes | Module: Enterprise Structure
+                        Duration: {activeLesson?.duration_minutes ?? 0} Minutes | Module: Enterprise Structure
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant="success">Published</Badge>
                     </div>
                   </div>
-                  {activeLesson.text_content && (
+                  {activeLesson?.text_content && (
                     <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-700 leading-relaxed border border-slate-100">
                       <p className="font-bold text-slate-800 mb-1">Lesson Brief:</p>
                       {activeLesson.text_content}
@@ -851,16 +948,17 @@ export default function StudentPortalPage() {
                   </div>
                 ) : (
                   sortedLessons.map((les, idx) => {
-                  const prog = (store.lessonProgress || []).find(
+                  if (!les) return null;
+                  const prog = student?.id ? (store.lessonProgress || []).find(
                     (lp) => lp.student_id === student.id && lp.lesson_id === les.id
-                  );
+                  ) : null;
                   const isCompleted = Boolean(
                     prog &&
                       (prog.is_completed === true ||
                         (typeof prog.completed_percentage === 'number' && prog.completed_percentage >= 90))
                   );
                   const isSelected = activeLesson?.id === les.id;
-                  const isUnlocked = isLessonUnlocked(idx, sortedLessons, student.id, store.lessonProgress);
+                  const isUnlocked = isLessonUnlocked(idx, sortedLessons, student?.id || '', store.lessonProgress);
                   const isLocked = !isUnlocked;
 
                   return (
@@ -1006,14 +1104,18 @@ export default function StudentPortalPage() {
                             >
                               <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1 shadow-xs">
                                 <Download className="h-3 w-3" />
-                                <span>Download PDF</span>
+                                <span>PDF</span>
                               </Button>
                             </a>
-                            <Link href={`/accounts/receipts/${r?.id || p.id}`}>
-                              <Button variant="outline" size="sm" className="text-xs px-2 py-1">
-                                View
-                              </Button>
-                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReceiptModal(p, r)}
+                              className="text-xs px-2.5 py-1 flex items-center space-x-1"
+                            >
+                              <ReceiptIcon className="h-3 w-3 text-slate-500" />
+                              <span>View</span>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -1806,11 +1908,25 @@ export default function StudentPortalPage() {
                     <span>Download Official PDF</span>
                   </Button>
                 </a>
-                <Link href={`/accounts/receipts/${successReceipt.id}`} target="_blank">
-                  <Button variant="outline" size="sm" className="text-xs">
-                    View Receipt
-                  </Button>
-                </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleOpenReceiptModal({
+                      id: successReceipt.payment_id || successReceipt.id,
+                      receipt_number: successReceipt.receipt_number,
+                      amount: successReceipt.payment_amount,
+                      payment_date: successReceipt.payment_date,
+                      payment_mode: successReceipt.payment_mode,
+                      course_name: successReceipt.course_name,
+                      status: 'Success',
+                    } as any, successReceipt);
+                  }}
+                  className="text-xs flex items-center space-x-1"
+                >
+                  <ReceiptIcon className="h-3.5 w-3.5 text-slate-500" />
+                  <span>View Receipt</span>
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setIsPayModalOpen(false)}>
                   Done
                 </Button>
@@ -2283,13 +2399,127 @@ export default function StudentPortalPage() {
             questions={store.quizQuestions.filter(
               (q) => q.quiz_id === selectedQuizForRunner.id
             )}
-            studentId={student.id}
-            courseId={student.course_id}
+            studentId={student?.id || ''}
+            courseId={student?.course_id || selectedQuizForRunner.course_id || ''}
             onQuizCompleted={() => {
-              setQuizAttemptsList([...store.quizAttempts.filter((a) => a.student_id === student.id)]);
-              setCourseProgress(student.course_progress);
+              if (student?.id) {
+                setQuizAttemptsList([...store.quizAttempts.filter((a) => a.student_id === student.id)]);
+                setCourseProgress(student.course_progress ?? 0);
+              }
             }}
           />
+        )}
+
+        {/* In-Portal Fee Receipt Viewer Modal */}
+        {selectedReceiptForModal && (
+          <Modal
+            isOpen={Boolean(selectedReceiptForModal)}
+            onClose={() => setSelectedReceiptForModal(null)}
+            title="Official Tuition Fee Receipt"
+            className="max-w-xl"
+          >
+            <div className="space-y-5 p-1 text-slate-800">
+              {/* Receipt Header Badge */}
+              <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Receipt Number</span>
+                  <h3 className="text-lg font-bold text-blue-600 font-mono mt-0.5">
+                    {selectedReceiptForModal.receipt_number}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Date: {formatDate(selectedReceiptForModal.payment_date)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Badge variant="success" className="text-xs px-2.5 py-0.5 flex items-center space-x-1">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    <span>Payment Verified</span>
+                  </Badge>
+                  <p className="text-[10px] text-slate-400 mt-1">Signed Digital Voucher</p>
+                </div>
+              </div>
+
+              {/* Student & Course Details Grid */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
+                <div>
+                  <span className="text-slate-400 font-medium">Student Name:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{selectedReceiptForModal.student_name}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Admission / Roll No:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5 font-mono">{selectedReceiptForModal.admission_number}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-slate-400 font-medium">Enrolled Course:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{selectedReceiptForModal.course_name}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Payment Mode:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">{selectedReceiptForModal.payment_mode}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Transaction Reference:</span>
+                  <p className="font-semibold text-slate-800 mt-0.5 font-mono truncate">{selectedReceiptForModal.transaction_reference}</p>
+                </div>
+              </div>
+
+              {/* Financial Breakdown Card */}
+              <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-blue-700">Amount Paid</span>
+                  <h4 className="text-2xl font-black text-blue-900 mt-0.5">
+                    {formatINR(selectedReceiptForModal.payment_amount)}
+                  </h4>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-medium text-slate-500">Remaining Balance</span>
+                  <p className="text-sm font-bold text-slate-700 mt-0.5">
+                    {formatINR(selectedReceiptForModal.remaining_balance)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Authorized Signatory Footer */}
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                <div className="flex items-center space-x-1.5 text-slate-600">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span>Authorized by: <strong>{selectedReceiptForModal.authorized_by}</strong></span>
+                </div>
+                <span className="text-[10px] text-slate-400">Next-Gen ERP Institute</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 flex flex-wrap items-center justify-end gap-2">
+                <a
+                  href={`/api/receipts/${selectedReceiptForModal.id}/pdf?download=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="sap" size="sm" className="text-xs flex items-center space-x-1.5">
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download PDF</span>
+                  </Button>
+                </a>
+                <Link
+                  href={`/accounts/receipts/${selectedReceiptForModal.id}`}
+                  target="_blank"
+                >
+                  <Button variant="outline" size="sm" className="text-xs flex items-center space-x-1.5">
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>Print Page</span>
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedReceiptForModal(null)}
+                  className="text-xs"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Lesson Prerequisite Toast Notification */}

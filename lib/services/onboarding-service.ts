@@ -23,6 +23,8 @@ import {
   sendResendEmail,
   buildStudentWelcomeEmailHtml,
 } from './notification-service';
+import { onTransactionCommit } from './payment-workflow-transaction';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export interface OnboardingFilters {
   search?: string;
@@ -339,17 +341,51 @@ function initializeOnboardingCase(
 export function forwardApprovedPaymentToOnboarding(payment: StudentPaymentRecord, actor: UserProfile): OnboardingCase | undefined {
   if (payment.verification_status !== 'Verified') return;
   const student = store.students.find((s) => s.id === payment.student_id && tenantId(s) === tenantId(actor));
-  const admission = store.admissions.find((a) => a.id === (payment.enrollment_id || student?.admission_id) && tenantId(a) === tenantId(actor));
-  if (!student || admission?.status !== 'Confirmed') return;
+  const admission = store.admissions.find(
+    (a) =>
+      (a.id === (payment.enrollment_id || student?.admission_id) ||
+        (payment.enrollment_id && a.admission_number === payment.enrollment_id) ||
+        (student?.admission_id && a.id === student.admission_id) ||
+        (student?.admission_number && a.admission_number === student.admission_number) ||
+        (payment.admission_number && a.admission_number === payment.admission_number) ||
+        (student?.id && a.student_id === student.id)) &&
+      tenantId(a) === tenantId(actor)
+  );
+  const isAdmissionApproved = admission && (admission.status === 'Confirmed' || admission.status === 'Active' || (admission as any).status === 'Approved');
+  if (!student || !admission || !isAdmissionApproved) return;
   const caseRecord = initializeOnboardingCase(admission.id, actor.id);
   assertSameTenant(actor, caseRecord);
-  if (caseRecord.status === 'completed') return caseRecord;
+  // B03: Evaluate financial clearance against configured policy threshold
+  const fee = (store.studentFees || []).find(
+    (f) => (f.enrollment_id === admission.id || f.student_id === student.id) && tenantId(f) === tenantId(actor)
+  );
+  const finalPayable = fee ? fee.final_payable : admission.net_payable ?? 0;
+  const totalVerifiedPaid = (store.studentPayments || [])
+    .filter(
+      (p) =>
+        p.student_id === student.id &&
+        tenantId(p) === tenantId(actor) &&
+        p.verification_status === 'Verified' &&
+        p.status !== 'Voided' &&
+        (!p.enrollment_id || p.enrollment_id === admission.id)
+    )
+    .reduce((sum, p) => sum + p.amount_paid, 0);
+
+  const minThresholdPct = store.financeSettings?.minimum_down_payment_percent ?? 25;
+  const minRequiredClearance = finalPayable > 0 ? (finalPayable * minThresholdPct) / 100 : 0;
+  const isFinanciallyCleared = finalPayable === 0 || totalVerifiedPaid >= finalPayable || totalVerifiedPaid >= minRequiredClearance;
+
   const item = caseRecord.checklist.fee_clearance_verification;
-  item.completed = true;
-  item.completed_by = actor.id;
-  item.completed_by_name = actor.full_name;
-  item.completed_at = payment.verified_at;
-  item.notes = `Accounts approved payment ${payment.id}; receipt ${payment.receipt_number}.`;
+  if (isFinanciallyCleared) {
+    item.completed = true;
+    item.completed_by = actor.id;
+    item.completed_by_name = actor.full_name;
+    item.completed_at = payment.verified_at || new Date().toISOString();
+    item.notes = `Accounts approved payment ${payment.id}; receipt ${payment.receipt_number}. Verified paid (₹${totalVerifiedPaid}/${finalPayable}) satisfies financial clearance policy.`;
+  } else {
+    item.completed = false;
+    item.notes = `Partial payment of ₹${payment.amount_paid} recorded (Total verified: ₹${totalVerifiedPaid}/${finalPayable}). Required clearance threshold is ₹${minRequiredClearance} (${minThresholdPct}%). Financial clearance pending.`;
+  }
   const staff = store.users.filter((u) => u.role === 'onboarding_team' && u.is_active && tenantId(u) === tenantId(actor));
   if (!caseRecord.assigned_staff_id && staff.length) {
     staff.sort((a, b) => store.onboardingCases.filter((c) => c.assigned_staff_id === a.id && c.status !== 'completed').length - store.onboardingCases.filter((c) => c.assigned_staff_id === b.id && c.status !== 'completed').length || a.id.localeCompare(b.id));
@@ -446,7 +482,46 @@ export async function updateChecklistItem(
     throw new Error(`Invalid checklist item key: ${itemKey}`);
   }
   if (itemKey === 'lms_account_activation') throw new Error('Use the LMS activation action after completing the required checks.');
-  if (itemKey === 'fee_clearance_verification' && completed && !store.studentPayments.some((p) => p.student_id === caseRecord.student_id && tenantId(p) === tenantId(caseRecord) && p.verification_status === 'Verified' && (!p.enrollment_id || p.enrollment_id === caseRecord.admission_id))) throw new Error('Accounts must approve a payment before financial clearance.');
+  if (itemKey === 'document_verification' && completed) {
+    if (!caseRecord.documents || caseRecord.documents.length === 0) {
+      throw new Error('Cannot complete document verification: No student documents have been submitted.');
+    }
+  }
+  if (itemKey === 'batch_allocation' && completed) {
+    if (!caseRecord.batch_id) {
+      throw new Error('Cannot complete batch allocation: No batch has been allocated to this onboarding case.');
+    }
+    const batch = store.batches.find((b) => b.id === caseRecord.batch_id);
+    if (!batch) {
+      throw new Error(`Cannot complete batch allocation: Allocated batch "${caseRecord.batch_id}" does not exist.`);
+    }
+    if (caseRecord.course_id && batch.course_id && batch.course_id !== caseRecord.course_id) {
+      throw new Error(`Cannot complete batch allocation: Batch "${batch.batch_name}" belongs to course "${batch.course_id}", not student course "${caseRecord.course_id}".`);
+    }
+  }
+  if (itemKey === 'fee_clearance_verification' && completed) {
+    const fee = (store.studentFees || []).find(
+      (f) => (f.enrollment_id === caseRecord.admission_id || f.student_id === caseRecord.student_id) && tenantId(f) === tenantId(caseRecord)
+    );
+    const finalPayable = fee ? fee.final_payable : 0;
+    const totalVerifiedPaid = (store.studentPayments || [])
+      .filter(
+        (p) =>
+          p.student_id === caseRecord.student_id &&
+          tenantId(p) === tenantId(caseRecord) &&
+          p.verification_status === 'Verified' &&
+          p.status !== 'Voided' &&
+          (!p.enrollment_id || p.enrollment_id === caseRecord.admission_id)
+      )
+      .reduce((sum, p) => sum + p.amount_paid, 0);
+    const minThresholdPct = store.financeSettings?.minimum_down_payment_percent ?? 25;
+    const minRequiredClearance = finalPayable > 0 ? (finalPayable * minThresholdPct) / 100 : 0;
+    if (finalPayable > 0 && totalVerifiedPaid < minRequiredClearance) {
+      throw new Error(
+        `Cannot grant financial clearance: Verified payment (₹${totalVerifiedPaid}) is below the required policy threshold of ${minThresholdPct}% (₹${minRequiredClearance}) of ₹${finalPayable}.`
+      );
+    }
+  }
 
   item.completed = completed;
   if (completed) {
@@ -613,9 +688,15 @@ export async function provisionStudentLmsAccount(
   const prerequisites: OnboardingChecklistKey[] = ['admission_confirmation', 'student_details_verification', 'document_verification', 'course_confirmation', 'batch_allocation', 'fee_clearance_verification'];
   if (caseRecord.status === 'blocked') throw new Error('Cannot activate LMS access while onboarding is blocked.');
   if (prerequisites.some((key) => !caseRecord.checklist[key]?.completed)) throw new Error('Cannot activate LMS access until admission, identity, documents, course, batch, and payment checks are completed.');
+
+  // B05: If documents are uploaded, ensure they are verified
+  if (caseRecord.documents && caseRecord.documents.length > 0 && !caseRecord.documents.some((d) => d.status === 'verified')) {
+    throw new Error('Cannot activate LMS access: Uploaded student verification documents must be verified.');
+  }
+
+  // B03: Admission status check
   const admission = store.admissions.find((a) => a.id === caseRecord.admission_id && tenantId(a) === tenantId(performedBy));
-  const approvedPayment = store.studentPayments.some((p) => p.student_id === caseRecord.student_id && tenantId(p) === tenantId(performedBy) && p.verification_status === 'Verified' && (!p.enrollment_id || p.enrollment_id === caseRecord.admission_id));
-  if (admission?.status !== 'Confirmed' || !approvedPayment) throw new Error('Confirmed admission and an Accounts-approved payment are required for LMS activation.');
+  if (admission && admission.status !== 'Confirmed') throw new Error('Confirmed admission is required for LMS activation.');
   if (caseRecord.lms_account_created) return { success: true, message: 'LMS account is already activated.', caseRecord };
 
   // Find student user profile
@@ -645,6 +726,46 @@ export async function provisionStudentLmsAccount(
     store.users.push(studentUser);
   }
 
+  // B04: Live Supabase Auth User Provisioning
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/admin');
+      const adminClient = createAdminClient();
+      const { data: userList } = await adminClient.auth.admin.listUsers();
+      const existingAuth = userList?.users?.find((u) => u.email?.toLowerCase() === caseRecord.student_email.toLowerCase());
+      let authId = existingAuth?.id;
+      if (!authId) {
+        const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
+          email: caseRecord.student_email,
+          email_confirm: true,
+          user_metadata: {
+            full_name: caseRecord.student_name,
+            role: 'student',
+            tenant_id: tenantId(caseRecord),
+          },
+        });
+        if (!createErr && created?.user) authId = created.user.id;
+      }
+      if (authId) {
+        studentUser.id = authId;
+        const student = store.students.find((s) => s.id === caseRecord.student_id);
+        if (student) student.user_id = authId;
+        await adminClient.from('profiles').upsert({
+          id: authId,
+          email: caseRecord.student_email,
+          full_name: caseRecord.student_name,
+          role: 'student',
+          tenant_id: tenantId(caseRecord),
+          is_active: true,
+          phone: caseRecord.student_phone,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } catch (authErr: any) {
+      console.warn('Live Supabase Auth provisioning warning:', authErr?.message);
+    }
+  }
+
   // Update student status
   const student = store.students.find((s) => s.id === caseRecord.student_id);
   if (student) {
@@ -671,51 +792,7 @@ export async function provisionStudentLmsAccount(
     `LMS access provisioned and enabled for ${caseRecord.student_name} (${caseRecord.student_email})`
   );
 
-  // Hook provisionStudentLmsAccount directly to sendResendEmail() and sendMultiChannelNotification()
   try {
-    const loginUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://lms.next-generpsolutions.com'}/login`;
-    const coordinator = caseRecord.assigned_staff_name || performedBy.full_name;
-
-    const welcomeEmailHtml = buildStudentWelcomeEmailHtml({
-      studentName: caseRecord.student_name,
-      courseName: caseRecord.course_name,
-      admissionNumber: caseRecord.admission_number,
-      batchName: caseRecord.batch_name || 'SAP Core Batch',
-      orientationDate: caseRecord.orientation_date,
-      orientationMode: caseRecord.orientation_mode || 'Hybrid',
-      portalUrl: loginUrl,
-      coordinatorName: coordinator,
-      helpdeskEmail: 'onboarding@next-generpsolutions.com',
-    });
-
-    // 1. Transactional Welcome Email via Resend
-    await sendResendEmail({
-      to: caseRecord.student_email,
-      subject: `Welcome to Next-Gen ERP LMS – Student Portal Credentials & Batch Schedule`,
-      html: welcomeEmailHtml,
-      text: `Hello ${caseRecord.student_name}, your student portal account has been activated. Login link: ${loginUrl}. Batch: ${caseRecord.batch_name || 'SAP Core Batch'}.`,
-    });
-
-    // 2. Real-time Multi-Channel Notification Dispatch (In-App, Realtime Stream, WhatsApp)
-    await sendMultiChannelNotification({
-      userId: studentUser.id,
-      recipientName: caseRecord.student_name,
-      recipientEmail: caseRecord.student_email,
-      recipientPhone: caseRecord.student_phone,
-      title: 'LMS Student Portal Provisioned & Activated',
-      message: `Your student portal account is now active. Log in at /login. Assigned Batch: ${caseRecord.batch_name || 'SAP Core Batch'}. Orientation: ${caseRecord.orientation_date || 'Pending Schedule'}.`,
-      category: 'onboarding',
-      type: 'success',
-      channels: ['in_app', 'email', 'whatsapp'],
-      actionUrl: '/login',
-      metadata: {
-        htmlTemplate: welcomeEmailHtml,
-        loginUrl,
-        batchName: caseRecord.batch_name || 'SAP Core Batch',
-        admissionNumber: caseRecord.admission_number,
-      },
-    });
-
     // Mark welcome_notification checklist item completed
     if (!caseRecord.checklist.welcome_notification) {
       caseRecord.checklist.welcome_notification = {
@@ -732,8 +809,58 @@ export async function provisionStudentLmsAccount(
     caseRecord.checklist.welcome_notification.completed_by_name = performedBy.full_name;
     caseRecord.checklist.welcome_notification.notes = `Welcome credentials and login link (/login) dispatched to ${caseRecord.student_email}`;
     store.persist();
+
+    // B14: Outbox pattern - dispatch external notifications only after transaction commit
+    onTransactionCommit(async () => {
+      try {
+        const loginUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://lms.next-generpsolutions.com'}/login`;
+        const coordinator = caseRecord.assigned_staff_name || performedBy.full_name;
+
+        const welcomeEmailHtml = buildStudentWelcomeEmailHtml({
+          studentName: caseRecord.student_name,
+          courseName: caseRecord.course_name,
+          admissionNumber: caseRecord.admission_number,
+          batchName: caseRecord.batch_name || 'SAP Core Batch',
+          orientationDate: caseRecord.orientation_date,
+          orientationMode: caseRecord.orientation_mode || 'Hybrid',
+          portalUrl: loginUrl,
+          coordinatorName: coordinator,
+          helpdeskEmail: 'onboarding@next-generpsolutions.com',
+        });
+
+        // 1. Transactional Welcome Email via Resend
+        await sendResendEmail({
+          to: caseRecord.student_email,
+          subject: `Welcome to Next-Gen ERP LMS – Student Portal Credentials & Batch Schedule`,
+          html: welcomeEmailHtml,
+          text: `Hello ${caseRecord.student_name}, your student portal account has been activated. Login link: ${loginUrl}. Batch: ${caseRecord.batch_name || 'SAP Core Batch'}.`,
+        });
+
+        // 2. Real-time Multi-Channel Notification Dispatch (In-App, Realtime Stream, WhatsApp)
+        await sendMultiChannelNotification({
+          userId: studentUser.id,
+          recipientName: caseRecord.student_name,
+          recipientEmail: caseRecord.student_email,
+          recipientPhone: caseRecord.student_phone,
+          title: 'LMS Student Portal Provisioned & Activated',
+          message: `Your student portal account is now active. Log in at /login. Assigned Batch: ${caseRecord.batch_name || 'SAP Core Batch'}. Orientation: ${caseRecord.orientation_date || 'Pending Schedule'}.`,
+          category: 'onboarding',
+          type: 'success',
+          channels: ['in_app', 'email', 'whatsapp'],
+          actionUrl: '/login',
+          metadata: {
+            htmlTemplate: welcomeEmailHtml,
+            loginUrl,
+            batchName: caseRecord.batch_name || 'SAP Core Batch',
+            admissionNumber: caseRecord.admission_number,
+          },
+        });
+      } catch (dispatchErr) {
+        console.warn('[provisionStudentLmsAccount] Post-commit notification dispatch error:', dispatchErr);
+      }
+    });
   } catch (err) {
-    console.warn('[provisionStudentLmsAccount] Notification dispatch error:', err);
+    console.warn('[provisionStudentLmsAccount] Notification setup error:', err);
   }
 
   return {
@@ -1062,13 +1189,16 @@ export async function completeOnboardingWorkflow(
   const batch = store.batches.find(
     (b) => b.id === caseRecord.batch_id || (student && b.id === student.batch_id)
   );
+  const caseTenant = tenantId(caseRecord);
   const trainer =
     store.users.find(
       (u) =>
-        u.id === caseRecord.trainer_id ||
-        (student && u.id === student.trainer_id) ||
-        (batch && u.id === batch.trainer_id)
-    ) || store.users.find((u) => u.role === 'trainer');
+        tenantId(u) === caseTenant &&
+        u.is_active !== false &&
+        (u.id === caseRecord.trainer_id ||
+          (student && u.id === student.trainer_id) ||
+          (batch && u.id === batch.trainer_id))
+    ) || store.users.find((u) => u.role === 'trainer' && u.is_active !== false && tenantId(u) === caseTenant);
 
   const batchName = caseRecord.batch_name || batch?.batch_name || 'Assigned Batch';
   const orientationDate = caseRecord.orientation_date || 'Attended & Verified';
@@ -1141,6 +1271,8 @@ export async function completeOnboardingWorkflow(
   // 4. Dispatch Notification to Academic Operations Team (Email & In-App)
   const academicOpsUsers = store.users.filter(
     (u) =>
+      tenantId(u) === caseTenant &&
+      u.is_active !== false &&
       (u.role === 'support' || u.role === 'admin') &&
       u.id !== trainer?.id &&
       u.id !== performedBy.id

@@ -141,7 +141,6 @@ export default function FeeApprovalsPage() {
   const [proposedDiscount, setProposedDiscount] = React.useState<number>(0);
   const [proposedDiscountPercent, setProposedDiscountPercent] = React.useState<number>(0);
   const [proposedDiscountReason, setProposedDiscountReason] = React.useState('');
-  const [proposedPaymentPlan, setProposedPaymentPlan] = React.useState<'Full Payment'>('Full Payment');
   const [proposedDueDate, setProposedDueDate] = React.useState<string>(
     new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0]
   );
@@ -179,8 +178,12 @@ export default function FeeApprovalsPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const deskParam = params.get('desk') || params.get('tab');
-      if (deskParam === 'payments' || deskParam === 'payment_approvals') {
+      const paymentId = params.get('paymentId') || params.get('payment_id');
+      if (deskParam === 'payments' || deskParam === 'payment_approvals' || paymentId) {
         setActiveDesk('payment_approvals');
+      }
+      if (paymentId) {
+        setPaymentSearchQuery(paymentId);
       }
     }
     return () => { active = false; clearTimeout(timer); };
@@ -447,9 +450,17 @@ export default function FeeApprovalsPage() {
 
   // Actions
   const handleApprove = async () => {
-    if (!selectedFee || !canApproveFees) return;
+    if (!selectedFee) return;
+    if (!canApproveFees) {
+      setActionError('Unauthorized: Only an Accountant, Admin, or Super Admin can approve fee proposals.');
+      return;
+    }
     if (!user) {
       setActionError('You must be logged in to approve fee proposals.');
+      return;
+    }
+    if (selectedFee.counsellor_id === user.id || selectedFee.submitted_by === user.id) {
+      setActionError('Separation of duties violation: The creator or submitter of a fee proposal cannot approve their own proposal.');
       return;
     }
     setActionError(null);
@@ -467,9 +478,17 @@ export default function FeeApprovalsPage() {
   };
 
   const handleReject = async () => {
-    if (!selectedFee || !canApproveFees) return;
+    if (!selectedFee) return;
+    if (!canApproveFees) {
+      setActionError('Unauthorized: Only an Accountant, Admin, or Super Admin can reject fee proposals.');
+      return;
+    }
     if (!user) {
       setActionError('You must be logged in to reject fee proposals.');
+      return;
+    }
+    if (selectedFee.counsellor_id === user.id || selectedFee.submitted_by === user.id) {
+      setActionError('Separation of duties violation: You cannot reject a fee proposal that you submitted.');
       return;
     }
     setActionError(null);
@@ -485,9 +504,17 @@ export default function FeeApprovalsPage() {
   };
 
   const handleCorrection = async () => {
-    if (!selectedFee || !canApproveFees) return;
+    if (!selectedFee) return;
+    if (!canApproveFees) {
+      setActionError('Unauthorized: Only an Accountant, Admin, or Super Admin can request corrections.');
+      return;
+    }
     if (!user) {
       setActionError('You must be logged in to request corrections.');
+      return;
+    }
+    if (selectedFee.counsellor_id === user.id || selectedFee.submitted_by === user.id) {
+      setActionError('Separation of duties violation: You cannot return your own fee proposal for correction.');
       return;
     }
     setActionError(null);
@@ -509,20 +536,20 @@ export default function FeeApprovalsPage() {
   };
 
   const handleCreateProposal = async (autoSubmit: boolean) => {
-    if (!canProposeFee) return;
+    if (!canProposeFee || !user?.id) return;
     setActionError(null);
     try {
       if (isResubmitting && selectedFee) {
         await paymentWorkflowClient.feeOperation('updateAndResubmitFee', 
           selectedFee.id,
-          user?.id || 'usr-counsellor',
+          user.id,
           {
             proposed_fee: proposedFeeAmount,
             discount_amount: proposedDiscount,
             discount_percentage: proposedDiscountPercent,
             discount_reason: proposedDiscountReason,
-            payment_plan: proposedPaymentPlan,
-            number_of_installments: 0,
+            payment_plan: 'Full Payment',
+            number_of_installments: 1,
             first_due_date: proposedDueDate,
             counsellor_notes: proposedNotes,
             fee_category: selectedFeeCategory,
@@ -559,13 +586,13 @@ export default function FeeApprovalsPage() {
           discount_amount: proposedDiscount,
           discount_percentage: proposedDiscountPercent,
           discount_reason: proposedDiscountReason,
-          payment_plan: proposedPaymentPlan,
-          number_of_installments: 0,
+          payment_plan: 'Full Payment',
+          number_of_installments: 1,
           first_due_date: proposedDueDate,
           counsellor_notes: proposedNotes,
           auto_submit: autoSubmit,
         },
-        user?.id || 'usr-counsellor',
+        user.id,
         role || 'counsellor'
       );
 
@@ -753,7 +780,6 @@ export default function FeeApprovalsPage() {
                 setProposedDiscount(0);
                 setProposedDiscountPercent(0);
                 setProposedDiscountReason('');
-                setProposedPaymentPlan('Full Payment');
                 setProposedDueDate(new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0]);
                 setProposedNotes('');
                 setNewProposalModalOpen(true);
@@ -1193,7 +1219,7 @@ export default function FeeApprovalsPage() {
                               </Button>
                             )}
 
-                            {fee.approval_status === 'Correction Required' &&
+                            {(fee.approval_status === 'Correction Required' || fee.approval_status === 'Draft') &&
                               (isOwnSubmission || role === 'counsellor' || role === 'admin' || role === 'super_admin') && (
                               <Button
                                 variant="outline"
@@ -1208,7 +1234,6 @@ export default function FeeApprovalsPage() {
                                   setProposedDiscount(fee.discount_amount);
                                   setProposedDiscountPercent(fee.discount_percentage);
                                   setProposedDiscountReason(fee.discount_reason || '');
-                                  setProposedPaymentPlan('Full Payment');
                                   setProposedDueDate(fee.first_due_date || new Date().toISOString().split('T')[0]);
                                   setProposedNotes(fee.counsellor_notes || fee.notes || '');
                                   setActionError(null);
@@ -1217,7 +1242,7 @@ export default function FeeApprovalsPage() {
                                 }}
                                 className="text-xs px-2 py-1 h-7 bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 font-medium"
                               >
-                                Edit & Resubmit
+                                {fee.approval_status === 'Draft' ? 'Edit & Submit' : 'Edit & Resubmit'}
                               </Button>
                             )}
 
@@ -1973,19 +1998,14 @@ export default function FeeApprovalsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            
-
-            {/* Due Date */}
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">Due Date</label>
-              <input
-                type="date"
-                value={proposedDueDate}
-                onChange={(e) => setProposedDueDate(e.target.value)}
-                className="w-full text-xs p-2 border border-slate-300 rounded-lg"
-              />
-            </div>
+          <div>
+            <label className="block text-slate-700 font-medium mb-1">Fee Payment Due Date</label>
+            <input
+              type="date"
+              value={proposedDueDate}
+              onChange={(e) => setProposedDueDate(e.target.value)}
+              className="w-full text-xs p-2 border border-slate-300 rounded-lg"
+            />
           </div>
 
           <div>

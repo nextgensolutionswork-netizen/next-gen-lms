@@ -12,6 +12,13 @@ BEGIN
   END LOOP;
 END $$;
 
+CREATE POLICY profile_tenant_boundary ON public.profiles AS RESTRICTIVE FOR SELECT TO authenticated
+  USING (
+    (SELECT p.role FROM public.profiles p WHERE p.id = (SELECT auth.uid())) = 'super_admin'
+    OR id = (SELECT auth.uid())
+    OR tenant_id = (SELECT p.tenant_id FROM public.profiles p WHERE p.id = (SELECT auth.uid()))
+  );
+
 CREATE TABLE public.fee_workflow_state (
   tenant_id text PRIMARY KEY,
   revision bigint NOT NULL CHECK (revision > 0),
