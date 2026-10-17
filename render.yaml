@@ -1,9 +1,13 @@
 services:
+  # ============================================================================
+  # 1. PRODUCTION SERVICE (Deploys from 'main' branch to lms.next-generpsolutions.com)
+  # ============================================================================
   - type: web
     name: next-gen-sap-lms
     env: node
     plan: starter
     region: singapore
+    branch: main
     buildCommand: npm run build
     startCommand: npm start
     autoDeploy: true
@@ -11,6 +15,8 @@ services:
       - lms.next-generpsolutions.com
     envVars:
       - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_ENV
         value: production
       - key: NEXT_PUBLIC_APP_URL
         value: https://lms.next-generpsolutions.com
@@ -20,6 +26,43 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: NEXT_PUBLIC_DEFAULT_CURRENCY
+        value: INR
+      - key: NEXT_PUBLIC_DEFAULT_TIMEZONE
+        value: Asia/Kolkata
+
+  # ============================================================================
+  # 2. ISOLATED STAGING SERVICE (Deploys exclusively from 'staging/safe-load-test')
+  # Safe, independent runtime for 100 concurrent authenticated load testing
+  # ============================================================================
+  - type: web
+    name: nextgen-lms-staging
+    env: node
+    plan: starter
+    region: singapore
+    branch: staging/safe-load-test
+    buildCommand: npm run build
+    startCommand: npm start
+    autoDeploy: true
+    domains:
+      - nextgen-lms-staging.onrender.com
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: NEXT_PUBLIC_APP_ENV
+        value: staging
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://nextgen-lms-staging.onrender.com
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_PAYMENT_GATEWAY_ENV
+        value: mock
+      - key: NOTIFICATION_PROVIDER
+        value: mock
       - key: NEXT_PUBLIC_DEFAULT_CURRENCY
         value: INR
       - key: NEXT_PUBLIC_DEFAULT_TIMEZONE
