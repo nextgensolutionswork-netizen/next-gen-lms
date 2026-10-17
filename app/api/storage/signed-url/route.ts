@@ -44,3 +44,31 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const bucketParam = searchParams.get('bucket') || 'assignments';
+    const pathParam = searchParams.get('path') || 'samples/course-materials.pdf';
+    const expiresInSeconds = Number(searchParams.get('expiresIn') || searchParams.get('expiresInSeconds') || 3600);
+
+    const bucket = (STORAGE_BUCKETS[bucketParam as StorageBucket] ? bucketParam : 'assignments') as StorageBucket;
+    const result = await createSignedUrl(bucket, pathParam, expiresInSeconds);
+
+    return NextResponse.json({
+      success: true,
+      bucket,
+      path: pathParam,
+      expiresInSeconds,
+      signedUrl: result.signedUrl,
+      token: result.token,
+      expiresAt: result.expiresAt,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err?.message || 'Failed to generate signed storage URL' },
+      { status: 500 }
+    );
+  }
+}
+

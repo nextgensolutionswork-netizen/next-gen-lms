@@ -24,8 +24,13 @@ export async function getDoubts(filters?: {
         .select('*, messages:doubt_messages(*)')
         .order('updated_at', { ascending: false });
 
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (filters?.student_id) {
-        query = query.eq('student_id', filters.student_id);
+        if (isUuid.test(filters.student_id)) {
+          query = query.eq('student_id', filters.student_id);
+        } else {
+          return store.doubts.filter((d) => d.student_id === filters.student_id);
+        }
       }
       if (filters?.assigned_to_id) {
         query = query.eq('assigned_to_id', filters.assigned_to_id);

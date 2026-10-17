@@ -111,6 +111,10 @@ const StudentPlacementHub = dynamic(
 
 export default function StudentPortalPage() {
   const { user, logout } = useAuth();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   const [activePortalTab, setActivePortalTab] = React.useState<'curriculum' | 'placement'>('curriculum');
   const student = React.useMemo(() => {
     return (
@@ -622,6 +626,17 @@ export default function StudentPortalPage() {
       : null;
     setVideoPosition(existingProgress?.last_watched_seconds || 0);
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-300 font-medium">Loading Learning Portal...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!student) {
     return (

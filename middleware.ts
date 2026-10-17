@@ -279,6 +279,54 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 15. Financial workspace boundary: /accounts/approvals, /accounts/expenses, /accounts/vendors
+  if (isAuthenticated && ['/accounts/approvals', '/accounts/expenses', '/accounts/vendors'].some((p) => pathname.startsWith(p))) {
+    if (!['super_admin', 'admin', 'accountant'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          counsellor: '/crm/leads',
+          trainer: '/academics/courses',
+          placement_coordinator: '/placement',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
+  // 16. CRM & Admissions boundary: /crm and /admissions restricted to super_admin, admin, counsellor
+  if (isAuthenticated && (pathname.startsWith('/crm') || pathname.startsWith('/admissions'))) {
+    if (!['super_admin', 'admin', 'counsellor'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          accountant: '/accounts/fees',
+          trainer: '/academics/courses',
+          placement_coordinator: '/placement',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
+  // 17. Placements boundary: /placement restricted to super_admin, admin, placement_coordinator
+  if (isAuthenticated && pathname.startsWith('/placement')) {
+    if (!['super_admin', 'admin', 'placement_coordinator'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          accountant: '/accounts/fees',
+          counsellor: '/crm/leads',
+          trainer: '/academics/courses',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
   return response;
 }
 

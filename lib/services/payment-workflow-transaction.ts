@@ -104,6 +104,8 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
       store.persist = originalPersist;
     }
   });
-  transactionQueue = run.catch(() => {});
+  if (!readOnly) {
+    transactionQueue = run.catch(() => {});
+  }
   return run;
 }

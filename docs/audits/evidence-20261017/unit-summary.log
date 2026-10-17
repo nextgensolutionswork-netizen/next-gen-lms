@@ -1,0 +1,7 @@
+   ? Domain 4: Student Learning Portal Hardening & Edge Cases > 4. Middleware Access for Student Receipts > strictly bounces student session from /accounts/fees back to /portal 477ms
+
+ Test Files  43 passed (43)
+      Tests  599 passed (599)
+   Start at  12:10:05
+   Duration  50.58s (transform 6.60s, setup 1.67s, collect 102.09s, tests 199.32s, environment 18ms, prepare 11.27s)
+
