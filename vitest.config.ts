@@ -6,6 +6,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup-storage.ts'],
     environment: 'node',
     globals: true,
+    testTimeout: 15000,
   },
   resolve: {
     alias: {

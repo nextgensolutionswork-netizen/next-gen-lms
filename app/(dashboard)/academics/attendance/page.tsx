@@ -130,12 +130,16 @@ export default function AttendancePage() {
   };
 
   const handleSaveAttendance = async () => {
-    if (!canMark) {
+    if (!canMark || !user?.id) {
       setSaveError('Unauthorized: You do not have permission to mark attendance.');
       return;
     }
     if (!selectedBatchId) {
       setSaveError('Please select a batch to mark attendance.');
+      return;
+    }
+    if (isTrainer && batch && batch.trainer_id !== user.id) {
+      setSaveError('Unauthorized: Trainers may only mark attendance for their own assigned batches.');
       return;
     }
     if (students.length === 0) {
@@ -144,12 +148,7 @@ export default function AttendancePage() {
     }
     setSaveError(null);
     try {
-      const markerId =
-        user?.id ||
-        batch?.trainer_id ||
-        store.users.find((u) => u.role === 'trainer')?.id ||
-        store.users.find((u) => u.role === 'admin')?.id ||
-        'usr-trainer';
+      const markerId = user.id;
 
       const session = await getOrCreateClassSessionForDate(selectedBatchId, selectedDate, markerId);
       if (!session || !session.id) {

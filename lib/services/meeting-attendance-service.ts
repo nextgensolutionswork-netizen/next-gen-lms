@@ -42,8 +42,8 @@ export function verifyZoomWebhookSignature(
   signature: string,
   secretToken?: string
 ): boolean {
-  const secret = secretToken || process.env.ZOOM_WEBHOOK_SECRET_TOKEN || 'zoom_webhook_secret_dev';
-  if (!signature || !timestamp || !rawBody) {
+  const secret = secretToken || process.env.ZOOM_WEBHOOK_SECRET_TOKEN || (process.env.NODE_ENV !== 'production' ? 'zoom_webhook_secret_dev' : undefined);
+  if (!secret || !signature || !timestamp || !rawBody) {
     return false;
   }
 

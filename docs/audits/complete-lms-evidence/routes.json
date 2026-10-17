@@ -1,0 +1,588 @@
+[
+  {
+    "route": "/",
+    "kind": "Page",
+    "file": "app/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/assessments",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/assessments/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/assignments",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/assignments/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/attendance",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/attendance/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/batches",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/batches/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/courses",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/courses/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/sap-servers",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/sap-servers/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/academics/schedule",
+    "kind": "Page",
+    "file": "app/(dashboard)/academics/schedule/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/approvals",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/approvals/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/expenses",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/expenses/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/fees",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/fees/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/installments",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/installments/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/payments",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/payments/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/receipts",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/receipts/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/receipts/[id]",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/receipts/[id]/page.tsx",
+    "methods": [],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/accounts/reports",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/reports/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/accounts/vendors",
+    "kind": "Page",
+    "file": "app/(dashboard)/accounts/vendors/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/admissions",
+    "kind": "Page",
+    "file": "app/(dashboard)/admissions/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/api/admissions",
+    "kind": "API",
+    "file": "app/api/admissions/route.ts",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/attendance/sync-meeting",
+    "kind": "API",
+    "file": "app/api/attendance/sync-meeting/route.ts",
+    "methods": [
+      "POST",
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/audit-logs",
+    "kind": "API",
+    "file": "app/api/audit-logs/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/bulk-import/execute",
+    "kind": "API",
+    "file": "app/api/bulk-import/execute/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/bulk-import/preview",
+    "kind": "API",
+    "file": "app/api/bulk-import/preview/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/bulk-import/template",
+    "kind": "API",
+    "file": "app/api/bulk-import/template/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/certificates/[id]/pdf",
+    "kind": "API",
+    "file": "app/api/certificates/[id]/pdf/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/conference/create-meeting",
+    "kind": "API",
+    "file": "app/api/conference/create-meeting/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/database/backup",
+    "kind": "API",
+    "file": "app/api/database/backup/route.ts",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/database/health",
+    "kind": "API",
+    "file": "app/api/database/health/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/database/sync",
+    "kind": "API",
+    "file": "app/api/database/sync/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/fees/payments",
+    "kind": "API",
+    "file": "app/api/fees/payments/route.ts",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated GET 401; authenticated mutations BLOCKED"
+  },
+  {
+    "route": "/api/fees/proof",
+    "kind": "API",
+    "file": "app/api/fees/proof/route.ts",
+    "methods": [
+      "POST",
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/fees/proposals",
+    "kind": "API",
+    "file": "app/api/fees/proposals/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/fees/receipts",
+    "kind": "API",
+    "file": "app/api/fees/receipts/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/onboarding",
+    "kind": "API",
+    "file": "app/api/onboarding/route.ts",
+    "methods": [],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/onboarding/[id]",
+    "kind": "API",
+    "file": "app/api/onboarding/[id]/route.ts",
+    "methods": [],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/onboarding/analytics",
+    "kind": "API",
+    "file": "app/api/onboarding/analytics/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/onboarding/backfill",
+    "kind": "API",
+    "file": "app/api/onboarding/backfill/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/onboarding/cases",
+    "kind": "API",
+    "file": "app/api/onboarding/cases/route.ts",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/onboarding/cases/[id]",
+    "kind": "API",
+    "file": "app/api/onboarding/cases/[id]/route.ts",
+    "methods": [
+      "GET",
+      "PATCH"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/payments/create-order",
+    "kind": "API",
+    "file": "app/api/payments/create-order/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/payments/verify",
+    "kind": "API",
+    "file": "app/api/payments/verify/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/realtime/broadcast",
+    "kind": "API",
+    "file": "app/api/realtime/broadcast/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/realtime/stream",
+    "kind": "API",
+    "file": "app/api/realtime/stream/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/receipts/[id]/pdf",
+    "kind": "API",
+    "file": "app/api/receipts/[id]/pdf/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/settings",
+    "kind": "API",
+    "file": "app/api/settings/route.ts",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/storage/signed",
+    "kind": "API",
+    "file": "app/api/storage/signed/route.ts",
+    "methods": [
+      "GET"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/storage/signed-url",
+    "kind": "API",
+    "file": "app/api/storage/signed-url/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/upload",
+    "kind": "API",
+    "file": "app/api/upload/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/webhooks/google-meet",
+    "kind": "API",
+    "file": "app/api/webhooks/google-meet/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/webhooks/razorpay",
+    "kind": "API",
+    "file": "app/api/webhooks/razorpay/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/webhooks/zoom",
+    "kind": "API",
+    "file": "app/api/webhooks/zoom/route.ts",
+    "methods": [
+      "POST"
+    ],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/api/workflow/notifications",
+    "kind": "API",
+    "file": "app/api/workflow/notifications/route.ts",
+    "methods": [],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/audit-logs",
+    "kind": "Page",
+    "file": "app/(dashboard)/audit-logs/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/certificate/verify/[id]",
+    "kind": "Page",
+    "file": "app/certificate/verify/[id]/page.tsx",
+    "methods": [],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/certificates",
+    "kind": "Page",
+    "file": "app/(dashboard)/certificates/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/crm/followups",
+    "kind": "Page",
+    "file": "app/(dashboard)/crm/followups/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/crm/leads",
+    "kind": "Page",
+    "file": "app/(dashboard)/crm/leads/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/dashboard",
+    "kind": "Page",
+    "file": "app/(dashboard)/dashboard/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/login",
+    "kind": "Page",
+    "file": "app/login/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Public page/forms/responsive; real authentication BLOCKED"
+  },
+  {
+    "route": "/onboarding",
+    "kind": "Page",
+    "file": "app/(dashboard)/onboarding/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/placement",
+    "kind": "Page",
+    "file": "app/(dashboard)/placement/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/placement/enrollments",
+    "kind": "Page",
+    "file": "app/(dashboard)/placement/enrollments/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/portal",
+    "kind": "Page",
+    "file": "app/portal/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/settings",
+    "kind": "Page",
+    "file": "app/(dashboard)/settings/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/students",
+    "kind": "Page",
+    "file": "app/(dashboard)/students/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/students/[id]",
+    "kind": "Page",
+    "file": "app/(dashboard)/students/[id]/page.tsx",
+    "methods": [],
+    "status": "NOT TESTED"
+  },
+  {
+    "route": "/support",
+    "kind": "Page",
+    "file": "app/(dashboard)/support/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/todos",
+    "kind": "Page",
+    "file": "app/todos/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  },
+  {
+    "route": "/users",
+    "kind": "Page",
+    "file": "app/(dashboard)/users/page.tsx",
+    "methods": [],
+    "status": "PARTIAL",
+    "tested": "Unauthenticated redirect only: PASS"
+  }
+]

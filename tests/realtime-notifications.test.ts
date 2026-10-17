@@ -23,6 +23,8 @@ import {
 import { store } from '@/lib/services/data-store';
 import { NextRequest } from 'next/server';
 import { POST as broadcastRouteHandler } from '@/app/api/realtime/broadcast/route';
+import { GET as streamRouteHandler } from '@/app/api/realtime/stream/route';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 
 describe('Realtime PubSub & Multi-Channel Notification Service', () => {
   beforeEach(() => {
@@ -285,14 +287,20 @@ describe('Realtime PubSub & Multi-Channel Notification Service', () => {
     });
   });
 
-  describe('6. Realtime Broadcast API Route Handler', () => {
-    it('accepts broadcast payload and returns 200 with published event', async () => {
+  describe('6. Realtime Broadcast & Stream API Route Security', () => {
+    it('accepts broadcast payload from authorized staff and returns 200 with published event', async () => {
       const events: any[] = [];
       const unsub = subscribeRealtimeTopic('academics', (e) => events.push(e));
 
+      const trainerCookie = encodeURIComponent(JSON.stringify({ role: 'trainer', id: 'usr-trainer-fico', is_active: true }));
+      const trainerSig = generateAuthCookieSignatureSync(trainerCookie);
+
       const req = new NextRequest('http://localhost:3000/api/realtime/broadcast', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${trainerCookie}; next_gen_auth_user_sig=${trainerSig}`,
+        },
         body: JSON.stringify({
           topic: 'academics',
           event: 'class_starting',
@@ -314,10 +322,58 @@ describe('Realtime PubSub & Multi-Channel Notification Service', () => {
       unsub();
     });
 
-    it('returns 400 when topic or event is missing', async () => {
+    it('rejects unauthenticated broadcast attempts with 401 Unauthorized', async () => {
       const req = new NextRequest('http://localhost:3000/api/realtime/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: 'academics',
+          event: 'class_starting',
+          payload: { sessionId: 'sess-01' },
+        }),
+      });
+
+      const res = await broadcastRouteHandler(req);
+      expect(res.status).toBe(401);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Unauthorized');
+    });
+
+    it('rejects unauthorized student broadcast attempts with 403 Forbidden', async () => {
+      const studentCookie = encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-student-01', is_active: true }));
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
+
+      const req = new NextRequest('http://localhost:3000/api/realtime/broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
+        },
+        body: JSON.stringify({
+          topic: 'academics',
+          event: 'student_announcement',
+          payload: { msg: 'spam' },
+        }),
+      });
+
+      const res = await broadcastRouteHandler(req);
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Forbidden');
+    });
+
+    it('returns 400 when topic or event is missing in authorized broadcast', async () => {
+      const adminCookie = encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin', is_active: true }));
+      const adminSig = generateAuthCookieSignatureSync(adminCookie);
+
+      const req = new NextRequest('http://localhost:3000/api/realtime/broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
+        },
         body: JSON.stringify({ topic: 'academics' }), // missing event
       });
 
@@ -327,6 +383,29 @@ describe('Realtime PubSub & Multi-Channel Notification Service', () => {
       const data = await res.json();
       expect(data.success).toBe(false);
       expect(data.error).toContain('required');
+    });
+
+    it('rejects unauthenticated stream connections to GET /api/realtime/stream with 401', async () => {
+      const req = new NextRequest('http://localhost:3000/api/realtime/stream?topics=academics');
+      const res = await streamRouteHandler(req);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects wildcard subscription requests from students with 403 Forbidden', async () => {
+      const studentCookie = encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-student-01', is_active: true }));
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
+
+      const req = new NextRequest('http://localhost:3000/api/realtime/stream?topics=*', {
+        headers: {
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
+        },
+      });
+
+      const res = await streamRouteHandler(req);
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Wildcard');
     });
   });
 });

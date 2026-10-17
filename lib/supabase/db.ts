@@ -25,6 +25,15 @@ export function isLiveSupabaseEnabled(): boolean {
 
   if (!url || !anonKey) return false;
   if (url.includes('mock-sap-lms') || anonKey.includes('mockAnonKey')) return false;
+
+  // Staging Isolation Guardrail: Ensure staging cannot accidentally connect to production database
+  const isStaging = (process.env.NODE_ENV as string) === 'staging' || process.env.NEXT_PUBLIC_APP_ENV === 'staging';
+  if (isStaging && url.includes('tgohtdzwehhjfahtgovq')) {
+    throw new Error(
+      'CRITICAL ISOLATION BLOCKER: Staging environment attempted to connect to production database (tgohtdzwehhjfahtgovq). Staging must connect exclusively to nextgen-lms-staging.'
+    );
+  }
+
   return true;
 }
 

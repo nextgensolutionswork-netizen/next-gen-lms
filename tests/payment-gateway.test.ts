@@ -11,6 +11,7 @@ import { NextRequest } from 'next/server';
 import { POST as createOrderRouteHandler } from '@/app/api/payments/create-order/route';
 import { POST as verifyRouteHandler } from '@/app/api/payments/verify/route';
 import { POST as webhookRouteHandler } from '@/app/api/webhooks/razorpay/route';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 
 describe('10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests', () => {
   const secretKey = 'test_secret_key_123456';
@@ -254,6 +255,84 @@ describe('10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests', () =>
       expect(json.status).toBe('ok');
       expect(json.reconciled).toBe(true);
       expect(json.paymentId).toBe(testPaymentId);
+    });
+
+    it('rejects unauthenticated verification requests to POST /api/payments/verify with 401', async () => {
+      const req = new NextRequest('http://localhost:3000/api/payments/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: 'order_test_unauth',
+          payment_id: 'pay_test_unauth',
+        }),
+      });
+
+      const res = await verifyRouteHandler(req);
+      expect(res.status).toBe(401);
+      const data = await res.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Unauthorized');
+    });
+
+    it('authenticates and processes payment verification from student or accounts', async () => {
+      const student = store.students[0];
+      const feeAccount = store.feeAccounts.find((f) => f.student_id === student.id)!;
+      const testPaymentId = `pay_verify_unit_${Date.now()}`;
+      const testOrderId = `order_verify_unit_${Date.now()}`;
+
+      const studentUserId = student.user_id || 'usr-student-01';
+      const studentCookie = encodeURIComponent(
+        JSON.stringify({ role: 'student', id: studentUserId, is_active: true })
+      );
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
+
+      const req = new NextRequest('http://localhost:3000/api/payments/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
+        },
+        body: JSON.stringify({
+          order_id: testOrderId,
+          payment_id: testPaymentId,
+          signature: 'test_signature',
+          student_id: student.id,
+          course_id: student.course_id,
+          fee_account_id: feeAccount.id,
+          amount: 5000,
+        }),
+      });
+
+      const res = await verifyRouteHandler(req);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.payment).toBeDefined();
+      expect(data.payment.transaction_reference).toBe(testPaymentId);
+      expect(data.receipt).toBeDefined();
+
+      // Idempotency: submitting again should return alreadyProcessed: true
+      const repeatReq = new NextRequest('http://localhost:3000/api/payments/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
+        },
+        body: JSON.stringify({
+          order_id: testOrderId,
+          payment_id: testPaymentId,
+          signature: 'test_signature',
+          student_id: student.id,
+          course_id: student.course_id,
+          fee_account_id: feeAccount.id,
+          amount: 5000,
+        }),
+      });
+      const repeatRes = await verifyRouteHandler(repeatReq);
+      expect(repeatRes.status).toBe(200);
+      const repeatData = await repeatRes.json();
+      expect(repeatData.success).toBe(true);
+      expect(repeatData.alreadyProcessed).toBe(true);
     });
   });
 });

@@ -1,0 +1,80 @@
+[
+  {
+    "route": "/api/database/backup",
+    "status": 200,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "version",
+      "timestamp",
+      "store"
+    ],
+    "bytes": 90908,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  },
+  {
+    "route": "/api/database/health",
+    "status": 200,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "success",
+      "health"
+    ],
+    "bytes": 343,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  },
+  {
+    "route": "/api/audit-logs",
+    "status": 403,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "success",
+      "error"
+    ],
+    "bytes": 148,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  },
+  {
+    "route": "/api/settings",
+    "status": 200,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "success",
+      "settings"
+    ],
+    "bytes": 1091,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  },
+  {
+    "route": "/api/fees/payments",
+    "status": 401,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "success",
+      "error"
+    ],
+    "bytes": 66,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  },
+  {
+    "route": "/api/onboarding/cases",
+    "status": 401,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "success",
+      "error"
+    ],
+    "bytes": 106,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  },
+  {
+    "route": "/api/workflow/notifications",
+    "status": 401,
+    "contentType": "application/json",
+    "topLevelKeys": [
+      "success",
+      "error"
+    ],
+    "bytes": 51,
+    "scope": "anonymous isolated mock-backend GET; response data not retained"
+  }
+]

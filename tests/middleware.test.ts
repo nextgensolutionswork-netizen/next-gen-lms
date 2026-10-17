@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware } from '@/middleware';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 
 function createMockRequest(url: string, cookieValue?: string) {
   const req = new NextRequest(new URL(url, 'http://localhost:3000'), {
@@ -11,6 +12,7 @@ function createMockRequest(url: string, cookieValue?: string) {
 
   if (cookieValue) {
     req.cookies.set('next_gen_auth_user', cookieValue);
+    req.cookies.set('next_gen_auth_user_sig', generateAuthCookieSignatureSync(cookieValue));
   }
 
   return req;

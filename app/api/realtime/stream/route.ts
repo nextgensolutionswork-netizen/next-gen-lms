@@ -1,18 +1,53 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { subscribeRealtimeTopic } from '@/lib/services/realtime-service';
 import { RealtimeMessageEvent } from '@/types';
+import { authenticateApiRequest } from '@/lib/auth/server-session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
+  // 1. Session authentication
+  const auth = await authenticateApiRequest(request);
+  if (auth.errorResponse) {
+    return auth.errorResponse;
+  }
+  const user = auth.user;
+
   const { searchParams } = new URL(request.url);
   const rawTopics = searchParams.get('topics') || searchParams.get('topic') || '*';
-  const topics = rawTopics
+  const requestedTopics = rawTopics
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean);
 
+  // 2. Topic Scoping Enforcement
+  const isAdmin = ['super_admin', 'admin'].includes(user.role);
+  if (!isAdmin) {
+    if (requestedTopics.includes('*')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden: Wildcard realtime topic subscriptions are restricted to administrators.',
+        },
+        { status: 403 }
+      );
+    }
+
+    const sensitivePrefixes = ['audit:', 'system:', 'finance:', 'expenses:'];
+    const hasSensitive = requestedTopics.some((t) => sensitivePrefixes.some((p) => t.startsWith(p)));
+    if (hasSensitive && user.role !== 'accountant') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden: Insufficient privileges to subscribe to restricted realtime topics.',
+        },
+        { status: 403 }
+      );
+    }
+  }
+
+  const topics = requestedTopics;
   const encoder = new TextEncoder();
 
   let unsubs: Array<() => void> = [];
@@ -24,6 +59,7 @@ export async function GET(request: NextRequest) {
       const handshakePayload = JSON.stringify({
         connected: true,
         topics,
+        user_id: user.id,
         timestamp: new Date().toISOString(),
       });
       controller.enqueue(encoder.encode(`event: connected\ndata: ${handshakePayload}\n\n`));
@@ -58,19 +94,11 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  // Also listen to client abort signal
-  request.signal.addEventListener('abort', () => {
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
-    unsubs.forEach((unsub) => unsub());
-    unsubs = [];
-  });
-
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform, no-store',
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no', // Disable proxy buffering for nginx
     },
   });
 }

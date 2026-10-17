@@ -7,6 +7,20 @@ import { workflowKeys, workflowSnapshot, mergeWorkflowSnapshot } from './payment
 
 let transactionQueue: Promise<unknown> = Promise.resolve();
 
+let currentPostCommitTasks: Array<() => Promise<void>> | null = null;
+
+/**
+ * Register an external action (emails, WhatsApp, webhooks) to run ONLY
+ * after the database transaction successfully commits. Discarded if transaction conflicts or aborts.
+ */
+export function onTransactionCommit(task: () => Promise<void>): void {
+  if (currentPostCommitTasks) {
+    currentPostCommitTasks.push(task);
+  } else {
+    task().catch((err) => console.warn('Post-commit task failed outside transaction:', err));
+  }
+}
+
 /** Serialize the local adapter; use compare-and-swap for cross-process PostgreSQL commits.
  * All financial effects, receipts, audits and in-app notifications commit in one row update.
  * A stale writer fails with 409; no partial ledger changes or external effects escape.
@@ -60,9 +74,12 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
     const before = Object.fromEntries(workflowKeys.map((key) => [key, structuredClone(store[key])]));
     const originalPersist = store.persist;
     store.persist = () => {}; // no intermediate durable snapshots
+    const postCommitTasks: Array<() => Promise<void>> = [];
+    currentPostCommitTasks = postCommitTasks;
     try {
       const result = await operation();
       if (!readOnly) {
+        store.reconcileDualLedgers();
         const snapshot = workflowSnapshot(tenant);
         if (db) {
           const response = await db.rpc('commit_fee_workflow', { p_tenant: tenant, p_revision: revision, p_snapshot: snapshot });
@@ -71,14 +88,25 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
           throw new Error('Payment storage failed; no changes were committed.');
         }
       }
+      currentPostCommitTasks = null;
+      for (const task of postCommitTasks) {
+        try {
+          await task();
+        } catch (taskErr) {
+          console.warn('Post-commit task execution error:', taskErr);
+        }
+      }
       return result;
     } catch (error) {
+      currentPostCommitTasks = null;
       Object.assign(store, before);
       throw error;
     } finally {
       store.persist = originalPersist;
     }
   });
-  transactionQueue = run.catch(() => {});
+  if (!readOnly) {
+    transactionQueue = run.catch(() => {});
+  }
   return run;
 }

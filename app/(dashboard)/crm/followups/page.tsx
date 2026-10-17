@@ -25,6 +25,7 @@ import {
   CalendarClock,
   MessageSquare,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +66,9 @@ export default function FollowupsPage() {
   const [historyModalLead, setHistoryModalLead] = React.useState<Lead | null>(null);
   const [quickNote, setQuickNote] = React.useState('');
   const [isAddingNote, setIsAddingNote] = React.useState(false);
+
+  // Calendar Day Details Modal
+  const [selectedCalendarDay, setSelectedCalendarDay] = React.useState<{ dateStr: string; leads: Lead[] } | null>(null);
 
   const todayStr = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -193,16 +197,50 @@ export default function FollowupsPage() {
 
   const handleOpenRescheduleModal = (lead: Lead) => {
     handleOpenLogModal(lead);
+    setNewStage('Follow-up');
     setCallOutcome('Call Back Requested');
+    setMarkCompleteCheckbox(false);
+  };
+
+  const applyDatePreset = (daysToAdd: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + daysToAdd);
+    setNewFollowUpDate(d.toISOString().slice(0, 10));
+  };
+
+  const handleCallOutcomeChange = (outcome: string) => {
+    setCallOutcome(outcome);
+    if (outcome === 'Call Back Requested') {
+      setNewStage('Follow-up');
+      setMarkCompleteCheckbox(false);
+    } else if (outcome === 'Demo Scheduled / Confirmed' || outcome === 'Demo Rescheduled') {
+      setNewStage('Demo Scheduled');
+      setMarkCompleteCheckbox(false);
+    } else if (outcome === 'Demo Attended') {
+      setNewStage('Demo Attended');
+    } else if (outcome === 'Not Interested' || outcome === 'Wrong Number / Invalid') {
+      setNewStage('Not Interested');
+      setMarkCompleteCheckbox(true);
+    } else if (outcome === 'Ringing / No Answer' || outcome === 'Switched Off / Busy') {
+      setNewStage('Follow-up');
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setNewFollowUpDate(tomorrow.toISOString().slice(0, 10));
+    }
   };
 
   const handleQuickComplete = async (lead: Lead) => {
     if (!confirm(`Mark follow-up for "${lead.full_name}" as completed?`)) return;
     setCompletingId(lead.id);
     try {
-      const actorId = user?.id || 'usr-counsellor';
+      const actorId = user?.id || lead.counsellor_id || availableCounsellors[0]?.id || 'system';
       await completeFollowup(lead.id, actorId, 'Follow-up marked completed via quick action');
       refreshLeads();
+      if (selectedCalendarDay) {
+        setSelectedCalendarDay((prev) =>
+          prev ? { ...prev, leads: prev.leads.filter((l) => l.id !== lead.id) } : null
+        );
+      }
     } catch (err: any) {
       alert('Error completing follow-up: ' + (err.message || 'Unknown error'));
     } finally {
@@ -215,10 +253,9 @@ export default function FollowupsPage() {
     if (!selectedLead) return;
     setIsSaving(true);
     try {
-      const actorId = user?.id || 'usr-counsellor';
+      const actorId = user?.id || selectedLead.counsellor_id || availableCounsellors[0]?.id || 'system';
       const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
       const entryNote = `[${timestamp} | ${callOutcome}${markCompleteCheckbox ? ' (Completed)' : ''}]: ${callNotes.trim() || 'Interaction recorded'}`;
-      const combinedNotes = selectedLead.notes ? `${entryNote}\n---\n${selectedLead.notes}` : entryNote;
 
       let targetFollowUpDate: string | null = null;
       if (!markCompleteCheckbox && (newStage === 'Follow-up' || newStage === 'Demo Scheduled')) {
@@ -227,10 +264,16 @@ export default function FollowupsPage() {
           : selectedLead.follow_up_date || null;
       }
 
-      await updateLeadStage(selectedLead.id, newStage, combinedNotes, actorId, targetFollowUpDate);
+      await updateLeadStage(selectedLead.id, newStage, entryNote, actorId, targetFollowUpDate);
 
       refreshLeads();
       setSelectedLead(null);
+      if (selectedCalendarDay) {
+        const updatedLeads = (store.leads || []).filter(
+          (l) => l.follow_up_date && l.follow_up_date.slice(0, 10) === selectedCalendarDay.dateStr
+        );
+        setSelectedCalendarDay({ ...selectedCalendarDay, leads: updatedLeads });
+      }
     } catch (err: any) {
       alert('Error updating follow-up: ' + (err.message || 'Unknown error'));
     } finally {
@@ -243,15 +286,14 @@ export default function FollowupsPage() {
     if (!historyModalLead || !quickNote.trim()) return;
     setIsAddingNote(true);
     try {
-      const actorId = user?.id || 'usr-counsellor';
+      const actorId = user?.id || historyModalLead.counsellor_id || availableCounsellors[0]?.id || 'system';
       const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' });
       const entry = `[${timestamp} | Quick Note]: ${quickNote.trim()}`;
-      const combinedNotes = historyModalLead.notes ? `${entry}\n---\n${historyModalLead.notes}` : entry;
 
       await updateLeadStage(
         historyModalLead.id,
         historyModalLead.stage,
-        combinedNotes,
+        entry,
         actorId,
         historyModalLead.follow_up_date
       );
@@ -264,6 +306,12 @@ export default function FollowupsPage() {
       alert('Failed to save note: ' + (err.message || 'Unknown error'));
     } finally {
       setIsAddingNote(false);
+    }
+  };
+
+  const handleDayClick = (dateStr: string, leads: Lead[]) => {
+    if (leads.length > 0) {
+      setSelectedCalendarDay({ dateStr, leads });
     }
   };
 
@@ -361,10 +409,11 @@ export default function FollowupsPage() {
   // Parse notes history blocks helper
   const parseNotesHistory = (notes?: string) => {
     if (!notes) return [];
-    return notes
-      .split('\n---\n')
-      .map((block) => block.trim())
+    const blocks = notes
+      .split(/\n(?=(?:\[|\-\-\-))/)
+      .map((block) => block.replace(/^---\n?/, '').trim())
       .filter(Boolean);
+    return blocks.length > 0 ? blocks : [notes.trim()];
   };
 
   return (
@@ -577,7 +626,10 @@ export default function FollowupsPage() {
               return (
                 <div
                   key={idx}
+                  onClick={() => dayLeads.length > 0 && handleDayClick(d.dateStr, dayLeads)}
                   className={`min-h-[110px] p-1.5 flex flex-col justify-between transition-colors ${
+                    dayLeads.length > 0 ? 'cursor-pointer hover:ring-1 hover:ring-[#0A6ED1]' : ''
+                  } ${
                     !d.isCurrentMonth
                       ? 'bg-slate-50/60 text-slate-400'
                       : isToday
@@ -598,7 +650,7 @@ export default function FollowupsPage() {
                       {d.dayNum}
                     </span>
                     {dayLeads.length > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded-full">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200">
                         {dayLeads.length}
                       </span>
                     )}
@@ -610,21 +662,30 @@ export default function FollowupsPage() {
                       return (
                         <div
                           key={lead.id}
-                          onClick={() => handleOpenLogModal(lead)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenLogModal(lead);
+                          }}
                           className={`text-[10px] truncate rounded px-1.5 py-0.5 font-medium cursor-pointer transition-shadow hover:shadow-xs ${
                             isDemo
                               ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300'
                               : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200'
                           }`}
-                          title={`${lead.full_name} (${lead.interested_course_name || 'Program'}) - Click to log`}
+                          title={`${lead.full_name} (${lead.interested_course_name || 'Program'}) - Click to log call`}
                         >
                           {lead.full_name}
                         </div>
                       );
                     })}
                     {dayLeads.length > 3 && (
-                      <span className="text-[9px] text-slate-500 font-semibold pl-1">
-                        +{dayLeads.length - 3} more
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDayClick(d.dateStr, dayLeads);
+                        }}
+                        className="text-[9px] text-[#0A6ED1] font-semibold pl-1 hover:underline block cursor-pointer"
+                      >
+                        +{dayLeads.length - 3} more (view all)
                       </span>
                     )}
                   </div>
@@ -793,10 +854,10 @@ export default function FollowupsPage() {
                             <span>Log Call</span>
                           </Button>
                           <Link
-                            href={`/crm/leads?search=${encodeURIComponent(lead.lead_code || lead.phone || lead.full_name)}&leadId=${lead.id}`}
+                            href={`/crm/leads?leadId=${lead.id}&search=${encodeURIComponent(lead.lead_code || lead.phone || lead.full_name)}`}
                           >
                             <Button variant="sap" size="sm" className="text-xs h-7 px-2.5">
-                              Manage
+                              Manage Lead
                             </Button>
                           </Link>
                         </div>
@@ -957,10 +1018,10 @@ export default function FollowupsPage() {
                         <span>Log Call</span>
                       </Button>
                       <Link
-                        href={`/crm/leads?search=${encodeURIComponent(lead.lead_code || lead.phone || lead.full_name)}&leadId=${lead.id}`}
+                        href={`/crm/leads?leadId=${lead.id}&search=${encodeURIComponent(lead.lead_code || lead.phone || lead.full_name)}`}
                       >
                         <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 h-7">
-                          Manage
+                          Manage Lead
                         </Button>
                       </Link>
                     </div>
@@ -992,6 +1053,16 @@ export default function FollowupsPage() {
                   {selectedLead.phone}
                 </a>
               </div>
+              <div className="flex justify-between pt-1 border-t border-slate-200/60 items-center">
+                <span className="font-semibold text-slate-700">Lead Record:</span>
+                <Link
+                  href={`/crm/leads?leadId=${selectedLead.id}&search=${encodeURIComponent(selectedLead.lead_code || selectedLead.phone || selectedLead.full_name)}`}
+                  className="text-blue-600 font-semibold hover:underline flex items-center space-x-1"
+                >
+                  <span>Manage Lead Profile ({selectedLead.lead_code})</span>
+                  <ExternalLink className="h-3 w-3 ml-0.5" />
+                </Link>
+              </div>
             </div>
 
             {/* Quick Completion Checkbox */}
@@ -1022,7 +1093,7 @@ export default function FollowupsPage() {
               </label>
               <select
                 value={callOutcome}
-                onChange={(e) => setCallOutcome(e.target.value)}
+                onChange={(e) => handleCallOutcomeChange(e.target.value)}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
               >
                 <option value="Connected - Interested">Connected - Interested</option>
@@ -1058,29 +1129,53 @@ export default function FollowupsPage() {
             </div>
 
             {!markCompleteCheckbox && (newStage === 'Follow-up' || newStage === 'Demo Scheduled') && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              <div className="space-y-2 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
                     Next Follow-up / Demo Date *
                   </label>
-                  <Input
-                    type="date"
-                    value={newFollowUpDate}
-                    onChange={(e) => setNewFollowUpDate(e.target.value)}
-                    className="w-full text-xs bg-white"
-                    required
-                  />
+                  <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => applyDatePreset(1)}
+                      className="px-1.5 py-0.5 text-[10px] bg-white border border-blue-200 rounded text-blue-700 hover:bg-blue-100 font-medium"
+                    >
+                      +1 Day (Tomorrow)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDatePreset(2)}
+                      className="px-1.5 py-0.5 text-[10px] bg-white border border-blue-200 rounded text-blue-700 hover:bg-blue-100 font-medium"
+                    >
+                      +2 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDatePreset(7)}
+                      className="px-1.5 py-0.5 text-[10px] bg-white border border-blue-200 rounded text-blue-700 hover:bg-blue-100 font-medium"
+                    >
+                      +1 Week
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Scheduled Time
-                  </label>
-                  <Input
-                    type="time"
-                    value={newFollowUpTime}
-                    onChange={(e) => setNewFollowUpTime(e.target.value)}
-                    className="w-full text-xs bg-white"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Input
+                      type="date"
+                      value={newFollowUpDate}
+                      onChange={(e) => setNewFollowUpDate(e.target.value)}
+                      className="w-full text-xs bg-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Input
+                      type="time"
+                      value={newFollowUpTime}
+                      onChange={(e) => setNewFollowUpTime(e.target.value)}
+                      className="w-full text-xs bg-white"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -1127,7 +1222,16 @@ export default function FollowupsPage() {
                   {historyModalLead.interested_course_name}
                 </p>
               </div>
-              <Badge variant="outline">{historyModalLead.stage}</Badge>
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline">{historyModalLead.stage}</Badge>
+                <Link
+                  href={`/crm/leads?leadId=${historyModalLead.id}&search=${encodeURIComponent(historyModalLead.lead_code || historyModalLead.phone || historyModalLead.full_name)}`}
+                >
+                  <Button variant="sap" size="sm" className="text-xs h-7 px-2">
+                    Manage Lead
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {/* History timeline list */}
@@ -1175,6 +1279,132 @@ export default function FollowupsPage() {
                 Close
               </Button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Calendar Day Details Modal */}
+      {selectedCalendarDay && (
+        <Modal
+          isOpen={!!selectedCalendarDay}
+          onClose={() => setSelectedCalendarDay(null)}
+          title={`Scheduled Calls: ${formatDate(selectedCalendarDay.dateStr)}`}
+          description={`${selectedCalendarDay.leads.length} candidate follow-up session(s) scheduled on this day.`}
+          maxWidth="2xl"
+        >
+          <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 text-xs">
+            {selectedCalendarDay.leads.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                All scheduled follow-ups for this date have been addressed.
+              </div>
+            ) : (
+              selectedCalendarDay.leads.map((lead) => {
+                const urgency = getUrgency(lead);
+                const isOverdue = urgency === 'overdue';
+                const isToday = urgency === 'today';
+                const timeStr = lead.follow_up_date?.includes('T')
+                  ? lead.follow_up_date.split('T')[1].slice(0, 5)
+                  : 'Flexible';
+
+                return (
+                  <div
+                    key={lead.id}
+                    className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-2xs space-y-2 hover:border-[#0A6ED1] transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-slate-900 text-sm">{lead.full_name}</h4>
+                          <span className="text-[10px] font-semibold text-slate-400">({lead.lead_code})</span>
+                          <span className="text-xs font-medium text-[#0A6ED1]">
+                            • {lead.interested_course_name || 'SAP Program'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 flex items-center space-x-2">
+                          <Phone className="h-3 w-3 text-slate-400" />
+                          <a href={`tel:${lead.phone}`} className="text-blue-600 hover:underline font-semibold">
+                            {lead.phone}
+                          </a>
+                          <span>•</span>
+                          <span>Time: <strong>{timeStr}</strong></span>
+                          <span>•</span>
+                          <span>Counsellor: <strong>{lead.counsellor_name || 'Unassigned'}</strong></span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center space-x-1.5">
+                        {isOverdue && <Badge variant="destructive">Overdue</Badge>}
+                        {isToday && <Badge variant="warning">Due Today</Badge>}
+                        <Badge variant={lead.stage === 'Demo Scheduled' ? 'default' : 'secondary'}>
+                          {lead.stage}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {lead.notes && (
+                      <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 italic">
+                        {lead.notes.split('\n---\n')[0]}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setHistoryModalLead(lead)}
+                        className="text-xs h-7 px-2 text-slate-500 hover:text-slate-800"
+                      >
+                        <History className="h-3 w-3 mr-1" />
+                        <span>History</span>
+                      </Button>
+
+                      <div className="flex items-center space-x-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={completingId === lead.id}
+                          onClick={() => handleQuickComplete(lead)}
+                          className="text-xs h-7 px-2 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          <span>{completingId === lead.id ? '...' : 'Done'}</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenRescheduleModal(lead)}
+                          className="text-xs h-7 px-2 text-amber-700 border-amber-200 hover:bg-amber-50"
+                        >
+                          <Clock className="h-3 w-3 mr-1" />
+                          <span>Reschedule</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenLogModal(lead)}
+                          className="text-xs h-7 px-2 text-blue-700 border-blue-200 hover:bg-blue-50"
+                        >
+                          <PhoneCall className="h-3 w-3 mr-1" />
+                          <span>Log Call</span>
+                        </Button>
+                        <Link
+                          href={`/crm/leads?leadId=${lead.id}&search=${encodeURIComponent(lead.lead_code || lead.phone || lead.full_name)}`}
+                        >
+                          <Button variant="sap" size="sm" className="text-xs h-7 px-2.5">
+                            Manage Lead
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <div className="flex justify-end pt-3 border-t border-slate-100">
+            <Button variant="outline" size="sm" onClick={() => setSelectedCalendarDay(null)}>
+              Close
+            </Button>
           </div>
         </Modal>
       )}

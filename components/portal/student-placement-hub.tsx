@@ -47,6 +47,7 @@ import {
   createPlacementEnrollment,
   getPlacementEnrollmentByStudentId,
   evaluatePlacementEligibility,
+  evaluateEnrollmentPrerequisites,
   requestReEnrollment,
   applyForJob,
   getJobOpenings,
@@ -68,6 +69,11 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
     store.jobApplications.filter((a) => a.student_id === student.id)
   );
   const [evaluation, setEvaluation] = React.useState<any>(null);
+
+  // Automated Pre-requisite Audit Evaluation for Current Student
+  const prereqAudit = React.useMemo(() => {
+    return evaluateEnrollmentPrerequisites(student.id);
+  }, [student.id]);
 
   // Modals
   const [isEnrollModalOpen, setIsEnrollModalOpen] = React.useState(false);
@@ -405,6 +411,73 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
               </div>
             </div>
           </div>
+
+          {/* Live Placement Eligibility Prerequisite Status Card */}
+          <Card
+            className={`border shadow-xs ${
+              prereqAudit.all_passed
+                ? 'bg-emerald-50/40 border-emerald-200'
+                : 'bg-amber-50/40 border-amber-200'
+            }`}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <CardTitle className="text-sm font-bold flex items-center space-x-2 text-slate-800">
+                  <ShieldCheck
+                    className={`h-4 w-4 ${prereqAudit.all_passed ? 'text-emerald-600' : 'text-amber-600'}`}
+                  />
+                  <span>Automated Placement Prerequisite Standing</span>
+                </CardTitle>
+                <Badge variant={prereqAudit.all_passed ? 'success' : 'warning'} className="text-xs w-fit">
+                  {prereqAudit.all_passed ? 'Prerequisites Cleared ✓' : 'Prerequisites Incomplete'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-slate-600">
+                Institutional criteria required for placement enrollment and job drive eligibility:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* Attendance */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Attendance Metric</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900">{prereqAudit.attendance_percentage}%</span>
+                    <Badge variant={prereqAudit.passes_attendance ? 'success' : 'destructive'} className="text-[10px]">
+                      {prereqAudit.passes_attendance ? 'PASS (≥80%)' : `FAIL (<${prereqAudit.min_attendance_percentage}%)`}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Institutional benchmark: ≥ {prereqAudit.min_attendance_percentage}%</p>
+                </div>
+
+                {/* Progress */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Course Progress</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900">{prereqAudit.course_progress}%</span>
+                    <Badge variant={prereqAudit.passes_progress ? 'success' : 'destructive'} className="text-[10px]">
+                      {prereqAudit.passes_progress ? 'PASS (≥80%)' : `FAIL (<${prereqAudit.min_course_progress}%)`}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Institutional benchmark: ≥ {prereqAudit.min_course_progress}%</p>
+                </div>
+
+                {/* Fee Status */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Tuition Fee Status</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900">
+                      {prereqAudit.outstanding_amount <= 0 ? '₹0 No Dues' : `₹${formatINR(prereqAudit.outstanding_amount)} Due`}
+                    </span>
+                    <Badge variant={prereqAudit.passes_fees ? 'success' : 'destructive'} className="text-[10px]">
+                      {prereqAudit.passes_fees ? 'CLEARED' : 'ARREARS DUE'}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Requires full tuition fee clearance</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* 7-Stage Structured Placement Process Overview */}
           <Card className="border-slate-200">
@@ -913,6 +986,87 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
                 <span className="font-bold text-slate-800">{student.batch_name || 'SAP Batch'} ({student.trainer_name || 'Faculty'})</span>
               </div>
             </div>
+          </div>
+
+          {/* Live Automated Pre-requisite Audit Status Card */}
+          <div
+            className={`p-3.5 rounded-xl border space-y-2.5 ${
+              prereqAudit.all_passed
+                ? 'bg-emerald-50/70 border-emerald-300'
+                : 'bg-amber-50/70 border-amber-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center space-x-1.5 text-slate-900 text-xs">
+                <ShieldCheck
+                  className={`h-4 w-4 ${prereqAudit.all_passed ? 'text-emerald-600' : 'text-amber-600'}`}
+                />
+                <span>Institutional Placement Eligibility Audit</span>
+              </span>
+              <Badge
+                variant={prereqAudit.all_passed ? 'success' : 'warning'}
+                className="text-[10px]"
+              >
+                {prereqAudit.all_passed ? 'Prerequisites Cleared ✓' : 'Prerequisites Incomplete'}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-[11px]">
+              {/* Attendance Check */}
+              <div className="p-2 bg-white rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-400 block font-semibold">ATTENDANCE</span>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="font-bold text-slate-800">{prereqAudit.attendance_percentage}%</span>
+                  <span
+                    className={`text-[10px] font-bold ${
+                      prereqAudit.passes_attendance ? 'text-emerald-600' : 'text-rose-600'
+                    }`}
+                  >
+                    {prereqAudit.passes_attendance ? 'PASS (≥80%)' : `FAIL (<${prereqAudit.min_attendance_percentage}%)`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Check */}
+              <div className="p-2 bg-white rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-400 block font-semibold">PROGRESS</span>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="font-bold text-slate-800">{prereqAudit.course_progress}%</span>
+                  <span
+                    className={`text-[10px] font-bold ${
+                      prereqAudit.passes_progress ? 'text-emerald-600' : 'text-rose-600'
+                    }`}
+                  >
+                    {prereqAudit.passes_progress ? 'PASS (≥80%)' : `FAIL (<${prereqAudit.min_course_progress}%)`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fee Clearance Check */}
+              <div className="p-2 bg-white rounded-lg border border-slate-200">
+                <span className="text-[10px] text-slate-400 block font-semibold">FEE STATUS</span>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="font-bold text-slate-800">
+                    {prereqAudit.outstanding_amount <= 0
+                      ? 'Cleared'
+                      : `₹${formatINR(prereqAudit.outstanding_amount)}`}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold ${
+                      prereqAudit.passes_fees ? 'text-emerald-600' : 'text-rose-600'
+                    }`}
+                  >
+                    {prereqAudit.passes_fees ? 'PASS (No Dues)' : 'DUE'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {!prereqAudit.all_passed && (
+              <p className="text-[10px] text-amber-800 bg-amber-100/70 p-2 rounded-lg leading-relaxed">
+                <strong>Advisory:</strong> Your standing currently does not satisfy all institutional prerequisites (minimum 80% attendance and zero fee arrears). You may submit this application for administrative review; however, placement coordinator approval and employer referrals require clearing fee dues and fulfilling attendance benchmarks or receiving authorized dispensation.
+              </p>
+            )}
           </div>
 
           {/* Contact Numbers */}

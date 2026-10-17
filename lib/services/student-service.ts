@@ -51,7 +51,7 @@ export async function getStudents(filters?: {
         item.full_name?.toLowerCase().includes(s) ||
         item.student_code?.toLowerCase().includes(s) ||
         item.email?.toLowerCase().includes(s) ||
-        item.phone?.includes(s)
+        (item.phone != null && String(item.phone).toLowerCase().includes(s))
     );
   }
 
@@ -90,16 +90,7 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
 
 export async function getStudentProfileFullDetails(studentId: string) {
   if (!studentId) return null;
-  const target = decodeURIComponent(String(studentId)).trim().toLowerCase();
-  const student = store.students.find(
-    (s) =>
-      s.id?.toLowerCase() === target ||
-      s.student_code?.toLowerCase() === target ||
-      s.admission_id?.toLowerCase() === target ||
-      s.admission_number?.toLowerCase() === target ||
-      (s.email && s.email.toLowerCase() === target) ||
-      (s.phone && s.phone.toLowerCase() === target)
-  );
+  const student = await getStudentById(studentId);
   if (!student) return null;
 
   const admission = store.admissions.find((a) => a.id === student.admission_id);
@@ -119,6 +110,8 @@ export async function getStudentProfileFullDetails(studentId: string) {
   const studentLedger = (store.studentFinancialLedgers || [])
     .filter((l) => l.student_id === student.id)
     .sort((a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime());
+  const jobApplications = (store.jobApplications || []).filter((j) => j.student_id === student.id);
+  const doubts = (store.doubts || []).filter((d) => d.student_id === student.id);
 
   return {
     student,
@@ -137,5 +130,7 @@ export async function getStudentProfileFullDetails(studentId: string) {
     studentFees,
     studentPayments,
     studentLedger,
+    jobApplications,
+    doubts,
   };
 }

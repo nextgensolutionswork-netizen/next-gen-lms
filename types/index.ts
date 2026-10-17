@@ -511,7 +511,7 @@ export interface Installment {
   due_date: string;
   paid_amount: number;
   paid_date?: string;
-  status: 'Upcoming' | 'Due' | 'Paid' | 'Partial' | 'Overdue';
+  status: 'Upcoming' | 'Due' | 'Paid' | 'Partial' | 'Overdue' | 'Pending';
 }
 
 export type PaymentMethod =
@@ -731,7 +731,7 @@ export interface Certificate {
   verification_url: string;
   pdf_url?: string;
   is_valid: boolean;
-  status?: 'Issued' | 'Revoked' | 'Suspended';
+  status?: 'Issued' | 'Revoked' | 'Suspended' | 'Fraudulent';
   revocation_reason?: string;
   revoked_at?: string;
   revoked_by?: string;
@@ -1299,7 +1299,7 @@ export interface FeeRevisionRequest {
 }
 
 export interface StudentPaymentRecord {
-  status?: 'Pending Approval' | 'Approved' | 'Rejected';
+  status?: 'Pending Approval' | 'Approved' | 'Rejected' | 'Voided';
   enrollment_id?: string;
   idempotency_key?: string;
   rejection_reason?: string;
@@ -1395,6 +1395,7 @@ export interface FinanceWorkflowSettings {
   low_discount_max_percent: number;
   medium_discount_max_percent: number;
   exceptional_discount_threshold: number;
+  minimum_down_payment_percent?: number;
   require_payment_verification_for_all_non_accountants: boolean;
   auto_clearance_on_zero_balance: boolean;
   clearance_rules: {

@@ -3,14 +3,21 @@ import {
   executeBulkImport,
   BulkImportEntityType,
 } from '@/lib/services/bulk-import-service';
+import { authenticateApiRequest } from '@/lib/auth/server-session';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. RBAC Enforcement: Authenticate caller and require super_admin or admin
+    const auth = await authenticateApiRequest(req, { allowedRoles: ['super_admin', 'admin'] });
+    if (auth.errorResponse) {
+      return auth.errorResponse;
+    }
+
     let entityType: BulkImportEntityType = 'students';
     let csvContent = '';
     let skipInvalidRows = false;
-    let userId = 'usr-admin';
-    let userName = 'Operations Head';
+    let userId = auth.user.id;
+    let userName = auth.user.full_name;
 
     const contentType = req.headers.get('content-type') || '';
 
@@ -18,8 +25,6 @@ export async function POST(req: NextRequest) {
       const formData = await req.formData();
       entityType = (formData.get('entityType') as BulkImportEntityType) || 'students';
       skipInvalidRows = formData.get('skipInvalidRows') === 'true';
-      userId = (formData.get('userId') as string) || userId;
-      userName = (formData.get('userName') as string) || userName;
 
       const file = formData.get('file') as File | null;
       if (!file) {
@@ -31,8 +36,6 @@ export async function POST(req: NextRequest) {
       entityType = body.entityType || 'students';
       csvContent = body.csvContent || '';
       skipInvalidRows = Boolean(body.skipInvalidRows);
-      userId = body.userId || userId;
-      userName = body.userName || userName;
     }
 
     if (!csvContent || csvContent.trim().length === 0) {

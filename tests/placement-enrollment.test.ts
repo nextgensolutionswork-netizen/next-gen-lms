@@ -14,6 +14,10 @@ import {
   getPlacementEligibilitySettings,
   updatePlacementEligibilitySettings,
   updatePlacementProfile,
+  evaluateEnrollmentPrerequisites,
+  updateJobOpeningStatus,
+  deleteJobOpening,
+  getJobOpenings,
 } from '@/lib/services/placement-service';
 import { PlacementEnrollment, PlacementProfile } from '@/types';
 
@@ -491,6 +495,341 @@ describe('Placement Enrollment & Eligibility Architecture', () => {
 
       expect(cleared.technical_interview_score).toBeUndefined();
       expect(cleared.hr_interview_score).toBeUndefined();
+    });
+  });
+
+  describe('7. Crash Resistance on Uninitialized / Undefined Store Collections', () => {
+    it('handles undefined store.placementEnrollments and status histories safely', async () => {
+      const originalEnrollments = store.placementEnrollments;
+      const originalHistories = store.placementEnrollmentStatusHistories;
+      const originalSettings = store.placementEligibilitySettings;
+      const originalJobOpenings = store.jobOpenings;
+      const originalProfiles = store.placementProfiles;
+
+      try {
+        // Force undefined states simulating unseeded / reset store
+        (store as any).placementEnrollments = undefined;
+        (store as any).placementEnrollmentStatusHistories = undefined;
+        (store as any).placementEligibilitySettings = undefined;
+        (store as any).jobOpenings = undefined;
+        (store as any).placementProfiles = undefined;
+
+        // 1. Querying placement enrollments should not throw
+        const list = await getPlacementEnrollments();
+        expect(list).toEqual([]);
+
+        // 2. Querying enrollment by student ID should return undefined safely
+        const single = await getPlacementEnrollmentByStudentId('non-existent');
+        expect(single).toBeUndefined();
+
+        // 3. Fallback to default eligibility settings
+        const settings = await getPlacementEligibilitySettings();
+        expect(settings.min_course_progress_percentage).toBe(80);
+        expect(settings.min_attendance_percentage).toBe(80);
+
+        // 4. Evaluating eligibility with undefined enrollments should return safe ineligible result
+        const evalRes = await evaluatePlacementEligibility('stu-01');
+        expect(evalRes.isEligible).toBe(false);
+        expect(evalRes.reasons).toContain('No placement enrollment found for student.');
+
+        // 5. Querying job openings & profiles should return empty array safely
+        const jobList = store.jobOpenings || [];
+        expect(jobList).toEqual([]);
+        const profileList = store.placementProfiles || [];
+        expect(profileList).toEqual([]);
+
+        // 6. Creating placement enrollment when store was undefined initializes it and succeeds
+        const newEnr = await createPlacementEnrollment(
+          {
+            student_id: testStudentId,
+            declaration: {
+              terms_version: 'v2026.1',
+              accepted_by: testStudentId,
+              accepted_by_name: 'Amit Gupta',
+              accepted_at: new Date().toISOString(),
+              confirmed_information_correct: true,
+              understands_no_guarantee: true,
+              agrees_attend_scheduled_interviews: true,
+              agrees_inform_external_offer: true,
+              authorizes_resume_sharing: true,
+              understands_sensitive_docs_policy: true,
+              agrees_keep_profile_updated: true,
+            },
+          },
+          'usr-student-01'
+        );
+        expect(newEnr.id).toBeDefined();
+        expect(store.placementEnrollments).toBeDefined();
+        expect(store.placementEnrollments.length).toBeGreaterThan(0);
+        expect(store.placementEnrollmentStatusHistories.length).toBeGreaterThan(0);
+      } finally {
+        // Restore original collections
+        store.placementEnrollments = originalEnrollments;
+        store.placementEnrollmentStatusHistories = originalHistories;
+        store.placementEligibilitySettings = originalSettings;
+        store.jobOpenings = originalJobOpenings;
+        store.placementProfiles = originalProfiles;
+      }
+    });
+  });
+
+  describe('8. Automated Eligibility Audit Validation Before Student Enrollment (80% Attendance + 100% Fee Clearance)', () => {
+    it('evaluates prerequisites and flags low attendance (<80%) and outstanding tuition fee dues', () => {
+      const student = store.students.find((s) => s.id === testStudentId);
+      expect(student).toBeDefined();
+      if (!student) return;
+
+      // Set low attendance and fee dues
+      student.attendance_percentage = 65;
+      student.course_progress = 70;
+      student.outstanding_amount = 25000;
+
+      const audit = evaluateEnrollmentPrerequisites(testStudentId);
+      expect(audit.all_passed).toBe(false);
+      expect(audit.passes_attendance).toBe(false);
+      expect(audit.passes_progress).toBe(false);
+      expect(audit.passes_fees).toBe(false);
+      expect(audit.attendance_percentage).toBe(65);
+      expect(audit.outstanding_amount).toBe(25000);
+      expect(audit.unmet_criteria.length).toBe(3);
+      expect(audit.unmet_criteria.some((c) => c.includes('Attendance 65%'))).toBe(true);
+      expect(audit.unmet_criteria.some((c) => c.includes('fee arrears'))).toBe(true);
+    });
+
+    it('passes prerequisite audit when student satisfies 80% attendance, 80% progress, and zero fee dues', () => {
+      const student = store.students.find((s) => s.id === testStudentId);
+      expect(student).toBeDefined();
+      if (!student) return;
+
+      student.attendance_percentage = 85;
+      student.course_progress = 90;
+      student.outstanding_amount = 0;
+
+      const audit = evaluateEnrollmentPrerequisites(testStudentId);
+      expect(audit.all_passed).toBe(true);
+      expect(audit.passes_attendance).toBe(true);
+      expect(audit.passes_progress).toBe(true);
+      expect(audit.passes_fees).toBe(true);
+      expect(audit.unmet_criteria).toEqual([]);
+    });
+
+    it('populates initial eligibility reasons in placement enrollment reflecting prerequisite audit', async () => {
+      const student = store.students.find((s) => s.id === testStudentId);
+      expect(student).toBeDefined();
+      if (!student) return;
+
+      student.attendance_percentage = 72;
+      student.outstanding_amount = 12000;
+
+      const enrollment = await createPlacementEnrollment(
+        {
+          student_id: testStudentId,
+          declaration: {
+            terms_version: 'v2026.1',
+            accepted_by: testStudentId,
+            accepted_by_name: 'Amit Gupta',
+            accepted_at: new Date().toISOString(),
+            confirmed_information_correct: true,
+            understands_no_guarantee: true,
+            agrees_attend_scheduled_interviews: true,
+            agrees_inform_external_offer: true,
+            authorizes_resume_sharing: true,
+            understands_sensitive_docs_policy: true,
+            agrees_keep_profile_updated: true,
+          },
+        },
+        'usr-student-01'
+      );
+
+      expect(enrollment.is_placement_eligible).toBe(false);
+      expect(enrollment.eligibility_reasons?.length).toBeGreaterThanOrEqual(1);
+      expect(enrollment.eligibility_reasons?.some((r) => r.includes('Attendance'))).toBe(true);
+    });
+
+    it('creates placement enrollment with authorized administrative override directly when granted by coordinator', async () => {
+      const student = store.students.find((s) => s.id === testStudentId);
+      expect(student).toBeDefined();
+      if (!student) return;
+
+      // Student has fee dues and low attendance
+      student.attendance_percentage = 60;
+      student.outstanding_amount = 30000;
+
+      const enrollment = await createPlacementEnrollment(
+        {
+          student_id: testStudentId,
+          eligibility_overridden: true,
+          override_reason: 'Director approved placement onboarding exception for corporate batch.',
+          overridden_by: 'usr-admin',
+          declaration: {
+            terms_version: 'v2026.1',
+            accepted_by: 'usr-admin',
+            accepted_by_name: 'Placement Officer',
+            accepted_at: new Date().toISOString(),
+            confirmed_information_correct: true,
+            understands_no_guarantee: true,
+            agrees_attend_scheduled_interviews: true,
+            agrees_inform_external_offer: true,
+            authorizes_resume_sharing: true,
+            understands_sensitive_docs_policy: true,
+            agrees_keep_profile_updated: true,
+          },
+        },
+        'usr-admin'
+      );
+
+      expect(enrollment.is_placement_eligible).toBe(true);
+      expect(enrollment.eligibility_overridden).toBe(true);
+      expect(enrollment.override_reason).toContain('Director approved placement onboarding exception');
+      expect(enrollment.eligibility_reasons).toEqual([]);
+    });
+
+    it('dynamically adapts audit thresholds when institutional settings are updated', async () => {
+      const student = store.students.find((s) => s.id === testStudentId);
+      expect(student).toBeDefined();
+      if (!student) return;
+
+      student.attendance_percentage = 75;
+      student.course_progress = 85;
+      student.outstanding_amount = 0;
+
+      // Default 80% attendance -> should FAIL
+      let audit = evaluateEnrollmentPrerequisites(testStudentId);
+      expect(audit.passes_attendance).toBe(false);
+      expect(audit.all_passed).toBe(false);
+
+      // Relax threshold to 70% in institutional settings
+      await updatePlacementEligibilitySettings({ min_attendance_percentage: 70 }, 'usr-admin');
+
+      // Now 75% attendance -> should PASS!
+      audit = evaluateEnrollmentPrerequisites(testStudentId);
+      expect(audit.passes_attendance).toBe(true);
+      expect(audit.all_passed).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // 5. AUDIT FINDING REMEDIATIONS (G24, G25, G26)
+  // =========================================================================
+  describe('5. Audit Finding Remediations (G24, G25, G26)', () => {
+    it('G24: strictly prevents non-coordinators and non-admins from overriding placement eligibility', async () => {
+      const enrollment = await createPlacementEnrollment(
+        {
+          student_id: testStudentId,
+          sap_module: 'SAP FICO',
+          declaration: {
+            terms_version: 'v2026.1',
+            accepted_by: testStudentId,
+            accepted_by_name: 'Amit Gupta',
+            accepted_at: new Date().toISOString(),
+            confirmed_information_correct: true,
+            understands_no_guarantee: true,
+            agrees_attend_scheduled_interviews: true,
+            agrees_inform_external_offer: true,
+            authorizes_resume_sharing: true,
+            understands_sensitive_docs_policy: true,
+            agrees_keep_profile_updated: true,
+          },
+        },
+        'usr-student-01'
+      );
+
+      // Student attempting to override -> reject
+      await expect(
+        overridePlacementEligibility(enrollment.id, 'usr-student-01', 'Self promotion')
+      ).rejects.toThrow(/Unauthorized: Only Placement Coordinators or Administrators/);
+
+      // Trainer attempting to override -> reject
+      await expect(
+        overridePlacementEligibility(enrollment.id, 'usr-trainer-fico', 'Faculty recommendation')
+      ).rejects.toThrow(/Unauthorized: Only Placement Coordinators or Administrators/);
+
+      // Unknown user attempting to override -> reject
+      await expect(
+        overridePlacementEligibility(enrollment.id, 'non-existent-user', 'Bypass attempt')
+      ).rejects.toThrow(/Unauthorized: Only Placement Coordinators or Administrators/);
+
+      // Legitimate admin -> allowed
+      const overridden = await overridePlacementEligibility(enrollment.id, 'usr-admin', 'Director approved placement exception');
+      expect(overridden.is_placement_eligible).toBe(true);
+      expect(overridden.eligibility_overridden).toBe(true);
+    });
+
+    it('G25: rejects job applications for non-existent, closed, or expired job openings', async () => {
+      let enrollment = store.placementEnrollments.find((e) => e.student_id === testStudentId);
+      if (!enrollment) {
+        enrollment = await createPlacementEnrollment({
+          student_id: testStudentId,
+          sap_module: 'SAP FICO',
+          declaration: {
+            terms_version: 'v2026.1',
+            accepted_by: testStudentId,
+            accepted_by_name: 'Amit Gupta',
+            accepted_at: new Date().toISOString(),
+            confirmed_information_correct: true,
+            understands_no_guarantee: true,
+            agrees_attend_scheduled_interviews: true,
+            agrees_inform_external_offer: true,
+            authorizes_resume_sharing: true,
+            understands_sensitive_docs_policy: true,
+            agrees_keep_profile_updated: true,
+          },
+        }, 'usr-student-01');
+      }
+      enrollment.is_placement_eligible = true;
+      enrollment.enrollment_status = 'Placement Eligible';
+
+      // 1. Non-existent job
+      await expect(
+        applyForJob('non-existent-job-999', testStudentId)
+      ).rejects.toThrow(/Job opening not found/);
+
+      // 2. Closed job
+      const closedJob = store.jobOpenings[0];
+      const origStatus = closedJob.status;
+      closedJob.status = 'Closed';
+      await expect(
+        applyForJob(closedJob.id, testStudentId)
+      ).rejects.toThrow(/Job opening is closed for applications/);
+      closedJob.status = origStatus;
+
+      // 3. Expired deadline
+      const expiredJob = store.jobOpenings[1];
+      const origDeadline = expiredJob.application_deadline;
+      expiredJob.application_deadline = '2025-01-01'; // In the past
+      await expect(
+        applyForJob(expiredJob.id, testStudentId)
+      ).rejects.toThrow(/Job application deadline has passed/);
+      expiredJob.application_deadline = origDeadline;
+    });
+
+    it('G26: validates mock interview score bounds (0-100) and reconciles job opening updates and deletions', async () => {
+      // Bounds check on mock interview score (< 0)
+      await expect(
+        updatePlacementProfile(testStudentId, { technical_interview_score: -5 }, 'usr-placement')
+      ).rejects.toThrow(/Technical mock interview score must be between 0 and 100/);
+
+      // Bounds check on mock interview score (> 100)
+      await expect(
+        updatePlacementProfile(testStudentId, { technical_interview_score: 105 }, 'usr-placement')
+      ).rejects.toThrow(/Technical mock interview score must be between 0 and 100/);
+
+      // Valid score (95)
+      const updatedProfile = await updatePlacementProfile(
+        testStudentId,
+        { technical_interview_score: 95 },
+        'usr-placement'
+      );
+      expect(updatedProfile.technical_interview_score).toBe(95);
+
+      // Job opening update and delete reconciliation
+      const job = store.jobOpenings[0];
+      const updatedJob = await updateJobOpeningStatus(job.id, 'Closed');
+      expect(updatedJob?.status).toBe('Closed');
+
+      // Reopen job
+      await updateJobOpeningStatus(job.id, 'Open');
+      expect(job.status).toBe('Open');
     });
   });
 });

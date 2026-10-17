@@ -467,8 +467,8 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
     });
   });
 
-  describe('7. Single Balance & Resubmission Integration', () => {
-    it('ignores retired schedule inputs and approves one fee balance', () => {
+  describe('7. Installment Schedule Generation & Resubmission Integration', () => {
+    it('generates installment schedule in store.installments upon accountant approval', () => {
       const proposal = feeWorkflowService.createFeeProposal(
         {
           student_id: testStudentId,
@@ -499,13 +499,20 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       expect(approved.approval_status).toBe('Approved');
       expect(approved.fee_account_id).toBeDefined();
 
-      expect(store.installments).toHaveLength(0);
-      expect(approved.number_of_installments).toBe(0);
+      // Installments are now generated in store.installments
+      expect(store.installments).toHaveLength(3);
+      expect(approved.number_of_installments).toBe(3);
       expect(approved.tax_gst_amount).toBe(0);
       expect(approved.final_payable).toBe(50000);
+
+      const totalInstAmount = store.installments.reduce((sum, i) => sum + i.amount, 0);
+      expect(totalInstAmount).toBe(50000);
+      expect(store.installments[0].due_date).toBe('2026-03-01');
+      expect(store.installments[0].status).toBe('Overdue');
+      expect(store.installments[1].status).toBe('Overdue');
     });
 
-    it('keeps a corrected proposal as one fee balance despite legacy schedule inputs', () => {
+    it('synchronizes installment schedule upon resubmission and approval after correction', () => {
       const initialProposal = feeWorkflowService.createFeeProposal(
         {
           student_id: testStudentId,
@@ -545,7 +552,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       );
 
       expect(resubmitted.approval_status).toBe('Pending Accountant Approval');
-      expect(resubmitted.number_of_installments).toBe(0);
+      expect(resubmitted.number_of_installments).toBe(3);
 
       // Accountant approves the resubmitted proposal
       const approved = feeWorkflowService.approveFeeProposal(
@@ -556,7 +563,9 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
 
       expect(approved.approval_status).toBe('Approved');
       const insts = store.installments.filter((i) => i.fee_account_id === approved.fee_account_id);
-      expect(insts).toHaveLength(0);
+      expect(insts).toHaveLength(3);
+      const totalInstAmount = insts.reduce((sum, i) => sum + i.amount, 0);
+      expect(totalInstAmount).toBe(45000);
       expect(approved.final_payable).toBe(45000);
       expect(approved.outstanding_amount).toBe(45000);
     });

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/services/data-store';
-import { getAuthenticatedUserFromRequest } from '@/lib/auth/server-session';
-import { hasPermission } from '@/lib/auth/rbac';
+import { authenticateApiRequest } from '@/lib/auth/server-session';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
 import { AuditLog } from '@/types';
 
@@ -12,24 +11,14 @@ export async function GET(req: NextRequest) {
     store.hydrateFromDisk();
 
     // 1. RBAC Authentication & Session Verification
-    const authUser = await getAuthenticatedUserFromRequest(req);
-    const roleCookie = req.cookies.get('user_role')?.value;
-    const effectiveRole = authUser?.role || roleCookie;
-
-    const isAuthorized =
-      effectiveRole === 'super_admin' ||
-      effectiveRole === 'admin' ||
-      (authUser && (hasPermission(authUser, 'audit:read') || hasPermission(authUser, 'all:manage')));
-
-    if (!isAuthorized) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Forbidden: Access to forensic audit trail is strictly restricted to Super Administrators and Operational Administrators.',
-        },
-        { status: 403 }
-      );
+    const auth = await authenticateApiRequest(req, {
+      allowedRoles: ['super_admin', 'admin'],
+      requiredPermission: 'audit:read',
+    });
+    if (auth.errorResponse) {
+      return auth.errorResponse;
     }
+    const authUser = auth.user;
 
     // 2. Fetch from Supabase if configured, otherwise serve durable local store
     if (isLiveSupabaseEnabled()) {

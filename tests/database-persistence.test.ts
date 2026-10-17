@@ -267,10 +267,15 @@ describe('13. Data Persistence & Database Layer Tests', () => {
     });
 
     it('POST /api/database/sync handles push and pull synchronizations', async () => {
+      const { generateAuthCookieSignatureSync } = await import('@/lib/security/auth-cookie');
+      const superAdminCookie = encodeURIComponent(JSON.stringify({ role: 'super_admin', id: 'usr-superadmin', is_active: true }));
+      const superAdminSig = generateAuthCookieSignatureSync(superAdminCookie);
+      const authHeader = `next_gen_auth_user=${superAdminCookie}; next_gen_auth_user_sig=${superAdminSig}`;
+
       // Test push
       const pushReq = new NextRequest('http://localhost:3000/api/database/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', cookie: authHeader },
         body: JSON.stringify({ direction: 'push' }),
       });
 
@@ -283,7 +288,7 @@ describe('13. Data Persistence & Database Layer Tests', () => {
       // Test pull
       const pullReq = new NextRequest('http://localhost:3000/api/database/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', cookie: authHeader },
         body: JSON.stringify({ direction: 'pull' }),
       });
 
@@ -295,7 +300,15 @@ describe('13. Data Persistence & Database Layer Tests', () => {
     });
 
     it('GET /api/database/backup returns JSON database snapshot', async () => {
-      const res = await backupGetRoute();
+      const { generateAuthCookieSignatureSync } = await import('@/lib/security/auth-cookie');
+      const superAdminCookie = encodeURIComponent(JSON.stringify({ role: 'super_admin', id: 'usr-superadmin', is_active: true }));
+      const superAdminSig = generateAuthCookieSignatureSync(superAdminCookie);
+      const authHeader = `next_gen_auth_user=${superAdminCookie}; next_gen_auth_user_sig=${superAdminSig}`;
+
+      const req = new NextRequest('http://localhost:3000/api/database/backup', {
+        headers: { cookie: authHeader },
+      });
+      const res = await backupGetRoute(req);
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('application/json');
       expect(res.headers.get('content-disposition')).toContain('lms_database_backup_');
@@ -307,8 +320,14 @@ describe('13. Data Persistence & Database Layer Tests', () => {
     });
 
     it('POST /api/database/backup creates snapshot file on disk', async () => {
+      const { generateAuthCookieSignatureSync } = await import('@/lib/security/auth-cookie');
+      const superAdminCookie = encodeURIComponent(JSON.stringify({ role: 'super_admin', id: 'usr-superadmin', is_active: true }));
+      const superAdminSig = generateAuthCookieSignatureSync(superAdminCookie);
+      const authHeader = `next_gen_auth_user=${superAdminCookie}; next_gen_auth_user_sig=${superAdminSig}`;
+
       const req = new NextRequest('http://localhost:3000/api/database/backup', {
         method: 'POST',
+        headers: { cookie: authHeader },
       });
       const res = await backupPostRoute(req);
       expect(res.status).toBe(200);

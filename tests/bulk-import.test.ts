@@ -8,6 +8,7 @@ import {
   generateCsvTemplate,
 } from '@/lib/services/bulk-import-service';
 import { store } from '@/lib/services/data-store';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 import { POST as previewRoute } from '@/app/api/bulk-import/preview/route';
 import { POST as executeRoute } from '@/app/api/bulk-import/execute/route';
 import { GET as templateRoute } from '@/app/api/bulk-import/template/route';
@@ -275,10 +276,17 @@ describe('12. Excel / CSV Bulk Data Imports & CI/CD Pipeline Tests', () => {
     });
 
     it('POST /api/bulk-import/execute commits data via API', async () => {
+      const adminCookie = encodeURIComponent(
+        JSON.stringify({ role: 'admin', id: 'usr-admin', is_active: true })
+      );
+      const adminSig = generateAuthCookieSignatureSync(adminCookie);
       const csv = 'full_name,email,phone,lead_source,stage\nAPI Lead,api.lead@domain.com,+91 99999 54321,Website,New';
       const req = new NextRequest('http://localhost:3000/api/bulk-import/execute', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
+        },
         body: JSON.stringify({ entityType: 'leads', csvContent: csv }),
       });
 

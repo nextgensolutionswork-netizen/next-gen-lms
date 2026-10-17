@@ -75,17 +75,30 @@ export default function StudentsListPage() {
     }
 
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.full_name?.toLowerCase().includes(q) ||
-          s.student_code?.toLowerCase().includes(q) ||
-          s.admission_number?.toLowerCase().includes(q) ||
-          s.phone?.includes(q) ||
-          s.email?.toLowerCase().includes(q) ||
-          s.course_name?.toLowerCase().includes(q) ||
-          s.batch_name?.toLowerCase().includes(q)
-      );
+      const q = search.trim().toLowerCase();
+      const cleanDigits = q.replace(/\D/g, '');
+      list = list.filter((s) => {
+        if (!s) return false;
+        const fullName = s.full_name ? String(s.full_name).toLowerCase() : '';
+        const studentCode = s.student_code ? String(s.student_code).toLowerCase() : '';
+        const admNumber = s.admission_number ? String(s.admission_number).toLowerCase() : '';
+        const email = s.email ? String(s.email).toLowerCase() : '';
+        const courseName = s.course_name ? String(s.course_name).toLowerCase() : '';
+        const batchName = s.batch_name ? String(s.batch_name).toLowerCase() : '';
+        const phoneRaw = s.phone != null ? String(s.phone).toLowerCase() : '';
+        const phoneDigits = phoneRaw.replace(/\D/g, '');
+
+        return (
+          fullName.includes(q) ||
+          studentCode.includes(q) ||
+          admNumber.includes(q) ||
+          email.includes(q) ||
+          courseName.includes(q) ||
+          batchName.includes(q) ||
+          (phoneRaw.length > 0 && phoneRaw.includes(q)) ||
+          (cleanDigits.length > 0 && phoneDigits.includes(cleanDigits))
+        );
+      });
     }
 
     return list;

@@ -26,7 +26,7 @@ export async function getPlacementProfiles(): Promise<PlacementProfile[]> {
       console.warn('Supabase placement profiles query error, fallback to local persistent store:', err);
     }
   }
-  return [...store.placementProfiles];
+  return [...(store.placementProfiles || [])];
 }
 
 export async function getPlacementProfileForStudent(studentId: string): Promise<PlacementProfile | undefined> {
@@ -47,9 +47,9 @@ export async function getPlacementProfileForStudent(studentId: string): Promise<
     }
   }
 
-  let profile = store.placementProfiles.find((p) => p.student_id === studentId);
+  let profile = (store.placementProfiles || []).find((p) => p.student_id === studentId);
   if (!profile) {
-    const student = store.students.find((s) => s.id === studentId);
+    const student = (store.students || []).find((s) => s.id === studentId);
     if (student) {
       profile = {
         id: `pp-${Date.now()}`,
@@ -65,6 +65,7 @@ export async function getPlacementProfileForStudent(studentId: string): Promise<
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+      if (!store.placementProfiles) store.placementProfiles = [];
       store.placementProfiles.push(profile);
       store.persist();
     }
@@ -80,11 +81,22 @@ export async function updatePlacementProfile(
   const profile = await getPlacementProfileForStudent(studentId);
   if (!profile) throw new Error('Placement profile not found');
 
+  if (updates.technical_interview_score !== undefined) {
+    if (updates.technical_interview_score < 0 || updates.technical_interview_score > 100 || isNaN(updates.technical_interview_score)) {
+      throw new Error('Technical mock interview score must be between 0 and 100.');
+    }
+  }
+  if (updates.hr_interview_score !== undefined) {
+    if (updates.hr_interview_score < 0 || updates.hr_interview_score > 100 || isNaN(updates.hr_interview_score)) {
+      throw new Error('HR mock interview score must be between 0 and 100.');
+    }
+  }
+
   Object.assign(profile, updates, { updated_at: new Date().toISOString() });
 
   // Update in student profile if placement status changed
   if (updates.placement_status) {
-    const student = store.students.find((s) => s.id === studentId);
+    const student = (store.students || []).find((s) => s.id === studentId);
     if (student) student.placement_status = updates.placement_status;
   }
   store.persist();
@@ -117,7 +129,7 @@ export async function updatePlacementProfile(
     }
   }
 
-  const coordinator = store.users.find((u) => u.id === coordinatorUserId);
+  const coordinator = (store.users || []).find((u) => u.id === coordinatorUserId);
 
   await recordAuditLog({
     user_id: coordinatorUserId,
@@ -144,13 +156,13 @@ export async function uploadStudentResume(
   profile.resume_status = 'Pending Review';
   profile.updated_at = new Date().toISOString();
 
-  const student = store.students.find((s) => s.id === studentId);
+  const student = (store.students || []).find((s) => s.id === studentId);
   if (student) {
     (student as any).resume_url = resumeUrl;
   }
 
   // Also update corresponding placement enrollment if present
-  const enrollment = store.placementEnrollments.find((e) => e.student_id === studentId);
+  const enrollment = (store.placementEnrollments || []).find((e) => e.student_id === studentId);
   if (enrollment) {
     enrollment.resume_url = resumeUrl;
     enrollment.resume_status = 'Pending Review';
@@ -193,7 +205,7 @@ export async function getJobOpenings(): Promise<JobOpening[]> {
     try {
       const supabase = createClient();
       const { data, error } = await supabase.from('job_openings').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         store.jobOpenings = data as JobOpening[];
         return data as JobOpening[];
       }
@@ -201,7 +213,7 @@ export async function getJobOpenings(): Promise<JobOpening[]> {
       console.warn('Supabase job openings query error, fallback to local persistent store:', err);
     }
   }
-  return [...store.jobOpenings];
+  return [...(store.jobOpenings || [])];
 }
 
 export async function createJobOpening(data: Omit<JobOpening, 'id' | 'applications_count' | 'created_at'>): Promise<JobOpening> {
@@ -211,6 +223,7 @@ export async function createJobOpening(data: Omit<JobOpening, 'id' | 'applicatio
     applications_count: 0,
     created_at: new Date().toISOString(),
   };
+  if (!store.jobOpenings) store.jobOpenings = [];
   store.jobOpenings.unshift(job);
   store.persist();
 
@@ -239,18 +252,39 @@ export async function createJobOpening(data: Omit<JobOpening, 'id' | 'applicatio
 }
 
 export async function updateJobOpeningStatus(jobId: string, status: 'Open' | 'Closed'): Promise<JobOpening | null> {
-  const job = store.jobOpenings.find((j) => j.id === jobId);
+  const job = (store.jobOpenings || []).find((j) => j.id === jobId);
   if (!job) return null;
   job.status = status;
   store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('job_openings').update({ status }).eq('id', jobId);
+    } catch (err) {
+      console.warn('Supabase updateJobOpeningStatus warning, preserved locally:', err);
+    }
+  }
+
   return job;
 }
 
 export async function deleteJobOpening(jobId: string): Promise<boolean> {
-  const idx = store.jobOpenings.findIndex((j) => j.id === jobId);
+  const idx = (store.jobOpenings || []).findIndex((j) => j.id === jobId);
   if (idx === -1) return false;
+  if (!store.jobOpenings) store.jobOpenings = [];
   store.jobOpenings.splice(idx, 1);
   store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('job_openings').delete().eq('id', jobId);
+    } catch (err) {
+      console.warn('Supabase deleteJobOpening warning, preserved locally:', err);
+    }
+  }
+
   return true;
 }
 
@@ -267,7 +301,7 @@ export async function getJobApplications(): Promise<JobApplication[]> {
       console.warn('Supabase job applications query error, fallback to local persistent store:', err);
     }
   }
-  return [...store.jobApplications];
+  return [...(store.jobApplications || [])];
 }
 
 /**
@@ -297,7 +331,23 @@ export async function applyForJob(
   if (existing) throw new Error('Already applied to this opening');
 
   const job = (store.jobOpenings || []).find((j) => j.id === jobId);
+  if (!job) {
+    throw new Error('Job opening not found.');
+  }
+  if (job.status !== 'Open') {
+    throw new Error('Job opening is closed for applications.');
+  }
+  if (job.application_deadline) {
+    const deadlineTime = new Date(job.application_deadline).setHours(23, 59, 59, 999);
+    if (!isNaN(deadlineTime) && deadlineTime < Date.now()) {
+      throw new Error('Job application deadline has passed.');
+    }
+  }
+
   const student = (store.students || []).find((s) => s.id === studentId);
+  if (!student) {
+    throw new Error('Student not found.');
+  }
 
   const application: JobApplication = {
     id: `app-${Date.now()}`,
@@ -358,6 +408,11 @@ export async function updateJobApplicationStatus(
   const application = (store.jobApplications || []).find((a) => a.id === applicationId);
   if (!application) throw new Error('Job application not found');
 
+  const actor = (store.users || []).find((u) => u.id === updatedByUserId);
+  if (actor && !['super_admin', 'admin', 'placement_coordinator'].includes(actor.role)) {
+    throw new Error('Unauthorized: Only Placement Coordinators or Administrators can update application status.');
+  }
+
   application.status = status;
   store.persist();
 
@@ -373,7 +428,6 @@ export async function updateJobApplicationStatus(
     }
   }
 
-  const actor = (store.users || []).find((u) => u.id === updatedByUserId);
   await recordAuditLog({
     user_id: updatedByUserId || 'usr-placement',
     user_name: actor?.full_name || 'Placement Coordinator',
@@ -408,7 +462,7 @@ export async function getPlacementEnrollments(filters?: {
     }
   }
 
-  let list = [...store.placementEnrollments];
+  let list = [...(store.placementEnrollments || [])];
 
   if (filters?.status && filters.status !== 'all') {
     list = list.filter((e) => e.enrollment_status === filters.status);
@@ -434,27 +488,42 @@ export async function getPlacementEnrollments(filters?: {
   return list;
 }
 
+export const DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS: PlacementEligibilitySettings = {
+  id: 'pes-default',
+  min_course_progress_percentage: 80,
+  min_attendance_percentage: 80,
+  require_assessments_completed: true,
+  require_mock_interview_completed: true,
+  min_mock_interview_score: 75,
+  require_resume_approved: true,
+  require_mandatory_documents_verified: true,
+  require_fees_cleared: true,
+  allow_admin_override: true,
+  updated_at: '2026-01-01T00:00:00Z',
+  updated_by: 'usr-admin',
+};
+
 export async function getPlacementEnrollmentByStudentId(studentId: string): Promise<PlacementEnrollment | undefined> {
-  return store.placementEnrollments.find((e) => e.student_id === studentId);
+  return (store.placementEnrollments || []).find((e) => e.student_id === studentId);
 }
 
 export async function getPlacementEnrollmentHistory(enrollmentId: string): Promise<PlacementEnrollmentStatusHistory[]> {
-  return store.placementEnrollmentStatusHistories
+  return (store.placementEnrollmentStatusHistories || [])
     .filter((h) => h.enrollment_id === enrollmentId)
     .sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
 }
 
 export async function getPlacementEligibilitySettings(): Promise<PlacementEligibilitySettings> {
-  return { ...store.placementEligibilitySettings };
+  return { ...(store.placementEligibilitySettings || DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS) };
 }
 
 export async function updatePlacementEligibilitySettings(
   updates: Partial<PlacementEligibilitySettings>,
   adminUserId: string
 ): Promise<PlacementEligibilitySettings> {
-  const admin = store.users.find((u) => u.id === adminUserId);
+  const admin = (store.users || []).find((u) => u.id === adminUserId);
   store.placementEligibilitySettings = {
-    ...store.placementEligibilitySettings,
+    ...(store.placementEligibilitySettings || DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS),
     ...updates,
     updated_at: new Date().toISOString(),
     updated_by: adminUserId,
@@ -486,15 +555,81 @@ export interface EligibilityEvaluationResult {
   reasons: string[];
 }
 
+export interface EnrollmentPrerequisiteAudit {
+  student_id: string;
+  student_name: string;
+  attendance_percentage: number;
+  min_attendance_percentage: number;
+  passes_attendance: boolean;
+  course_progress: number;
+  min_course_progress: number;
+  passes_progress: boolean;
+  outstanding_amount: number;
+  passes_fees: boolean;
+  require_fees_cleared: boolean;
+  all_passed: boolean;
+  unmet_criteria: string[];
+}
+
+/**
+ * Automated Pre-requisite Audit Engine before Student Enrollment
+ * Evaluates minimum attendance (80%), course progress (80%), and fee dues clearance (0 balance)
+ * against institutional configuration.
+ */
+export function evaluateEnrollmentPrerequisites(studentId: string): EnrollmentPrerequisiteAudit {
+  const student = (store.students || []).find((s) => s.id === studentId);
+  const settings = store.placementEligibilitySettings || DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS;
+
+  const attendance = student?.attendance_percentage ?? 0;
+  const progress = student?.course_progress ?? 0;
+  const outstanding = student?.outstanding_amount ?? 0;
+
+  const minAtt = settings.min_attendance_percentage ?? 80;
+  const minProg = settings.min_course_progress_percentage ?? 80;
+  const requireFees = settings.require_fees_cleared ?? true;
+
+  const passesAttendance = attendance >= minAtt;
+  const passesProgress = progress >= minProg;
+  const passesFees = !requireFees || outstanding <= 0;
+  const allPassed = passesAttendance && passesProgress && passesFees;
+
+  const unmet: string[] = [];
+  if (!passesAttendance) {
+    unmet.push(`Attendance ${attendance}% is below minimum required (${minAtt}%)`);
+  }
+  if (!passesProgress) {
+    unmet.push(`Course progress ${progress}% is below minimum required (${minProg}%)`);
+  }
+  if (!passesFees) {
+    unmet.push(`Outstanding tuition fee arrears of ₹${outstanding.toLocaleString('en-IN')} pending clearance`);
+  }
+
+  return {
+    student_id: studentId,
+    student_name: student?.full_name || 'Student',
+    attendance_percentage: attendance,
+    min_attendance_percentage: minAtt,
+    passes_attendance: passesAttendance,
+    course_progress: progress,
+    min_course_progress: minProg,
+    passes_progress: passesProgress,
+    outstanding_amount: outstanding,
+    passes_fees: passesFees,
+    require_fees_cleared: requireFees,
+    all_passed: allPassed,
+    unmet_criteria: unmet,
+  };
+}
+
 /**
  * Dynamic Configurable Placement Eligibility Engine
  * Evaluates candidate standing against institutional settings without hardcoded thresholds.
  */
 export async function evaluatePlacementEligibility(studentId: string): Promise<EligibilityEvaluationResult> {
-  const enrollment = store.placementEnrollments.find((e) => e.student_id === studentId);
-  const student = store.students.find((s) => s.id === studentId);
-  const profile = store.placementProfiles.find((p) => p.student_id === studentId);
-  const settings = store.placementEligibilitySettings;
+  const enrollment = (store.placementEnrollments || []).find((e) => e.student_id === studentId);
+  const student = (store.students || []).find((s) => s.id === studentId);
+  const profile = (store.placementProfiles || []).find((p) => p.student_id === studentId);
+  const settings = store.placementEligibilitySettings || DEFAULT_PLACEMENT_ELIGIBILITY_SETTINGS;
 
   if (!enrollment) {
     return {
@@ -576,8 +711,8 @@ export async function evaluatePlacementEligibility(studentId: string): Promise<E
 
   // 4. Academic Assessments
   if (settings.require_assessments_completed) {
-    const courseAssignments = store.assignments.filter((a) => a.course_id === student?.course_id);
-    const completedSubmissions = store.submissions.filter((s) => s.student_id === studentId);
+    const courseAssignments = (store.assignments || []).filter((a) => a.course_id === student?.course_id);
+    const completedSubmissions = (store.submissions || []).filter((s) => s.student_id === studentId);
     const assessmentsPassed = courseAssignments.length === 0 || completedSubmissions.length >= courseAssignments.length;
     results.push({
       criterion: 'Course Assessments & Assignments',
@@ -696,7 +831,7 @@ export async function createPlacementEnrollment(
   input: Partial<PlacementEnrollment>,
   studentUserId: string
 ): Promise<PlacementEnrollment> {
-  const student = store.students.find((s) => s.id === input.student_id);
+  const student = (store.students || []).find((s) => s.id === input.student_id);
   if (!student) throw new Error('Student record not found in LMS');
 
   // Verify 7 mandatory declarations
@@ -714,6 +849,9 @@ export async function createPlacementEnrollment(
     throw new Error('All 7 terms and declarations must be accepted before submitting placement enrollment.');
   }
 
+  if (!store.placementEnrollments) store.placementEnrollments = [];
+  if (!store.placementEnrollmentStatusHistories) store.placementEnrollmentStatusHistories = [];
+
   // Check if active enrollment already exists
   const existing = store.placementEnrollments.find((e) => e.student_id === input.student_id);
   if (existing && !['Student Withdrawn', 'Placement Closed', 'Enrollment Rejected'].includes(existing.enrollment_status)) {
@@ -722,6 +860,12 @@ export async function createPlacementEnrollment(
 
   const enrollmentId = `pe-${Date.now()}`;
   const now = new Date().toISOString();
+  const prereqAudit = evaluateEnrollmentPrerequisites(student.id);
+  const initialEligibilityReasons = input.eligibility_overridden
+    ? []
+    : prereqAudit.all_passed
+    ? ['Prerequisites verified (Attendance & Fees Cleared). Pending document and interview review.']
+    : prereqAudit.unmet_criteria;
 
   const newEnrollment: PlacementEnrollment = {
     id: enrollmentId,
@@ -741,8 +885,12 @@ export async function createPlacementEnrollment(
     trainer_name: student.trainer_name,
 
     enrollment_status: 'Application Submitted',
-    is_placement_eligible: false,
-    eligibility_reasons: ['Application under initial administrative review.'],
+    is_placement_eligible: Boolean(input.eligibility_overridden),
+    eligibility_overridden: input.eligibility_overridden,
+    override_reason: input.override_reason,
+    overridden_by: input.overridden_by,
+    overridden_at: input.overridden_at || (input.eligibility_overridden ? now : undefined),
+    eligibility_reasons: initialEligibilityReasons,
 
     current_status: input.current_status || 'Fresher',
     employment_status: input.employment_status || 'Fresher',
@@ -791,7 +939,11 @@ export async function createPlacementEnrollment(
 
   if (existing) {
     const idx = store.placementEnrollments.findIndex((e) => e.student_id === input.student_id);
-    store.placementEnrollments[idx] = newEnrollment;
+    if (idx !== -1) {
+      store.placementEnrollments[idx] = newEnrollment;
+    } else {
+      store.placementEnrollments.push(newEnrollment);
+    }
   } else {
     store.placementEnrollments.push(newEnrollment);
   }
@@ -838,6 +990,8 @@ export async function updatePlacementEnrollmentStatus(
   reason?: string,
   notes?: string
 ): Promise<PlacementEnrollment> {
+  if (!store.placementEnrollments) store.placementEnrollments = [];
+  if (!store.placementEnrollmentStatusHistories) store.placementEnrollmentStatusHistories = [];
   const enrollment = store.placementEnrollments.find((e) => e.id === enrollmentId);
   if (!enrollment) throw new Error('Placement enrollment record not found');
 
@@ -850,7 +1004,7 @@ export async function updatePlacementEnrollmentStatus(
   }
 
   const oldStatus = enrollment.enrollment_status;
-  const actor = store.users.find((u) => u.id === actorUserId);
+  const actor = (store.users || []).find((u) => u.id === actorUserId);
   const now = new Date().toISOString();
 
   enrollment.enrollment_status = newStatus;
@@ -918,6 +1072,7 @@ export async function assignPlacementOfficer(
   officerName: string,
   actorUserId: string
 ): Promise<PlacementEnrollment> {
+  if (!store.placementEnrollments) store.placementEnrollments = [];
   const enrollment = store.placementEnrollments.find((e) => e.id === enrollmentId);
   if (!enrollment) throw new Error('Placement enrollment not found');
 
@@ -926,7 +1081,7 @@ export async function assignPlacementOfficer(
   enrollment.updated_at = new Date().toISOString();
   store.persist();
 
-  const actor = store.users.find((u) => u.id === actorUserId);
+  const actor = (store.users || []).find((u) => u.id === actorUserId);
   await recordAuditLog({
     user_id: actorUserId,
     user_name: actor?.full_name || 'Placement Head',
@@ -948,11 +1103,12 @@ export async function addInternalNoteToEnrollment(
   note: string,
   actorUserId: string
 ): Promise<PlacementEnrollment> {
-  if (!note?.trim()) return store.placementEnrollments.find((e) => e.id === enrollmentId)!;
+  if (!store.placementEnrollments) store.placementEnrollments = [];
   const enrollment = store.placementEnrollments.find((e) => e.id === enrollmentId);
+  if (!note?.trim()) return enrollment!;
   if (!enrollment) throw new Error('Placement enrollment not found');
 
-  const actor = store.users.find((u) => u.id === actorUserId);
+  const actor = (store.users || []).find((u) => u.id === actorUserId);
   const formattedNote = `[${new Date().toLocaleDateString('en-IN')} - ${actor?.full_name || 'Staff'}]: ${note.trim()}`;
 
   enrollment.internal_notes = [...(enrollment.internal_notes || []), formattedNote];
@@ -984,10 +1140,16 @@ export async function overridePlacementEligibility(
     throw new Error('Mandatory justification reason is required for administrative eligibility override.');
   }
 
+  if (!store.placementEnrollments) store.placementEnrollments = [];
+  if (!store.placementEnrollmentStatusHistories) store.placementEnrollmentStatusHistories = [];
   const enrollment = store.placementEnrollments.find((e) => e.id === enrollmentId);
   if (!enrollment) throw new Error('Placement enrollment not found');
 
-  const actor = store.users.find((u) => u.id === actorUserId);
+  const actor = (store.users || []).find((u) => u.id === actorUserId);
+  if (!actor || !['super_admin', 'admin', 'placement_coordinator'].includes(actor.role)) {
+    throw new Error('Unauthorized: Only Placement Coordinators or Administrators can override placement eligibility.');
+  }
+
   const now = new Date().toISOString();
   const oldStatus = enrollment.enrollment_status;
 
@@ -1038,6 +1200,8 @@ export async function requestReEnrollment(
     throw new Error('Reason for re-enrollment request is required.');
   }
 
+  if (!store.placementEnrollments) store.placementEnrollments = [];
+  if (!store.placementEnrollmentStatusHistories) store.placementEnrollmentStatusHistories = [];
   const enrollment = store.placementEnrollments.find((e) => e.student_id === studentId);
   if (!enrollment) throw new Error('No previous placement enrollment record found to re-enroll.');
 
@@ -1085,13 +1249,14 @@ export async function verifyEnrollmentDocument(
   notes: string | undefined,
   actorUserId: string
 ): Promise<PlacementEnrollment> {
+  if (!store.placementEnrollments) store.placementEnrollments = [];
   const enrollment = store.placementEnrollments.find((e) => e.id === enrollmentId);
   if (!enrollment) throw new Error('Placement enrollment not found');
 
   const doc = enrollment.documents?.find((d) => d.id === documentId);
   if (!doc) throw new Error('Document item not found in enrollment');
 
-  const actor = store.users.find((u) => u.id === actorUserId);
+  const actor = (store.users || []).find((u) => u.id === actorUserId);
   const now = new Date().toISOString();
 
   doc.is_verified = isVerified;

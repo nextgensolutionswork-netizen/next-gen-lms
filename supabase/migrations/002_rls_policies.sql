@@ -40,6 +40,12 @@ RETURNS TEXT AS $$
   SELECT role FROM profiles WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
+-- Helper function: get current user tenant
+CREATE OR REPLACE FUNCTION get_current_user_tenant_id()
+RETURNS TEXT AS $$
+  SELECT COALESCE(tenant_id, 'default') FROM profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
 -- 1. Profiles
 CREATE POLICY "Super Admins can manage all profiles" ON profiles
   FOR ALL USING (get_current_user_role() = 'super_admin');
@@ -48,7 +54,10 @@ CREATE POLICY "Users can view their own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "Staff can view staff profiles" ON profiles
-  FOR SELECT USING (get_current_user_role() IN ('admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant'));
+  FOR SELECT USING (
+    get_current_user_role() IN ('admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant')
+    AND COALESCE(tenant_id, 'default') = get_current_user_tenant_id()
+  );
 
 -- 2. Courses & Academic Content
 -- Super Admins and Admins can view/edit all courses

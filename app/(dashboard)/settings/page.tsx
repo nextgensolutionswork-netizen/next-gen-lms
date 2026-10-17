@@ -28,34 +28,42 @@ import { useAuth } from '@/components/providers/auth-provider';
 
 export default function SettingsPage() {
   const { role: currentRole, hasPermission } = useAuth();
-  const [settings, setSettings] = React.useState<SystemSettings>(
-    store.settings || {
-      id: 'sys-01',
-      institute_name: 'Next-Gen ERP Solutions',
-      tagline: 'Premier SAP Training, Certification & Placement Institute',
-      address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081',
-      phone: '+91 98765 43210',
-      email: 'admissions@next-generpsolutions.com',
-      gst_number: '',
-      default_currency: 'INR',
-      academic_year: '2026-2027',
-      receipt_prefix: 'REC',
-      admission_prefix: 'ADM',
-      student_code_prefix: 'STU',
-      invoice_terms: 'Full payment required before course completion certificate is generated.',
-      authorized_signatory_name: 'Dr. Rajesh Kumar',
-      authorized_signatory_designation: 'Managing Director & Academic Dean',
-      bank_account_name: 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED',
-      bank_name: 'HDFC Bank Ltd',
-      bank_account_number: '50200088991122',
-      bank_ifsc: 'HDFC0000123',
-      bank_branch: 'Hitec City, Hyderabad',
-      upi_id: 'nextgenerp@hdfcbank',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-  );
+  const [settings, setSettings] = React.useState<SystemSettings>(() => {
+    const base = store.settings || {};
+    return {
+      id: base.id || 'sys-01',
+      institute_name: base.institute_name || 'Next-Gen ERP Solutions',
+      logo_url: base.logo_url || '',
+      tagline: base.tagline || 'Premier SAP Training, Certification & Placement Institute',
+      address: base.address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081',
+      phone: base.phone || '+91 98765 43210',
+      email: base.email || 'admissions@next-generpsolutions.com',
+      gst_number: base.gst_number || '36AAACN1234F1Z8',
+      default_currency: base.default_currency || 'INR',
+      academic_year: base.academic_year || '2026-2027',
+      timezone: base.timezone || 'Asia/Kolkata',
+      receipt_prefix: base.receipt_prefix || 'REC',
+      admission_prefix: base.admission_prefix || 'ADM',
+      student_code_prefix: base.student_code_prefix || 'STU',
+      invoice_terms: base.invoice_terms || 'Full payment required before course completion certificate is generated.',
+      authorized_signatory_name: base.authorized_signatory_name || 'Dr. Rajesh Kumar',
+      authorized_signatory_designation: base.authorized_signatory_designation || 'Managing Director & Academic Dean',
+      bank_account_name: base.bank_account_name || 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED',
+      bank_name: base.bank_name || 'HDFC Bank Ltd',
+      bank_account_no: base.bank_account_no || base.bank_account_number || '50200088991122',
+      bank_account_number: base.bank_account_number || base.bank_account_no || '50200088991122',
+      bank_ifsc: base.bank_ifsc || 'HDFC0000123',
+      bank_branch: base.bank_branch || 'Hitec City, Hyderabad',
+      upi_id: base.upi_id || 'nextgenerp@hdfcbank',
+      enable_email_notifications: base.enable_email_notifications ?? true,
+      enable_sms_notifications: base.enable_sms_notifications ?? false,
+      enable_whatsapp_notifications: base.enable_whatsapp_notifications ?? true,
+      created_at: base.created_at || new Date().toISOString(),
+      updated_at: base.updated_at || new Date().toISOString(),
+    };
+  });
   const [saved, setSaved] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [syncResult, setSyncResult] = React.useState<SeedSyncResult | null>(null);
   const isSupabaseLive = isLiveSupabaseEnabled();
@@ -73,13 +81,21 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
+    let isMounted = true;
     // 1. Immediately hydrate from localStorage if client had previously saved
     if (typeof localStorage !== 'undefined') {
       try {
         const stored = localStorage.getItem('institute_settings');
         if (stored) {
           const parsed = JSON.parse(stored);
-          setSettings((prev) => ({ ...prev, ...parsed }));
+          if (isMounted) {
+            setSettings((prev) => ({
+              ...prev,
+              ...parsed,
+              bank_account_no: parsed.bank_account_no || parsed.bank_account_number || prev.bank_account_no,
+              bank_account_number: parsed.bank_account_number || parsed.bank_account_no || prev.bank_account_number,
+            }));
+          }
           store.settings = { ...store.settings, ...parsed };
         }
       } catch {}
@@ -89,8 +105,13 @@ export default function SettingsPage() {
     void fetch('/api/settings')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.settings) {
-          setSettings((prev) => ({ ...prev, ...data.settings }));
+        if (isMounted && data.success && data.settings) {
+          setSettings((prev) => ({
+            ...prev,
+            ...data.settings,
+            bank_account_no: data.settings.bank_account_no || data.settings.bank_account_number || prev.bank_account_no,
+            bank_account_number: data.settings.bank_account_number || data.settings.bank_account_no || prev.bank_account_number,
+          }));
           store.settings = { ...store.settings, ...data.settings };
           if (typeof localStorage !== 'undefined') {
             try {
@@ -99,7 +120,13 @@ export default function SettingsPage() {
           }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('[Settings] Failed to fetch server settings:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSyncToDb = async () => {
@@ -150,48 +177,16 @@ export default function SettingsPage() {
       return;
     }
     setIsSaving(true);
+    setSaveError(null);
+
+    const bankAcc = settings.bank_account_no || settings.bank_account_number || '';
     const updatedSettings: SystemSettings = {
       ...settings,
-      bank_account_no: settings.bank_account_no || settings.bank_account_number,
-      bank_account_number: settings.bank_account_no || settings.bank_account_number,
+      bank_account_no: bankAcc,
+      bank_account_number: bankAcc,
       updated_at: new Date().toISOString(),
     };
 
-    // 1. Instantly update in-memory client singleton
-    store.settings = { ...updatedSettings };
-
-    // 2. Persist to browser localStorage across multiple storage adapters
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem('institute_settings', JSON.stringify(updatedSettings));
-        const rawSnapshot = localStorage.getItem('next_gen_lms_store_snapshot_v1');
-        const parsedSnapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {};
-        parsedSnapshot.settings = updatedSettings;
-        localStorage.setItem('next_gen_lms_store_snapshot_v1', JSON.stringify(parsedSnapshot));
-      } catch (err) {
-        console.warn('[Settings] LocalStorage persistence warning:', err);
-      }
-    }
-
-    // 3. Persist client-side store adapter
-    store.persistSync();
-    store.persist();
-
-    // 4. Record in-memory audit log
-    if (!store.auditLogs) store.auditLogs = [];
-    store.auditLogs.unshift({
-      id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      user_id: user?.id || 'usr-admin',
-      user_name: user?.full_name || 'Administrator',
-      user_role: currentRole,
-      action: 'SETTINGS_UPDATED',
-      module: 'SETTINGS',
-      record_id: updatedSettings.id || 'sys-01',
-      new_value: updatedSettings,
-      created_at: new Date().toISOString(),
-    });
-
-    // 5. Persist to server disk snapshot & database via /api/settings
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
@@ -200,29 +195,61 @@ export default function SettingsPage() {
           ...updatedSettings,
           updated_by: user?.id || 'usr-admin',
           updated_by_name: user?.full_name || 'Administrator',
+          updated_by_role: currentRole || 'admin',
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to save settings on server');
       }
-      if (data.settings) {
-        setSettings(data.settings);
-        store.settings = { ...store.settings, ...data.settings };
-        if (typeof localStorage !== 'undefined') {
-          try {
-            localStorage.setItem('institute_settings', JSON.stringify(data.settings));
-          } catch {}
+
+      const confirmedSettings = data.settings || updatedSettings;
+
+      // 1. Update component state with server-confirmed settings
+      setSettings(confirmedSettings);
+
+      // 2. Instantly update in-memory client singleton
+      store.settings = { ...store.settings, ...confirmedSettings };
+
+      // 3. Persist to browser localStorage across multiple storage adapters
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('institute_settings', JSON.stringify(confirmedSettings));
+          const rawSnapshot = localStorage.getItem('next_gen_lms_store_snapshot_v1');
+          const parsedSnapshot = rawSnapshot ? JSON.parse(rawSnapshot) : {};
+          parsedSnapshot.settings = confirmedSettings;
+          localStorage.setItem('next_gen_lms_store_snapshot_v1', JSON.stringify(parsedSnapshot));
+        } catch (storageErr) {
+          console.warn('[Settings] LocalStorage persistence warning:', storageErr);
         }
       }
-    } catch (err) {
+
+      // 4. Persist client-side store adapter
+      store.persistSync();
+      store.persist();
+
+      // 5. Record client-side audit log
+      if (!store.auditLogs) store.auditLogs = [];
+      store.auditLogs.unshift({
+        id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        user_id: user?.id || 'usr-admin',
+        user_name: user?.full_name || 'Administrator',
+        user_role: currentRole || 'admin',
+        action: 'SETTINGS_UPDATED',
+        module: 'SETTINGS',
+        record_id: confirmedSettings.id || 'sys-01',
+        new_value: confirmedSettings,
+        created_at: new Date().toISOString(),
+      });
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
       console.warn('[Settings] Failed to save to /api/settings:', err);
+      setSaveError(err instanceof Error ? err.message : 'Failed to save settings on server');
     } finally {
       setIsSaving(false);
     }
-
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   if (currentRole === 'student') {
@@ -245,7 +272,7 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Institute System Settings</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Global institution profile, default currency (INR ₹), timezone, and numbering prefixes.
+            Global institution profile, default currency (INR ₹), timezone, statutory GST details, and numbering prefixes.
           </p>
         </div>
       </div>
@@ -256,6 +283,13 @@ export default function SettingsPage() {
           <span>
             <strong>Read-Only Mode:</strong> Your role ({currentRole ? currentRole.replace('_', ' ') : 'viewer'}) does not have administrative permissions to edit global system settings. Only Super Admins and Operations Admins can commit changes.
           </span>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-semibold flex items-center space-x-2">
+          <ShieldAlert className="h-4 w-4 text-rose-600 flex-shrink-0" />
+          <span>Failed to save system settings: {saveError}</span>
         </div>
       )}
 
@@ -283,10 +317,41 @@ export default function SettingsPage() {
 
             <Input
               label="Tagline / Motto"
-              value={settings.tagline}
+              value={settings.tagline || ''}
               onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
               disabled={!canManageSettings}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2">
+                <Input
+                  label="Institute Logo URL"
+                  placeholder="https://example.com/logo.png"
+                  value={settings.logo_url || ''}
+                  onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })}
+                  disabled={!canManageSettings}
+                />
+              </div>
+              <div className="flex flex-col justify-end">
+                <div className="h-10 px-3 border border-slate-200 rounded-md bg-slate-50 flex items-center gap-2 overflow-hidden">
+                  {settings.logo_url ? (
+                    <>
+                      <img
+                        src={settings.logo_url}
+                        alt="Logo Preview"
+                        className="h-6 w-auto object-contain max-w-[80px]"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="text-[11px] text-slate-600 truncate">Preview Active</span>
+                    </>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic">No logo configured</span>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Input
@@ -323,7 +388,14 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-3">
-              
+              <Input
+                label="GSTIN / GST Number *"
+                placeholder="e.g. 36AAACN1234F1Z8"
+                value={settings.gst_number || ''}
+                onChange={(e) => setSettings({ ...settings, gst_number: e.target.value.toUpperCase() })}
+                disabled={!canManageSettings}
+                required
+              />
               <Input
                 label="Default Currency Code *"
                 value={settings.default_currency}
@@ -362,6 +434,35 @@ export default function SettingsPage() {
                 value={settings.invoice_prefix}
                 onChange={(e) => setSettings({ ...settings, invoice_prefix: e.target.value })}
                 disabled={!canManageSettings}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Authorized Signatory Name"
+                placeholder="e.g. Dr. Rajesh Kumar"
+                value={settings.authorized_signatory_name || ''}
+                onChange={(e) => setSettings({ ...settings, authorized_signatory_name: e.target.value })}
+                disabled={!canManageSettings}
+              />
+              <Input
+                label="Signatory Designation"
+                placeholder="e.g. Managing Director & Academic Dean"
+                value={settings.authorized_signatory_designation || ''}
+                onChange={(e) => setSettings({ ...settings, authorized_signatory_designation: e.target.value })}
+                disabled={!canManageSettings}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-slate-700">Official Invoice & Receipt Terms</label>
+              <textarea
+                rows={2}
+                value={settings.invoice_terms || ''}
+                onChange={(e) => setSettings({ ...settings, invoice_terms: e.target.value })}
+                disabled={!canManageSettings}
+                placeholder="e.g. Full payment required before course completion certificate is generated."
+                className="w-full text-xs p-2.5 rounded-md border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1] focus:border-[#0A6ED1] disabled:bg-slate-50 disabled:text-slate-400"
               />
             </div>
           </CardContent>

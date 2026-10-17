@@ -9,9 +9,24 @@ import {
   dispatchMultiChannelNotification,
   buildReceiptEmailHtml,
 } from '@/lib/services/notification-service';
+import { getAuthenticatedUserFromRequest } from '@/lib/auth/server-session';
+import { recordAuditLog } from '@/lib/services/audit-service';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    store.hydrateFromDisk();
+
+    // 1. Authenticate caller session
+    const user = await getAuthenticatedUserFromRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Authentication required to verify and record payment.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
       order_id,
@@ -31,7 +46,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In live mode, signature verification is strictly enforced
+    // 2. Validate student ownership or staff authorization
+    const student = store.students.find((s) => s.id === student_id);
+    if (user.role === 'student') {
+      const isOwner = user.id === student_id || (student && student.user_id === user.id);
+      if (!isOwner) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: You may only record payments for your own account.' },
+          { status: 403 }
+        );
+      }
+    } else {
+      const allowedRoles = ['super_admin', 'admin', 'accountant', 'counsellor'];
+      if (!allowedRoles.includes(user.role)) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Insufficient privileges to verify financial payments.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 3. Cryptographic signature check
+    const isTest = process.env.NODE_ENV === 'test';
     if (isLiveRazorpayConfigured()) {
       const isValid = verifyRazorpayPaymentSignature(order_id, payment_id, signature);
       if (!isValid) {
@@ -40,8 +76,13 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+    } else if (!isTest) {
+      return NextResponse.json(
+        { success: false, error: 'Payment gateway configuration missing; live verification unavailable.' },
+        { status: 503 }
+      );
     } else {
-      // In sandbox/test mode: if signature provided, check signature or allow test payment
+      // In sandbox/test mode:
       if (signature && signature !== 'test_signature') {
         const isValid = verifyRazorpayPaymentSignature(order_id, payment_id, signature);
         if (!isValid && !signature.startsWith('test_')) {
@@ -53,7 +94,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if this payment_id is already recorded (idempotency)
+    // 4. Idempotency Check
     const existing = store.payments.find(
       (p) =>
         p.transaction_reference === payment_id ||
@@ -72,7 +113,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Record atomic payment and update ledger
+    // 5. Record atomic payment and update ledger
     const result = await recordPaymentAtomic(
       {
         student_id,
@@ -90,11 +131,30 @@ export async function POST(request: NextRequest) {
         status: 'Success',
         notes: `Online checkout verified. Order ID: ${order_id}`,
       },
-      student_id
+      user.id
     );
 
-    // Dispatch multi-channel notification (in-app, Resend email, WhatsApp)
-    const student = store.students.find((s) => s.id === student_id);
+    // Reconcile dual-ledgers
+    store.reconcileDualLedgers();
+    store.persistSync();
+
+    // 6. Record forensic audit log
+    await recordAuditLog({
+      user_id: user.id,
+      user_name: user.full_name,
+      user_role: user.role,
+      action: 'PAYMENT_GATEWAY_VERIFIED',
+      module: 'FINANCE',
+      record_id: result.payment.id,
+      new_value: {
+        amount: Number(amount),
+        gateway_payment_id: payment_id,
+        receipt_id: result.receipt.id,
+        student_id,
+      },
+    });
+
+    // 7. Dispatch multi-channel notification (in-app, Resend email, WhatsApp)
     const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/api/receipts/${result.receipt.id}/pdf?download=true`;
     const emailHtml = buildReceiptEmailHtml({
       studentName: student?.full_name || result.receipt.student_name,

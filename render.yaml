@@ -1,9 +1,13 @@
 services:
+  # ============================================================================
+  # 1. PRODUCTION SERVICE (Deploys from 'main' branch to lms.next-generpsolutions.com)
+  # ============================================================================
   - type: web
     name: next-gen-sap-lms
     env: node
     plan: starter
     region: singapore
+    branch: main
     buildCommand: npm run build
     startCommand: npm start
     autoDeploy: true
@@ -11,6 +15,8 @@ services:
       - lms.next-generpsolutions.com
     envVars:
       - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_ENV
         value: production
       - key: NEXT_PUBLIC_APP_URL
         value: https://lms.next-generpsolutions.com
@@ -20,6 +26,45 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: NEXT_PUBLIC_DEFAULT_CURRENCY
+        value: INR
+      - key: NEXT_PUBLIC_DEFAULT_TIMEZONE
+        value: Asia/Kolkata
+
+  # ============================================================================
+  # 2. ISOLATED STAGING SERVICE (Deploys exclusively from 'staging/safe-load-test')
+  # Connected exclusively to independent Supabase project nextgen-lms-staging
+  # ============================================================================
+  - type: web
+    name: nextgen-lms-staging
+    env: node
+    plan: starter
+    region: singapore
+    branch: staging/safe-load-test
+    buildCommand: npm run build
+    startCommand: npm start
+    autoDeploy: true
+    domains:
+      - nextgen-lms-staging.onrender.com
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: NEXT_PUBLIC_APP_ENV
+        value: staging
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://nextgen-lms-staging.onrender.com
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://neiccpnxftfmmwnvtgdy.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_ta86fl6G2CbwIzrnJMTLsQ_W0U3QjYe
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5laWNjcG54ZnRmbW13bnZ0Z2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyMTY5MTgsImV4cCI6MjEwNzc5MjkxOH0.QMWa1r4JQ-SQWcrq2zZCeIJCc0EH7suUCf_KpT8I4FM
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5laWNjcG54ZnRmbW13bnZ0Z2R5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjIxNjkxOCwiZXhwIjoyMTA3NzkyOTE4fQ.Kbqf_ih7F-Scto8MevqzFNeScZ-djT96mKXBtnaOENQ
+      - key: NEXT_PUBLIC_PAYMENT_GATEWAY_ENV
+        value: mock
+      - key: NOTIFICATION_PROVIDER
+        value: mock
       - key: NEXT_PUBLIC_DEFAULT_CURRENCY
         value: INR
       - key: NEXT_PUBLIC_DEFAULT_TIMEZONE

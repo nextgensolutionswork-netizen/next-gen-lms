@@ -327,24 +327,20 @@ export default function UsersPage() {
     if (!resettingUser || !newPassword) return;
 
     try {
-      await updateUser(resettingUser.id, {
-        updated_at: new Date().toISOString(),
+      const res = await fetch('/api/users/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: resettingUser.id,
+          new_password: newPassword,
+        }),
       });
 
-      if (!store.auditLogs) store.auditLogs = [];
-      store.auditLogs.unshift({
-        id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        user_id: currentUser?.id || 'usr-admin',
-        user_name: currentUser?.full_name || 'Administrator',
-        user_role: currentRole,
-        action: 'PASSWORD_RESET',
-        module: 'SECURITY',
-        record_id: resettingUser.id,
-        new_value: { reset_by: currentUser?.id, user_email: resettingUser.email },
-        created_at: new Date().toISOString(),
-      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to apply new password.');
+      }
 
-      store.persist();
       refreshList();
       setResetSuccess(true);
     } catch (err: any) {

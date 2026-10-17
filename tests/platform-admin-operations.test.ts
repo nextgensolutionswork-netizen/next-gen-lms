@@ -3,7 +3,9 @@ import { store } from '@/lib/services/data-store';
 import {
   verifyAndGenerateCertificate,
   revokeCertificate,
+  flagCertificateAsFraudulent,
   getCertificateByVerificationId,
+  getCertificates,
 } from '@/lib/services/certificate-service';
 import {
   createStudentDoubt,
@@ -18,6 +20,7 @@ import {
   hasPermission,
 } from '@/lib/auth/rbac';
 import { setUserActiveStatus } from '@/lib/services/auth-service';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 import { Certificate, StudentDoubt, SystemSettings } from '@/types';
 
 describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () => {
@@ -122,6 +125,68 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
         const first = store.certificates[0];
         const lowerLookup = await getCertificateByVerificationId(first.certificate_id.toLowerCase());
         expect(lowerLookup?.id).toBe(first.id);
+      }
+    });
+
+    it('allows coordinators and admins to flag certificates as fraudulent', async () => {
+      const fraudCert: Certificate = {
+        id: `cert-fraud-${Date.now()}`,
+        certificate_id: `NG-FRAUD-${Date.now()}`,
+        student_id: 'stu-fake',
+        student_name: 'Counterfeit Candidate',
+        course_id: 'crs-fico',
+        course_name: 'SAP S/4HANA Finance',
+        grade: 'A+ (Distinction)',
+        issue_date: '2026-03-01',
+        completion_date: '2026-03-01',
+        attendance_percentage: 100,
+        assignment_completion_rate: 100,
+        exam_score_percentage: 100,
+        verification_url: `/certificate/verify/NG-FRAUD-${Date.now()}`,
+        is_valid: true,
+        created_at: new Date().toISOString(),
+      };
+
+      store.certificates.push(fraudCert);
+
+      const fraudReason = 'Forged PDF presented to employer; tampering with marks detected';
+      const flagged = await flagCertificateAsFraudulent(fraudCert.certificate_id, 'usr-admin', fraudReason);
+
+      expect(flagged).not.toBeNull();
+      expect(flagged?.is_valid).toBe(false);
+      expect(flagged?.status).toBe('Fraudulent');
+      expect(flagged?.revocation_reason).toBe(fraudReason);
+
+      // Verify audit log has CERTIFICATE_FLAGGED_FRAUDULENT
+      const audit = (store.auditLogs || []).find(
+        (a) => a.action === 'CERTIFICATE_FLAGGED_FRAUDULENT' && a.record_id === fraudCert.id
+      );
+      expect(audit).toBeDefined();
+      expect((audit?.new_value as any)?.status).toBe('Fraudulent');
+    });
+
+    it('guards against empty or undefined students and courses gracefully without runtime crash', async () => {
+      const origStudents = store.students;
+      const origCourses = store.courses;
+      const origCertificates = store.certificates;
+
+      try {
+        (store as any).students = [];
+        (store as any).courses = [];
+        (store as any).certificates = undefined;
+
+        // getCertificates on undefined store should return empty array
+        const list = await getCertificates();
+        expect(list).toEqual([]);
+
+        // verifyAndGenerateCertificate should throw clean descriptive error, not TypeError
+        await expect(
+          verifyAndGenerateCertificate('non-existent', 'non-existent', 'usr-admin')
+        ).rejects.toThrow(/Student or Course not found/i);
+      } finally {
+        store.students = origStudents;
+        store.courses = origCourses;
+        store.certificates = origCertificates;
       }
     });
   });
@@ -553,6 +618,108 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
       expect(latestLog.action).toBe('SETTINGS_UPDATED');
       expect(latestLog.module).toBe('SETTINGS');
     });
+
+    it('persists modified institute branding, GSTIN, bank details, and signatories across POST /api/settings and GET /api/settings', async () => {
+      const { GET, POST } = await import('@/app/api/settings/route');
+      const { NextRequest } = await import('next/server');
+      const originalSettings = { ...store.settings };
+
+      const updatePayload = {
+        institute_name: 'Next-Gen Enterprise Institute & Co.',
+        tagline: 'Leading SAP Academy & Excellence Center',
+        logo_url: 'https://lms.next-generpsolutions.com/logo.png',
+        gst_number: '36AAACN9999F1Z9',
+        bank_name: 'State Bank of India',
+        bank_account_name: 'NEXT GEN ACADEMY LTD',
+        bank_account_no: '602000112233',
+        bank_account_number: '602000112233',
+        bank_ifsc: 'SBIN0001234',
+        bank_branch: 'Financial District, Hyderabad',
+        upi_id: 'nextgenenterprise@sbi',
+        authorized_signatory_name: 'Prof. Ananya Sen',
+        authorized_signatory_designation: 'Director of Academic Affairs',
+        invoice_terms: 'Strictly non-refundable after commencement of batch.',
+      };
+
+      const adminCookie = encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin', full_name: 'System Admin', is_active: true }));
+      const adminSig = generateAuthCookieSignatureSync(adminCookie);
+
+      const postReq = new NextRequest('http://localhost:3000/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      const postRes = await POST(postReq);
+      expect(postRes.status).toBe(200);
+      const postData = await postRes.json();
+      expect(postData.success).toBe(true);
+      expect(postData.settings.institute_name).toBe(updatePayload.institute_name);
+      expect(postData.settings.logo_url).toBe(updatePayload.logo_url);
+      expect(postData.settings.gst_number).toBe(updatePayload.gst_number);
+      expect(postData.settings.bank_account_no).toBe(updatePayload.bank_account_no);
+      expect(postData.settings.bank_name).toBe(updatePayload.bank_name);
+      expect(postData.settings.authorized_signatory_name).toBe(updatePayload.authorized_signatory_name);
+
+      // Verify that re-reading via GET /api/settings re-hydrates from persistent disk storage
+      const getRes = await GET();
+      expect(getRes.status).toBe(200);
+      const getData = await getRes.json();
+      expect(getData.success).toBe(true);
+      expect(getData.settings.institute_name).toBe(updatePayload.institute_name);
+      expect(getData.settings.gst_number).toBe(updatePayload.gst_number);
+      expect(getData.settings.bank_account_no).toBe(updatePayload.bank_account_no);
+      expect(getData.settings.bank_name).toBe(updatePayload.bank_name);
+      expect(getData.settings.authorized_signatory_name).toBe(updatePayload.authorized_signatory_name);
+
+      // Restore original settings
+      store.settings = originalSettings;
+      store.persistSync();
+    });
+
+    it('strictly rejects non-admin users attempting to POST /api/settings with 403 Forbidden', async () => {
+      const { POST } = await import('@/app/api/settings/route');
+      const { NextRequest } = await import('next/server');
+
+      // Unauthorized request from a student
+      const studentCookie = encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-student-01', is_active: true }));
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
+      const studentReq = new NextRequest('http://localhost:3000/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
+        },
+        body: JSON.stringify({ institute_name: 'Hacked Institute' }),
+      });
+
+      const studentRes = await POST(studentReq);
+      expect(studentRes.status).toBe(403);
+      const studentData = await studentRes.json();
+      expect(studentData.success).toBe(false);
+      expect(studentData.error).toContain('Forbidden');
+
+      // Unauthorized request from a counsellor
+      const counsellorCookie = encodeURIComponent(JSON.stringify({ role: 'counsellor', id: 'usr-counsellor', is_active: true }));
+      const counsellorSig = generateAuthCookieSignatureSync(counsellorCookie);
+      const counsellorReq = new NextRequest('http://localhost:3000/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `next_gen_auth_user=${counsellorCookie}; next_gen_auth_user_sig=${counsellorSig}`,
+        },
+        body: JSON.stringify({ institute_name: 'Counsellor Override' }),
+      });
+
+      const counsellorRes = await POST(counsellorReq);
+      expect(counsellorRes.status).toBe(403);
+      const counsellorData = await counsellorRes.json();
+      expect(counsellorData.success).toBe(false);
+      expect(counsellorData.error).toContain('Forbidden');
+    });
   });
 
   // =========================================================================
@@ -603,11 +770,14 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
     it('GET /api/audit-logs strictly restricts unauthorized roles and permits administrators', async () => {
       const { GET } = await import('@/app/api/audit-logs/route');
       const { NextRequest } = await import('next/server');
+      const { generateAuthCookieSignatureSync } = await import('@/lib/security/auth-cookie');
 
       // 1. Unauthorized request (e.g., trainer)
+      const trainerCookie = encodeURIComponent(JSON.stringify({ role: 'trainer', id: 'usr-trainer-fico', is_active: true }));
+      const trainerSig = generateAuthCookieSignatureSync(trainerCookie);
       const trainerReq = new NextRequest('http://localhost:3000/api/audit-logs', {
         headers: {
-          cookie: 'user_role=trainer; next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'trainer', id: 'usr-tr-01' })),
+          cookie: `next_gen_auth_user=${trainerCookie}; next_gen_auth_user_sig=${trainerSig}`,
         },
       });
       const trainerRes = await GET(trainerReq);
@@ -617,18 +787,22 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
       expect(trainerData.error).toContain('Forbidden');
 
       // 2. Unauthorized request (e.g., student)
+      const studentCookie = encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-student-01', is_active: true }));
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
       const studentReq = new NextRequest('http://localhost:3000/api/audit-logs', {
         headers: {
-          cookie: 'user_role=student; next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-stu-01' })),
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
         },
       });
       const studentRes = await GET(studentReq);
       expect(studentRes.status).toBe(403);
 
       // 3. Authorized request (admin)
+      const adminCookie = encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin', is_active: true }));
+      const adminSig = generateAuthCookieSignatureSync(adminCookie);
       const adminReq = new NextRequest('http://localhost:3000/api/audit-logs', {
         headers: {
-          cookie: 'user_role=admin; next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin-01' })),
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
         },
       });
       const adminRes = await GET(adminReq);

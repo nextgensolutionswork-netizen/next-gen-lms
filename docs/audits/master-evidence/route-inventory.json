@@ -1,0 +1,1201 @@
+{
+  "pages": [
+    {
+      "route": "/academics/assessments",
+      "file": "app/(dashboard)/academics/assessments/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/academics-service",
+        "@/lib/auth/rbac",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/academics/assignments",
+      "file": "app/(dashboard)/academics/assignments/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/ui/file-upload",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/academics-service",
+        "@/lib/auth/rbac",
+        "@/lib/utils/formatters",
+        "@/lib/utils/zip-export"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/academics/attendance",
+      "file": "app/(dashboard)/academics/attendance/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/academics-service",
+        "@/lib/auth/rbac",
+        "@/lib/utils/formatters",
+        "@/lib/utils/excel-export",
+        "@/lib/services/realtime-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/academics/batches",
+      "file": "app/(dashboard)/academics/batches/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/academics-service",
+        "@/lib/auth/rbac",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/academics/courses",
+      "file": "app/(dashboard)/academics/courses/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/components/providers/auth-provider",
+        "@/lib/services/academics-service",
+        "@/lib/auth/rbac",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/academics/sap-servers",
+      "file": "app/(dashboard)/academics/sap-servers/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/lib/services/sap-lab-service",
+        "@/types",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/academics/schedule",
+      "file": "app/(dashboard)/academics/schedule/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/academics-service",
+        "@/lib/auth/rbac",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/approvals",
+      "file": "app/(dashboard)/accounts/approvals/page.tsx",
+      "imports": [
+        "react",
+        "@/lib/services/payment-workflow-client",
+        "@/components/ui/file-upload",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/modal",
+        "@/components/ui/input",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/lib/services/fee-workflow-service",
+        "@/types",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/expenses",
+      "file": "app/(dashboard)/accounts/expenses/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/finance-service",
+        "@/lib/utils/formatters",
+        "@/lib/utils/excel-export"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/fees",
+      "file": "app/(dashboard)/accounts/fees/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/utils/formatters",
+        "@/lib/utils/excel-export",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/installments",
+      "file": "app/(dashboard)/accounts/installments/page.tsx",
+      "imports": [
+        "next/navigation"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/payments",
+      "file": "app/(dashboard)/accounts/payments/page.tsx",
+      "imports": [
+        "react",
+        "@/lib/services/payment-workflow-client",
+        "@/components/ui/file-upload",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/lib/services/fee-workflow-service",
+        "@/types",
+        "@/lib/utils/formatters",
+        "@/lib/utils/excel-export"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/receipts",
+      "file": "app/(dashboard)/accounts/receipts/page.tsx",
+      "imports": [
+        "react",
+        "@/lib/services/payment-workflow-client",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/lib/services/fee-workflow-service",
+        "@/lib/utils/formatters",
+        "@/lib/utils/excel-export",
+        "@/types"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/receipts/[id]",
+      "file": "app/(dashboard)/accounts/receipts/[id]/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "next/navigation",
+        "lucide-react",
+        "@/components/ui/button",
+        "@/lib/services/payment-workflow-state",
+        "@/lib/services/data-store",
+        "@/lib/utils/formatters",
+        "@/lib/services/finance-formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/reports",
+      "file": "app/(dashboard)/accounts/reports/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/lib/utils/formatters",
+        "@/lib/utils/excel-export",
+        "@/types",
+        "@/lib/services/finance-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/accounts/vendors",
+      "file": "app/(dashboard)/accounts/vendors/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/finance-service",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/admissions",
+      "file": "app/(dashboard)/admissions/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/file-upload",
+        "@/components/ui/modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/admission-service",
+        "@/lib/utils/formatters",
+        "@/lib/services/finance-formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/audit-logs",
+      "file": "app/(dashboard)/audit-logs/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider",
+        "@/lib/services/audit-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/certificates",
+      "file": "app/(dashboard)/certificates/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/certificate-service",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/crm/followups",
+      "file": "app/(dashboard)/crm/followups/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/crm-service",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/crm/leads",
+      "file": "app/(dashboard)/crm/leads/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "next/navigation",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/bulk-import-modal",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/crm-service",
+        "@/lib/services/admission-service",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/dashboard",
+      "file": "app/(dashboard)/dashboard/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/lib/utils/formatters",
+        "@/lib/services/data-store",
+        "@/components/providers/auth-provider",
+        "@/types"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/onboarding",
+      "file": "app/(dashboard)/onboarding/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/ui/file-upload",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/onboarding-client",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/placement/enrollments",
+      "file": "app/(dashboard)/placement/enrollments/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/placement-service",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/placement",
+      "file": "app/(dashboard)/placement/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/ui/file-upload",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/placement-service",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/settings",
+      "file": "app/(dashboard)/settings/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/button",
+        "@/components/ui/badge",
+        "@/components/ui/input",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/supabase/db",
+        "@/lib/supabase/seeder",
+        "@/lib/supabase/sync-service",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/students",
+      "file": "app/(dashboard)/students/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/bulk-import-modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/students/[id]",
+      "file": "app/(dashboard)/students/[id]/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "next/navigation",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/ui/file-upload",
+        "@/lib/services/data-store",
+        "@/lib/services/student-service",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider",
+        "@/lib/services/payment-workflow-client",
+        "@/lib/services/academics-service",
+        "@/lib/services/certificate-service",
+        "@/types"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/support",
+      "file": "app/(dashboard)/support/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/components/ui/file-upload",
+        "@/lib/services/data-store",
+        "@/lib/hooks/use-realtime",
+        "@/lib/services/doubt-service",
+        "@/types",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/users",
+      "file": "app/(dashboard)/users/page.tsx",
+      "imports": [
+        "react",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/input",
+        "@/components/ui/modal",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/services/auth-service",
+        "@/lib/services/notification-service",
+        "@/lib/utils/formatters",
+        "@/components/providers/auth-provider"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/certificate/verify/[id]",
+      "file": "app/certificate/verify/[id]/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "next/navigation",
+        "lucide-react",
+        "@/components/ui/button",
+        "@/lib/services/data-store",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/login",
+      "file": "app/login/page.tsx",
+      "imports": [
+        "react",
+        "next/navigation",
+        "lucide-react",
+        "@/lib/supabase/client",
+        "@/components/ui/button",
+        "@/components/providers/auth-provider",
+        "@/lib/auth/rbac",
+        "@/lib/security/auth-cookie"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/",
+      "file": "app/page.tsx",
+      "imports": [
+        "next/headers",
+        "next/navigation",
+        "@/lib/security/auth-cookie",
+        "@/lib/auth/rbac",
+        "@/types"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/portal",
+      "file": "app/portal/page.tsx",
+      "imports": [
+        "react",
+        "next/link",
+        "next/dynamic",
+        "lucide-react",
+        "@/components/ui/card",
+        "@/components/ui/badge",
+        "@/components/ui/button",
+        "@/components/ui/modal",
+        "@/components/ui/input",
+        "@/components/ui/file-upload",
+        "@/components/providers/auth-provider",
+        "@/lib/services/data-store",
+        "@/lib/services/academics-service",
+        "@/lib/services/sap-lab-service",
+        "@/lib/services/finance-service",
+        "@/lib/services/fee-workflow-service",
+        "@/lib/services/doubt-service",
+        "@/lib/services/placement-service",
+        "@/lib/hooks/use-realtime",
+        "@/types",
+        "@/lib/utils/formatters"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/todos",
+      "file": "app/todos/page.tsx",
+      "imports": [
+        "react",
+        "@/utils/supabase/server",
+        "next/headers",
+        "next/navigation",
+        "@/lib/security/auth-cookie",
+        "next/link",
+        "lucide-react"
+      ],
+      "status": "UNVERIFIED"
+    }
+  ],
+  "apis": [
+    {
+      "route": "/api/admissions",
+      "file": "app/api/admissions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "zod",
+        "@/lib/auth/payment-session",
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/services/payment-workflow-state",
+        "@/lib/services/admission-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/attendance/sync-meeting",
+      "file": "app/api/attendance/sync-meeting/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/meeting-attendance-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/audit-logs",
+      "file": "app/api/audit-logs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/data-store",
+        "@/lib/auth/server-session",
+        "@/lib/auth/rbac",
+        "@/lib/supabase/db",
+        "@/types"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/auth/login",
+      "file": "app/api/auth/login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/auth/credentials",
+        "@/lib/auth/rbac",
+        "@/lib/security/auth-cookie",
+        "@/lib/security/rate-limiter"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/auth/logout",
+      "file": "app/api/auth/logout/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/security/auth-cookie",
+        "@/lib/supabase/db"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/bulk-import/execute",
+      "file": "app/api/bulk-import/execute/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/bulk-import-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/bulk-import/preview",
+      "file": "app/api/bulk-import/preview/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/bulk-import-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/bulk-import/template",
+      "file": "app/api/bulk-import/template/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/bulk-import-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/certificates/[id]/pdf",
+      "file": "app/api/certificates/[id]/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/data-store",
+        "@/lib/services/pdf-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/conference/create-meeting",
+      "file": "app/api/conference/create-meeting/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/conference-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/database/backup",
+      "file": "app/api/database/backup/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/data-store",
+        "@/lib/services/persistent-storage-adapter"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/database/health",
+      "file": "app/api/database/health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/supabase/sync-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/database/sync",
+      "file": "app/api/database/sync/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/supabase/sync-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/fees/payments",
+      "file": "app/api/fees/payments/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "zod",
+        "@/lib/auth/payment-session",
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/services/payment-workflow-state",
+        "@/lib/services/fee-workflow-service",
+        "@/lib/services/data-store",
+        "@/lib/auth/tenant"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/fees/proof",
+      "file": "app/api/fees/proof/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "crypto",
+        "fs/promises",
+        "path",
+        "@/lib/auth/payment-session",
+        "@/lib/auth/tenant",
+        "@/lib/supabase/admin",
+        "@/lib/supabase/db",
+        "@/lib/services/storage-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/fees/proposals",
+      "file": "app/api/fees/proposals/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "zod",
+        "@/lib/auth/payment-session",
+        "@/lib/auth/tenant",
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/services/payment-workflow-state",
+        "@/lib/services/fee-workflow-service",
+        "@/lib/services/data-store"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/fees/receipts",
+      "file": "app/api/fees/receipts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/auth/payment-session",
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/services/data-store",
+        "@/lib/auth/tenant"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/onboarding/analytics",
+      "file": "app/api/onboarding/analytics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/auth/tenant",
+        "next/server",
+        "@/lib/auth/server-session",
+        "@/lib/services/onboarding-service",
+        "@/lib/auth/rbac"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/onboarding/backfill",
+      "file": "app/api/onboarding/backfill/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/auth/tenant",
+        "next/server",
+        "@/lib/auth/server-session",
+        "@/lib/services/onboarding-service",
+        "@/lib/auth/rbac"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/onboarding/cases",
+      "file": "app/api/onboarding/cases/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "@/lib/services/payment-workflow-transaction",
+        "next/server",
+        "@/lib/auth/server-session",
+        "@/lib/services/onboarding-service",
+        "@/lib/auth/rbac",
+        "@/lib/services/data-store"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/onboarding/cases/[id]",
+      "file": "app/api/onboarding/cases/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "imports": [
+        "@/lib/services/payment-workflow-transaction",
+        "next/server",
+        "@/lib/auth/server-session",
+        "@/lib/services/onboarding-service",
+        "@/lib/auth/rbac",
+        "@/types",
+        "@/lib/services/data-store"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/onboarding",
+      "file": "app/api/onboarding/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "./cases/route"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/onboarding/[id]",
+      "file": "app/api/onboarding/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "imports": [
+        "../cases/[id]/route"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/payments/create-order",
+      "file": "app/api/payments/create-order/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/payment-gateway-service",
+        "@/lib/security/rate-limiter"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/payments/verify",
+      "file": "app/api/payments/verify/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/payment-gateway-service",
+        "@/lib/services/finance-service",
+        "@/lib/services/data-store",
+        "@/lib/services/notification-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/realtime/broadcast",
+      "file": "app/api/realtime/broadcast/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/realtime-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/realtime/stream",
+      "file": "app/api/realtime/stream/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/realtime-service",
+        "@/types"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/receipts/[id]/pdf",
+      "file": "app/api/receipts/[id]/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "@/lib/auth/payment-session",
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/auth/tenant",
+        "next/server",
+        "@/lib/services/data-store",
+        "@/lib/services/pdf-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/settings",
+      "file": "app/api/settings/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/data-store",
+        "@/types",
+        "@/lib/auth/server-session",
+        "@/lib/security/auth-cookie",
+        "@/lib/supabase/db"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/storage/signed",
+      "file": "app/api/storage/signed/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/storage-service",
+        "@/lib/supabase/db"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/storage/signed-url",
+      "file": "app/api/storage/signed-url/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/storage-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/upload",
+      "file": "app/api/upload/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/storage-service",
+        "@/lib/security/rate-limiter"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/webhooks/google-meet",
+      "file": "app/api/webhooks/google-meet/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/meeting-attendance-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/webhooks/razorpay",
+      "file": "app/api/webhooks/razorpay/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/payment-gateway-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/webhooks/zoom",
+      "file": "app/api/webhooks/zoom/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/services/meeting-attendance-service"
+      ],
+      "status": "UNVERIFIED"
+    },
+    {
+      "route": "/api/workflow/notifications",
+      "file": "app/api/workflow/notifications/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "imports": [
+        "next/server",
+        "@/lib/auth/payment-session",
+        "@/lib/services/payment-workflow-transaction",
+        "@/lib/services/data-store",
+        "@/lib/auth/tenant"
+      ],
+      "status": "UNVERIFIED"
+    }
+  ]
+}

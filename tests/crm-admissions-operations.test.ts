@@ -145,10 +145,65 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
         [l1.id, l2.id],
         'Demo Scheduled',
         counsellorId,
-        'Batch weekend demo scheduled'
+        'Batch weekend demo scheduled',
+        '2026-10-25T14:00:00'
       );
       expect(stageCount).toBe(2);
       expect(store.leads.find((l) => l.id === l1.id)?.stage).toBe('Demo Scheduled');
+      expect(store.leads.find((l) => l.id === l1.id)?.follow_up_date).toBe('2026-10-25T14:00:00');
+      expect(store.leads.find((l) => l.id === l2.id)?.follow_up_date).toBe('2026-10-25T14:00:00');
+    });
+
+    it('handles empty courses safely during lead creation and conversion helper', async () => {
+      const originalCourses = [...store.courses];
+      try {
+        store.courses = [];
+        const lead = await createLead({
+          full_name: 'Resilient Lead',
+          phone: '+91 99999 88888',
+          email: 'resilient@example.com',
+          interested_course_id: 'non-existent',
+          counsellor_id: counsellorId,
+          stage: 'New',
+        });
+        expect(lead.id).toBeDefined();
+        expect(lead.interested_course_name).toBeUndefined();
+
+        const { admissionPrefill } = await import('@/lib/services/crm-service').then(m => m.convertLeadToAdmission(lead.id));
+        expect(admissionPrefill.course_fee).toBe(0);
+        expect(admissionPrefill.city).toBe('');
+      } finally {
+        store.courses = originalCourses;
+      }
+    });
+
+    it('logs structured call outcomes and interactions without corrupting historical notes', async () => {
+      const lead = await createLead({
+        full_name: 'Tarun Joshi',
+        phone: '+91 91234 56789',
+        email: 'tarun@example.com',
+        interested_course_id: store.courses[0]?.id || 'crs-01',
+        counsellor_id: counsellorId,
+        stage: 'Follow-up',
+      });
+
+      // Entry 1: Call Back Requested
+      const note1 = '[10/16/2026, 10:30 AM | Call Back Requested]: Candidate asked for weekend batch details';
+      await updateLeadStage(lead.id, 'Follow-up', note1, counsellorId, '2026-10-22T11:00:00');
+
+      // Entry 2: Demo Scheduled
+      const note2 = '[10/18/2026, 03:00 PM | Demo Scheduled / Confirmed]: Scheduled faculty demo for S/4HANA Finance';
+      await updateLeadStage(lead.id, 'Demo Scheduled', note2, counsellorId, '2026-10-25T14:00:00');
+
+      const updatedLead = store.leads.find((l) => l.id === lead.id);
+      expect(updatedLead?.stage).toBe('Demo Scheduled');
+      expect(updatedLead?.follow_up_date).toBe('2026-10-25T14:00:00');
+      expect(updatedLead?.notes).toContain('Candidate asked for weekend batch details');
+      expect(updatedLead?.notes).toContain('Scheduled faculty demo for S/4HANA Finance');
+
+      // Verify that notes are cleanly parseable into distinct entries
+      const blocks = updatedLead?.notes?.split(/\n(?=(?:\[|\-\-\-))/) || [];
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
     });
   });
 

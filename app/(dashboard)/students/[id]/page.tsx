@@ -23,14 +23,28 @@ import {
   MapPin,
   ExternalLink,
   ShieldCheck,
+  ArrowRightLeft,
+  Send,
+  UploadCloud,
+  XCircle,
+  Plus,
+  RefreshCw,
+  Check,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
+import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { transferStudentBatch } from '@/lib/services/academics-service';
+import { issueCertificate } from '@/lib/services/certificate-service';
+import { PaymentMethod } from '@/types';
 
 export default function StudentDetailsPage() {
   const { user, role } = useAuth();
@@ -55,13 +69,42 @@ export default function StudentDetailsPage() {
 
   const [data, setData] = React.useState<any>(null);
 
-  React.useEffect(() => {
-    async function load() {
-      const details = await getStudentProfileFullDetails(studentId);
-      setData(details);
-    }
-    load();
+  const reloadData = React.useCallback(async () => {
+    if (!studentId) return;
+    const details = await getStudentProfileFullDetails(studentId);
+    setData(details);
   }, [studentId]);
+
+  React.useEffect(() => {
+    reloadData();
+  }, [reloadData]);
+
+  // Quick Record Payment Modal state
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
+  const [payFeeId, setPayFeeId] = React.useState('');
+  const [payAmount, setPayAmount] = React.useState<number>(0);
+  const [payMode, setPayMode] = React.useState<PaymentMethod>('UPI');
+  const [payDate, setPayDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [payTxnRef, setPayTxnRef] = React.useState('');
+  const [payBankUpiRef, setPayBankUpiRef] = React.useState('');
+  const [payNotes, setPayNotes] = React.useState('');
+  const [payProofUrl, setPayProofUrl] = React.useState('');
+  const [payProofUploading, setPayProofUploading] = React.useState(false);
+  const [payLoading, setPayLoading] = React.useState(false);
+  const [payError, setPayError] = React.useState<string | null>(null);
+  const [paySuccessMsg, setPaySuccessMsg] = React.useState<string | null>(null);
+
+  // Batch Transfer Modal state
+  const [isTransferModalOpen, setIsTransferModalOpen] = React.useState(false);
+  const [targetBatchId, setTargetBatchId] = React.useState('');
+  const [transferReason, setTransferReason] = React.useState('');
+  const [transferLoading, setTransferLoading] = React.useState(false);
+  const [transferError, setTransferError] = React.useState<string | null>(null);
+  const [transferSuccess, setTransferSuccess] = React.useState<string | null>(null);
+
+  // Certificate Issuance state
+  const [isIssuingCert, setIsIssuingCert] = React.useState(false);
+  const [certMsg, setCertMsg] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   if (!data || !data.student) {
     return (
@@ -80,17 +123,19 @@ export default function StudentDetailsPage() {
     course,
     batch,
     feeAccount,
-    payments,
-    receipts,
-    attendance,
-    submissions,
-    quizAttempts,
+    payments = [],
+    receipts = [],
+    attendance = [],
+    submissions = [],
+    quizAttempts = [],
     placement,
     certificate,
-    transfers,
+    transfers = [],
     studentFees = [],
     studentPayments = [],
     studentLedger = [],
+    jobApplications = [],
+    doubts = [],
   } = data;
 
   // Student ownership security validation (IDOR protection)
@@ -122,6 +167,20 @@ export default function StudentDetailsPage() {
     }
   }
 
+  const canRecordPayment =
+    role === 'accountant' ||
+    role === 'admin' ||
+    role === 'super_admin' ||
+    role === 'counsellor';
+  const canTransferBatch =
+    role === 'admin' ||
+    role === 'super_admin' ||
+    role === 'trainer';
+  const canIssueCertificate =
+    role === 'admin' ||
+    role === 'super_admin' ||
+    role === 'trainer';
+
   const onboardingCase = store.onboardingCases.find(
     (c) =>
       c.student_id === student.id ||
@@ -129,6 +188,303 @@ export default function StudentDetailsPage() {
       c.admission_id === student.admission_id ||
       c.admission_number === student.admission_number
   );
+
+  const availableBatches = (store.batches || []).filter(
+    (b) => b.course_id === student.course_id && b.id !== student.batch_id
+  );
+
+  const isCertEligible =
+    (student.attendance_percentage || 0) >= 80 &&
+    (student.course_progress || 0) >= 80 &&
+    (student.outstanding_amount || 0) <= 0;
+
+  const openRecordPaymentModal = (feeId?: string, defaultAmt?: number) => {
+    setPayError(null);
+    setPaySuccessMsg(null);
+    const targetFeeId = feeId || studentFees[0]?.id || (feeAccount ? `fee-${feeAccount.id}` : '');
+    setPayFeeId(targetFeeId);
+    const due = defaultAmt ?? (feeAccount?.outstanding_amount || studentFees[0]?.outstanding_amount || 0);
+    setPayAmount(due > 0 ? due : 5000);
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayTxnRef('');
+    setPayBankUpiRef('');
+    setPayProofUrl('');
+    setPayNotes('');
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !student) return;
+    if (payAmount <= 0) {
+      setPayError('Please enter a valid payment amount greater than zero.');
+      return;
+    }
+    if (payProofUploading) {
+      setPayError('Please wait for the payment proof file to finish uploading.');
+      return;
+    }
+    if (!payProofUrl && payMode !== 'Cash') {
+      setPayError('Payment proof (deposit slip or transaction screenshot) is required for non-cash payments.');
+      return;
+    }
+    if (payMode !== 'Cash' && !payTxnRef.trim() && !payBankUpiRef.trim()) {
+      setPayError('Please enter a transaction reference or UTR number.');
+      return;
+    }
+
+    setPayLoading(true);
+    setPayError(null);
+    try {
+      let feeIdToUse = payFeeId;
+      if (!feeIdToUse && studentFees.length > 0) {
+        feeIdToUse = studentFees[0].id;
+      }
+      if (!feeIdToUse) {
+        const newSF = {
+          id: `fee-${feeAccount?.id || Date.now()}`,
+          student_id: student.id,
+          student_name: student.full_name,
+          student_code: student.student_code,
+          admission_number: student.admission_number,
+          course_id: student.course_id,
+          course_name: course?.course_name || 'SAP Course',
+          batch_id: student.batch_id,
+          batch_name: batch?.batch_name || 'SAP Batch',
+          fee_category: 'Tuition Fee',
+          reference_type: 'Course' as const,
+          standard_fee: feeAccount?.original_fee || 45000,
+          proposed_fee: feeAccount?.original_fee || 45000,
+          discount_amount: feeAccount?.discount || 0,
+          discount_percentage: 0,
+          tax_gst_amount: 0,
+          additional_charges: 0,
+          final_payable: feeAccount?.net_payable || 45000,
+          paid_amount: feeAccount?.paid_amount || 0,
+          outstanding_amount: feeAccount?.outstanding_amount || 45000,
+          number_of_installments: 0,
+          payment_plan: 'Full Payment',
+          first_due_date: new Date().toISOString().split('T')[0],
+          counsellor_id: user.id,
+          counsellor_name: user.full_name || 'Admissions Desk',
+          approval_status: 'Approved',
+          version: 1,
+          is_payable: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        store.studentFees.unshift(newSF as any);
+        feeIdToUse = newSF.id;
+      }
+
+      const enrollmentId = student.admission_id || student.admission_number || student.id;
+      const userRole = (role as any) || (user.role as any) || 'counsellor';
+      const proofToUse = payProofUrl.trim() || (payMode === 'Cash' ? `/api/fees/proof?path=cash-counter-receipt-${student.id}.pdf` : '');
+
+      const paymentRec = await paymentWorkflowClient.recordPayment(
+        {
+          fee_id: feeIdToUse,
+          student_id: student.id,
+          enrollment_id: enrollmentId,
+          amount_paid: payAmount,
+          payment_mode: payMode,
+          payment_date: payDate,
+          transaction_reference: payTxnRef.trim() || undefined,
+          bank_upi_reference: payBankUpiRef.trim() || undefined,
+          payment_proof_url: proofToUse,
+          notes: payNotes.trim() || undefined,
+        },
+        user.id,
+        userRole
+      );
+
+      store.reconcileDualLedgers();
+      store.persist();
+      await reloadData();
+
+      const isCounsellor = userRole === 'counsellor';
+      setPaySuccessMsg(
+        isCounsellor || paymentRec?.status === 'Pending Approval'
+          ? `Payment of ${formatINR(payAmount)} submitted with status "Pending Approval"! Automatically forwarded to Accounts for verification at /accounts/approvals.`
+          : `Payment of ${formatINR(payAmount)} successfully recorded and verified!`
+      );
+      setTimeout(() => {
+        setIsPaymentModalOpen(false);
+        setPaySuccessMsg(null);
+      }, 1600);
+    } catch (err: any) {
+      setPayError(err.message || 'Failed to record payment');
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  const handleBatchTransferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetBatchId) {
+      setTransferError('Please select a target batch.');
+      return;
+    }
+    if (!transferReason.trim()) {
+      setTransferError('Please provide a reason for the batch transfer.');
+      return;
+    }
+    setTransferLoading(true);
+    setTransferError(null);
+    try {
+      await transferStudentBatch(student.id, targetBatchId, transferReason, user?.id || 'usr-admin');
+      store.persist();
+      await reloadData();
+      setTransferSuccess('Student transferred to new cohort successfully!');
+      setTimeout(() => {
+        setIsTransferModalOpen(false);
+        setTransferSuccess(null);
+        setTransferReason('');
+      }, 1200);
+    } catch (err: any) {
+      setTransferError(err.message || 'Failed to transfer batch');
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  const handleIssueCertificate = async () => {
+    if (!user) return;
+    setIsIssuingCert(true);
+    setCertMsg(null);
+    try {
+      const res = await issueCertificate(student.id, student.course_id, user.id);
+      if (res.eligible && res.certificate) {
+        store.persist();
+        await reloadData();
+        setCertMsg({ type: 'success', text: `Certificate #${res.certificate.certificate_id} successfully issued!` });
+      } else {
+        setCertMsg({
+          type: 'error',
+          text: `Ineligible: ${res.reasons.join(', ')}`,
+        });
+      }
+    } catch (err: any) {
+      setCertMsg({ type: 'error', text: err.message || 'Error generating certificate' });
+    } finally {
+      setIsIssuingCert(false);
+    }
+  };
+
+  const activityTimeline = (() => {
+    const events: Array<{
+      id: string;
+      date: string;
+      title: string;
+      description: string;
+      badge: string;
+      badgeVariant: 'default' | 'success' | 'destructive' | 'warning' | 'info' | 'outline';
+      iconType: 'payment' | 'assignment' | 'assessment' | 'batch' | 'onboarding' | 'admission' | 'doubt';
+    }> = [];
+
+    if (admission) {
+      events.push({
+        id: `adm-${admission.id}`,
+        date: admission.admission_date || student.created_at,
+        title: `Admission Confirmed (#${admission.admission_number})`,
+        description: `Admitted into ${admission.course_name} (Counselor: ${admission.counsellor_name || 'Admissions Desk'})`,
+        badge: 'Admission',
+        badgeVariant: 'success',
+        iconType: 'admission',
+      });
+    }
+
+    if (student.joining_date) {
+      events.push({
+        id: `join-${student.id}`,
+        date: student.joining_date,
+        title: `Enrolled into ${batch?.batch_name || 'Academic Batch'}`,
+        description: `Course: ${course?.course_name || 'SAP Program'} | Code: ${student.student_code}`,
+        badge: 'Enrolled',
+        badgeVariant: 'info',
+        iconType: 'batch',
+      });
+    }
+
+    (transfers || []).forEach((t: any) => {
+      events.push({
+        id: `transfer-${t.id}`,
+        date: t.transferred_at,
+        title: `Cohort Transferred: ${t.from_batch_name} → ${t.to_batch_name}`,
+        description: `Reason: ${t.reason} (Approved by ${t.transferred_by})`,
+        badge: 'Batch Transfer',
+        badgeVariant: 'warning',
+        iconType: 'batch',
+      });
+    });
+
+    const allPayments = studentPayments && studentPayments.length > 0 ? studentPayments : payments;
+    (allPayments || []).forEach((p: any) => {
+      const isVerified = p.verification_status === 'Verified' || p.status === 'Success';
+      events.push({
+        id: `pay-${p.id}`,
+        date: p.payment_date || p.created_at,
+        title: `Fee Payment Recorded (${formatINR(p.amount_paid ?? p.amount)})`,
+        description: `Mode: ${p.payment_mode} | Ref: ${p.transaction_reference || p.bank_upi_reference || p.receipt_number || 'N/A'}${p.recorded_by_name ? ` | Collected by: ${p.recorded_by_name}` : ''}`,
+        badge: isVerified ? 'Verified' : 'Pending',
+        badgeVariant: isVerified ? 'success' : 'warning',
+        iconType: 'payment',
+      });
+    });
+
+    (submissions || []).forEach((s: any) => {
+      events.push({
+        id: `sub-${s.id}`,
+        date: s.submitted_at,
+        title: `Assignment Submission (${s.marks_obtained !== undefined ? `Score: ${s.marks_obtained}/100` : s.status})`,
+        description: `${s.submission_text || 'Completed Assignment submission'}${s.feedback ? ` • Feedback: "${s.feedback}"` : ''}`,
+        badge: s.status || 'Graded',
+        badgeVariant: s.status === 'Graded' ? 'success' : 'info',
+        iconType: 'assignment',
+      });
+    });
+
+    (quizAttempts || []).forEach((qa: any) => {
+      events.push({
+        id: `quiz-${qa.id}`,
+        date: qa.completed_at,
+        title: `Quiz Attempt: ${qa.quiz_title || 'Modular Exam'}`,
+        description: `Score: ${qa.score}/${qa.total_points} (${qa.percentage}%) • Result: ${qa.passed ? 'PASSED' : 'NEEDS RETAKE'}`,
+        badge: qa.passed ? 'Passed' : 'Failed',
+        badgeVariant: qa.passed ? 'success' : 'destructive',
+        iconType: 'assessment',
+      });
+    });
+
+    if (onboardingCase) {
+      const caseLogs = (store.onboardingAuditLogs || []).filter((l) => l.case_id === onboardingCase.id);
+      caseLogs.forEach((evt: any) => {
+        events.push({
+          id: `onb-${evt.id}`,
+          date: evt.timestamp,
+          title: `Onboarding Event: ${evt.action}`,
+          description: `${evt.details} (Actor: ${evt.actor_name} [${evt.actor_role}])`,
+          badge: 'Onboarding',
+          badgeVariant: 'outline',
+          iconType: 'onboarding',
+        });
+      });
+    }
+
+    (doubts || []).forEach((d: any) => {
+      events.push({
+        id: `dbt-${d.id}`,
+        date: d.created_at,
+        title: `Academic Query: ${d.title}`,
+        description: `Module: ${d.sap_module || 'General'} | Status: ${d.status}${d.resolution_summary ? ` | Resolution: ${d.resolution_summary}` : ''}`,
+        badge: d.status,
+        badgeVariant: d.status === 'Resolved' ? 'success' : 'warning',
+        iconType: 'doubt',
+      });
+    });
+
+    return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  })();
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -165,7 +521,7 @@ export default function StudentDetailsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
               <div className="h-16 w-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl font-extrabold text-white">
-                {student.full_name.charAt(0)}
+                {student.full_name?.charAt(0) || 'S'}
               </div>
               <div>
                 <div className="flex items-center space-x-2">
@@ -430,14 +786,24 @@ export default function StudentDetailsPage() {
                 <span>Outstanding Balance:</span>
                 <span>{formatINR(feeAccount?.outstanding_amount)}</span>
               </div>
-              <div className="pt-2">
-                <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
+              <div className="pt-2 flex flex-col space-y-2">
+                {canRecordPayment && (
                   <Button
                     variant="sap"
                     size="sm"
                     className="w-full text-xs"
+                    onClick={() => openRecordPaymentModal()}
                   >
                     Record Fee Payment
+                  </Button>
+                )}
+                <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                  >
+                    Open Payment Desk &rarr;
                   </Button>
                 </Link>
               </div>
@@ -808,33 +1174,97 @@ export default function StudentDetailsPage() {
 
       {/* Tab 3: Batch */}
       {activeTab === 'batch' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Assigned Batch & Timetable</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Batch Name</p>
-                <p className="font-bold text-slate-800 text-sm mt-0.5">{batch?.batch_name}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Class Timings</p>
-                <p className="font-bold text-slate-800 text-sm mt-0.5">{batch?.start_time} - {batch?.end_time}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Days</p>
-                <p className="font-bold text-slate-800 text-sm mt-0.5">
-                  {Array.isArray(batch?.days) ? batch.days.join(', ') : 'Flexible Schedule'}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Batch Trainer</p>
-                <p className="font-bold text-slate-800 text-sm mt-0.5">{batch?.trainer_name}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Assigned Batch & Timetable</CardTitle>
+              {canTransferBatch && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs flex items-center space-x-1"
+                  onClick={() => {
+                    setTransferError(null);
+                    setTransferSuccess(null);
+                    setTargetBatchId(availableBatches[0]?.id || '');
+                    setTransferReason('');
+                    setIsTransferModalOpen(true);
+                  }}
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  <span>Transfer Batch Cohort</span>
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              {batch ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div>
+                    <p className="text-slate-400 font-semibold text-[10px] uppercase">Batch Name</p>
+                    <p className="font-bold text-slate-800 text-sm mt-0.5">{batch.batch_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold text-[10px] uppercase">Class Timings</p>
+                    <p className="font-bold text-slate-800 text-sm mt-0.5">{batch.start_time} - {batch.end_time}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold text-[10px] uppercase">Days</p>
+                    <p className="font-bold text-slate-800 text-sm mt-0.5">
+                      {Array.isArray(batch.days) ? batch.days.join(', ') : 'Flexible Schedule'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-semibold text-[10px] uppercase">Batch Trainer</p>
+                    <p className="font-bold text-slate-800 text-sm mt-0.5">{batch.trainer_name}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-slate-400">
+                  No active batch cohort assigned to this student.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Batch Transfer History Table */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Batch Transfer Audit History</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+                  <tr>
+                    <th className="px-4 py-3">Transfer Date</th>
+                    <th className="px-4 py-3">From Batch</th>
+                    <th className="px-4 py-3">To Batch</th>
+                    <th className="px-4 py-3">Transfer Reason</th>
+                    <th className="px-4 py-3">Transferred By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(!transfers || transfers.length === 0) ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                        No batch transfers recorded. Student remains in initial cohort.
+                      </td>
+                    </tr>
+                  ) : (
+                    transfers.map((t: any) => (
+                      <tr key={t.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-slate-800">{formatDateTime(t.transferred_at)}</td>
+                        <td className="px-4 py-3 text-slate-600 font-medium">{t.from_batch_name}</td>
+                        <td className="px-4 py-3 font-bold text-blue-600">{t.to_batch_name}</td>
+                        <td className="px-4 py-3 text-slate-700">{t.reason}</td>
+                        <td className="px-4 py-3 text-slate-500">{t.transferred_by}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Tab 4: Attendance */}
@@ -969,11 +1399,23 @@ export default function StudentDetailsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">Payment History</CardTitle>
-            <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
-              <Button variant="sap" size="sm" className="text-xs">
-                Collect Payment Desk
-              </Button>
-            </Link>
+            <div className="flex items-center space-x-2">
+              {canRecordPayment && (
+                <Button
+                  variant="sap"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => openRecordPaymentModal()}
+                >
+                  Record Payment
+                </Button>
+              )}
+              <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
+                <Button variant="outline" size="sm" className="text-xs">
+                  Payment Desk &rarr;
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-xs text-left">
@@ -1088,7 +1530,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Approved Fees</p>
                 <h4 className="text-xl font-bold text-slate-900 mt-1">
-                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.final_payable, 0))}
+                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.final_payable || 0), 0))}
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">{studentFees.length} Fee Category Plan(s)</p>
               </CardContent>
@@ -1098,7 +1540,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Verified Paid</p>
                 <h4 className="text-xl font-bold text-emerald-700 mt-1">
-                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.paid_amount, 0))}
+                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.paid_amount || 0), 0))}
                 </h4>
                 <p className="text-[11px] text-emerald-600 mt-0.5 font-medium">Financially cleared</p>
               </CardContent>
@@ -1108,7 +1550,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Outstanding Due</p>
                 <h4 className="text-xl font-bold text-amber-700 mt-1">
-                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.outstanding_amount, 0))}
+                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.outstanding_amount || 0), 0))}
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">Remaining balance</p>
               </CardContent>
@@ -1118,7 +1560,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Clearance Standing</p>
                 <h4 className="text-sm font-bold text-indigo-700 mt-1">
-                  {studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + f.outstanding_amount, 0) === 0 && studentFees.length > 0 ? (
+                  {studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.outstanding_amount || 0), 0) === 0 && studentFees.length > 0 ? (
                     <Badge variant="success">Financially Cleared ✓</Badge>
                   ) : (
                     <Badge variant="warning">Payment Pending</Badge>
@@ -1248,124 +1690,328 @@ export default function StudentDetailsPage() {
 
       {/* Tab: Certificates */}
       {activeTab === 'certificates' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Issued Course Certificates</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {certificate ? (
-              <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <Award className="h-5 w-5 text-amber-600" />
-                    <h4 className="font-bold text-slate-800 text-sm">{certificate.certificate_id}</h4>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1">Course: {certificate.course_name} | Grade: {certificate.grade}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Issued On: {formatDate(certificate.issue_date)}</p>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Course Completion Certificate</CardTitle>
+              {canIssueCertificate && !certificate && isCertEligible && (
+                <Button
+                  variant="sap"
+                  size="sm"
+                  className="text-xs"
+                  onClick={handleIssueCertificate}
+                  disabled={isIssuingCert}
+                >
+                  {isIssuingCert ? 'Issuing...' : 'Issue Graduation Certificate'}
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {certMsg && (
+                <div
+                  className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
+                    certMsg.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {certMsg.type === 'success' ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                  )}
+                  <span>{certMsg.text}</span>
                 </div>
-                <Link href={`/certificate/verify/${certificate.certificate_id}`} target="_blank">
-                  <Button variant="sap" size="sm" className="text-xs">
-                    Public Verification Page
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">No certificate issued yet. Requires completion &gt;= 80% and fees settled.</p>
-            )}
-          </CardContent>
-        </Card>
+              )}
+
+              {certificate ? (
+                <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <Award className="h-5 w-5 text-amber-600" />
+                      <h4 className="font-bold text-slate-800 text-sm">{certificate.certificate_id}</h4>
+                      <Badge variant="success" className="text-[10px]">Official Ledger Verified</Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Program: <span className="font-semibold text-slate-800">{certificate.course_name}</span> | Grade: <span className="font-bold text-amber-700">{certificate.grade}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Issued On: {formatDate(certificate.issue_date)} • Completion: {formatDate(certificate.completion_date || certificate.issue_date)}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Link href={`/certificate/verify/${certificate.certificate_id}`} target="_blank">
+                      <Button variant="sap" size="sm" className="text-xs">
+                        Public Verification Page &rarr;
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Certificate Issuance Eligibility Matrix
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] text-slate-500 font-medium">1. Attendance Standard (≥ 80%)</p>
+                          <p className="text-sm font-bold text-slate-800 mt-0.5">{student.attendance_percentage}%</p>
+                        </div>
+                        <Badge variant={student.attendance_percentage >= 80 ? 'success' : 'destructive'} className="text-[10px]">
+                          {student.attendance_percentage >= 80 ? 'Requirement Met ✓' : 'Below 80%'}
+                        </Badge>
+                      </div>
+
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] text-slate-500 font-medium">2. LMS Progress (≥ 80%)</p>
+                          <p className="text-sm font-bold text-slate-800 mt-0.5">{student.course_progress}%</p>
+                        </div>
+                        <Badge variant={student.course_progress >= 80 ? 'success' : 'destructive'} className="text-[10px]">
+                          {student.course_progress >= 80 ? 'Requirement Met ✓' : 'Below 80%'}
+                        </Badge>
+                      </div>
+
+                      <div className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] text-slate-500 font-medium">3. Fee Balance (₹0 Remaining)</p>
+                          <p className="text-sm font-bold text-slate-800 mt-0.5">{formatINR(student.outstanding_amount)}</p>
+                        </div>
+                        <Badge variant={(student.outstanding_amount || 0) <= 0 ? 'success' : 'destructive'} className="text-[10px]">
+                          {(student.outstanding_amount || 0) <= 0 ? 'Financially Cleared ✓' : 'Fee Pending'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!isCertEligible ? (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                      <span>
+                        Student does not yet meet all graduation criteria. All 3 thresholds (attendance &ge; 80%, syllabus &ge; 80%, and zero outstanding dues) must be satisfied.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                        <span>All academic and financial eligibility criteria met! Student is eligible for certification.</span>
+                      </div>
+                      {canIssueCertificate && (
+                        <Button
+                          variant="sap"
+                          size="sm"
+                          className="text-xs"
+                          onClick={handleIssueCertificate}
+                          disabled={isIssuingCert}
+                        >
+                          {isIssuingCert ? 'Issuing...' : 'Issue Graduation Certificate'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Tab 10: Placement */}
       {activeTab === 'placement' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Placement Profile & Interview Readiness</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Placement Stage</p>
-                <Badge variant="default" className="mt-1">{placement?.placement_status || 'Not Started'}</Badge>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Placement Profile & Interview Readiness</CardTitle>
+              <Link href="/placement">
+                <Button variant="outline" size="sm" className="text-xs">
+                  Placement Workspace &rarr;
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div>
+                  <p className="text-slate-400 font-semibold text-[10px] uppercase">Placement Stage</p>
+                  <Badge variant="default" className="mt-1">{placement?.placement_status || 'Not Started'}</Badge>
+                </div>
+                <div>
+                  <p className="text-slate-400 font-semibold text-[10px] uppercase">Resume Status</p>
+                  <Badge variant={placement?.resume_status === 'Reviewed & Approved' ? 'success' : 'warning'} className="mt-1">
+                    {placement?.resume_status || 'Pending'}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-slate-400 font-semibold text-[10px] uppercase">Tech Interview Score</p>
+                  <p className="font-bold text-slate-800 text-sm mt-1">
+                    {typeof placement?.technical_interview_score === 'number'
+                      ? `${placement.technical_interview_score} / 100`
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-400 font-semibold text-[10px] uppercase">HR Interview Score</p>
+                  <p className="font-bold text-slate-800 text-sm mt-1">
+                    {typeof placement?.hr_interview_score === 'number'
+                      ? `${placement.hr_interview_score} / 100`
+                      : '—'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Resume Status</p>
-                <Badge variant="success" className="mt-1">{placement?.resume_status || 'Pending'}</Badge>
-              </div>
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">Tech Interview Score</p>
-                <p className="font-bold text-slate-800 text-sm mt-1">
-                  {typeof placement?.technical_interview_score === 'number'
-                    ? `${placement.technical_interview_score} / 100`
-                    : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-semibold text-[10px] uppercase">HR Interview Score</p>
-                <p className="font-bold text-slate-800 text-sm mt-1">
-                  {typeof placement?.hr_interview_score === 'number'
-                    ? `${placement.hr_interview_score} / 100`
-                    : '—'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              {placement?.skills && placement.skills.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-[11px] font-semibold text-slate-600 mb-1.5">Verified Core Competencies & Skills:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {placement.skills.map((skill: string, idx: number) => (
+                      <span key={idx} className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] px-2 py-0.5 rounded-md font-medium">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Job Applications Table */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Applied Placement Opportunities</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+                  <tr>
+                    <th className="px-4 py-3">Applied Date</th>
+                    <th className="px-4 py-3">Company</th>
+                    <th className="px-4 py-3">Job Role</th>
+                    <th className="px-4 py-3">Application Status</th>
+                    <th className="px-4 py-3">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(!jobApplications || jobApplications.length === 0) ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                        No job applications submitted yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    jobApplications.map((app: any) => (
+                      <tr key={app.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-slate-500">{formatDate(app.applied_at)}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{app.company_name || 'SAP Partner Corp'}</td>
+                        <td className="px-4 py-3 text-slate-700">{app.job_title || 'SAP Consultant'}</td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            variant={
+                              app.status === 'Selected'
+                                ? 'success'
+                                : app.status === 'Rejected'
+                                ? 'destructive'
+                                : app.status === 'Interview Scheduled'
+                                ? 'info'
+                                : 'default'
+                            }
+                            className="text-[10px]"
+                          >
+                            {app.status}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{app.notes || '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Tab 11: Documents */}
       {activeTab === 'documents' && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">Submitted Student Documents & Verification</CardTitle>
+            {onboardingCase && (
+              <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || onboardingCase.case_number)}`}>
+                <Button variant="outline" size="sm" className="text-xs">
+                  Manage in Onboarding Workspace &rarr;
+                </Button>
+              </Link>
+            )}
           </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            {onboardingCase && onboardingCase.documents.length > 0 ? (
+          <CardContent className="space-y-4 text-xs">
+            {onboardingCase && onboardingCase.documents && onboardingCase.documents.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {onboardingCase.documents.map((doc) => (
                   <div
                     key={doc.id}
-                    className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between"
+                    className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between shadow-xs"
                   >
-                    <div>
+                    <div className="space-y-0.5">
                       <p className="font-semibold text-slate-800 text-xs">{doc.name}</p>
-                      <p className="text-[10px] text-slate-400 capitalize">{doc.doc_type}</p>
+                      <p className="text-[10px] text-slate-400 capitalize">{doc.doc_type.replace('_', ' ')}</p>
+                      {doc.uploaded_at && (
+                        <p className="text-[10px] text-slate-400">
+                          Uploaded: {formatDate(doc.uploaded_at)}
+                        </p>
+                      )}
                       {doc.verified_by && (
-                        <p className="text-[10px] text-emerald-700 mt-0.5">
+                        <p className="text-[10px] text-emerald-700">
                           Verified by {doc.verified_by}
                         </p>
                       )}
                     </div>
-                    <Badge
-                      variant={
-                        doc.status === 'verified'
-                          ? 'success'
-                          : doc.status === 'rejected'
-                          ? 'destructive'
-                          : 'warning'
-                      }
-                      className="text-[10px] capitalize"
-                    >
-                      {doc.status}
-                    </Badge>
+                    <div className="flex flex-col items-end space-y-1">
+                      <Badge
+                        variant={
+                          doc.status === 'verified'
+                            ? 'success'
+                            : doc.status === 'rejected'
+                            ? 'destructive'
+                            : 'warning'
+                        }
+                        className="text-[10px] capitalize"
+                      >
+                        {doc.status}
+                      </Badge>
+                      {doc.file_url && (
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-blue-600 hover:underline flex items-center space-x-0.5"
+                        >
+                          <span>View Doc</span>
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <span>Identity Proof (Aadhaar / Passport)</span>
-                  </div>
-                  <Badge variant="success">Verified</Badge>
+              <div className="py-12 text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                  <FileText className="h-6 w-6" />
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="h-4 w-4 text-purple-600" />
-                    <span>Graduation Degree Certificate</span>
-                  </div>
-                  <Badge variant="success">Verified</Badge>
+                <div className="max-w-md mx-auto">
+                  <h4 className="font-semibold text-slate-700 text-sm">No Documents Uploaded Yet</h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Identity proofs (Aadhaar/Passport), graduation certificates, and work experience documents have not been attached to this student record.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link href={onboardingCase ? `/onboarding?search=${encodeURIComponent(student.admission_number || onboardingCase.case_number)}` : '/onboarding'}>
+                    <Button variant="sap" size="sm" className="text-xs">
+                      Open Onboarding Upload Desk
+                    </Button>
+                  </Link>
                 </div>
               </div>
             )}
@@ -1379,32 +2025,283 @@ export default function StudentDetailsPage() {
           <CardHeader>
             <CardTitle className="text-base">Student Timeline & Audit Log</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            {payments.map((p: any) => (
-              <div key={p.id} className="border-l-2 border-[#0A6ED1] pl-3 py-1">
-                <p className="font-bold text-slate-800">Fee Payment Recorded ({p.receipt_number} - {formatINR(p.amount)})</p>
-                <p className="text-slate-500 text-[10px]">{formatDate(p.payment_date)} • Mode: {p.payment_mode}</p>
+          <CardContent className="space-y-4 text-xs">
+            {activityTimeline.length === 0 ? (
+              <div className="py-8 text-center text-slate-400">
+                No activity records found for this student.
               </div>
-            ))}
-            {submissions.map((s: any) => (
-              <div key={s.id} className="border-l-2 border-emerald-500 pl-3 py-1">
-                <p className="font-bold text-slate-800">Assignment Submission ({s.status} - Score: {s.marks_obtained}/100)</p>
-                <p className="text-slate-500 text-[10px]">{formatDateTime(s.submitted_at)}</p>
-              </div>
-            ))}
-            <div className="border-l-2 border-blue-500 pl-3 py-1">
-              <p className="font-bold text-slate-800">Enrolled into {batch?.batch_name || 'SAP Batch'}</p>
-              <p className="text-slate-500 text-[10px]">{formatDate(student.joining_date)}</p>
-            </div>
-            {admission && (
-              <div className="border-l-2 border-purple-500 pl-3 py-1">
-                <p className="font-bold text-slate-800">Admission Confirmed ({admission.admission_number})</p>
-                <p className="text-slate-500 text-[10px]">{formatDate(admission.admission_date)}</p>
-              </div>
+            ) : (
+              activityTimeline.map((evt) => (
+                <div key={evt.id} className="border-l-2 border-[#0A6ED1] pl-3 py-1 space-y-0.5">
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <span className="font-bold text-slate-800 text-xs">{evt.title}</span>
+                    <Badge variant={evt.badgeVariant} className="text-[10px]">
+                      {evt.badge}
+                    </Badge>
+                  </div>
+                  <p className="text-slate-600 text-xs">{evt.description}</p>
+                  <p className="text-slate-400 text-[10px]">{formatDateTime(evt.date)}</p>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
       )}
+
+      {/* Modal: Quick Record Fee Payment */}
+      <Modal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title="Record Student Fee Payment"
+        description={`Student: ${student.full_name} (ID: ${student.student_code || student.id}) | Enrollment: ${student.admission_id || student.admission_number || 'N/A'}`}
+      >
+        <form onSubmit={handleRecordPaymentSubmit} className="space-y-4 text-xs">
+          {payError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 flex items-center space-x-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{payError}</span>
+            </div>
+          )}
+          {paySuccessMsg && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{paySuccessMsg}</span>
+            </div>
+          )}
+
+          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-[11px]">
+            <div>
+              <span className="text-slate-500">Student ID: </span>
+              <span className="font-mono font-bold text-slate-800">{student.student_code || student.id}</span>
+            </div>
+            <div>
+              <span className="text-slate-500">Enrollment ID: </span>
+              <span className="font-mono font-bold text-slate-800">{student.admission_id || student.admission_number || 'N/A'}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Fee Category / Plan</label>
+              <select
+                value={payFeeId}
+                onChange={(e) => setPayFeeId(e.target.value)}
+                className="w-full text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+              >
+                {studentFees.length > 0 ? (
+                  studentFees.map((f: any) => (
+                    <option key={f.id} value={f.id}>
+                      {f.fee_category} - {formatINR(f.final_payable)} (Due: {formatINR(f.outstanding_amount)})
+                    </option>
+                  ))
+                ) : (
+                  <option value={feeAccount ? `fee-${feeAccount.id}` : 'default-fee'}>
+                    Tuition Fee - {formatINR(feeAccount?.net_payable || 45000)} (Due: {formatINR(feeAccount?.outstanding_amount || 45000)})
+                  </option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Payment Amount (₹) <span className="text-amber-600 font-normal">(Outstanding: {formatINR(student.outstanding_amount)})</span>
+              </label>
+              <Input
+                type="number"
+                min="1"
+                value={payAmount}
+                onChange={(e) => setPayAmount(Number(e.target.value))}
+                placeholder="Enter amount"
+                className="text-xs"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
+              <select
+                value={payMode}
+                onChange={(e) => setPayMode(e.target.value as PaymentMethod)}
+                className="w-full text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+              >
+                <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
+                <option value="Net Banking">Net Banking / NEFT / RTGS / IMPS</option>
+                <option value="Card">Debit / Credit Card</option>
+                <option value="Cash">Cash at Counter</option>
+                <option value="Bank Transfer">Direct Bank Transfer</option>
+                <option value="Cheque">Cheque / Demand Draft</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Payment Date</label>
+              <Input
+                type="date"
+                value={payDate}
+                onChange={(e) => setPayDate(e.target.value)}
+                className="text-xs"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Transaction Ref / UTR / Cheque #</label>
+              <Input
+                type="text"
+                value={payTxnRef}
+                onChange={(e) => setPayTxnRef(e.target.value)}
+                placeholder="e.g. UTR192837482"
+                className="text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Bank / UPI App Reference</label>
+              <Input
+                type="text"
+                value={payBankUpiRef}
+                onChange={(e) => setPayBankUpiRef(e.target.value)}
+                placeholder="e.g. HDFC Bank UPI"
+                className="text-xs"
+              />
+            </div>
+          </div>
+
+          <FileUpload
+            bucket="payment-proofs"
+            label="Payment Proof (Bank / UPI Slip or Counter Voucher) *"
+            value={payProofUrl}
+            onChange={setPayProofUrl}
+            onUploadingChange={setPayProofUploading}
+          />
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Internal Notes / Remarks</label>
+            <Input
+              type="text"
+              value={payNotes}
+              onChange={(e) => setPayNotes(e.target.value)}
+              placeholder="e.g. Initial payment collected at front desk"
+              className="text-xs"
+            />
+          </div>
+
+          {role === 'counsellor' && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] space-y-1">
+              <p className="font-semibold">⚠️ Counsellor Submission Policy:</p>
+              <p>
+                This payment will be saved with status <strong>Pending Approval</strong> and forwarded to the Accounts Team at <strong>/accounts/approvals</strong>. Official receipt generation, fee ledger clearance, and onboarding progression occur upon Accounts verification.
+              </p>
+            </div>
+          )}
+
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setIsPaymentModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="sap"
+              size="sm"
+              className="text-xs"
+              disabled={payLoading || payProofUploading || (!payProofUrl && payMode !== 'Cash')}
+            >
+              {payLoading ? 'Submitting...' : role === 'counsellor' ? 'Submit Payment for Approval' : 'Record Payment'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Transfer Student Batch Cohort */}
+      <Modal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        title="Transfer Student Batch Cohort"
+        description={`Student: ${student.full_name} | Current Batch: ${batch?.batch_name || 'Unassigned'}`}
+      >
+        <form onSubmit={handleBatchTransferSubmit} className="space-y-4 text-xs">
+          {transferError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 flex items-center space-x-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{transferError}</span>
+            </div>
+          )}
+          {transferSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{transferSuccess}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Select Target Batch</label>
+            {availableBatches.length === 0 ? (
+              <p className="text-amber-600 text-xs py-2">
+                No alternative active batches found for course &quot;{course?.course_name}&quot;. Create an additional batch before transferring.
+              </p>
+            ) : (
+              <select
+                value={targetBatchId}
+                onChange={(e) => setTargetBatchId(e.target.value)}
+                className="w-full text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                required
+              >
+                {availableBatches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.batch_name} ({b.start_time} - {b.end_time} | Trainer: {b.trainer_name} | Seats: {b.current_enrolled}/{b.maximum_capacity || 30})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Transfer Reason / Academic Justification *</label>
+            <textarea
+              value={transferReason}
+              onChange={(e) => setTransferReason(e.target.value)}
+              placeholder="e.g. Student requested weekend cohort due to weekday employment shift"
+              rows={3}
+              className="w-full text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+              required
+            />
+          </div>
+
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px]">
+            <p className="font-semibold">Audit Notice:</p>
+            <p className="mt-0.5">
+              This action transfers the student immediately, updates current enrolled seats in both batches, and registers an immutable entry into the Batch Transfer Audit log.
+            </p>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setIsTransferModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="sap"
+              size="sm"
+              className="text-xs"
+              disabled={transferLoading || availableBatches.length === 0}
+            >
+              {transferLoading ? 'Transferring...' : 'Confirm Cohort Transfer'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

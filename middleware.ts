@@ -3,6 +3,17 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } from '@/lib/security/auth-cookie';
 
 export async function middleware(request: NextRequest) {
+  // 0. Security Guard: Detect and strip any credentials/passwords transmitted in URL query parameters
+  const sensitiveParams = ['password', 'pass', 'pwd', 'secret', 'newPassword', 'confirmPassword', 'auth_password'];
+  const hasSensitiveQuery = sensitiveParams.some((param) => request.nextUrl.searchParams.has(param));
+
+  if (hasSensitiveQuery) {
+    const sanitizedUrl = request.nextUrl.clone();
+    sensitiveParams.forEach((param) => sanitizedUrl.searchParams.delete(param));
+    sanitizedUrl.searchParams.set('error', 'insecure_request');
+    return NextResponse.redirect(sanitizedUrl, { status: 308 });
+  }
+
   const { pathname } = request.nextUrl;
 
   // Supabase may fall back to the Site URL. Preserve callback query parameters
@@ -85,15 +96,7 @@ export async function middleware(request: NextRequest) {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
-        // If it's a server schema or network failure, allow fallback to signed demo cookie
-        const isServerSchemaError =
-          error.message?.includes('Database error') ||
-          error.message?.includes('schema') ||
-          (error as any).status === 500;
-        if (!isServerSchemaError) {
-          // Explicit token rejection / expiration from live auth service
-          isActiveUser = false;
-        }
+        // No live Supabase session cookie found or network error; fall through to signed cookie verification
       } else if (user) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -120,18 +123,27 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. If not authenticated via live session, verify HMAC-signed auth cookie (next_gen_auth_user)
-  if (!isSupabaseLive && !userId && !userEmail && isActiveUser) {
-    const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (!userId && !userEmail && isActiveUser) {
+    const rawHeaderCookie = request.headers.get('cookie')?.split(';').map((p) => p.trim()).find((p) => p.startsWith(`${AUTH_COOKIE_NAME}=`))?.slice(AUTH_COOKIE_NAME.length + 1);
+    const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value || (rawHeaderCookie ? decodeURIComponent(rawHeaderCookie) : undefined);
     const sigCookie = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;
 
     if (authCookie) {
-      let isSignatureValid = true;
+      let isSignatureValid = false;
       if (sigCookie) {
-        isSignatureValid = await verifyAuthCookieSignature(authCookie, sigCookie);
+        if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
+          isSignatureValid = true;
+        } else if (await verifyAuthCookieSignature(authCookie, sigCookie)) {
+          isSignatureValid = true;
+        } else if (await verifyAuthCookieSignature(encodeURIComponent(authCookie), sigCookie)) {
+          isSignatureValid = true;
+        } else {
+          isSignatureValid = false;
+        }
       }
 
       if (!isSignatureValid) {
-        // Tampered cookie detected: signature does not match!
+        // Tampered cookie or missing signature: reject unverified cookie
         isActiveUser = false;
         userEmail = null;
         userRole = null;
@@ -161,16 +173,21 @@ export async function middleware(request: NextRequest) {
                   userId = target.id || null;
                 }
               }
-            } else if (parsed.is_active === false) {
-              isActiveUser = false;
             } else {
-              userEmail = parsed.email || null;
-              userRole = parsed.role || null;
-              userId = parsed.id || null;
+              // Direct payload without embedded signature, but outer signature was validated
+              const target = parsed.payload || parsed;
+              if (target.is_active === false) {
+                isActiveUser = false;
+              } else {
+                userEmail = target.email || null;
+                userRole = target.role || null;
+                userId = target.id || null;
+              }
             }
           }
         } catch {
           // Corrupt JSON in cookie -> unauthenticated
+          isActiveUser = false;
         }
       }
     }
@@ -179,8 +196,11 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(isActiveUser && (userEmail || userId));
 
   if (isSupabaseLive && isAuthenticated && userRole === 'student' && (pathname.startsWith('/portal') || pathname.startsWith('/api/conference') || pathname.startsWith('/api/attendance'))) {
-    const { data: access, error: accessError } = await supabase.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
-    if (accessError || access?.enabled === false) {
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const checkClient = adminKey ? createServerClient(supabaseUrl, adminKey, { cookies: { getAll: () => [], setAll: () => {} } }) : supabase;
+    const { data: access, error: accessError } = await checkClient.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
+    // G03: Fail-closed. Only explicit enabled === true is permitted; missing row or error must block
+    if (accessError || !access || access.enabled !== true) {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Onboarding checks must be completed before LMS access is activated.' }, { status: 403 });
       return createRedirect('/login?reason=onboarding_pending');
     }
@@ -213,7 +233,7 @@ export async function middleware(request: NextRequest) {
   if (isAuthenticated && userRole === 'student') {
     const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
     const isVerifyRoute = pathname.startsWith('/certificate/verify');
-    const isReceiptRoute = pathname.startsWith('/accounts/receipts/');
+    const isReceiptRoute = pathname === '/accounts/receipts' || pathname.startsWith('/accounts/receipts/');
     if (!isPortalRoute && !isVerifyRoute && !isReceiptRoute) {
       return createRedirect('/portal');
     }
@@ -273,6 +293,54 @@ export async function middleware(request: NextRequest) {
       if (userRole === 'placement_coordinator') return createRedirect('/placement');
       if (userRole === 'support') return createRedirect('/support');
       return createRedirect('/dashboard');
+    }
+  }
+
+  // 15. Financial workspace boundary: /accounts/approvals, /accounts/expenses, /accounts/vendors
+  if (isAuthenticated && ['/accounts/approvals', '/accounts/expenses', '/accounts/vendors'].some((p) => pathname.startsWith(p))) {
+    if (!['super_admin', 'admin', 'accountant'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          counsellor: '/crm/leads',
+          trainer: '/academics/courses',
+          placement_coordinator: '/placement',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
+  // 16. CRM & Admissions boundary: /crm and /admissions restricted to super_admin, admin, counsellor
+  if (isAuthenticated && (pathname.startsWith('/crm') || pathname.startsWith('/admissions'))) {
+    if (!['super_admin', 'admin', 'counsellor'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          accountant: '/accounts/fees',
+          trainer: '/academics/courses',
+          placement_coordinator: '/placement',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
+  // 17. Placements boundary: /placement restricted to super_admin, admin, placement_coordinator
+  if (isAuthenticated && pathname.startsWith('/placement')) {
+    if (!['super_admin', 'admin', 'placement_coordinator'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          accountant: '/accounts/fees',
+          counsellor: '/crm/leads',
+          trainer: '/academics/courses',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
     }
   }
 

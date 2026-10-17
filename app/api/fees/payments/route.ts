@@ -17,12 +17,14 @@ const details = z.object({
   bank_upi_reference: z.string().trim().max(200).optional(),
   payment_proof_url: z.string().min(1).max(4096).refine((v) => v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach payment proof'),
   notes: z.string().max(2000).optional(),
+  installment_id: z.string().trim().max(200).optional(),
 });
 const command = z.discriminatedUnion('action', [
   z.object({ action: z.literal('record'), input: details.extend({ fee_id: z.string().min(1), student_id: z.string().optional(), enrollment_id: z.string().optional(), idempotency_key: z.string().min(1).max(200) }) }),
   z.object({ action: z.literal('update'), paymentId: z.string(), input: details }),
   z.object({ action: z.literal('approve'), paymentId: z.string(), notes: z.string().max(2000).optional() }),
   z.object({ action: z.literal('reject'), paymentId: z.string(), reason: z.string().trim().min(1).max(2000) }),
+  z.object({ action: z.literal('void_receipt'), receiptId: z.string().min(1), reason: z.string().trim().min(1).max(2000) }),
 ]);
 
 function failure(error: unknown) {
@@ -46,6 +48,16 @@ export async function POST(request: NextRequest) {
     if (!['counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role)) throw new Error('Forbidden: Payment staff access required.');
     const body = command.parse(await request.json());
     const result = await paymentTransaction(actor, () => {
+      if (body.action === 'void_receipt') {
+        if (!['accountant', 'admin', 'super_admin'].includes(actor.role)) {
+          throw new Error('Forbidden: Only Accounts or Administrators can void receipts.');
+        }
+        const receipt = (store.receipts || []).find((r) => r.id === body.receiptId || r.receipt_number === body.receiptId);
+        if (!receipt) throw new Error('Receipt not found.');
+        assertSameTenant(actor, receipt);
+        const voidRes = feeWorkflowService.voidReceipt(receipt.id, actor.id, body.reason);
+        return { result: voidRes, snapshot: visibleWorkflowSnapshot(actor) };
+      }
       if (body.action === 'record') {
         const studentFee = store.studentFees.find((f) => f.id === body.input.fee_id);
         if (!studentFee) throw new Error('Fee account not found.');

@@ -12,6 +12,7 @@ import {
   Calendar,
   Download,
   ShieldAlert,
+  Flag,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,11 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Certificate } from '@/types';
-import { verifyAndGenerateCertificate, revokeCertificate } from '@/lib/services/certificate-service';
+import {
+  verifyAndGenerateCertificate,
+  revokeCertificate,
+  flagCertificateAsFraudulent,
+} from '@/lib/services/certificate-service';
 import { formatDate } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
 
@@ -34,8 +39,9 @@ export default function CertificatesPage() {
   const [reasons, setReasons] = React.useState<string[]>([]);
   const [issuedSuccess, setIssuedSuccess] = React.useState<Certificate | null>(null);
 
-  // Revocation modal state
+  // Revocation & Fraud modal state
   const [revokingCertId, setRevokingCertId] = React.useState<string | null>(null);
+  const [revocationType, setRevocationType] = React.useState<'Revoked' | 'Fraudulent'>('Revoked');
   const [revokeReason, setRevokeReason] = React.useState('');
   const [isRevokeModalOpen, setIsRevokeModalOpen] = React.useState(false);
   const [revokeSuccessMessage, setRevokeSuccessMessage] = React.useState<string | null>(null);
@@ -52,15 +58,24 @@ export default function CertificatesPage() {
 
   React.useEffect(() => {
     if (!studentId && (store.students || []).length > 0) {
-      const first = store.students[0];
+      const first = (store.students || [])[0];
       setStudentId(first.id);
-      if (first.course_id) setCourseId(first.course_id);
+      if (first.course_id) {
+        setCourseId(first.course_id);
+      } else if (!courseId && (store.courses || []).length > 0) {
+        setCourseId((store.courses || [])[0].id);
+      }
     }
-  }, [studentId]);
+  }, [studentId, courseId]);
 
-  const handleOpenRevokeModal = (certificateId: string) => {
+  const handleOpenRevokeModal = (certificateId: string, type: 'Revoked' | 'Fraudulent' = 'Revoked') => {
     setRevokingCertId(certificateId);
-    setRevokeReason('');
+    setRevocationType(type);
+    setRevokeReason(
+      type === 'Fraudulent'
+        ? 'Fraudulent credential / unauthorized forgery detected'
+        : 'Administrative Revocation'
+    );
     setIsRevokeModalOpen(true);
   };
 
@@ -68,17 +83,24 @@ export default function CertificatesPage() {
     e.preventDefault();
     if (!revokingCertId || !revokeReason.trim()) return;
     const targetId = revokingCertId;
-    await revokeCertificate(targetId, user?.id || 'usr-admin', revokeReason.trim());
+    await revokeCertificate(targetId, user?.id || 'usr-admin', revokeReason.trim(), revocationType);
     setIsRevokeModalOpen(false);
     setRevokingCertId(null);
     setRevokeReason('');
-    setRevokeSuccessMessage(`Certificate ${targetId} has been successfully revoked and marked invalid.`);
+    setRevokeSuccessMessage(
+      revocationType === 'Fraudulent'
+        ? `Certificate ${targetId} has been permanently flagged as FRAUDULENT and blacklisted across all verification systems.`
+        : `Certificate ${targetId} has been successfully revoked and marked invalid.`
+    );
     refreshList();
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentId || !courseId) return;
+    if (!studentId || !courseId) {
+      setReasons(['Please select both an enrolled student candidate and course to proceed with benchmark verification.']);
+      return;
+    }
     setReasons([]);
     setIssuedSuccess(null);
 
@@ -125,6 +147,16 @@ export default function CertificatesPage() {
             onClick={() => {
               setReasons([]);
               setIssuedSuccess(null);
+              const students = store.students || [];
+              const courses = store.courses || [];
+              if (students.length > 0) {
+                const currentOrFirst = students.find((s) => s.id === studentId) || students[0];
+                setStudentId(currentOrFirst.id);
+                setCourseId(currentOrFirst.course_id || (courses.find((c) => c.id === courseId)?.id) || courses[0]?.id || '');
+              } else {
+                setStudentId('');
+                setCourseId('');
+              }
               setIsGenerateModal(true);
             }}
             className="text-xs flex items-center space-x-1"
@@ -196,7 +228,8 @@ export default function CertificatesPage() {
                 </tr>
               ) : (
                 certificates.map((cert) => {
-                  const isRevoked = cert.is_valid === false || cert.status === 'Revoked';
+                  const isRevoked = cert.is_valid === false || cert.status === 'Revoked' || cert.status === 'Fraudulent';
+                  const isFraudulent = cert.status === 'Fraudulent';
                   return (
                     <tr key={cert.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 font-semibold text-blue-600">{cert.certificate_id}</td>
@@ -207,12 +240,17 @@ export default function CertificatesPage() {
                       <td className="px-4 py-3 text-slate-500">{formatDate(cert.issue_date)}</td>
                       <td className="px-4 py-3">
                         <div className="space-y-0.5">
-                          <Badge variant={!isRevoked ? 'success' : 'destructive'}>
-                            {!isRevoked ? 'Valid' : 'Revoked'}
+                          <Badge
+                            variant={!isRevoked ? 'success' : isFraudulent ? 'destructive' : 'warning'}
+                            className={isFraudulent ? 'bg-red-800 text-white border-0 font-bold' : ''}
+                          >
+                            {!isRevoked ? 'Valid' : isFraudulent ? 'Fraudulent' : 'Revoked'}
                           </Badge>
                           {isRevoked && cert.revocation_reason && (
                             <p
-                              className="text-[10px] text-rose-600 font-medium truncate max-w-[140px]"
+                              className={`text-[10px] font-medium truncate max-w-[140px] ${
+                                isFraudulent ? 'text-red-700 font-bold' : 'text-slate-500'
+                              }`}
                               title={cert.revocation_reason}
                             >
                               {cert.revocation_reason}
@@ -225,17 +263,19 @@ export default function CertificatesPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end space-x-1.5">
-                          <a
-                            href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Download Verified PDF Certificate"
-                          >
-                            <Button variant="outline" size="sm" className="text-xs px-2 py-1 flex items-center space-x-1">
-                              <Download className="h-3 w-3 text-[#0A6ED1]" />
-                              <span>PDF</span>
-                            </Button>
-                          </a>
+                          {!isRevoked && (
+                            <a
+                              href={`/api/certificates/${cert.certificate_id}/pdf?download=true`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Download Verified PDF Certificate"
+                            >
+                              <Button variant="outline" size="sm" className="text-xs px-2 py-1 flex items-center space-x-1">
+                                <Download className="h-3 w-3 text-[#0A6ED1]" />
+                                <span>PDF</span>
+                              </Button>
+                            </a>
+                          )}
                           <Link href={`/certificate/verify/${cert.certificate_id}`} target="_blank">
                             <Button variant="sap" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
                               <ExternalLink className="h-3 w-3" />
@@ -243,14 +283,27 @@ export default function CertificatesPage() {
                             </Button>
                           </Link>
                           {canIssueCertificate && !isRevoked && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenRevokeModal(cert.certificate_id)}
-                              className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
-                            >
-                              Revoke
-                            </Button>
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenRevokeModal(cert.certificate_id, 'Revoked')}
+                                className="text-xs px-2 py-1 text-slate-700 border-slate-300 hover:bg-slate-100"
+                                title="Administrative Revocation"
+                              >
+                                Revoke
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleOpenRevokeModal(cert.certificate_id, 'Fraudulent')}
+                                className="text-xs px-2 py-1 flex items-center space-x-1 bg-rose-700 hover:bg-rose-800 text-white"
+                                title="Flag as Fraudulent / Forgery"
+                              >
+                                <Flag className="h-3 w-3" />
+                                <span>Flag Fraud</span>
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -271,6 +324,33 @@ export default function CertificatesPage() {
         description="Validates academic benchmarks before minting an official verifiable credential."
       >
         <form onSubmit={handleGenerate} className="space-y-4 text-xs">
+          {((store.students || []).length === 0 || (store.courses || []).length === 0) && (
+            <div className="space-y-2">
+              {(store.students || []).length === 0 && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl space-y-1">
+                  <p className="font-bold flex items-center space-x-1.5 text-amber-950">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>No Enrolled Students Available</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    No active student profiles found in the institute directory. Please enroll candidates via Admissions or Students workspace before minting certificates.
+                  </p>
+                </div>
+              )}
+              {(store.courses || []).length === 0 && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl space-y-1">
+                  <p className="font-bold flex items-center space-x-1.5 text-amber-950">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>No Courses Registered</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    No academic courses configured. Please add courses in Academic Operations before generating certificates.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {reasons.length > 0 && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg space-y-1">
               <p className="font-bold flex items-center space-x-1">
@@ -309,17 +389,15 @@ export default function CertificatesPage() {
                   setCourseId(s.course_id);
                 }
               }}
-              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+              disabled={(store.students || []).length === 0}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#0A6ED1] disabled:bg-slate-100 disabled:text-slate-400"
             >
-              {(store.students || []).length === 0 ? (
-                <option value="" disabled>No enrolled students available</option>
-              ) : (
-                (store.students || []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name} ({s.student_code} — Progress: {s.course_progress}% | Att: {s.attendance_percentage}%)
-                  </option>
-                ))
-              )}
+              <option value="">-- Select Enrolled Student ({(store.students || []).length} available) --</option>
+              {(store.students || []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.full_name} ({s.student_code || s.admission_number || s.id} — Progress: {s.course_progress ?? 0}% | Att: {s.attendance_percentage ?? 0}%)
+                </option>
+              ))}
             </select>
           </div>
 
@@ -330,15 +408,15 @@ export default function CertificatesPage() {
             <select
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
-              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+              disabled={(store.courses || []).length === 0}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#0A6ED1] disabled:bg-slate-100 disabled:text-slate-400"
             >
-              {(store.courses || []).length === 0 ? (
-                <option value="" disabled>No courses registered</option>
-              ) : (
-                (store.courses || []).map((c) => (
-                  <option key={c.id} value={c.id}>{c.course_name}</option>
-                ))
-              )}
+              <option value="">-- Select Course ({(store.courses || []).length} available) --</option>
+              {(store.courses || []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.course_name} ({c.course_code || 'SAP'})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -346,14 +424,24 @@ export default function CertificatesPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setIsGenerateModal(false)}>
               Close
             </Button>
-            <Button type="submit" variant="sap" size="sm">
+            <Button
+              type="submit"
+              variant="sap"
+              size="sm"
+              disabled={
+                !studentId ||
+                !courseId ||
+                (store.students || []).length === 0 ||
+                (store.courses || []).length === 0
+              }
+            >
               Verify Benchmarks & Issue
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Revocation Justification Modal */}
+      {/* Revocation & Fraud Justification Modal */}
       <Modal
         isOpen={isRevokeModalOpen}
         onClose={() => {
@@ -361,8 +449,12 @@ export default function CertificatesPage() {
           setRevokingCertId(null);
           setRevokeReason('');
         }}
-        title="Revoke Official Certificate"
-        description="Invalidating a certificate permanently marks it as revoked across all institutional verification channels."
+        title={revocationType === 'Fraudulent' ? 'Flag Certificate as Fraudulent' : 'Revoke Official Certificate'}
+        description={
+          revocationType === 'Fraudulent'
+            ? 'Blacklists the credential for forgery or security breach across all public verification channels.'
+            : 'Invalidating a certificate permanently marks it as revoked across all institutional verification channels.'
+        }
       >
         {(() => {
           const certToRevoke = (certificates || []).find(
@@ -370,15 +462,60 @@ export default function CertificatesPage() {
           );
           return (
             <form onSubmit={handleConfirmRevoke} className="space-y-4 text-xs">
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg">
-                <p className="font-bold flex items-center space-x-1.5 text-rose-900">
-                  <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                  <span>Warning: Permanent Credential Invalidation</span>
-                </p>
-                <p className="text-[11px] mt-1 text-rose-700 leading-relaxed">
-                  Revoking this certificate immediately invalidates the tamper-proof credential on public QR verification links and employer verification queries.
-                </p>
+              {/* Type Switcher */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRevocationType('Revoked');
+                    setRevokeReason('Administrative Revocation');
+                  }}
+                  className={`py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    revocationType === 'Revoked'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Standard Revocation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRevocationType('Fraudulent');
+                    setRevokeReason('Fraudulent credential / unauthorized forgery detected');
+                  }}
+                  className={`py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center justify-center space-x-1 ${
+                    revocationType === 'Fraudulent'
+                      ? 'bg-rose-700 text-white shadow-xs'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  <span>Flag as Fraudulent</span>
+                </button>
               </div>
+
+              {revocationType === 'Fraudulent' ? (
+                <div className="p-3 bg-red-950 text-white border border-red-800 rounded-lg space-y-1">
+                  <p className="font-bold flex items-center space-x-1.5 text-red-200">
+                    <ShieldAlert className="h-4 w-4 text-red-400 shrink-0" />
+                    <span>SECURITY BLACKLIST: FRAUDULENT CREDENTIAL</span>
+                  </p>
+                  <p className="text-[11px] text-red-300 leading-relaxed">
+                    Flagging this credential permanently displays a prominent Security Warning on the public verification portal and records an immutable fraud audit log.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg">
+                  <p className="font-bold flex items-center space-x-1.5 text-rose-900">
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                    <span>Warning: Credential Invalidation</span>
+                  </p>
+                  <p className="text-[11px] mt-1 text-rose-700 leading-relaxed">
+                    Revoking this certificate invalidates the credential on public QR verification links and employer verification queries.
+                  </p>
+                </div>
+              )}
 
               {certToRevoke && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
@@ -407,23 +544,36 @@ export default function CertificatesPage() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Revocation Justification / Reason <span className="text-rose-500">*</span>:
+                  {revocationType === 'Fraudulent' ? 'Fraud Justification / Evidence' : 'Revocation Justification / Reason'}{' '}
+                  <span className="text-rose-500">*</span>:
                 </label>
                 <textarea
                   rows={3}
                   value={revokeReason}
                   onChange={(e) => setRevokeReason(e.target.value)}
-                  placeholder="e.g. Disciplinary violation discovered / Academic dishonesty / Re-issuance required"
+                  placeholder={
+                    revocationType === 'Fraudulent'
+                      ? 'e.g. Counterfeit PDF presented to employer / Stolen certificate ID / Tampered grades'
+                      : 'e.g. Disciplinary violation discovered / Academic discrepancy / Re-issuance required'
+                  }
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none"
                   required
                 />
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {[
-                    'Academic dishonesty / integrity policy breach',
-                    'Attendance / exam requirement discrepancy',
-                    'Fee arrears or cheque bounce discovered',
-                    'Administrative correction & re-issuance',
-                  ].map((preset) => (
+                  {(revocationType === 'Fraudulent'
+                    ? [
+                        'Forged / counterfeit credential presented to employer',
+                        'Unauthorized alteration / tampering of grades or dates',
+                        'Impersonation / proxy examination and attendance breach',
+                        'Fabricated batch enrollment or stolen certificate ID',
+                      ]
+                    : [
+                        'Academic dishonesty / integrity policy breach',
+                        'Attendance / exam requirement discrepancy',
+                        'Fee arrears or cheque bounce discovered',
+                        'Administrative correction & re-issuance',
+                      ]
+                  ).map((preset) => (
                     <button
                       type="button"
                       key={preset}
@@ -454,8 +604,9 @@ export default function CertificatesPage() {
                   variant="destructive"
                   size="sm"
                   disabled={!revokeReason.trim()}
+                  className={revocationType === 'Fraudulent' ? 'bg-red-800 hover:bg-red-900 text-white' : ''}
                 >
-                  Confirm Revocation
+                  {revocationType === 'Fraudulent' ? 'Confirm Fraud Blacklist' : 'Confirm Revocation'}
                 </Button>
               </div>
             </form>

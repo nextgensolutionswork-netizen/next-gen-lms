@@ -64,8 +64,11 @@ class InstituteDataStore {
       if (snapshot) {
         if (snapshot.settings) this.settings = snapshot.settings;
         if (snapshot.users?.length) {
+          const existingEmails = new Set(snapshot.users.map((u: any) => u.email?.toLowerCase()));
           const existingIds = new Set(snapshot.users.map((u: any) => u.id));
-          const missingSeedUsers = this.users.filter((u) => !existingIds.has(u.id));
+          const missingSeedUsers = this.users
+            .filter((u) => !existingEmails.has(u.email.toLowerCase()))
+            .map((u) => (existingIds.has(u.id) ? { ...u, id: `${u.id}-seed` } : u));
           this.users = [...snapshot.users, ...missingSeedUsers];
         }
         if (snapshot.admissions?.length) this.admissions = snapshot.admissions;
@@ -1498,7 +1501,7 @@ class InstituteDataStore {
       location: 'Hyderabad / Bengaluru',
       salary_range: '₹6.5 - ₹8.5 LPA',
       description: 'Seeking trained SAP FICO consultants with solid grasp on General Ledger, Accounts Payable, Accounts Receivable, and Asset Accounting on S/4HANA.',
-      application_deadline: '2026-04-30',
+      application_deadline: '2026-12-31',
       status: 'Open',
       applications_count: 8,
       created_at: '2026-02-15T10:00:00Z',
@@ -1512,7 +1515,7 @@ class InstituteDataStore {
       location: 'Pune / Mumbai',
       salary_range: '₹6.0 - ₹8.0 LPA',
       description: 'Procure to pay lifecycle, master data governance, inventory control, and purchase order configuration.',
-      application_deadline: '2026-05-15',
+      application_deadline: '2026-12-31',
       status: 'Open',
       applications_count: 5,
       created_at: '2026-02-18T10:00:00Z',

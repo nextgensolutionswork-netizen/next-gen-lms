@@ -1,0 +1,17 @@
+[
+  {
+    "javascriptEnabled": true,
+    "url": "http://127.0.0.1:3106/login",
+    "pageErrors": [],
+    "alerts": [
+      "User profile not found. Please verify your credentials.",
+      ""
+    ]
+  },
+  {
+    "javascriptEnabled": false,
+    "url": "http://127.0.0.1:3106/login?email=audit-nonexistent%40example.test&password=SyntheticOnly%212026",
+    "pageErrors": [],
+    "alerts": []
+  }
+]

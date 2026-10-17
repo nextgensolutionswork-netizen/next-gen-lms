@@ -35,6 +35,19 @@ export async function GET(
       );
     }
 
+    // G18: Block download if certificate has been revoked, suspended, or flagged as fraudulent
+    if (!cert.is_valid || cert.status === 'Revoked' || cert.status === 'Fraudulent' || cert.status === 'Suspended') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Certificate '${cert.certificate_id}' has been ${cert.status || 'revoked'} and is invalid. Official PDF download is permanently disabled.`,
+          revocation_reason: cert.revocation_reason,
+          status: cert.status,
+        },
+        { status: 410 }
+      );
+    }
+
     const pdfBuffer = await generateCertificatePdfBuffer(cert);
 
     const { searchParams } = new URL(request.url);

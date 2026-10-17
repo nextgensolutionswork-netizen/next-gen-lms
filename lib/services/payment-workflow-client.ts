@@ -43,7 +43,13 @@ export const paymentWorkflowClient = {
   async rejectPayment(paymentId: string, _userId: string, reason: string) {
     return (await request({ action: 'reject', paymentId, reason })).payment as StudentPaymentRecord;
   },
+  async voidReceipt(receiptId: string, reason: string) {
+    return (await request({ action: 'void_receipt', receiptId, reason })).result;
+  },
   async createAdmission(input: CreateAdmissionInput) {
-    return (await request(input, '/api/admissions')).result;
+    const signature = JSON.stringify({ email: input.email, course_id: input.course_id, date: input.admission_date, phone: input.phone });
+    const key = input.idempotency_key || keys.get(signature) || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `adm-key-${Date.now()}`);
+    keys.set(signature, key);
+    return (await request({ ...input, idempotency_key: key }, '/api/admissions')).result;
   },
 };
