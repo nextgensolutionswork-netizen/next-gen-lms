@@ -744,7 +744,10 @@ export async function provisionStudentLmsAccount(
             tenant_id: tenantId(caseRecord),
           },
         });
-        if (!createErr && created?.user) authId = created.user.id;
+        if (createErr || !created?.user) {
+          throw new Error(createErr?.message || 'Failed to create Supabase Auth student identity');
+        }
+        authId = created.user.id;
       }
       if (authId) {
         studentUser.id = authId;
@@ -760,9 +763,21 @@ export async function provisionStudentLmsAccount(
           phone: caseRecord.student_phone,
           updated_at: new Date().toISOString(),
         });
+      } else {
+        throw new Error('Supabase Auth identity could not be established');
       }
     } catch (authErr: any) {
-      console.warn('Live Supabase Auth provisioning warning:', authErr?.message);
+      console.error('Live Supabase Auth provisioning failure:', authErr?.message);
+      const student = store.students.find((s) => s.id === caseRecord.student_id);
+      if (student) {
+        student.status = 'On Hold';
+        student.updated_at = new Date().toISOString();
+      }
+      return {
+        success: false,
+        message: `Supabase Auth provisioning failure: ${authErr?.message || 'Authentication identity creation failed'}`,
+        caseRecord,
+      };
     }
   }
 
@@ -1523,14 +1538,19 @@ export async function backfillLegacyAdmissions(
       checklist.batch_allocation.notes = `Batch: ${student?.batch_name || adm.batch_name || 'Assigned'}`;
     }
 
-    // 5. Financial clearance (if payments exist)
-    const hasPaid = feeAccount ? feeAccount.paid_amount > 0 : false;
-    if (hasPaid) {
+    // 5. Financial clearance (enforce statutory threshold policy - G10)
+    const finalPayable = feeAccount ? feeAccount.net_payable : (adm.net_payable ?? adm.course_fee ?? 0);
+    const paidAmount = feeAccount ? feeAccount.paid_amount : 0;
+    const minThresholdPct = store.financeSettings?.minimum_down_payment_percent ?? 25;
+    const minRequiredClearance = finalPayable > 0 ? (finalPayable * minThresholdPct) / 100 : 0;
+    const isFinanciallyCleared = finalPayable === 0 || paidAmount >= finalPayable || (paidAmount >= minRequiredClearance && minRequiredClearance > 0);
+
+    if (isFinanciallyCleared) {
       checklist.fee_clearance_verification.completed = true;
       checklist.fee_clearance_verification.completed_at = new Date().toISOString();
       checklist.fee_clearance_verification.completed_by = user.id;
       checklist.fee_clearance_verification.completed_by_name = user.full_name;
-      checklist.fee_clearance_verification.notes = `Prior payment recorded: ₹${feeAccount?.paid_amount}`;
+      checklist.fee_clearance_verification.notes = `Verified payment (₹${paidAmount}/${finalPayable}) satisfies financial clearance policy (${minThresholdPct}% threshold).`;
     }
 
     // 6. LMS account activation

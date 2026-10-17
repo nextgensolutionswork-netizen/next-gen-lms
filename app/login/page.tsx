@@ -143,6 +143,40 @@ export default function LoginPage() {
       setTargetRedirect(redirectToParam);
     }
 
+    // Security Defense: Strip any sensitive credentials that may have leaked into URL query
+    const sensitiveKeys = ['password', 'pass', 'pwd', 'secret', 'newPassword', 'confirmPassword'];
+    let hadSensitive = false;
+    sensitiveKeys.forEach((k) => {
+      if (query.has(k)) {
+        query.delete(k);
+        hadSensitive = true;
+      }
+    });
+    if (hadSensitive && typeof window !== 'undefined') {
+      const cleanSearch = query.toString() ? `?${query.toString()}` : '';
+      window.history.replaceState(null, '', `${window.location.pathname}${cleanSearch}`);
+      setError('Insecure login attempt detected. Credentials must never be transmitted in the URL.');
+    }
+
+    // Handle standard server-side redirect error and notice query parameters
+    const urlError = query.get('error');
+    if (urlError) {
+      const errorMap: Record<string, string> = {
+        invalid_credentials: 'Unable to sign in. Check your email and password and try again.',
+        missing_credentials: 'Please enter both your email address and password.',
+        onboarding_pending: 'Your LMS portal account is currently pending onboarding verification. Please contact your coordinator.',
+        account_deactivated: 'This account has been deactivated. Please contact the administrator.',
+        insecure_request: 'Insecure login attempt detected. Credentials must never be transmitted in the URL.',
+        csrf_failed: 'Security verification failed. Please try signing in again.',
+      };
+      setError(errorMap[urlError] || 'Unable to sign in. Please try again.');
+    }
+
+    const urlNotice = query.get('notice');
+    if (urlNotice === 'logged_out') {
+      setNotice('You have been securely signed out.');
+    }
+
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const authError = query.get('error_description') || hash.get('error_description');
     const authErrorCode = query.get('error_code') || hash.get('error_code');
@@ -338,11 +372,12 @@ export default function LoginPage() {
               Return to sign in
             </Button>
           ) : recoveryMode ? (
-            <form onSubmit={handlePasswordUpdate} className="mt-6 space-y-4">
+            <form method="POST" action="/api/auth/update-password" onSubmit={handlePasswordUpdate} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="new-password" className="text-xs font-medium text-slate-700">New password</label>
                 <input
                   id="new-password"
+                  name="new_password"
                   type="password"
                   autoComplete="new-password"
                   value={newPassword}
@@ -356,6 +391,7 @@ export default function LoginPage() {
                 <label htmlFor="confirm-password" className="text-xs font-medium text-slate-700">Confirm new password</label>
                 <input
                   id="confirm-password"
+                  name="confirm_password"
                   type="password"
                   autoComplete="new-password"
                   value={confirmPassword}
@@ -371,11 +407,12 @@ export default function LoginPage() {
               </Button>
             </form>
           ) : forgotPasswordMode ? (
-            <form onSubmit={handlePasswordRecovery} className="mt-6 space-y-4">
+            <form method="POST" action="/api/auth/recover-password" onSubmit={handlePasswordRecovery} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="recovery-email" className="text-xs font-medium text-slate-700">Email address</label>
                 <input
                   id="recovery-email"
+                  name="email"
                   type="email"
                   autoComplete="email"
                   value={email}
@@ -516,7 +553,21 @@ export default function LoginPage() {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <form
+            method="POST"
+            action="/api/auth/login"
+            onSubmit={handleSubmit}
+            className="mt-4 space-y-4"
+          >
+            <input type="hidden" name="redirectTo" value={targetRedirect || ''} />
+            <noscript>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <p className="font-semibold text-amber-900">JavaScript is disabled.</p>
+                <p className="mt-0.5 text-[11px] text-amber-700">
+                  Secure server-side authentication is active. Form submissions are transmitted via encrypted HTTP POST.
+                </p>
+              </div>
+            </noscript>
             <div>
               <label htmlFor="email" className="text-xs font-medium text-slate-700">Email address</label>
               <input

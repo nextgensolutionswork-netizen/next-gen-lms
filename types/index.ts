@@ -511,7 +511,7 @@ export interface Installment {
   due_date: string;
   paid_amount: number;
   paid_date?: string;
-  status: 'Upcoming' | 'Due' | 'Paid' | 'Partial' | 'Overdue';
+  status: 'Upcoming' | 'Due' | 'Paid' | 'Partial' | 'Overdue' | 'Pending';
 }
 
 export type PaymentMethod =

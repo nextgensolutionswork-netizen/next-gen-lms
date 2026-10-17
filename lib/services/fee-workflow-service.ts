@@ -951,9 +951,24 @@ export class FeeWorkflowService {
 
     const paymentId = `spr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
-    const matchedInstallment = input.installment_id
+    const rawInstallment = input.installment_id
       ? store.installments?.find((i) => i.id === input.installment_id)
       : undefined;
+
+    if (rawInstallment) {
+      const isOwner =
+        (rawInstallment.fee_account_id === fee.id ||
+          rawInstallment.fee_account_id === fee.fee_account_id ||
+          (rawInstallment as any).student_fee_id === fee.id ||
+          (rawInstallment as any).student_id === fee.student_id) &&
+        tenantId(rawInstallment) === tenantId(recorder);
+
+      if (!isOwner) {
+        throw new Error('Installment does not belong to this student fee account or tenant.');
+      }
+    }
+
+    const matchedInstallment = rawInstallment;
 
     const paymentRecord: StudentPaymentRecord = {
       tenant_id: tenantId(recorder),
@@ -1064,7 +1079,9 @@ export class FeeWorkflowService {
     if (updates.notes !== undefined) {
       payment.notes = updates.notes;
     }
-    payment.installment_id = undefined;
+    if (updates.installment_id !== undefined) {
+      payment.installment_id = updates.installment_id;
+    }
 
     payment.verification_status = 'Pending Verification';
     payment.status = 'Pending Approval';
@@ -1268,7 +1285,15 @@ export class FeeWorkflowService {
     // 1c. Reconcile Installments (B06)
     if (!store.installments) store.installments = [];
     if (payment.installment_id) {
-      const targetInst = store.installments.find((i) => i.id === payment.installment_id);
+      const targetInst = store.installments.find(
+        (i) =>
+          i.id === payment.installment_id &&
+          (i.fee_account_id === fee.id ||
+            i.fee_account_id === fee.fee_account_id ||
+            (i as any).student_fee_id === fee.id ||
+            (i as any).student_id === fee.student_id) &&
+          tenantId(i) === tenantId(fee)
+      );
       if (targetInst) {
         targetInst.paid_amount = Number(((targetInst.paid_amount || 0) + payment.amount_paid).toFixed(2));
         targetInst.status = targetInst.paid_amount >= targetInst.amount ? 'Paid' : 'Partial';
@@ -1789,6 +1814,25 @@ export class FeeWorkflowService {
       student.paid_amount = Math.max(0, Number(((student.paid_amount || 0) - receipt.payment_amount).toFixed(2)));
       student.outstanding_amount = Number(((student.outstanding_amount || 0) + receipt.payment_amount).toFixed(2));
       student.updated_at = now;
+    }
+
+    // 3. Reconcile Linked Installment (G06 fix)
+    const linkedInstallmentId = studentPayment?.installment_id || (legacyPayment as any)?.installment_id;
+    if (linkedInstallmentId && store.installments) {
+      const targetInst = store.installments.find(
+        (i) =>
+          i.id === linkedInstallmentId &&
+          (i.student_id === receipt.student_id ||
+            i.fee_account_id === feeAccount?.id ||
+            (fee && (i.fee_account_id === fee.id || (i as any).student_fee_id === fee.id)))
+      );
+      if (targetInst) {
+        targetInst.paid_amount = Math.max(0, Number(((targetInst.paid_amount || 0) - receipt.payment_amount).toFixed(2)));
+        targetInst.status = targetInst.paid_amount >= targetInst.amount ? 'Paid' : targetInst.paid_amount > 0 ? 'Partial' : 'Pending';
+        if (targetInst.status !== 'Paid') {
+          targetInst.paid_date = undefined;
+        }
+      }
     }
 
     // 4. Record Credit Note entry in Student Financial Ledger

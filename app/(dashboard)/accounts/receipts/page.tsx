@@ -106,13 +106,8 @@ export default function ReceiptsListPage() {
       let creditNoteNumber = '';
       if (typeof window !== 'undefined') {
         const { paymentWorkflowClient } = await import('@/lib/services/payment-workflow-client');
-        try {
-          const res = await paymentWorkflowClient.voidReceipt(selectedReceiptForVoid.id, finalReason);
-          creditNoteNumber = res?.creditNoteNumber || '';
-        } catch {
-          const res = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason);
-          creditNoteNumber = res.creditNoteNumber;
-        }
+        const res = await paymentWorkflowClient.voidReceipt(selectedReceiptForVoid.id, finalReason);
+        creditNoteNumber = res?.creditNoteNumber || '';
       } else {
         const res = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason);
         creditNoteNumber = res.creditNoteNumber;

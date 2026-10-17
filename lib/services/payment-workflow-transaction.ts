@@ -79,6 +79,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
     try {
       const result = await operation();
       if (!readOnly) {
+        store.reconcileDualLedgers();
         const snapshot = workflowSnapshot(tenant);
         if (db) {
           const response = await db.rpc('commit_fee_workflow', { p_tenant: tenant, p_revision: revision, p_snapshot: snapshot });

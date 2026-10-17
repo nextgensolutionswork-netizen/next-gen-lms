@@ -121,17 +121,19 @@ const liveAudit = vi.hoisted(()=>({enabled:false}));
 vi.mock('@/lib/supabase/db', async(importOriginal)=>({...await importOriginal<any>(),isLiveSupabaseEnabled:()=>liveAudit.enabled}));
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:()=>({auth:{admin:{listUsers:async()=>({data:{users:[]}}),createUser:async()=>({data:{user:null},error:new Error('Synthetic Auth rejection')})}}})}));
 vi.mock('@/lib/services/notification-service',async(importOriginal)=>({...await importOriginal<any>(),sendResendEmail:async()=>({success:true,simulated:true}),sendMultiChannelNotification:async()=>({success:true})}));
-it('F07: Auth provisioning rejection still reports activated LMS',async()=>{
-  const payment=fees.recordPayment({...input(),amount_paid:10000},counsellor.id);
-  fees.verifyPayment(payment.id,accountant.id);
-  const c=store.onboardingCases[0];
-  for(const key of ['admission_confirmation','student_details_verification','document_verification','course_confirmation','batch_allocation','fee_clearance_verification']) (c.checklist as any)[key].completed=true;
-  c.documents=[{id:'synthetic-document',status:'verified'} as any];
-  liveAudit.enabled=true;
+it('F07: Auth provisioning rejection fails closed and prevents unauthorized LMS activation', async () => {
+  const payment = fees.recordPayment({ ...input(), amount_paid: 10000 }, counsellor.id);
+  fees.verifyPayment(payment.id, accountant.id);
+  const c = store.onboardingCases[0];
+  for (const key of ['admission_confirmation', 'student_details_verification', 'document_verification', 'course_confirmation', 'batch_allocation', 'fee_clearance_verification']) (c.checklist as any)[key].completed = true;
+  c.documents = [{ id: 'synthetic-document', status: 'verified' } as any];
+  liveAudit.enabled = true;
   try {
-    const result=await provisionStudentLmsAccount(c.id,onboarding);
-    expect(result.success).toBe(true);
-    expect(c.lms_account_created).toBe(true);
-    expect(store.students.find(s=>s.id===studentId)?.status).toBe('Active');
-  } finally {liveAudit.enabled=false;}
+    const result = await provisionStudentLmsAccount(c.id, onboarding);
+    expect(result.success).toBe(false);
+    expect(c.lms_account_created).toBe(false);
+    expect(store.students.find((s) => s.id === studentId)?.status).not.toBe('Active');
+  } finally {
+    liveAudit.enabled = false;
+  }
 });

@@ -99,7 +99,7 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      await supabase.from('leads').insert({
+      const { error } = await supabase.from('leads').insert({
         id: newLead.id,
         lead_code: newLead.lead_code,
         full_name: newLead.full_name,
@@ -120,8 +120,13 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
         created_at: newLead.created_at,
         updated_at: newLead.updated_at,
       });
-    } catch (err) {
-      console.warn('Supabase createLead direct query warning, preserved locally:', err);
+      if (error) {
+        throw new Error(`Database error creating lead: ${error.message}`);
+      }
+    } catch (err: any) {
+      store.leads = store.leads.filter((l) => l.id !== newLead.id);
+      store.persistSync();
+      throw new Error(`Failed to create lead in database: ${err.message}`);
     }
   }
 
@@ -149,6 +154,10 @@ export async function updateLeadStage(
   if (!lead) throw new Error('Lead not found');
 
   const oldStage = lead.stage;
+  const oldNotes = lead.notes;
+  const oldFollowUp = lead.follow_up_date;
+  const oldUpdatedAt = lead.updated_at;
+
   lead.stage = stage;
   lead.updated_at = new Date().toISOString();
   if (followUpDate !== undefined) {
@@ -162,7 +171,7 @@ export async function updateLeadStage(
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      await supabase
+      const { error: updErr } = await supabase
         .from('leads')
         .update({
           stage,
@@ -172,16 +181,28 @@ export async function updateLeadStage(
         })
         .eq('id', leadId);
 
+      if (updErr) {
+        throw new Error(`Database error updating lead: ${updErr.message}`);
+      }
+
       // Insert audit record into lead_followups table matching migration 001
-      await supabase.from('lead_followups').insert({
+      const { error: fErr } = await supabase.from('lead_followups').insert({
         lead_id: leadId,
         counsellor_id: counsellorId,
         stage_before: oldStage,
         stage_after: stage,
         notes: notes || 'Stage updated',
       });
-    } catch (err) {
-      console.warn('Supabase updateLeadStage direct query warning, preserved locally:', err);
+      if (fErr) {
+        console.warn('Lead followups insert warning:', fErr.message);
+      }
+    } catch (err: any) {
+      lead.stage = oldStage;
+      lead.notes = oldNotes;
+      lead.follow_up_date = oldFollowUp;
+      lead.updated_at = oldUpdatedAt;
+      store.persistSync();
+      throw new Error(`Failed to update lead stage in database: ${err.message}`);
     }
   }
 

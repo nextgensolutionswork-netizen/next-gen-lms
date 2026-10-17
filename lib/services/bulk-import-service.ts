@@ -289,26 +289,26 @@ export function validateStudentRows(
     }
 
     // 4. Course validation
-    const course = store.courses.find(
+    const course = (store.courses || []).find(
       (c) =>
         c.id.toLowerCase() === courseIdentifier.toLowerCase() ||
         c.course_code.toLowerCase() === courseIdentifier.toLowerCase() ||
         c.course_name.toLowerCase().includes(courseIdentifier.toLowerCase())
-    ) || store.courses[0]; // fallback to default if not matched
+    ) || (store.courses && store.courses.length > 0 ? store.courses[0] : undefined);
 
-    if (!courseIdentifier) {
+    if (!courseIdentifier && course) {
       const msg = `Course not specified, defaulting to "${course?.course_name}"`;
       rowWarnings.push(msg);
       errors.push({ rowNumber, field: 'course_code', message: msg, severity: 'warning' });
     }
 
     // 5. Batch validation
-    const batch = store.batches.find(
+    const batch = (store.batches || []).find(
       (b) =>
         b.id.toLowerCase() === batchIdentifier.toLowerCase() ||
         b.batch_code.toLowerCase() === batchIdentifier.toLowerCase() ||
         b.batch_name.toLowerCase().includes(batchIdentifier.toLowerCase())
-    ) || store.batches[0];
+    ) || (store.batches && store.batches.length > 0 ? store.batches[0] : undefined);
 
     // 6. Fee validation
     const feeNum = parseFloat(courseFeeRaw.replace(/[^0-9.]/g, '')) || 40000;
@@ -491,12 +491,12 @@ export function validateLeadRows(
     ) || 'New';
 
     // 4. Course lookup
-    const course = store.courses.find(
+    const course = (store.courses || []).find(
       (c) =>
         c.id.toLowerCase() === courseIdentifier.toLowerCase() ||
         c.course_code.toLowerCase() === courseIdentifier.toLowerCase() ||
         c.course_name.toLowerCase().includes(courseIdentifier.toLowerCase())
-    ) || store.courses[0];
+    ) || (store.courses && store.courses.length > 0 ? store.courses[0] : undefined);
 
     const expYears = parseInt(experienceRaw, 10) || 0;
     const isValid = rowErrors.length === 0;

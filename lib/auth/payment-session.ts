@@ -42,7 +42,11 @@ export async function authenticatePaymentRequest(request: NextRequest): Promise<
     if (!signedValue) throw new Error('Unauthorized: Signed session required.');
     const decoded = JSON.parse(decodeURIComponent(signedValue));
     const targetId = (decoded.payload || decoded).id;
-    user = store.users.find((u) => u.id === targetId) || (decoded.payload || decoded);
+    const matchedUser = store.users.find((u) => u.id === targetId);
+    if (!matchedUser) {
+      throw new Error('Unauthorized: Unknown or unverified user profile.');
+    }
+    user = matchedUser;
     if (user && !user.tenant_id) user.tenant_id = 'default';
   }
   if (!user || user.is_active === false) throw new Error('Unauthorized: Active user required.');

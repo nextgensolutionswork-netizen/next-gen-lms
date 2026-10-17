@@ -22,20 +22,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const identity = (role: string) => encodeURIComponent(JSON.stringify({ id: 'synthetic-nonexistent', email: 'audit@example.test', role, tenant_id: 'audit-tenant', is_active: true }));
 
-it('F01: unsigned administrator cookie passes protected-page middleware without live authentication', async () => {
+it('F01: unsigned administrator cookie is rejected by protected-page middleware without live authentication', async () => {
   const response = await middleware(new NextRequest('http://localhost:3117/accounts/approvals', { headers: { cookie: `${AUTH_COOKIE_NAME}=${identity('super_admin')}` } }));
-  expect(response.headers.get('x-middleware-next')).toBe('1');
+  expect(response.headers.get('location')).toContain('/login');
 });
-it('F02: financial authentication accepts a cookie-only unknown actor after live Auth rejects session', async () => {
+it('F02: financial authentication rejects a cookie-only unknown actor after live Auth rejects session', async () => {
   const value = identity('accountant');
   const signature = await generateAuthCookieSignature(value);
-  const actor = await authenticatePaymentRequest(new NextRequest('http://localhost:3117/api/fees/payments', { headers: { cookie: `${AUTH_COOKIE_NAME}=${value}; ${AUTH_SIG_COOKIE_NAME}=${signature}` } }));
-  expect(actor.id).toBe('synthetic-nonexistent');
-  expect(actor.role).toBe('accountant');
-  expect(actor.tenant_id).toBe('audit-tenant');
+  await expect(
+    authenticatePaymentRequest(new NextRequest('http://localhost:3117/api/fees/payments', { headers: { cookie: `${AUTH_COOKIE_NAME}=${value}; ${AUTH_SIG_COOKIE_NAME}=${signature}` } }))
+  ).rejects.toThrow('Unauthorized: Unknown or unverified user profile.');
 });
-it.each(['missing row', 'database error'])('F03: student access gate fails open for %s', async (condition) => {
+it.each(['missing row', 'database error'])('F03: student access gate fails closed for %s', async (condition) => {
   mocks.gate.mockResolvedValue({ data: null, error: condition === 'database error' ? new Error('database unavailable') : null });
-  const response = await middleware(new NextRequest('http://localhost:3117/portal', { headers: { cookie: `${AUTH_COOKIE_NAME}=${identity('student')}` } }));
-  expect(response.headers.get('x-middleware-next')).toBe('1');
+  const val = identity('student');
+  const sig = await generateAuthCookieSignature(val);
+  const response = await middleware(new NextRequest('http://localhost:3117/portal', { headers: { cookie: `${AUTH_COOKIE_NAME}=${val}; ${AUTH_SIG_COOKIE_NAME}=${sig}` } }));
+  expect(response.headers.get('location')).toContain('/login?reason=onboarding_pending');
 });

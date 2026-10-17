@@ -117,18 +117,19 @@ export default function StudentPortalPage() {
   }, []);
   const [activePortalTab, setActivePortalTab] = React.useState<'curriculum' | 'placement'>('curriculum');
   const student = React.useMemo(() => {
-    return (
-      (user &&
-        (store.students || []).find(
-          (s) =>
-            s.email?.toLowerCase() === user.email?.toLowerCase() ||
-            s.id === user.id ||
-            s.user_id === user.id
-        )) ||
-      (user?.role !== 'student' && store.students && store.students.length > 0 ? store.students[0] : null) ||
-      (store.students && store.students.length > 0 ? store.students[0] : null) ||
-      null
+    if (!user) return null;
+    const found = (store.students || []).find(
+      (s) =>
+        s.email?.toLowerCase() === user.email?.toLowerCase() ||
+        s.id === user.id ||
+        s.user_id === user.id
     );
+    if (found) return found;
+    // Only non-student administrative/trainer staff can preview store.students[0] in demo/dev mode
+    if (user.role !== 'student' && store.students && store.students.length > 0) {
+      return store.students[0];
+    }
+    return null;
   }, [user]);
 
   const studentEnrollment = student

@@ -1,0 +1,305 @@
+{
+  "environment": "isolated production build; mock backend; no operational .env/data",
+  "layouts": [
+    {
+      "name": "desktop",
+      "status": 200,
+      "email": true,
+      "password": true,
+      "overflow": false
+    },
+    {
+      "name": "laptop",
+      "status": 200,
+      "email": true,
+      "password": true,
+      "overflow": false
+    },
+    {
+      "name": "tablet",
+      "status": 200,
+      "email": true,
+      "password": true,
+      "overflow": false
+    },
+    {
+      "name": "mobile",
+      "status": 200,
+      "email": true,
+      "password": true,
+      "overflow": false
+    }
+  ],
+  "login": [
+    {
+      "javascript": false,
+      "url": "http://localhost:3127/login?error=invalid_credentials",
+      "credentialInAnyUrl": false,
+      "authRequests": [
+        {
+          "method": "POST",
+          "path": "/api/auth/login"
+        }
+      ],
+      "alert": []
+    },
+    {
+      "javascript": true,
+      "url": "http://127.0.0.1:3127/login",
+      "credentialInAnyUrl": false,
+      "authRequests": [],
+      "alert": [
+        "Unable to sign in. Check your email and password and try again.",
+        ""
+      ]
+    }
+  ],
+  "roleAttempts": [
+    {
+      "role": "super_admin",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "admin",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "accountant",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "counsellor",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "trainer",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "placement_coordinator",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "support",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "onboarding_team",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    },
+    {
+      "role": "student",
+      "path": "/login",
+      "alert": [],
+      "scope": "synthetic bundled role, not Supabase Auth"
+    }
+  ],
+  "routes": [
+    {
+      "route": "/academics/assessments",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/academics/assignments",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/academics/attendance",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/academics/batches",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/academics/courses",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/academics/sap-servers",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/academics/schedule",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/approvals",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/expenses",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/fees",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/installments",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/payments",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/receipts",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/reports",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/accounts/vendors",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/admissions",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/audit-logs",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/certificates",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/crm/followups",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/crm/leads",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/dashboard",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/onboarding",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/placement/enrollments",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/placement",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/settings",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/students",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/support",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/users",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/portal",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    },
+    {
+      "route": "/todos",
+      "status": 200,
+      "landed": "/login",
+      "scope": "anonymous navigation only"
+    }
+  ],
+  "blockedExternalHosts": [
+    "localhost"
+  ],
+  "pageErrors": []
+}

@@ -149,7 +149,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 1. Courses
   try {
     for (const c of store.courses) {
-      await db.from('courses').upsert({
+      const { error } = await db.from('courses').upsert({
         id: c.id,
         course_name: c.course_name,
         course_code: c.course_code,
@@ -159,7 +159,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         price: c.price,
         status: c.status,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`courses (${c.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('courses');
   } catch (err: any) {
@@ -169,7 +173,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 2. Batches
   try {
     for (const b of store.batches) {
-      await db.from('batches').upsert({
+      const { error } = await db.from('batches').upsert({
         id: b.id,
         batch_code: b.batch_code,
         batch_name: b.batch_name,
@@ -185,7 +189,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         current_enrolled: b.current_enrolled,
         status: b.status,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`batches (${b.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('batches');
   } catch (err: any) {
@@ -195,7 +203,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 3. Students
   try {
     for (const s of store.students) {
-      await db.from('students').upsert({
+      const { error } = await db.from('students').upsert({
         id: s.id,
         user_id: s.user_id,
         admission_id: s.admission_id,
@@ -217,7 +225,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         course_progress: s.course_progress,
         placement_status: s.placement_status,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`students (${s.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('students');
   } catch (err: any) {
@@ -227,7 +239,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 4. Leads
   try {
     for (const l of store.leads) {
-      await db.from('leads').upsert({
+      const { error } = await db.from('leads').upsert({
         id: l.id,
         lead_code: l.lead_code,
         full_name: l.full_name,
@@ -243,7 +255,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         stage: l.stage,
         notes: l.notes,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`leads (${l.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('leads');
   } catch (err: any) {
@@ -253,7 +269,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 5. Attendance Records
   try {
     for (const a of store.attendanceRecords) {
-      await db.from('attendance_records').upsert({
+      const { error } = await db.from('attendance_records').upsert({
         id: a.id,
         student_id: a.student_id,
         session_id: a.session_id,
@@ -264,7 +280,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         marked_by: a.marked_by,
         marked_at: a.marked_at,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`attendance_records (${a.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('attendance_records');
   } catch (err: any) {
@@ -274,7 +294,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 6. Admissions
   try {
     for (const adm of store.admissions) {
-      await db.from('admissions').upsert({
+      const { error } = await db.from('admissions').upsert({
         id: adm.id,
         admission_number: adm.admission_number,
         student_name: adm.student_name,
@@ -300,7 +320,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         payment_plan: adm.payment_plan,
         status: adm.status,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`admissions (${adm.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('admissions');
   } catch (err: any) {
@@ -310,7 +334,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
   // 7. Student Fee Accounts & Payments
   try {
     for (const fa of store.feeAccounts) {
-      await db.from('student_fee_accounts').upsert({
+      const { error } = await db.from('student_fee_accounts').upsert({
         id: fa.id,
         student_id: fa.student_id,
         admission_id: fa.admission_id,
@@ -321,7 +345,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         outstanding_balance: (fa as any).outstanding_balance ?? fa.outstanding_amount,
         status: fa.status,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`student_fee_accounts (${fa.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('student_fee_accounts');
   } catch (err: any) {
@@ -330,7 +358,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
 
   try {
     for (const p of store.payments) {
-      await db.from('payments').upsert({
+      const { error } = await db.from('payments').upsert({
         id: p.id,
         receipt_number: p.receipt_number,
         fee_account_id: p.fee_account_id,
@@ -342,7 +370,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         collected_by: p.collected_by,
         remarks: p.notes || (p as any).remarks || null,
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`payments (${p.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('payments');
   } catch (err: any) {
@@ -351,7 +383,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
 
   try {
     for (const r of store.receipts) {
-      await db.from('receipts').upsert({
+      const { error } = await db.from('receipts').upsert({
         id: r.id,
         receipt_number: r.receipt_number,
         payment_id: r.payment_id,
@@ -371,7 +403,11 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
         sgst_amount: r.sgst_amount || 0,
         total_tax: (r as any).total_tax || ((r.cgst_amount || 0) + (r.sgst_amount || 0)),
       });
-      totalSynced++;
+      if (error) {
+        errors.push(`receipts (${r.id}): ${error.message}`);
+      } else {
+        totalSynced++;
+      }
     }
     syncedTables.push('receipts');
   } catch (err: any) {
@@ -417,7 +453,9 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
   try {
     // 1. Pull Students
     const { data: students, error: sErr } = await db.from('students').select('*');
-    if (!sErr && students) {
+    if (sErr) {
+      errors.push(`students pull: ${sErr.message}`);
+    } else if (students) {
       for (const s of students) {
         const idx = store.students.findIndex((item) => item.id === s.id);
         if (idx >= 0) {
@@ -436,7 +474,9 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
   try {
     // 2. Pull Leads
     const { data: leads, error: lErr } = await db.from('leads').select('*');
-    if (!lErr && leads) {
+    if (lErr) {
+      errors.push(`leads pull: ${lErr.message}`);
+    } else if (leads) {
       for (const l of leads) {
         const idx = store.leads.findIndex((item) => item.id === l.id);
         if (idx >= 0) {
@@ -455,7 +495,9 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
   try {
     // 3. Pull Admissions
     const { data: admissions, error: aErr } = await db.from('admissions').select('*');
-    if (!aErr && admissions) {
+    if (aErr) {
+      errors.push(`admissions pull: ${aErr.message}`);
+    } else if (admissions) {
       for (const adm of admissions) {
         const idx = store.admissions.findIndex((item) => item.id === adm.id);
         if (idx >= 0) {
@@ -474,7 +516,9 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
   try {
     // 4. Pull Courses
     const { data: courses, error: cErr } = await db.from('courses').select('*');
-    if (!cErr && courses) {
+    if (cErr) {
+      errors.push(`courses pull: ${cErr.message}`);
+    } else if (courses) {
       for (const c of courses) {
         const idx = store.courses.findIndex((item) => item.id === c.id);
         if (idx >= 0) {
@@ -493,7 +537,9 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
   try {
     // 5. Pull System Settings
     const { data: dbSettings, error: setErr } = await db.from('system_settings').select('*').maybeSingle();
-    if (!setErr && dbSettings) {
+    if (setErr) {
+      errors.push(`system_settings pull: ${setErr.message}`);
+    } else if (dbSettings) {
       store.settings = {
         ...store.settings,
         ...dbSettings,

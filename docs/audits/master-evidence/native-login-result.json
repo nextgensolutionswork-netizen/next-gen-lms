@@ -1,0 +1,7 @@
+{
+  "scope": "isolated synthetic bundled account, production build",
+  "status": 401,
+  "success": false,
+  "errorCode": "account_deactivated",
+  "error": "(0 , u.dS) is not a function"
+}

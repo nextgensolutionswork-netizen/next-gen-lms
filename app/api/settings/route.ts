@@ -15,66 +15,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. RBAC Enforcement: Only super_admin and admin roles can modify system settings
+    // 1. RBAC Enforcement: Authenticate caller using cryptographic session verification
     const authUser = await getAuthenticatedUserFromRequest(req);
-    let effectiveRole: string | undefined = authUser?.role;
-    let effectiveUserId: string = authUser?.id || '';
-    let effectiveUserName: string = authUser?.full_name || '';
-
-    // Check signed next_gen_auth_user cookie
-    if (!effectiveRole) {
-      const nextGenCookie = req.cookies.get(AUTH_COOKIE_NAME)?.value;
-      if (nextGenCookie) {
-        try {
-          const parsed = JSON.parse(decodeURIComponent(nextGenCookie));
-          effectiveRole = parsed?.payload?.role || parsed?.role;
-          if (!effectiveUserId) effectiveUserId = parsed?.payload?.id || parsed?.id;
-          if (!effectiveUserName) effectiveUserName = parsed?.payload?.full_name || parsed?.full_name;
-        } catch {}
-      }
-    }
-
-    // Fallback to legacy cookies
-    if (!effectiveRole) {
-      const roleCookie = req.cookies.get('user_role')?.value;
-      if (roleCookie) {
-        effectiveRole = roleCookie;
-      } else {
-        const authCookie = req.cookies.get('auth_session')?.value;
-        if (authCookie) {
-          try {
-            const parsed = JSON.parse(decodeURIComponent(authCookie));
-            effectiveRole = parsed?.payload?.role || parsed?.role;
-            if (!effectiveUserId) effectiveUserId = parsed?.payload?.id || parsed?.id;
-            if (!effectiveUserName) effectiveUserName = parsed?.payload?.full_name || parsed?.full_name;
-          } catch {}
-        }
-      }
-    }
-
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== 'object') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid settings payload' },
-        { status: 400 }
-      );
-    }
-
-    if (!effectiveRole && body.updated_by_role) {
-      effectiveRole = body.updated_by_role;
-    }
-
-    if (effectiveRole && !['super_admin', 'admin'].includes(effectiveRole)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Forbidden: Administrative role (super_admin or admin) is required to modify system settings.',
-        },
-        { status: 403 }
-      );
-    }
-
-    if (process.env.NODE_ENV === 'production' && !effectiveRole) {
+    if (!authUser) {
       return NextResponse.json(
         {
           success: false,
@@ -84,17 +27,85 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!['super_admin', 'admin'].includes(authUser.role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Forbidden: Administrative role (super_admin or admin) is required to modify system settings.',
+        },
+        { status: 403 }
+      );
+    }
+
+    const effectiveRole = authUser.role;
+    const effectiveUserId = authUser.id;
+    const effectiveUserName = authUser.full_name;
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid settings payload' },
+        { status: 400 }
+      );
+    }
+
+    // Explicit field whitelist - never allow arbitrary JSON keys injection
+    const allowedFields = [
+      'institute_name',
+      'institute_logo',
+      'logo_url',
+      'tagline',
+      'institute_address',
+      'address',
+      'phone',
+      'email',
+      'website',
+      'gst_number',
+      'tax_enabled',
+      'tax_rate',
+      'currency',
+      'default_currency',
+      'bank_name',
+      'bank_account_name',
+      'bank_account_no',
+      'bank_account_number',
+      'bank_ifsc',
+      'bank_branch',
+      'upi_id',
+      'academic_year',
+      'maintenance_mode',
+      'admission_prefix',
+      'receipt_prefix',
+      'invoice_prefix',
+      'student_code_prefix',
+      'invoice_terms',
+      'authorized_signatory_name',
+      'authorized_signatory_designation',
+      'timezone',
+      'date_format',
+      'enable_notifications',
+      'sms_alerts_enabled',
+      'email_alerts_enabled',
+    ];
+
+    const safeUpdates: Record<string, any> = {};
+    for (const key of allowedFields) {
+      if (key in body) {
+        safeUpdates[key] = body[key];
+      }
+    }
+
     const previousSettings = { ...store.settings };
     const bankAccountNo =
-      body.bank_account_no ||
-      body.bank_account_number ||
+      safeUpdates.bank_account_no ||
+      safeUpdates.bank_account_number ||
       store.settings.bank_account_no ||
       store.settings.bank_account_number ||
       '';
 
     store.settings = {
       ...store.settings,
-      ...body,
+      ...safeUpdates,
       bank_account_no: bankAccountNo,
       bank_account_number: bankAccountNo,
       updated_at: new Date().toISOString(),

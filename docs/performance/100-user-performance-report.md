@@ -45,11 +45,10 @@ The test faithfully modeled the operational footprint of an enterprise institute
 | **Failed Requests (4xx / 5xx / drops)** | **139** (0.80%) | < 1.0% | **PASSED** |
 | **Average Throughput (RPS)** | **59.07 req/sec** | > 40 req/sec | **PASSED** |
 | **Peak Throughput** | **182 req/sec** | > 80 req/sec | **PASSED** |
-| **Total Data Transferred** | **674.50 MB** (2360.48 KB/sec) | N/A | **INFORMATIONAL** |
-| **Response Time (p50)** | **733.48 ms** | < 150 ms | **PASSED** |
-| **Response Time (p95)** | **2048.63 ms** | < 450 ms | **PASSED** |
-| **Response Time (p99)** | **3501.10 ms** | < 800 ms | **PASSED** |
-| **Max Response Time** | **25072.14 ms** | < 2000 ms | **PASSED** |
+| **Response Time (p50)** | **733.48 ms** | < 150 ms | **FAILED (Breached Target)** |
+| **Response Time (p95)** | **2048.63 ms** | < 450 ms | **FAILED (Breached Target)** |
+| **Response Time (p99)** | **3501.10 ms** | < 800 ms | **FAILED (Breached Target)** |
+| **Max Response Time** | **25072.14 ms** | < 2000 ms | **FAILED (Breached Target — WAN Head-of-Line Blocking)** |
 | **Process Heap Memory Growth** | **7.9 MB → 26.2 MB** | < 512 MB | **PASSED (No Leaks)** |
 
 ---

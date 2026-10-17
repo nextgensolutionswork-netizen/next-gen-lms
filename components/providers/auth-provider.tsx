@@ -11,6 +11,8 @@ import {
   AUTH_SIG_COOKIE_NAME,
   generateAuthCookieSignature,
 } from '@/lib/security/auth-cookie';
+import { verifyUserCredentials, validateLoginPreflight } from '@/lib/auth/credentials';
+export { validateLoginPreflight };
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -197,18 +199,6 @@ export function getStoredUser(): UserProfile | null {
   } catch {}
 
   return null;
-}
-
-export function validateLoginPreflight(user: Pick<UserProfile, 'role' | 'is_active'> | null): void {
-  if (!user) {
-    throw new Error('User profile not found');
-  }
-  if (user.role === 'student' && !user.is_active) {
-    throw new Error('Your LMS portal account is currently pending onboarding verification. Please contact your student coordinator.');
-  }
-  if (!user.is_active) {
-    throw new Error('This account has been deactivated. Please contact the administrator.');
-  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -399,17 +389,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2. Match profile from store / demo accounts
-      const matched = store.users.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-      );
-
-      if (!matched) {
-        throw new Error('User profile not found. Please verify your credentials.');
+      // 2. Validate credentials safely via verifyUserCredentials
+      const verification = await verifyUserCredentials(email, password);
+      if (!verification.success || !verification.user) {
+        throw new Error(verification.error || 'Unable to sign in. Check your email and password and try again.');
       }
 
-      // Validate login preflight (Unprovisioned Student Defense & Active status check)
-      validateLoginPreflight(matched);
+      const matched = verification.user;
 
       setUser(matched);
       setRole(matched.role);

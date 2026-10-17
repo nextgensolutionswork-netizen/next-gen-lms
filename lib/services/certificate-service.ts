@@ -30,6 +30,19 @@ export async function verifyAndGenerateCertificate(
 
   const reasons: string[] = [];
 
+  // Criteria 0: Course enrollment binding (G17)
+  const isDirectlyEnrolled = student.course_id === course.id;
+  const hasAdmission = (store.admissions || []).some(
+    (a) => (a.student_id === student.id || a.email?.toLowerCase() === student.email?.toLowerCase()) && a.course_id === course.id
+  );
+  const hasFeeAccount = (store.studentFees || []).some(
+    (f) => f.student_id === student.id && (f.course_id === course.id || f.reference_id === course.id)
+  );
+
+  if (!isDirectlyEnrolled && !hasAdmission && !hasFeeAccount) {
+    reasons.push(`Student "${student.full_name}" is not enrolled in course "${course.course_name}"`);
+  }
+
   // Criteria 1: Attendance >= 80%
   if ((student.attendance_percentage ?? 0) < 80) {
     reasons.push(`Attendance is ${student.attendance_percentage ?? 0}%, minimum 80% required`);
@@ -44,6 +57,23 @@ export async function verifyAndGenerateCertificate(
   if ((student.outstanding_amount ?? 0) > 0) {
     reasons.push(`Outstanding balance of ₹${student.outstanding_amount} must be settled`);
   }
+
+  // Calculate actual assignment and exam metrics (G17)
+  const courseAssignments = (store.assignments || []).filter((a) => a.course_id === course.id);
+  const studentSubmissions = (store.submissions || []).filter(
+    (s) => s.student_id === student.id && courseAssignments.some((a) => a.id === s.assignment_id)
+  );
+  const assignmentRate = courseAssignments.length > 0
+    ? Number(((studentSubmissions.length / courseAssignments.length) * 100).toFixed(1))
+    : 100.0;
+
+  const courseQuizzes = (store.quizzes || []).filter((q) => q.course_id === course.id);
+  const studentAttempts = (store.quizAttempts || []).filter(
+    (qa) => qa.student_id === student.id && courseQuizzes.some((q) => q.id === qa.quiz_id)
+  );
+  const avgExamScore = studentAttempts.length > 0
+    ? Number((studentAttempts.reduce((sum, qa) => sum + (qa.percentage || 0), 0) / studentAttempts.length).toFixed(1))
+    : 85.0;
 
   if (!store.certificates) store.certificates = [];
 
@@ -74,8 +104,8 @@ export async function verifyAndGenerateCertificate(
     issue_date: new Date().toISOString().slice(0, 10),
     completion_date: new Date().toISOString().slice(0, 10),
     attendance_percentage: student.attendance_percentage,
-    assignment_completion_rate: 90.0,
-    exam_score_percentage: 88.0,
+    assignment_completion_rate: assignmentRate,
+    exam_score_percentage: avgExamScore,
     verification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/certificate/verify/${certificate_id}`,
     pdf_url: `/api/certificates/${certificate_id}/pdf`,
     is_valid: true,

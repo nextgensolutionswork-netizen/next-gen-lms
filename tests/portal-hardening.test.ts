@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { middleware } from '@/middleware';
 import { store } from '@/lib/services/data-store';
 import { isLessonUnlocked, updateVideoProgress, getStudentCourseProgress } from '@/lib/services/academics-service';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 import { Payment, Receipt, Student } from '@/types';
 
 function createMockRequest(url: string, cookiePayload?: Record<string, any>) {
@@ -15,6 +16,7 @@ function createMockRequest(url: string, cookiePayload?: Record<string, any>) {
   if (cookiePayload) {
     const cookie = encodeURIComponent(JSON.stringify(cookiePayload));
     req.cookies.set('next_gen_auth_user', cookie);
+    req.cookies.set('next_gen_auth_user_sig', generateAuthCookieSignatureSync(cookie));
   }
 
   return req;

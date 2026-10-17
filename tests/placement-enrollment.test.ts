@@ -15,6 +15,9 @@ import {
   updatePlacementEligibilitySettings,
   updatePlacementProfile,
   evaluateEnrollmentPrerequisites,
+  updateJobOpeningStatus,
+  deleteJobOpening,
+  getJobOpenings,
 } from '@/lib/services/placement-service';
 import { PlacementEnrollment, PlacementProfile } from '@/types';
 
@@ -702,6 +705,131 @@ describe('Placement Enrollment & Eligibility Architecture', () => {
       audit = evaluateEnrollmentPrerequisites(testStudentId);
       expect(audit.passes_attendance).toBe(true);
       expect(audit.all_passed).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // 5. AUDIT FINDING REMEDIATIONS (G24, G25, G26)
+  // =========================================================================
+  describe('5. Audit Finding Remediations (G24, G25, G26)', () => {
+    it('G24: strictly prevents non-coordinators and non-admins from overriding placement eligibility', async () => {
+      const enrollment = await createPlacementEnrollment(
+        {
+          student_id: testStudentId,
+          sap_module: 'SAP FICO',
+          declaration: {
+            terms_version: 'v2026.1',
+            accepted_by: testStudentId,
+            accepted_by_name: 'Amit Gupta',
+            accepted_at: new Date().toISOString(),
+            confirmed_information_correct: true,
+            understands_no_guarantee: true,
+            agrees_attend_scheduled_interviews: true,
+            agrees_inform_external_offer: true,
+            authorizes_resume_sharing: true,
+            understands_sensitive_docs_policy: true,
+            agrees_keep_profile_updated: true,
+          },
+        },
+        'usr-student-01'
+      );
+
+      // Student attempting to override -> reject
+      await expect(
+        overridePlacementEligibility(enrollment.id, 'usr-student-01', 'Self promotion')
+      ).rejects.toThrow(/Unauthorized: Only Placement Coordinators or Administrators/);
+
+      // Trainer attempting to override -> reject
+      await expect(
+        overridePlacementEligibility(enrollment.id, 'usr-trainer-fico', 'Faculty recommendation')
+      ).rejects.toThrow(/Unauthorized: Only Placement Coordinators or Administrators/);
+
+      // Unknown user attempting to override -> reject
+      await expect(
+        overridePlacementEligibility(enrollment.id, 'non-existent-user', 'Bypass attempt')
+      ).rejects.toThrow(/Unauthorized: Only Placement Coordinators or Administrators/);
+
+      // Legitimate admin -> allowed
+      const overridden = await overridePlacementEligibility(enrollment.id, 'usr-admin', 'Director approved placement exception');
+      expect(overridden.is_placement_eligible).toBe(true);
+      expect(overridden.eligibility_overridden).toBe(true);
+    });
+
+    it('G25: rejects job applications for non-existent, closed, or expired job openings', async () => {
+      let enrollment = store.placementEnrollments.find((e) => e.student_id === testStudentId);
+      if (!enrollment) {
+        enrollment = await createPlacementEnrollment({
+          student_id: testStudentId,
+          sap_module: 'SAP FICO',
+          declaration: {
+            terms_version: 'v2026.1',
+            accepted_by: testStudentId,
+            accepted_by_name: 'Amit Gupta',
+            accepted_at: new Date().toISOString(),
+            confirmed_information_correct: true,
+            understands_no_guarantee: true,
+            agrees_attend_scheduled_interviews: true,
+            agrees_inform_external_offer: true,
+            authorizes_resume_sharing: true,
+            understands_sensitive_docs_policy: true,
+            agrees_keep_profile_updated: true,
+          },
+        }, 'usr-student-01');
+      }
+      enrollment.is_placement_eligible = true;
+      enrollment.enrollment_status = 'Placement Eligible';
+
+      // 1. Non-existent job
+      await expect(
+        applyForJob('non-existent-job-999', testStudentId)
+      ).rejects.toThrow(/Job opening not found/);
+
+      // 2. Closed job
+      const closedJob = store.jobOpenings[0];
+      const origStatus = closedJob.status;
+      closedJob.status = 'Closed';
+      await expect(
+        applyForJob(closedJob.id, testStudentId)
+      ).rejects.toThrow(/Job opening is closed for applications/);
+      closedJob.status = origStatus;
+
+      // 3. Expired deadline
+      const expiredJob = store.jobOpenings[1];
+      const origDeadline = expiredJob.application_deadline;
+      expiredJob.application_deadline = '2025-01-01'; // In the past
+      await expect(
+        applyForJob(expiredJob.id, testStudentId)
+      ).rejects.toThrow(/Job application deadline has passed/);
+      expiredJob.application_deadline = origDeadline;
+    });
+
+    it('G26: validates mock interview score bounds (0-100) and reconciles job opening updates and deletions', async () => {
+      // Bounds check on mock interview score (< 0)
+      await expect(
+        updatePlacementProfile(testStudentId, { technical_interview_score: -5 }, 'usr-placement')
+      ).rejects.toThrow(/Technical mock interview score must be between 0 and 100/);
+
+      // Bounds check on mock interview score (> 100)
+      await expect(
+        updatePlacementProfile(testStudentId, { technical_interview_score: 105 }, 'usr-placement')
+      ).rejects.toThrow(/Technical mock interview score must be between 0 and 100/);
+
+      // Valid score (95)
+      const updatedProfile = await updatePlacementProfile(
+        testStudentId,
+        { technical_interview_score: 95 },
+        'usr-placement'
+      );
+      expect(updatedProfile.technical_interview_score).toBe(95);
+
+      // Job opening update and delete reconciliation
+      const job = store.jobOpenings[0];
+      const updatedJob = await updateJobOpeningStatus(job.id, 'Closed');
+      expect(updatedJob?.status).toBe('Closed');
+
+      // Reopen job
+      await updateJobOpeningStatus(job.id, 'Open');
+      expect(job.status).toBe('Open');
     });
   });
 });

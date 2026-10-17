@@ -113,7 +113,35 @@ export function QuizRunnerModal({
     }));
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/quizzes/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quiz_id: quiz.id,
+            answers: userAnswers,
+            started_at: new Date(startTime).toISOString(),
+            student_id: studentId,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.evaluation && data.attempt) {
+            setEvaluation(data.evaluation);
+            setAttempt(data.attempt);
+            setIsSubmitted(true);
+            setShowConfirmSubmit(false);
+            onQuizCompleted();
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Server grading request failed, falling back to local evaluation:', err);
+    }
+
     const evalResult = evaluateQuizSubmission(quiz, questions, userAnswers);
     const recordedAttempt = recordQuizAttempt(
       quiz,

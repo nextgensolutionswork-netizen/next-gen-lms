@@ -584,3 +584,104 @@ export async function resolveDoubt(
 
   return doubt;
 }
+
+export async function escalateDoubt(
+  doubtId: string,
+  escalatedByUserId: string,
+  reason: string,
+  targetRole: UserRole = 'trainer'
+): Promise<StudentDoubt> {
+  const doubt = store.doubts.find((d) => d.id === doubtId);
+  if (!doubt) throw new Error('Doubt ticket not found');
+
+  const actor = store.users.find((u) => u.id === escalatedByUserId);
+  const now = new Date().toISOString();
+
+  // Find senior faculty lead / trainer assigned to course or fallback to admin
+  const facultyLead = store.users.find(
+    (u) =>
+      u.role === targetRole &&
+      (u.assigned_course_ids?.includes(doubt.course_id) || true) &&
+      u.is_active
+  ) || store.users.find((u) => ['admin', 'super_admin'].includes(u.role) && u.is_active);
+
+  doubt.priority = 'Urgent';
+  doubt.status = 'In Progress';
+  if (facultyLead) {
+    doubt.assigned_to_id = facultyLead.id;
+    doubt.assigned_to_name = facultyLead.full_name;
+    doubt.assigned_to_role = facultyLead.role as any;
+  }
+  doubt.updated_at = now;
+
+  const escalationMsg: DoubtMessage = {
+    id: `msg-${Date.now()}`,
+    doubt_id: doubt.id,
+    sender_id: escalatedByUserId,
+    sender_name: actor?.full_name || 'Support Desk',
+    sender_role: (actor?.role as UserRole) || 'support',
+    message: `[Ticket Escalated to ${facultyLead?.full_name || 'Senior Faculty'}]: ${reason.trim()}`,
+    created_at: now,
+  };
+  doubt.messages.push(escalationMsg);
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('student_doubts')
+        .update({
+          priority: 'Critical',
+          status: 'In Progress',
+          assigned_to_id: doubt.assigned_to_id,
+          assigned_to_name: doubt.assigned_to_name,
+          assigned_to_role: doubt.assigned_to_role,
+          updated_at: now,
+        })
+        .eq('id', doubt.id);
+
+      await supabase.from('doubt_messages').insert({
+        id: escalationMsg.id,
+        doubt_id: doubt.id,
+        sender_id: escalationMsg.sender_id,
+        sender_name: escalationMsg.sender_name,
+        sender_role: escalationMsg.sender_role,
+        message: escalationMsg.message,
+        created_at: escalationMsg.created_at,
+      });
+    } catch (err) {
+      console.warn('Supabase escalateDoubt warning:', err);
+    }
+  }
+
+  await recordAuditLog({
+    user_id: escalatedByUserId,
+    user_name: actor?.full_name || 'Support Staff',
+    user_role: actor?.role || 'support',
+    action: 'DOUBT_ESCALATED',
+    module: 'SUPPORT',
+    record_id: doubt.id,
+    new_value: {
+      ticket_number: doubt.ticket_number,
+      reason,
+      escalated_to: facultyLead?.full_name,
+    },
+  });
+
+  if (facultyLead) {
+    dispatchMultiChannelNotification({
+      userId: facultyLead.id,
+      recipientName: facultyLead.full_name,
+      recipientEmail: facultyLead.email,
+      title: `URGENT: Escalated Doubt Ticket #${doubt.ticket_number}`,
+      message: `Ticket "${doubt.title}" has been escalated to you by ${actor?.full_name || 'Support'}: ${reason}`,
+      category: 'support',
+      type: 'warning',
+      channels: ['in_app', 'email'],
+      actionUrl: '/support',
+    }).catch((err) => console.warn('Failed to dispatch escalation notification:', err));
+  }
+
+  return doubt;
+}

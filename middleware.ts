@@ -3,6 +3,17 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } from '@/lib/security/auth-cookie';
 
 export async function middleware(request: NextRequest) {
+  // 0. Security Guard: Detect and strip any credentials/passwords transmitted in URL query parameters
+  const sensitiveParams = ['password', 'pass', 'pwd', 'secret', 'newPassword', 'confirmPassword', 'auth_password'];
+  const hasSensitiveQuery = sensitiveParams.some((param) => request.nextUrl.searchParams.has(param));
+
+  if (hasSensitiveQuery) {
+    const sanitizedUrl = request.nextUrl.clone();
+    sensitiveParams.forEach((param) => sanitizedUrl.searchParams.delete(param));
+    sanitizedUrl.searchParams.set('error', 'insecure_request');
+    return NextResponse.redirect(sanitizedUrl, { status: 308 });
+  }
+
   const { pathname } = request.nextUrl;
 
   // Supabase may fall back to the Site URL. Preserve callback query parameters
@@ -118,7 +129,7 @@ export async function middleware(request: NextRequest) {
     const sigCookie = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;
 
     if (authCookie) {
-      let isSignatureValid = true;
+      let isSignatureValid = false;
       if (sigCookie) {
         if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
           isSignatureValid = true;
@@ -132,7 +143,7 @@ export async function middleware(request: NextRequest) {
       }
 
       if (!isSignatureValid) {
-        // Tampered cookie detected: signature does not match!
+        // Tampered cookie or missing signature: reject unverified cookie
         isActiveUser = false;
         userEmail = null;
         userRole = null;
@@ -162,16 +173,21 @@ export async function middleware(request: NextRequest) {
                   userId = target.id || null;
                 }
               }
-            } else if (parsed.is_active === false) {
-              isActiveUser = false;
             } else {
-              userEmail = parsed.email || null;
-              userRole = parsed.role || null;
-              userId = parsed.id || null;
+              // Direct payload without embedded signature, but outer signature was validated
+              const target = parsed.payload || parsed;
+              if (target.is_active === false) {
+                isActiveUser = false;
+              } else {
+                userEmail = target.email || null;
+                userRole = target.role || null;
+                userId = target.id || null;
+              }
             }
           }
         } catch {
           // Corrupt JSON in cookie -> unauthenticated
+          isActiveUser = false;
         }
       }
     }
@@ -183,7 +199,8 @@ export async function middleware(request: NextRequest) {
     const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const checkClient = adminKey ? createServerClient(supabaseUrl, adminKey, { cookies: { getAll: () => [], setAll: () => {} } }) : supabase;
     const { data: access, error: accessError } = await checkClient.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
-    if (!accessError && access?.enabled === false) {
+    // G03: Fail-closed. Only explicit enabled === true is permitted; missing row or error must block
+    if (accessError || !access || access.enabled !== true) {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Onboarding checks must be completed before LMS access is activated.' }, { status: 403 });
       return createRedirect('/login?reason=onboarding_pending');
     }

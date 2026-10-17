@@ -20,6 +20,7 @@ import {
   hasPermission,
 } from '@/lib/auth/rbac';
 import { setUserActiveStatus } from '@/lib/services/auth-service';
+import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 import { Certificate, StudentDoubt, SystemSettings } from '@/types';
 
 describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () => {
@@ -640,11 +641,14 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
         invoice_terms: 'Strictly non-refundable after commencement of batch.',
       };
 
+      const adminCookie = encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin', full_name: 'System Admin', is_active: true }));
+      const adminSig = generateAuthCookieSignatureSync(adminCookie);
+
       const postReq = new NextRequest('http://localhost:3000/api/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          cookie: 'next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin-01', full_name: 'System Admin' })),
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
         },
         body: JSON.stringify(updatePayload),
       });
@@ -681,11 +685,13 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
       const { NextRequest } = await import('next/server');
 
       // Unauthorized request from a student
+      const studentCookie = encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-student-01', is_active: true }));
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
       const studentReq = new NextRequest('http://localhost:3000/api/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          cookie: 'next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-stu-01' })),
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
         },
         body: JSON.stringify({ institute_name: 'Hacked Institute' }),
       });
@@ -697,11 +703,13 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
       expect(studentData.error).toContain('Forbidden');
 
       // Unauthorized request from a counsellor
+      const counsellorCookie = encodeURIComponent(JSON.stringify({ role: 'counsellor', id: 'usr-counsellor', is_active: true }));
+      const counsellorSig = generateAuthCookieSignatureSync(counsellorCookie);
       const counsellorReq = new NextRequest('http://localhost:3000/api/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          cookie: 'next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'counsellor', id: 'usr-counsellor-01' })),
+          cookie: `next_gen_auth_user=${counsellorCookie}; next_gen_auth_user_sig=${counsellorSig}`,
         },
         body: JSON.stringify({ institute_name: 'Counsellor Override' }),
       });
@@ -762,11 +770,14 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
     it('GET /api/audit-logs strictly restricts unauthorized roles and permits administrators', async () => {
       const { GET } = await import('@/app/api/audit-logs/route');
       const { NextRequest } = await import('next/server');
+      const { generateAuthCookieSignatureSync } = await import('@/lib/security/auth-cookie');
 
       // 1. Unauthorized request (e.g., trainer)
+      const trainerCookie = encodeURIComponent(JSON.stringify({ role: 'trainer', id: 'usr-trainer-fico', is_active: true }));
+      const trainerSig = generateAuthCookieSignatureSync(trainerCookie);
       const trainerReq = new NextRequest('http://localhost:3000/api/audit-logs', {
         headers: {
-          cookie: 'user_role=trainer; next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'trainer', id: 'usr-tr-01' })),
+          cookie: `next_gen_auth_user=${trainerCookie}; next_gen_auth_user_sig=${trainerSig}`,
         },
       });
       const trainerRes = await GET(trainerReq);
@@ -776,18 +787,22 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
       expect(trainerData.error).toContain('Forbidden');
 
       // 2. Unauthorized request (e.g., student)
+      const studentCookie = encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-student-01', is_active: true }));
+      const studentSig = generateAuthCookieSignatureSync(studentCookie);
       const studentReq = new NextRequest('http://localhost:3000/api/audit-logs', {
         headers: {
-          cookie: 'user_role=student; next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'student', id: 'usr-stu-01' })),
+          cookie: `next_gen_auth_user=${studentCookie}; next_gen_auth_user_sig=${studentSig}`,
         },
       });
       const studentRes = await GET(studentReq);
       expect(studentRes.status).toBe(403);
 
       // 3. Authorized request (admin)
+      const adminCookie = encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin', is_active: true }));
+      const adminSig = generateAuthCookieSignatureSync(adminCookie);
       const adminReq = new NextRequest('http://localhost:3000/api/audit-logs', {
         headers: {
-          cookie: 'user_role=admin; next_gen_auth_user=' + encodeURIComponent(JSON.stringify({ role: 'admin', id: 'usr-admin-01' })),
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
         },
       });
       const adminRes = await GET(adminReq);

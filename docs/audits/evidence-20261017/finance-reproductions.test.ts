@@ -117,27 +117,27 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 
-it('F04: payment approval credits an installment belonging to another tenant and fee', () => {
+it('F04: rejects payment allocation to an installment belonging to another tenant or student (FIXED)', () => {
   store.installments = [{id:'foreign-installment',tenant_id:'tenant-b',fee_account_id:'foreign-fee',student_id:'foreign-student',amount:9000,paid_amount:0,status:'Pending'} as any];
-  const payment=fees.recordPayment({...input(),installment_id:'foreign-installment'},counsellor.id);
-  fees.verifyPayment(payment.id,accountant.id);
-  expect(store.installments[0].paid_amount).toBe(5000);
+  expect(() => fees.recordPayment({...input(),installment_id:'foreign-installment'},counsellor.id))
+    .toThrow('Installment does not belong to this student fee account or tenant.');
+  expect(store.installments[0].paid_amount).toBe(0);
 });
-it('F05: editing payment notes silently clears a valid installment association', () => {
+it('F05: editing payment notes preserves valid installment association (FIXED)', () => {
   store.installments = [{id:'own-installment',tenant_id:'default',fee_account_id:fee.fee_account_id,student_id:studentId,amount:9000,paid_amount:0,status:'Pending'} as any];
   const payment=fees.recordPayment({...input(),installment_id:'own-installment'},counsellor.id);
   fees.updatePayment(payment.id,{notes:'corrected'},counsellor.id);
-  expect(payment.installment_id).toBeUndefined();
+  expect(payment.installment_id).toBe('own-installment');
 });
-it('F06: voiding an installment payment leaves installment paid balance unchanged', () => {
+it('F06: voiding an installment payment restores installment paid balance and status to Pending (FIXED)', () => {
   store.installments = [{id:'own-installment',tenant_id:'default',fee_account_id:fee.fee_account_id,student_id:studentId,amount:5000,paid_amount:0,status:'Pending'} as any];
   const payment=fees.recordPayment({...input(),installment_id:'own-installment'},counsellor.id);
   fees.verifyPayment(payment.id,accountant.id);
   const receipt=store.receipts.find(r=>r.payment_id===payment.id)!;
   fees.voidReceipt(receipt.id,accountant.id,'Audit reversal');
   expect(fee.paid_amount).toBe(0);
-  expect(store.installments[0].paid_amount).toBe(5000);
-  expect(store.installments[0].status).toBe('Paid');
+  expect(store.installments[0].paid_amount).toBe(0);
+  expect(store.installments[0].status).toBe('Pending');
 });
 it('R01: reversal to zero paid correctly revokes onboarding financial clearance', () => {
   const payment=fees.recordPayment({...input(),amount_paid:10000},counsellor.id);

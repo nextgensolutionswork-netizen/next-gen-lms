@@ -81,6 +81,17 @@ export async function updatePlacementProfile(
   const profile = await getPlacementProfileForStudent(studentId);
   if (!profile) throw new Error('Placement profile not found');
 
+  if (updates.technical_interview_score !== undefined) {
+    if (updates.technical_interview_score < 0 || updates.technical_interview_score > 100 || isNaN(updates.technical_interview_score)) {
+      throw new Error('Technical mock interview score must be between 0 and 100.');
+    }
+  }
+  if (updates.hr_interview_score !== undefined) {
+    if (updates.hr_interview_score < 0 || updates.hr_interview_score > 100 || isNaN(updates.hr_interview_score)) {
+      throw new Error('HR mock interview score must be between 0 and 100.');
+    }
+  }
+
   Object.assign(profile, updates, { updated_at: new Date().toISOString() });
 
   // Update in student profile if placement status changed
@@ -194,7 +205,7 @@ export async function getJobOpenings(): Promise<JobOpening[]> {
     try {
       const supabase = createClient();
       const { data, error } = await supabase.from('job_openings').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         store.jobOpenings = data as JobOpening[];
         return data as JobOpening[];
       }
@@ -245,6 +256,16 @@ export async function updateJobOpeningStatus(jobId: string, status: 'Open' | 'Cl
   if (!job) return null;
   job.status = status;
   store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('job_openings').update({ status }).eq('id', jobId);
+    } catch (err) {
+      console.warn('Supabase updateJobOpeningStatus warning, preserved locally:', err);
+    }
+  }
+
   return job;
 }
 
@@ -254,6 +275,16 @@ export async function deleteJobOpening(jobId: string): Promise<boolean> {
   if (!store.jobOpenings) store.jobOpenings = [];
   store.jobOpenings.splice(idx, 1);
   store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('job_openings').delete().eq('id', jobId);
+    } catch (err) {
+      console.warn('Supabase deleteJobOpening warning, preserved locally:', err);
+    }
+  }
+
   return true;
 }
 
@@ -300,7 +331,23 @@ export async function applyForJob(
   if (existing) throw new Error('Already applied to this opening');
 
   const job = (store.jobOpenings || []).find((j) => j.id === jobId);
+  if (!job) {
+    throw new Error('Job opening not found.');
+  }
+  if (job.status !== 'Open') {
+    throw new Error('Job opening is closed for applications.');
+  }
+  if (job.application_deadline) {
+    const deadlineTime = new Date(job.application_deadline).setHours(23, 59, 59, 999);
+    if (!isNaN(deadlineTime) && deadlineTime < Date.now()) {
+      throw new Error('Job application deadline has passed.');
+    }
+  }
+
   const student = (store.students || []).find((s) => s.id === studentId);
+  if (!student) {
+    throw new Error('Student not found.');
+  }
 
   const application: JobApplication = {
     id: `app-${Date.now()}`,
@@ -361,6 +408,11 @@ export async function updateJobApplicationStatus(
   const application = (store.jobApplications || []).find((a) => a.id === applicationId);
   if (!application) throw new Error('Job application not found');
 
+  const actor = (store.users || []).find((u) => u.id === updatedByUserId);
+  if (actor && !['super_admin', 'admin', 'placement_coordinator'].includes(actor.role)) {
+    throw new Error('Unauthorized: Only Placement Coordinators or Administrators can update application status.');
+  }
+
   application.status = status;
   store.persist();
 
@@ -376,7 +428,6 @@ export async function updateJobApplicationStatus(
     }
   }
 
-  const actor = (store.users || []).find((u) => u.id === updatedByUserId);
   await recordAuditLog({
     user_id: updatedByUserId || 'usr-placement',
     user_name: actor?.full_name || 'Placement Coordinator',
@@ -1095,6 +1146,10 @@ export async function overridePlacementEligibility(
   if (!enrollment) throw new Error('Placement enrollment not found');
 
   const actor = (store.users || []).find((u) => u.id === actorUserId);
+  if (!actor || !['super_admin', 'admin', 'placement_coordinator'].includes(actor.role)) {
+    throw new Error('Unauthorized: Only Placement Coordinators or Administrators can override placement eligibility.');
+  }
+
   const now = new Date().toISOString();
   const oldStatus = enrollment.enrollment_status;
 
