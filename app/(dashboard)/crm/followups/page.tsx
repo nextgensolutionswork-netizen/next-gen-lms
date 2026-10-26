@@ -72,13 +72,13 @@ export default function FollowupsPage() {
 
   const todayStr = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  const getUrgency = (lead: Lead): 'overdue' | 'today' | 'upcoming' | 'unscheduled' => {
+  const getUrgency = React.useCallback((lead: Lead): 'overdue' | 'today' | 'upcoming' | 'unscheduled' => {
     if (!lead.follow_up_date) return 'unscheduled';
     const d = lead.follow_up_date.slice(0, 10);
     if (d < todayStr) return 'overdue';
     if (d === todayStr) return 'today';
     return 'upcoming';
-  };
+  }, [todayStr]);
 
   const refreshLeads = () => {
     setAllLeads([...(store.leads || [])]);
@@ -114,7 +114,7 @@ export default function FollowupsPage() {
       upcoming,
       demos,
     };
-  }, [activeFollowups, todayStr]);
+  }, [activeFollowups, getUrgency]);
 
   // Available counsellors for filtering
   const availableCounsellors = React.useMemo(() => {
@@ -160,7 +160,7 @@ export default function FollowupsPage() {
 
       return true;
     });
-  }, [activeFollowups, stageFilter, urgencyFilter, counsellorFilter, search, user?.id]);
+  }, [activeFollowups, stageFilter, urgencyFilter, counsellorFilter, search, user?.id, getUrgency]);
 
   // Chronologically sorted followups for timeline view
   const chronologicalFollowups = React.useMemo(() => {
@@ -175,7 +175,7 @@ export default function FollowupsPage() {
       const dateB = b.follow_up_date || '9999';
       return dateA.localeCompare(dateB);
     });
-  }, [filteredFollowups]);
+  }, [filteredFollowups, getUrgency]);
 
   const handleOpenLogModal = (lead: Lead) => {
     setSelectedLead(lead);

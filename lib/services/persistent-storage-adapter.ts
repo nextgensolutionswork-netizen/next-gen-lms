@@ -74,7 +74,7 @@ function getStoragePaths() {
     try {
       const p = getPathModule();
       if (p) {
-        const storageDir = process.env.VITEST && process.env.LMS_TEST_STORAGE_DIR
+        const storageDir = (process.env.VITEST || process.env.NEXT_PUBLIC_APP_ENV === 'staging') && process.env.LMS_TEST_STORAGE_DIR
           ? process.env.LMS_TEST_STORAGE_DIR
           : p.join(process.cwd(), 'data');
         return {

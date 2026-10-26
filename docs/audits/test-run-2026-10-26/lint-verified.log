@@ -1,0 +1,62 @@
+
+./app/(dashboard)/academics/courses/page.tsx
+205:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/accounts/receipts/[id]/page.tsx
+33:6  Warning: React Hook React.useEffect has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/accounts/reports/page.tsx
+124:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'refreshTick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+137:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'refreshTick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+154:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'refreshTick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/admissions/page.tsx
+128:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'store.batches'. Either exclude it or remove the dependency array. Outer scope values like 'store.batches' aren't valid dependencies because mutating them doesn't re-render the component.  react-hooks/exhaustive-deps
+229:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshList'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/crm/followups/page.tsx
+117:6  Warning: React Hook React.useMemo has a missing dependency: 'getUrgency'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+163:6  Warning: React Hook React.useMemo has a missing dependency: 'getUrgency'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+178:6  Warning: React Hook React.useMemo has a missing dependency: 'getUrgency'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/crm/leads/page.tsx
+137:6  Warning: React Hook React.useEffect has a missing dependency: 'counsellorId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+177:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshLeads'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/onboarding/page.tsx
+202:6  Warning: React Hook React.useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/placement/enrollments/page.tsx
+176:6  Warning: React Hook React.useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+468:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'enrollments'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/settings/page.tsx
+339:23  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./app/(dashboard)/support/page.tsx
+209:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshList'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+880:33  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./app/portal/page.tsx
+144:9  Warning: The 'lessons' conditional could make the dependencies of useMemo Hook (at line 176) change on every render. To fix this, wrap the initialization of 'lessons' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+322:6  Warning: React Hook React.useEffect has a missing dependency: 'fetchStudentDoubts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+1414:47  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/layout/header.tsx
+35:6  Warning: React Hook React.useEffect has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+108:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/layout/sidebar.tsx
+480:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/portal/quiz-runner-modal.tsx
+97:6  Warning: React Hook React.useEffect has a missing dependency: 'handleFinalSubmit'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/portal/student-placement-hub.tsx
+155:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/ui/hls-video-player.tsx
+161:6  Warning: React Hook React.useEffect has a missing dependency: 'initialPosition'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+524:6  Warning: React Hook React.useEffect has missing dependencies: 'toggleMute' and 'togglePlay'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules

@@ -123,9 +123,7 @@ export default function AdmissionsPage() {
     }
   }, [user, availableCounsellors, counsellorId]);
 
-  const courseBatches = React.useMemo(() => {
-    return (store.batches || []).filter((b) => b.course_id === courseId);
-  }, [courseId, store.batches]);
+  const courseBatches = (store.batches || []).filter((b) => b.course_id === courseId);
 
   // Synchronize batch selection reactively when course changes
   React.useEffect(() => {
@@ -200,7 +198,7 @@ export default function AdmissionsPage() {
   const courseFee = selectedCourse?.price || 45000;
   const netPayable = Math.max(0, courseFee - discount);
 
-  const refreshList = async () => {
+  const refreshList = React.useCallback(async () => {
     try {
     let list = await getAdmissions();
     if (statusFilter !== 'All') {
@@ -222,11 +220,11 @@ export default function AdmissionsPage() {
       setAdmissions([]);
       setLoadError(error instanceof Error ? error.message : 'Unable to load admissions. Please retry.');
     }
-  };
+  }, [search, statusFilter]);
 
   React.useEffect(() => {
     refreshList();
-  }, [search, statusFilter]);
+  }, [refreshList]);
 
   const handleCreateAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,7 +355,7 @@ export default function AdmissionsPage() {
             Confirmed student enrollments with automated fee ledger, and portal enablement.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {canExportAdmissions && (
             <Button
               variant="outline"
@@ -392,7 +390,7 @@ export default function AdmissionsPage() {
             />
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <span className="text-xs text-slate-500 font-medium">Status:</span>
             {['All', 'Confirmed', 'Active', 'Completed', 'On Hold'].map((st) => (
               <button
@@ -835,7 +833,7 @@ export default function AdmissionsPage() {
             {/* Admission Downpayment & Initial Payment Collection Section */}
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 mt-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2 max-w-full">
                   <CreditCard className="h-4 w-4 text-emerald-600" />
                   <div>
                     <span className="font-bold text-xs text-slate-800 block">

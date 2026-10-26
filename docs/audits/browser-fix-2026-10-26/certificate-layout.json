@@ -1,0 +1,24 @@
+[
+  {
+    "width": 375,
+    "longTextFits": true
+  },
+  {
+    "width": 768,
+    "longTextFits": true
+  },
+  {
+    "width": 1366,
+    "longTextFits": true
+  },
+  {
+    "width": 1440,
+    "longTextFits": true
+  },
+  {
+    "printPdfGenerated": true
+  },
+  {
+    "invalidLongIdFits": true
+  }
+]

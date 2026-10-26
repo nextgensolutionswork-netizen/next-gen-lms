@@ -1,0 +1,7 @@
+{"width":375,"status":200,"forms":1,"overflow":false,"errors":[]}
+{"width":1440,"status":200,"forms":1,"overflow":false,"errors":[]}
+{"route":"/dashboard","status":307,"location":"/login?redirectTo=%2Fdashboard"}
+{"route":"/portal","status":307,"location":"/login?redirectTo=%2Fportal"}
+{"route":"/accounts/fees","status":307,"location":"/login?redirectTo=%2Faccounts%2Ffees"}
+{"route":"/users","status":307,"location":"/login?redirectTo=%2Fusers"}
+{"route":"/api/database/backup","status":401,"location":null}

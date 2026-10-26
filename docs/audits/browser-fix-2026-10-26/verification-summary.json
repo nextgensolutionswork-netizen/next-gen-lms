@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-26",
+  "environment": "isolated local synthetic adapter; not verified Supabase staging",
+  "staticChecks": {
+    "lint": 0,
+    "typecheck": 0
+  },
+  "build": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "durationMs": 89462,
+    "remoteDatabaseEnabled": false,
+    "distDir": ".next-build-check"
+  },
+  "unitTests": {
+    "passed": 708,
+    "files": 56,
+    "exitCode": 0
+  },
+  "routeSweep": {
+    "routes": 35,
+    "passed": 35,
+    "viewportChecks": 140
+  },
+  "finalDirectoryRetest": true,
+  "detailChecks": {
+    "passed": 7,
+    "total": 7
+  },
+  "componentBrowsers": {
+    "quizTimer": 0,
+    "recordLoading": 0
+  },
+  "certificate": [
+    {
+      "width": 375,
+      "longTextFits": true
+    },
+    {
+      "width": 768,
+      "longTextFits": true
+    },
+    {
+      "width": 1366,
+      "longTextFits": true
+    },
+    {
+      "width": 1440,
+      "longTextFits": true
+    },
+    {
+      "printPdfGenerated": true
+    },
+    {
+      "invalidLongIdFits": true
+    }
+  ],
+  "stagingVerified": false,
+  "productionRecommendation": "HOLD: independently verified staging Auth, RLS and database regression required",
+  "deployed": false
+}

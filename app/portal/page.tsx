@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -171,9 +172,7 @@ export default function StudentPortalPage() {
   const [isResumeModalOpen, setIsResumeModalOpen] = React.useState(false);
 
   // Active Lesson for Video Player
-  const sortedLessons = React.useMemo(() => {
-    return [...lessons].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-  }, [lessons]);
+  const sortedLessons = [...lessons].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
   const [activeLesson, setActiveLesson] = React.useState<any>(() => sortedLessons[0] || lessons[0] || null);
   const [videoPosition, setVideoPosition] = React.useState(0);
@@ -306,20 +305,18 @@ export default function StudentPortalPage() {
     }
   };
 
-  const fetchStudentDoubts = async () => {
+  const fetchStudentDoubts = React.useCallback(async () => {
     if (!student?.id) return;
     const list = await getDoubts({ student_id: student.id });
     setDoubtsList(list);
-    if (!expandedDoubtId && list.length > 0) {
-      setExpandedDoubtId(list[0].id);
-    }
-  };
-
-  React.useEffect(() => {
-    if (student?.id) {
-      fetchStudentDoubts();
+    if (list.length > 0) {
+      setExpandedDoubtId((current) => current || list[0].id);
     }
   }, [student?.id]);
+
+  React.useEffect(() => {
+    fetchStudentDoubts();
+  }, [fetchStudentDoubts]);
 
   // Realtime Live Stream for Student Helpdesk
   const { isConnected: isRealtimeConnected } = useRealtime({
@@ -1411,10 +1408,13 @@ export default function StudentPortalPage() {
                                             m.attachment_url.startsWith('data:image/') ||
                                             m.attachment_url.includes('doubt-attachments') ||
                                             m.attachment_url.includes('screenshots') ? (
-                                              <img
+                                              <Image
+                                                width={640}
+                                                height={192}
+                                                unoptimized
                                                 src={m.attachment_url}
                                                 alt="Attached Screenshot"
-                                                className="max-h-48 rounded object-contain mx-auto"
+                                                className="h-auto w-auto max-w-full max-h-48 rounded object-contain mx-auto"
                                               />
                                             ) : (
                                               <div className="flex items-center space-x-1.5 text-[11px] p-1 font-medium">

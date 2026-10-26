@@ -1,0 +1,20 @@
+{
+  "mode": "isolated local synthetic adapter; NOT verified Supabase staging",
+  "results": [
+    {
+      "name": "/students: direct, refresh, directory link, back and forward (3 cycles)",
+      "pass": false,
+      "error": "page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"http://localhost:3001/students/stu-01\" until \"load\"\n============================================================"
+    },
+    {
+      "name": "/students: confirmed invalid ID",
+      "pass": false,
+      "error": "page.goto: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3001/students/synthetic-nonexistent-record\", waiting until \"load\"\u001b[22m\n"
+    },
+    {
+      "name": "/accounts/receipts: direct, refresh, directory link, back and forward (3 cycles)",
+      "pass": false,
+      "error": "page.goto: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3001/accounts/receipts\", waiting until \"load\"\u001b[22m\n"
+    }
+  ]
+}

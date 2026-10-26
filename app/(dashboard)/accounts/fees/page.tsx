@@ -24,6 +24,7 @@ import { StudentFeeAccount } from '@/types';
 import { formatINR, exportToCSV } from '@/lib/utils/formatters';
 import { exportFeeLedgerToExcel } from '@/lib/utils/excel-export';
 import { useAuth } from '@/components/providers/auth-provider';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') {
@@ -69,7 +70,14 @@ export default function StudentFeesPage() {
   }, [search, statusFilter]);
 
   React.useEffect(() => {
-    refreshList();
+    paymentWorkflowClient
+      .refresh()
+      .then(() => {
+        refreshList();
+      })
+      .catch(() => {
+        refreshList();
+      });
   }, [refreshList]);
 
   if (!canAccessFees) {

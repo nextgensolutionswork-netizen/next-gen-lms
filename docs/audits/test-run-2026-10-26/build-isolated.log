@@ -1,0 +1,166 @@
+  ▲ Next.js 14.2.24
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (113kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (268kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+./app/(dashboard)/academics/courses/page.tsx
+205:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/accounts/receipts/[id]/page.tsx
+33:6  Warning: React Hook React.useEffect has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/accounts/reports/page.tsx
+124:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'refreshTick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+137:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'refreshTick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+154:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'refreshTick'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/admissions/page.tsx
+128:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'store.batches'. Either exclude it or remove the dependency array. Outer scope values like 'store.batches' aren't valid dependencies because mutating them doesn't re-render the component.  react-hooks/exhaustive-deps
+229:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshList'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/crm/followups/page.tsx
+117:6  Warning: React Hook React.useMemo has a missing dependency: 'getUrgency'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+163:6  Warning: React Hook React.useMemo has a missing dependency: 'getUrgency'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+178:6  Warning: React Hook React.useMemo has a missing dependency: 'getUrgency'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/crm/leads/page.tsx
+137:6  Warning: React Hook React.useEffect has a missing dependency: 'counsellorId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+177:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshLeads'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/onboarding/page.tsx
+202:6  Warning: React Hook React.useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/placement/enrollments/page.tsx
+176:6  Warning: React Hook React.useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+468:6  Warning: React Hook React.useMemo has an unnecessary dependency: 'enrollments'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/(dashboard)/settings/page.tsx
+339:23  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./app/(dashboard)/support/page.tsx
+209:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshList'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+880:33  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./app/portal/page.tsx
+144:9  Warning: The 'lessons' conditional could make the dependencies of useMemo Hook (at line 176) change on every render. To fix this, wrap the initialization of 'lessons' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+322:6  Warning: React Hook React.useEffect has a missing dependency: 'fetchStudentDoubts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+1414:47  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/layout/header.tsx
+35:6  Warning: React Hook React.useEffect has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+108:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/layout/sidebar.tsx
+480:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/portal/quiz-runner-modal.tsx
+97:6  Warning: React Hook React.useEffect has a missing dependency: 'handleFinalSubmit'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/portal/student-placement-hub.tsx
+155:6  Warning: React Hook React.useEffect has a missing dependency: 'refreshData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/ui/hls-video-player.tsx
+161:6  Warning: React Hook React.useEffect has a missing dependency: 'initialPosition'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+524:6  Warning: React Hook React.useEffect has missing dependencies: 'toggleMute' and 'togglePlay'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/48) ...
+   Generating static pages (12/48) 
+   Generating static pages (24/48) 
+   Generating static pages (36/48) 
+ ✓ Generating static pages (48/48)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ƒ /                                    148 B          87.8 kB
+├ ○ /_not-found                          880 B          88.5 kB
+├ ○ /academics/assessments               9.96 kB         331 kB
+├ ○ /academics/assignments               11.4 kB         336 kB
+├ ○ /academics/attendance                8.46 kB         333 kB
+├ ○ /academics/batches                   9.16 kB         337 kB
+├ ○ /academics/courses                   12 kB           333 kB
+├ ○ /academics/sap-servers               12.9 kB         326 kB
+├ ○ /academics/schedule                  8.75 kB         337 kB
+├ ○ /accounts/approvals                  18.2 kB         342 kB
+├ ○ /accounts/expenses                   6.39 kB         565 kB
+├ ○ /accounts/fees                       5.93 kB         329 kB
+├ ○ /accounts/installments               148 B          87.8 kB
+├ ○ /accounts/payments                   12.5 kB         339 kB
+├ ○ /accounts/receipts                   8.02 kB         347 kB
+├ ƒ /accounts/receipts/[id]              5.93 kB         326 kB
+├ ○ /accounts/reports                    4.86 kB         563 kB
+├ ○ /accounts/vendors                    7.26 kB         562 kB
+├ ○ /admissions                          12.4 kB         356 kB
+├ ƒ /api/admissions                      0 B                0 B
+├ ƒ /api/attendance/sync-meeting         0 B                0 B
+├ ƒ /api/audit-logs                      0 B                0 B
+├ ƒ /api/auth/login                      0 B                0 B
+├ ƒ /api/auth/logout                     0 B                0 B
+├ ƒ /api/bulk-import/execute             0 B                0 B
+├ ƒ /api/bulk-import/preview             0 B                0 B
+├ ƒ /api/bulk-import/template            0 B                0 B
+├ ƒ /api/certificates/[id]/pdf           0 B                0 B
+├ ƒ /api/conference/create-meeting       0 B                0 B
+├ ƒ /api/database/backup                 0 B                0 B
+├ ○ /api/database/health                 0 B                0 B
+├ ƒ /api/database/sync                   0 B                0 B
+├ ƒ /api/fees/payments                   0 B                0 B
+├ ƒ /api/fees/proof                      0 B                0 B
+├ ƒ /api/fees/proposals                  0 B                0 B
+├ ƒ /api/fees/receipts                   0 B                0 B
+├ ƒ /api/onboarding                      0 B                0 B
+├ ƒ /api/onboarding/[id]                 0 B                0 B
+├ ƒ /api/onboarding/analytics            0 B                0 B
+├ ƒ /api/onboarding/backfill             0 B                0 B
+├ ƒ /api/onboarding/cases                0 B                0 B
+├ ƒ /api/onboarding/cases/[id]           0 B                0 B
+├ ƒ /api/payments/create-order           0 B                0 B
+├ ƒ /api/payments/verify                 0 B                0 B
+├ ƒ /api/quizzes/submit                  0 B                0 B
+├ ƒ /api/realtime/broadcast              0 B                0 B
+├ ƒ /api/realtime/stream                 0 B                0 B
+├ ƒ /api/receipts/[id]/pdf               0 B                0 B
+├ ƒ /api/settings                        0 B                0 B
+├ ƒ /api/storage/signed                  0 B                0 B
+├ ƒ /api/storage/signed-url              0 B                0 B
+├ ƒ /api/upload                          0 B                0 B
+├ ƒ /api/users                           0 B                0 B
+├ ƒ /api/users/reset-password            0 B                0 B
+├ ƒ /api/webhooks/google-meet            0 B                0 B
+├ ƒ /api/webhooks/razorpay               0 B                0 B
+├ ƒ /api/webhooks/zoom                   0 B                0 B
+├ ƒ /api/workflow/notifications          0 B                0 B
+├ ○ /audit-logs                          6.77 kB         320 kB
+├ ƒ /certificate/verify/[id]             4.68 kB         124 kB
+├ ○ /certificates                        8.33 kB         560 kB
+├ ○ /crm/followups                       13.4 kB         333 kB
+├ ○ /crm/leads                           9.06 kB         355 kB
+├ ○ /dashboard                           7.84 kB         328 kB
+├ ○ /login                               6.65 kB         320 kB
+├ ○ /onboarding                          14.4 kB         338 kB
+├ ○ /placement                           10.8 kB         342 kB
+├ ○ /placement/enrollments               14.9 kB         342 kB
+├ ○ /portal                              22.9 kB         383 kB
+├ ○ /settings                            7.96 kB         321 kB
+├ ○ /students                            4 kB            330 kB
+├ ƒ /students/[id]                       21.1 kB         581 kB
+├ ○ /support                             9.46 kB         335 kB
+├ ƒ /todos                               178 B          94.7 kB
+└ ○ /users                               9.97 kB         326 kB
++ First Load JS shared by all            87.7 kB
+  ├ chunks/2364-3b4afd593a891e98.js      31.8 kB
+  ├ chunks/618f8807-f296c276de9fd51c.js  53.6 kB
+  └ other shared chunks (total)          2.26 kB
+
+
+ƒ Middleware                             87.8 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

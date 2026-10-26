@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import {
   Settings as SettingsIcon,
   Save,
@@ -336,7 +337,10 @@ export default function SettingsPage() {
                 <div className="h-10 px-3 border border-slate-200 rounded-md bg-slate-50 flex items-center gap-2 overflow-hidden">
                   {settings.logo_url ? (
                     <>
-                      <img
+                      <Image
+                        width={80}
+                        height={24}
+                        unoptimized
                         src={settings.logo_url}
                         alt="Logo Preview"
                         className="h-6 w-auto object-contain max-w-[80px]"

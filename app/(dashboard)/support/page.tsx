@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import {
   HelpCircle,
   Search,
@@ -149,7 +150,7 @@ export default function SupportDeskPage() {
     }).length;
   }, [trainerBatchIds, trainerStudentIds, user]);
 
-  const refreshList = async () => {
+  const refreshList = React.useCallback(async () => {
     let list = await getDoubts();
     if (statusFilter !== 'All') {
       list = list.filter((d) => d.status === statusFilter);
@@ -195,18 +196,12 @@ export default function SupportDeskPage() {
     }
     setDoubts(list);
 
-    if (selectedDoubt) {
-      const updated = list.find((d) => d.id === selectedDoubt.id);
-      if (updated) setSelectedDoubt(updated);
-      else setSelectedDoubt(list[0] || null);
-    } else if (list.length > 0) {
-      setSelectedDoubt(list[0]);
-    }
-  };
+    setSelectedDoubt((current) => list.find((d) => d.id === current?.id) || list[0] || null);
+  }, [statusFilter, assignedFilter, batchFilter, search, user, activeUser.id, trainerBatchIds, trainerStudentIds]);
 
   React.useEffect(() => {
     refreshList();
-  }, [statusFilter, assignedFilter, batchFilter, search, role, trainerBatchIds, trainerStudentIds]);
+  }, [refreshList]);
 
   // Real-Time WebSocket / SSE Subscription
   const { isConnected } = useRealtime({
@@ -877,10 +872,13 @@ export default function SupportDeskPage() {
                               msg.attachment_url.startsWith('data:image/') ||
                               msg.attachment_url.includes('doubt-attachments') ||
                               msg.attachment_url.includes('screenshots') ? (
-                                <img
+                                <Image
+                                  width={640}
+                                  height={192}
+                                  unoptimized
                                   src={msg.attachment_url}
                                   alt="Attachment Screenshot"
-                                  className="max-h-48 rounded object-contain mx-auto"
+                                  className="h-auto w-auto max-w-full max-h-48 rounded object-contain mx-auto"
                                 />
                               ) : (
                                 <div className="flex items-center space-x-1.5 text-[11px] p-1 text-blue-600 font-medium">

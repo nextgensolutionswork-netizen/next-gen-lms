@@ -1,0 +1,394 @@
+{
+  "revision": "0000e5e6ff878f14d4cbd6704ab93cd769346167",
+  "counts": {
+    "pages": 35,
+    "apis": 39,
+    "controls": 1511,
+    "buttons": 630,
+    "forms": 69,
+    "dialogs": 98,
+    "tables": 38
+  },
+  "statusCount": {
+    "Fixed and verified": 8,
+    "Partially fixed": 21,
+    "Not verified": 1,
+    "Still present": 2
+  },
+  "openSeverityCounts": {
+    "P0": 9,
+    "P1": 17,
+    "P2": 2,
+    "P3": 0
+  },
+  "files": [
+    {
+      "file": "app/page.tsx",
+      "sha256": "2203e6c641ad0ebec1613fea6e074ccf9f5b8927d290910d201ad87b34d2b9d0"
+    },
+    {
+      "file": "lib/security/auth-cookie.ts",
+      "sha256": "8618c096a053fcdd7a0015d13b5209ca250346fa2fd3b59efa36c321a5819444"
+    },
+    {
+      "file": "lib/auth/rbac.ts",
+      "sha256": "c813a61ae0ffe9705077959bf9a342db286b3855a5ba86d5e2572b606cc029a5"
+    },
+    {
+      "file": "lib/auth/tenant.ts",
+      "sha256": "7608cbb3e6b5ae67fee86bbc223fd4395d4a6312bea74bb9fe3670da42b63c9e"
+    },
+    {
+      "file": "lib/services/data-store.ts",
+      "sha256": "b90ffb70bcd40a12ac70ce871a14e2ca4d325a1ec3a2d7d618e267be4a168ff1"
+    },
+    {
+      "file": "lib/services/persistent-storage-adapter.ts",
+      "sha256": "368c5ff085b05e9eac6d7d20cd2148910fb2955f2f980fde470d4bc04ffbc5eb"
+    },
+    {
+      "file": "app/layout.tsx",
+      "sha256": "0648417008c9c82d0b16480d2c53829f4c3c5a2c4d2329cc8dc1de3b345fb25c"
+    },
+    {
+      "file": "components/providers/auth-provider.tsx",
+      "sha256": "a3ef2d4b1d3139218bd90b0f64e947ce94a0fd5f51e1786d9435d8b8cc48211e"
+    },
+    {
+      "file": "lib/supabase/db.ts",
+      "sha256": "030e2c564cf75dff183a35afc24edfa72cfa11f7d325a4288d8f6a7e330f3660"
+    },
+    {
+      "file": "lib/supabase/admin.ts",
+      "sha256": "293c2c5868fa7f552da8d871df6daf9bdc863381a2758409237fd3941e34d4e2"
+    },
+    {
+      "file": "lib/supabase/client.ts",
+      "sha256": "9773884c58616004482b432a045effbc9f385763306c5576ca90c465fc49dc7f"
+    },
+    {
+      "file": "lib/supabase/rls.ts",
+      "sha256": "f7e28f451a749f7112d825f2ed101bd3f59ff819d112fcad980c7f40b7bfc0fb"
+    },
+    {
+      "file": "lib/auth/credentials.ts",
+      "sha256": "ccc1f21afd0d216c535e7e7b3a4fd57227dde46d144229c34a4fb7177ac0426b"
+    },
+    {
+      "file": "app/(dashboard)/academics/assessments/page.tsx",
+      "sha256": "863ab32208ff6807b4287dda22bd248392af862c8e07659df8c92eb33b2b5cc6"
+    },
+    {
+      "file": "components/ui/card.tsx",
+      "sha256": "35f0d7dc570c187857790673e4fdc3fcc491ec051e2f5f71b0b7f4839d5686c6"
+    },
+    {
+      "file": "components/ui/badge.tsx",
+      "sha256": "c6dace6891078d56fe3626aeab5a7e7c2c167885c21d075312b29f82fc42ebd6"
+    },
+    {
+      "file": "components/ui/button.tsx",
+      "sha256": "4a30f18039210412584b551dafe9a51ea140ea017a2ea0792977a9174a936685"
+    },
+    {
+      "file": "components/ui/input.tsx",
+      "sha256": "51d96c9f0c95e4dc643089c77b175bde9ed31a6af7c1fca818c3773549e018f3"
+    },
+    {
+      "file": "components/ui/modal.tsx",
+      "sha256": "1c8f2b8d380f1f8d7dcb700970ae995ac8527053284c0f8f20508ae72319254b"
+    },
+    {
+      "file": "lib/services/academics-service.ts",
+      "sha256": "741a7801ef8161d43b709ad2edd9d659695a18a0c3aefdcee5a119c2eededb06"
+    },
+    {
+      "file": "lib/services/audit-service.ts",
+      "sha256": "06a4cff824407f651f442c43365c5f8a3d5e155a50ccf4cdbd413505e4ac33e3"
+    },
+    {
+      "file": "lib/utils/formatters.ts",
+      "sha256": "8fdb101edd527ec304aec645d2d4a2602f84673cb7518f9436e75df192357e0f"
+    },
+    {
+      "file": "app/(dashboard)/layout.tsx",
+      "sha256": "09930cedb60652148f930b9ca8f6f8d57f68d6ecb9ed557b87b971bf75d6aacb"
+    },
+    {
+      "file": "components/layout/sidebar.tsx",
+      "sha256": "a447d7ef90c653a7645c3da8956676d31442f2649f246e4adf2f1239e8f77367"
+    },
+    {
+      "file": "components/layout/header.tsx",
+      "sha256": "8b37103e336133fcc23b93604b5b84679d7d8ff93da8ec54ecfae47f02809e31"
+    },
+    {
+      "file": "app/(dashboard)/academics/assignments/page.tsx",
+      "sha256": "1274b80e9ac264d4f20db9cb8394b4d19827d0d39d65628706f18c1f72db0bbd"
+    },
+    {
+      "file": "components/ui/file-upload.tsx",
+      "sha256": "7e25b8b86c9aaef009e2be53af22d6f4d52b475fd223815ef8d8e587bac3d876"
+    },
+    {
+      "file": "lib/services/storage-service.ts",
+      "sha256": "a05d38f86e98e914a0e64e91b8b8f7fffce6acaf1b0416b8545baaffb9c97b77"
+    },
+    {
+      "file": "lib/utils/zip-export.ts",
+      "sha256": "68f46b486221eef9eab5f6e1b5a2a79fa297bcb8c106ee6b7d396d1f47d3f845"
+    },
+    {
+      "file": "app/(dashboard)/academics/attendance/page.tsx",
+      "sha256": "524d7381ed866c5a40e7b6ef713dcc82958dfbcf74cb2992a8168d5105d70d77"
+    },
+    {
+      "file": "lib/utils/excel-export.ts",
+      "sha256": "317b6bfadcdd00c1d0f5d6a492ba80498865e129848f28253a488a61ac465ebf"
+    },
+    {
+      "file": "lib/services/realtime-service.ts",
+      "sha256": "71eb124ca3c17d3ff7f376e24e0a0b3cbad2d71497704cc2bfa64c9a9acbc52d"
+    },
+    {
+      "file": "app/(dashboard)/academics/batches/page.tsx",
+      "sha256": "bb981d5068a2933c20bd7ad6848dd5c16bb0239fb7907ed50564b2683681a80d"
+    },
+    {
+      "file": "app/(dashboard)/academics/courses/page.tsx",
+      "sha256": "bad1b8b4901db1ce13c64e7ed17dc4f04dcc956b10f890e60a3f747043b87560"
+    },
+    {
+      "file": "app/(dashboard)/academics/sap-servers/page.tsx",
+      "sha256": "17b7f4ba4f85a45979e5789c0588324f1b0c38c625e3e8db31a2bdab51e4bf7d"
+    },
+    {
+      "file": "lib/services/sap-lab-service.ts",
+      "sha256": "a71810b1f7d71765007b75c79bcd28845d481d79046105efad1ca4fd85b31f02"
+    },
+    {
+      "file": "app/(dashboard)/academics/schedule/page.tsx",
+      "sha256": "3ee0363caac618b76202bf03a21484ad7569da2cef80afe950d62165fd00d61f"
+    },
+    {
+      "file": "app/(dashboard)/accounts/approvals/page.tsx",
+      "sha256": "b9c65567b520dfa66b7594eceaae45e7248d6b88271a7d630b319a1404ca2615"
+    },
+    {
+      "file": "lib/services/payment-workflow-client.ts",
+      "sha256": "52bb7f8f083c9476b30ef55c4d4fcf35e4dc3fca86436a512510993422c6100f"
+    },
+    {
+      "file": "lib/services/payment-workflow-state.ts",
+      "sha256": "05cef8d010642511843bf18693a7913efee710c6e012559d54275fb525cd4666"
+    },
+    {
+      "file": "lib/services/admission-service.ts",
+      "sha256": "df7a772760af49805e7c15139047e5efcc3c3832e45f38de5cc48a1a5c07389f"
+    },
+    {
+      "file": "lib/services/onboarding-service.ts",
+      "sha256": "57cebfd58b3a78a43f7023693fb2d650e7ac3e60766e015ba8444fe542d1b295"
+    },
+    {
+      "file": "lib/services/payment-events.ts",
+      "sha256": "2601ddb5989ef45b0ac666778314b62b1232f59f5b43cc37416e0fb24068a311"
+    },
+    {
+      "file": "lib/services/notification-service.ts",
+      "sha256": "7dde9243841c0ed91f39933309b5b5c8621dcd226e5e0ec457fa13add9640ee6"
+    },
+    {
+      "file": "lib/services/payment-workflow-transaction.ts",
+      "sha256": "a53a99ae82235f7dfd6945b1f1a212836303725007e28fac88965f5e7f0d6d91"
+    },
+    {
+      "file": "lib/services/fee-workflow-service.ts",
+      "sha256": "f8d239bec73b0626436b9da87a45204b5d1b87dcb24e204c4f98b23323044e8d"
+    },
+    {
+      "file": "lib/services/receipt-amounts.ts",
+      "sha256": "797da6f28b904625133b7107d4d6223df4f1dbe153434ebbe205b7bc6dbe72fa"
+    },
+    {
+      "file": "app/(dashboard)/accounts/expenses/page.tsx",
+      "sha256": "7eb236e410468dcc73eb2cb530ac2a7d289fe850c1b0cc7bf3690f5831a0dae6"
+    },
+    {
+      "file": "lib/services/finance-service.ts",
+      "sha256": "cf126a5f2c223905291f9b56e40acc8f37a828d16e6da98b82b2cfd7657cf23d"
+    },
+    {
+      "file": "lib/services/pdf-service.ts",
+      "sha256": "1f708e18d8c7b70e0c10a4bfae04389bbd72ffd9121d8d09a91eac09e147334d"
+    },
+    {
+      "file": "lib/services/finance-formatters.ts",
+      "sha256": "94d79888b8b623349df59aa6b629992bcca71495a962397c645c0f16661aae1f"
+    },
+    {
+      "file": "app/(dashboard)/accounts/fees/page.tsx",
+      "sha256": "4c8a05fef2b9fafe7f3e4fabbc9017bb197373a19c5b87519d4427c83e020dfa"
+    },
+    {
+      "file": "app/(dashboard)/accounts/installments/page.tsx",
+      "sha256": "eb10bcc3701c622faf5103da14da087e3b43a6525c162105040ebc79ea768e78"
+    },
+    {
+      "file": "app/(dashboard)/accounts/payments/page.tsx",
+      "sha256": "b2d81ed9921570252d4a6d57f7e7caa9351646114f1ce505e53e794046014441"
+    },
+    {
+      "file": "app/(dashboard)/accounts/receipts/page.tsx",
+      "sha256": "553717a5ead8c580a68def867e196396ff01399ee82120e1f48086eaa0e244dc"
+    },
+    {
+      "file": "app/(dashboard)/accounts/receipts/[id]/page.tsx",
+      "sha256": "28a5312e0134c4825aaebf484bbd7e21033710ea23b439f727561f149e723858"
+    },
+    {
+      "file": "app/(dashboard)/accounts/reports/page.tsx",
+      "sha256": "678d82ef358ffb9edfe10b6a9abbff4d3210843b41cc362f4ca9e8231a90ac09"
+    },
+    {
+      "file": "app/(dashboard)/accounts/vendors/page.tsx",
+      "sha256": "26bed4a6fda3cf8e933168a24abfdaced4b4a5f19e336954541559e9d422fc3d"
+    },
+    {
+      "file": "app/(dashboard)/admissions/page.tsx",
+      "sha256": "b04cd4838d896ca45717168b1486c57b61c079d1f96158061b236bc8e3f8b8a9"
+    },
+    {
+      "file": "app/(dashboard)/audit-logs/page.tsx",
+      "sha256": "063d4e69e877d32b764729ea243e7ef2da985da53da9c711a42b4facc3075c1f"
+    },
+    {
+      "file": "app/certificate/verify/[id]/page.tsx",
+      "sha256": "368c95d97fe1d167edff691855ee1114afcc8104650896aa21e16e230a65e9c8"
+    },
+    {
+      "file": "app/(dashboard)/certificates/page.tsx",
+      "sha256": "9c3d15cd8ee8dc83ae2268a55ebf2b368e982cc994db017ecef6f0548f922a33"
+    },
+    {
+      "file": "lib/services/certificate-service.ts",
+      "sha256": "325999fd471fed525af594bdf4a0b1b1eee4bab136afd5a96868020fd7713da8"
+    },
+    {
+      "file": "app/(dashboard)/crm/followups/page.tsx",
+      "sha256": "3a81e422836b85c10888b74d9555b3cc82c5edf2110a52ca8339800ed87f6099"
+    },
+    {
+      "file": "lib/services/crm-service.ts",
+      "sha256": "d8be0e5c15d07f302799b81df0f5ffbba1061415d80dfe3de94fd5a86655df62"
+    },
+    {
+      "file": "app/(dashboard)/crm/leads/page.tsx",
+      "sha256": "d70b188d07ad46e93ff0a2e902d565e716afc7397a325d0896de7e3a46b2e8c8"
+    },
+    {
+      "file": "components/bulk-import-modal.tsx",
+      "sha256": "343629d4ff82aab8a17e19e707703f03403fd53d50302c5ffc042fa1a7900e73"
+    },
+    {
+      "file": "lib/services/bulk-import-service.ts",
+      "sha256": "3362f08b626e2f11542f672fdef34e6c064d1f73509d87191ef809e670d74ec7"
+    },
+    {
+      "file": "lib/services/meeting-attendance-service.ts",
+      "sha256": "211fabe91f771859b575a3336bc9d8e2bee2af639951dc962776b0f22927bcf1"
+    },
+    {
+      "file": "app/(dashboard)/dashboard/page.tsx",
+      "sha256": "553ba068301dde45c592b26599e4d3c96a7395e045c3c7fa3e29b769d4c17ed2"
+    },
+    {
+      "file": "app/login/page.tsx",
+      "sha256": "21f6165376f21b4f7fca684639696c7d796f53be4dff1ebb4fc41e9c3e245e2e"
+    },
+    {
+      "file": "app/(dashboard)/onboarding/page.tsx",
+      "sha256": "18c2f725f6e3727a4f4c4e26bfea85d0a1e18ac8ca6894ea48961d42a39ed4b7"
+    },
+    {
+      "file": "lib/services/onboarding-client.ts",
+      "sha256": "46fde94f1c6fe6f6f9bd9dcd57de36d41f53ac2625b35ec3f7b72d6068ccd407"
+    },
+    {
+      "file": "app/(dashboard)/placement/page.tsx",
+      "sha256": "8f4b5da79348bd42eae86a12b18556c8f5a614362f8e9455adc13066f7cb1954"
+    },
+    {
+      "file": "lib/services/placement-service.ts",
+      "sha256": "2f995a484a6814b6c98b9a3325ffa8dba5dde69beefeada9602eef8ab760edab"
+    },
+    {
+      "file": "app/(dashboard)/placement/enrollments/page.tsx",
+      "sha256": "68ede77dfc91b8417f92ac86131a48d769581e013ab872c1348d4a34e1b4161e"
+    },
+    {
+      "file": "app/portal/page.tsx",
+      "sha256": "ce482fd61a7aea063ca37bcbd77a60c9885e6f12246b770bf2e9910ab42b0aed"
+    },
+    {
+      "file": "lib/services/doubt-service.ts",
+      "sha256": "29f6f60748f35e5b86d727b9b6cce32c30dee0f434d9de55f4e6c569a93cec67"
+    },
+    {
+      "file": "lib/hooks/use-realtime.ts",
+      "sha256": "64805d20cae16b5ed335d52f7ce920eda8eddd3b6e6014f3811cf0917bc35b4e"
+    },
+    {
+      "file": "components/ui/hls-video-player.tsx",
+      "sha256": "3a082dae24a742b521dd2ab249f6daf5143a6eaa65a554fc34042e1c2314b28d"
+    },
+    {
+      "file": "components/portal/quiz-runner-modal.tsx",
+      "sha256": "9947f731c452980b3451be3679fa99393eb792d0d5004fe11e2db6a5109bc268"
+    },
+    {
+      "file": "components/portal/student-placement-hub.tsx",
+      "sha256": "2a53f397327b4d73dbc22adf83f13178c0dddb0a2b6234344f64ebd0f801e1f7"
+    },
+    {
+      "file": "app/(dashboard)/settings/page.tsx",
+      "sha256": "d4772f24d8ec4cf62b8bfccd9ffea9977857c8edcfc24badcab747bf870e80d2"
+    },
+    {
+      "file": "lib/supabase/seeder.ts",
+      "sha256": "525d574a690911cd90cc25938a8b821dd13064f288dded98be1296c9d79ce242"
+    },
+    {
+      "file": "lib/supabase/sync-service.ts",
+      "sha256": "52d8805e020c2611fd5a7559816570f318e1186c49851dcc25e9dc3e620613ba"
+    },
+    {
+      "file": "app/(dashboard)/students/page.tsx",
+      "sha256": "6ce1483e2a31d36c45d94922fb351d52e101ffb9edbbe1dce727ad29d9299c77"
+    },
+    {
+      "file": "app/(dashboard)/students/[id]/page.tsx",
+      "sha256": "6f49e9f4bb1f39a0bc8f70b57299d3a426e532de46bde07a2bd863366f37cfe7"
+    },
+    {
+      "file": "lib/services/student-service.ts",
+      "sha256": "dc99e7a1dee20678d7b1dcf84ce524fd125fc97852c33454e00a17abdb965f25"
+    },
+    {
+      "file": "app/(dashboard)/support/page.tsx",
+      "sha256": "da6bdabaf0d1eae9d0ab03402925061ad6b45786be60a8e964aa43af5590c7fa"
+    },
+    {
+      "file": "app/todos/page.tsx",
+      "sha256": "53075d3ea57810043c9b876866c7ca7933f969364003f772a69edb9bdc93116d"
+    },
+    {
+      "file": "app/(dashboard)/users/page.tsx",
+      "sha256": "2bd851053fd47bf58efde5d112855068fae72c2231eef972cf41212880abb9d4"
+    },
+    {
+      "file": "lib/services/auth-service.ts",
+      "sha256": "1f60426b9ca3d9f93d7f8febfb9b4a9249c01284a229f78fbce89989c269aeb8"
+    }
+  ]
+}

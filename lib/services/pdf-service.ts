@@ -5,6 +5,15 @@ import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { amountToWordsINR } from './finance-formatters';
 import { uploadFile } from './storage-service';
 
+export class ReceiptPdfDataError extends Error {}
+
+function receiptNumber(value: unknown): number | null {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
 /**
  * Server-Side PDF Generation Service
  * Generates vector PDF documents for Official Fee Receipts
@@ -15,12 +24,20 @@ import { uploadFile } from './storage-service';
  * Generate an official A4 Fee Receipt PDF Buffer
  */
 export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer> {
+  const paymentAmount = receiptNumber(receipt.payment_amount);
+  const remainingBalance = receiptNumber(receipt.remaining_balance);
+  if (paymentAmount === null) {
+    throw new ReceiptPdfDataError(`Receipt ${receipt.receipt_number} has no valid payment amount. Correct the receipt or its linked payment before downloading.`);
+  }
+  // Legacy/imported receipts may omit institute details despite the static type.
+  // PDFKit calls valueOf() on every metadata value during construction.
+  const instituteName = typeof receipt.institute_name === 'string' ? receipt.institute_name.trim() : '';
   const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/accounts/receipts/${encodeURIComponent(receipt.id)}`;
   const qr = await QRCode.toBuffer(verificationUrl, { width: 160, margin: 1 });
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 45, info: {
       Title: `Fee Receipt - ${receipt.receipt_number}`,
-      Author: receipt.institute_name,
+      ...(instituteName ? { Author: instituteName } : {}),
       Subject: `Payment receipt for ${receipt.student_name}`,
     } });
     const chunks: Buffer[] = [];
@@ -29,9 +46,11 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
     doc.on('error', reject);
     try {
       const money = (amount: number) => 'INR ' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      doc.fillColor('#0A6ED1').font('Helvetica-Bold').fontSize(20).text(receipt.institute_name);
-      doc.fillColor('#475569').font('Helvetica').fontSize(10).text(receipt.institute_address);
-      doc.text(receipt.institute_phone).moveDown();
+      doc.fillColor('#0A6ED1').font('Helvetica-Bold').fontSize(20).text(instituteName || 'Fee Receipt');
+      doc.fillColor('#475569').font('Helvetica').fontSize(10);
+      if (receipt.institute_address) doc.text(receipt.institute_address);
+      if (receipt.institute_phone) doc.text(receipt.institute_phone);
+      doc.moveDown();
       doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(16).text('OFFICIAL FEE RECEIPT');
       doc.font('Helvetica').fontSize(10).text('Receipt: ' + receipt.receipt_number);
       doc.text('Payment date: ' + formatDate(receipt.payment_date)).moveDown();
@@ -46,9 +65,9 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       if (receipt.student_email) doc.text(receipt.student_email);
       doc.moveDown().text('Payment mode: ' + receipt.payment_mode);
       doc.text('Transaction reference: ' + (receipt.transaction_reference || '-')).moveDown(2);
-      doc.font('Helvetica-Bold').fontSize(14).text('Amount received: ' + money(receipt.payment_amount));
-      doc.font('Helvetica').fontSize(10).text(amountToWordsINR(receipt.payment_amount)).moveDown();
-      doc.font('Helvetica-Bold').text('Remaining balance: ' + money(receipt.remaining_balance)).moveDown(2);
+      doc.font('Helvetica-Bold').fontSize(14).text('Amount received: ' + money(paymentAmount));
+      doc.font('Helvetica').fontSize(10).text(amountToWordsINR(paymentAmount)).moveDown();
+      doc.font('Helvetica-Bold').text('Remaining balance: ' + (remainingBalance === null ? 'Not recorded on this receipt' : money(remainingBalance))).moveDown(2);
       doc.font('Helvetica').text('Authorized by: ' + receipt.authorized_by);
       doc.text('Generated: ' + formatDateTime(receipt.created_at)).moveDown();
       const qrY = doc.y;

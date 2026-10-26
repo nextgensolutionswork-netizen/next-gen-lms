@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { StudentFee, FeeCategoryItem } from '@/types';
@@ -9,11 +9,42 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
   const accountantId = 'usr-accounts'; // Suresh Kumar
   const superAdminId = 'usr-superadmin'; // Rajesh Sharma
 
+  let initialStudentFees: any[];
+  let initialFeeAccounts: any[];
+  let initialPayments: any[];
+  let initialReceipts: any[];
+  let initialStudentPayments: any[];
+  let initialInstallments: any[];
+  let initialLedgers: any[];
+
+  beforeAll(() => {
+    initialStudentFees = [...(store.studentFees || [])];
+    initialFeeAccounts = [...(store.feeAccounts || [])];
+    initialPayments = [...(store.payments || [])];
+    initialReceipts = [...(store.receipts || [])];
+    initialStudentPayments = [...(store.studentPayments || [])];
+    initialInstallments = [...(store.installments || [])];
+    initialLedgers = [...(store.studentFinancialLedgers || [])];
+  });
+
+  afterAll(() => {
+    store.studentFees = initialStudentFees;
+    store.feeAccounts = initialFeeAccounts;
+    store.payments = initialPayments;
+    store.receipts = initialReceipts;
+    store.studentPayments = initialStudentPayments;
+    store.installments = initialInstallments;
+    store.studentFinancialLedgers = initialLedgers;
+    store.reconcileDualLedgers();
+  });
+
   beforeEach(() => {
     // Reset collections to clean state for deterministic unit testing
     store.studentFees = [];
     store.feeApprovalHistories = [];
     store.studentPayments = [];
+    store.payments = [];
+    store.receipts = [];
     store.studentFinancialLedgers = [];
     store.feeRevisionRequests = [];
     store.feeAccounts = [];

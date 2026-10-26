@@ -1,0 +1,33 @@
+{
+  "mode": "isolated local synthetic adapter; NOT verified Supabase staging",
+  "results": [
+    {
+      "name": "/students: direct, refresh, directory link, back and forward (3 cycles)",
+      "pass": true
+    },
+    {
+      "name": "/students: confirmed invalid ID",
+      "pass": true
+    },
+    {
+      "name": "/accounts/receipts: direct, refresh, directory link, back and forward (3 cycles)",
+      "pass": true
+    },
+    {
+      "name": "/accounts/receipts: confirmed invalid ID",
+      "pass": true
+    },
+    {
+      "name": "Receipt transport failure shows retry, never Not Found or first receipt",
+      "pass": true
+    },
+    {
+      "name": "Anonymous receipt API and detail access blocked",
+      "pass": true
+    },
+    {
+      "name": "Synthetic student server-form login, portal and receipt ownership isolation",
+      "pass": true
+    }
+  ]
+}

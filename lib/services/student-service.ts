@@ -1,36 +1,22 @@
 import { store } from './data-store';
 import { Student } from '@/types';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient as createSessionClient } from '@/lib/supabase/client';
 
 export async function getStudents(filters?: {
   course_id?: string;
   batch_id?: string;
   status?: string;
   search?: string;
-}): Promise<Student[]> {
+}, signal?: AbortSignal): Promise<Student[]> {
   if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      let query = supabase.from('students').select('*').order('created_at', { ascending: false });
-
-      if (filters?.course_id) {
-        query = query.eq('course_id', filters.course_id);
-      }
-      if (filters?.batch_id) {
-        query = query.eq('batch_id', filters.batch_id);
-      }
-      if (filters?.status && filters.status !== 'All') {
-        query = query.eq('status', filters.status);
-      }
-
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        store.students = data as Student[];
-        return data as Student[];
-      }
-    } catch (err) {
-      console.warn('Supabase students query error, falling back to local persistent store:', err);
-    }
+    // Use the authenticated browser client directly. Never replace an RLS-empty
+    // result or failed remote lookup with seeded/cached student records.
+    const supabase = typeof window !== 'undefined' ? createSessionClient() : createClient();
+    const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+    if (signal?.aborted) throw new Error('Student lookup cancelled.');
+    if (error) throw new Error('Unable to load students. Please retry or contact your administrator.');
+    store.students = (data || []) as Student[];
   }
 
   let list = [...store.students];
@@ -60,20 +46,12 @@ export async function getStudents(filters?: {
 
 export async function getStudentById(id: string): Promise<Student | undefined> {
   if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .or(`id.eq.${id},student_code.eq.${id}`)
-        .maybeSingle();
-
-      if (!error && data) {
-        return data as Student;
-      }
-    } catch (err) {
-      console.warn('Supabase getStudentById error, checking local store:', err);
-    }
+    const supabase = typeof window !== 'undefined' ? createSessionClient() : createClient();
+    const reference = String(id).trim();
+    const column = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference) ? 'id' : 'student_code';
+    const { data, error } = await supabase.from('students').select('*').eq(column, reference).maybeSingle();
+    if (error) throw new Error('Unable to verify the student profile. Please retry or contact your administrator.');
+    return data ? data as Student : undefined;
   }
 
   const target = decodeURIComponent(String(id)).trim().toLowerCase();

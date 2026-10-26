@@ -1,0 +1,11 @@
+const fs=require('fs'),path=require('path'),cp=require('child_process');
+const dir=fs.readFileSync(path.join(process.env.TEMP,'pages-current-copy.txt'),'utf8').trim();
+const env={}; for(const k of ['PATH','Path','SystemRoot','WINDIR','TEMP','TMP','COMSPEC','USERPROFILE','APPDATA','LOCALAPPDATA'])if(process.env[k])env[k]=process.env[k];
+Object.assign(env,{NODE_ENV:'production',NEXT_TELEMETRY_DISABLED:'1',NEXT_PUBLIC_SUPABASE_URL:'https://mock-sap-lms.supabase.co',NEXT_PUBLIC_SUPABASE_ANON_KEY:'mockAnonKey',NEXT_PUBLIC_APP_URL:'http://127.0.0.1:3137',AUTH_COOKIE_SECRET:'isolated-page-audit-synthetic-key'});
+const tasks={build:['next/dist/bin/next','build'],unit:['vitest/vitest.mjs','run'],tsc:['typescript/bin/tsc','--noEmit'],lint:['next/dist/bin/next','lint'],server:['next/dist/bin/next','start','--hostname','127.0.0.1','--port','3137']};
+const name=process.argv[2];const args=tasks[name];if(!args)throw Error('Unknown task');
+if(name==='unit')env.NODE_ENV='test';
+const log=fs.openSync(path.join(__dirname,name+'.log'),'w');
+const child=cp.spawn(process.execPath,[path.resolve('node_modules',args[0]),...args.slice(1)],{cwd:dir,env,stdio:['ignore',log,log]});
+if(name==='server')fs.writeFileSync(path.join(__dirname,'server-pid.txt'),String(child.pid));
+child.on('exit',code=>{fs.writeFileSync(path.join(__dirname,name+'-result.json'),JSON.stringify({revision:'0000e5e6ff878f14d4cbd6704ab93cd769346167',task:name,exitCode:code,finished:new Date().toISOString(),isolatedCopy:dir}));console.log(name+' exit='+code);process.exitCode=code;});

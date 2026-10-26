@@ -159,13 +159,14 @@ export default function LoginPage() {
     }
 
     // Handle standard server-side redirect error and notice query parameters
-    const urlError = query.get('error');
+    const urlError = query.get('error') || query.get('reason');
     if (urlError) {
       const errorMap: Record<string, string> = {
         invalid_credentials: 'Unable to sign in. Check your email and password and try again.',
         missing_credentials: 'Please enter both your email address and password.',
         onboarding_pending: 'Your LMS portal account is currently pending onboarding verification. Please contact your coordinator.',
         account_deactivated: 'This account has been deactivated. Please contact the administrator.',
+        access_unavailable: 'We could not verify your LMS access. Please retry in a moment or contact your coordinator.',
         insecure_request: 'Insecure login attempt detected. Credentials must never be transmitted in the URL.',
         csrf_failed: 'Security verification failed. Please try signing in again.',
       };

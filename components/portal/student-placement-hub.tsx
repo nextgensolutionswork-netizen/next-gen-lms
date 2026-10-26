@@ -139,7 +139,7 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
     declSensitiveDocs &&
     declKeepUpdated;
 
-  const refreshData = async () => {
+  const refreshData = React.useCallback(async () => {
     const enr = store.placementEnrollments.find((e) => e.student_id === student.id);
     setEnrollment(enr);
     setOpenings([...store.jobOpenings]);
@@ -148,11 +148,11 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
       const evalRes = await evaluatePlacementEligibility(student.id);
       setEvaluation(evalRes);
     }
-  };
+  }, [student.id]);
 
   React.useEffect(() => {
     refreshData();
-  }, [student.id]);
+  }, [refreshData]);
 
   const handleEnrollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

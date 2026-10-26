@@ -1,0 +1,618 @@
+{
+  "revision": "0000e5e6ff878f14d4cbd6704ab93cd769346167",
+  "mode": "isolated mock production build; no authenticated accounts or independent Supabase DB",
+  "routes": [
+    {
+      "id": "P01",
+      "route": "/",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P02",
+      "route": "/academics/assessments",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P03",
+      "route": "/academics/assignments",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P04",
+      "route": "/academics/attendance",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P05",
+      "route": "/academics/batches",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P06",
+      "route": "/academics/courses",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P07",
+      "route": "/academics/sap-servers",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P08",
+      "route": "/academics/schedule",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P09",
+      "route": "/accounts/approvals",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P10",
+      "route": "/accounts/expenses",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P11",
+      "route": "/accounts/fees",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P12",
+      "route": "/accounts/installments",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P13",
+      "route": "/accounts/payments",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P14",
+      "route": "/accounts/receipts",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P15",
+      "route": "/accounts/receipts/[id]",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P16",
+      "route": "/accounts/reports",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P17",
+      "route": "/accounts/vendors",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P18",
+      "route": "/admissions",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P19",
+      "route": "/audit-logs",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P20",
+      "route": "/certificate/verify/[id]",
+      "status": 200,
+      "finalPath": "/certificate/verify/audit-nonexistent",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Next-Gen ERP Solutions",
+        "Certificate Not Found"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P21",
+      "route": "/certificates",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P22",
+      "route": "/crm/followups",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P23",
+      "route": "/crm/leads",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P24",
+      "route": "/dashboard",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P25",
+      "route": "/login",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P26",
+      "route": "/onboarding",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P27",
+      "route": "/placement",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P28",
+      "route": "/placement/enrollments",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P29",
+      "route": "/portal",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P30",
+      "route": "/settings",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P31",
+      "route": "/students",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P32",
+      "route": "/students/[id]",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P33",
+      "route": "/support",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P34",
+      "route": "/todos",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    },
+    {
+      "id": "P35",
+      "route": "/users",
+      "status": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "pageErrors": [],
+      "scope": "anonymous navigation only"
+    }
+  ],
+  "responsive": [
+    {
+      "route": "/login",
+      "width": 375,
+      "scrollWidth": 375,
+      "bodyWidth": 375,
+      "horizontalOverflow": false,
+      "screenshot": "login-375.png"
+    },
+    {
+      "route": "/login",
+      "width": 768,
+      "scrollWidth": 768,
+      "bodyWidth": 768,
+      "horizontalOverflow": false,
+      "screenshot": "login-768.png"
+    },
+    {
+      "route": "/login",
+      "width": 1366,
+      "scrollWidth": 1366,
+      "bodyWidth": 1366,
+      "horizontalOverflow": false,
+      "screenshot": "login-1366.png"
+    },
+    {
+      "route": "/login",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "bodyWidth": 1920,
+      "horizontalOverflow": false,
+      "screenshot": "login-1920.png"
+    },
+    {
+      "route": "/certificate/verify/audit-nonexistent",
+      "width": 375,
+      "scrollWidth": 375,
+      "bodyWidth": 375,
+      "horizontalOverflow": false,
+      "screenshot": "certificate-missing-375.png"
+    },
+    {
+      "route": "/certificate/verify/audit-nonexistent",
+      "width": 768,
+      "scrollWidth": 768,
+      "bodyWidth": 768,
+      "horizontalOverflow": false,
+      "screenshot": "certificate-missing-768.png"
+    },
+    {
+      "route": "/certificate/verify/audit-nonexistent",
+      "width": 1366,
+      "scrollWidth": 1366,
+      "bodyWidth": 1366,
+      "horizontalOverflow": false,
+      "screenshot": "certificate-missing-1366.png"
+    },
+    {
+      "route": "/certificate/verify/audit-nonexistent",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "bodyWidth": 1920,
+      "horizontalOverflow": false,
+      "screenshot": "certificate-missing-1920.png"
+    }
+  ],
+  "api": [
+    {
+      "route": "/api/fees/payments",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/fees/receipts",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/onboarding/cases",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/audit-logs",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/database/backup",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/users",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/realtime/stream",
+      "method": "GET",
+      "status": 401,
+      "contentType": "application/json"
+    },
+    {
+      "route": "/api/settings",
+      "method": "GET",
+      "status": 200,
+      "contentType": "application/json"
+    }
+  ],
+  "login": [
+    {
+      "javascript": true,
+      "finalPath": "/login",
+      "queryKeys": [],
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/login",
+          "credentialInURL": false
+        }
+      ],
+      "bodyText": "our account\n\nSelect any of the 8 accounts below or enter credentials manually.\n\n8 PRESET ROLE ACCOUNTS:\nClick to fill\nSuper Admin\n/dashboard\n\nsuperadmin@next-generpsolutions.com\n\nOperations Admin\n/dashboard\n\nadmin@next-generpsolutions.com\n\nAccountant\n/accounts/fees\n\naccounts@next-generpsolutions.com\n\nCounsellor\n/crm/leads\n\ncounsellor@next-generpsolutions.com\n\nTrainer / Faculty\n/academics/courses\n\nvikram.fico@next-generpsolutions.com\n\nPlacement Head\n/placement\n\nplacement@next-generpsolutions.com\n\nAcademic Support\n/support\n\nsupport@next-generpsolutions.com\n\nOnboarding Team\n/onboarding\n\nonboarding@next-generpsolutions.com\n\nEnrolled Student\n/portal\n\namit.gupta@student.next-gen.com\n\nEmail address\nPassword\nForgot password?\n\nUnable to sign in. Check your email and password and try again.\n\nSign in\n\nNeed assistance or access issue?\nContact institute administrator at admin@next-generpsolutions.com"
+    },
+    {
+      "javascript": false,
+      "finalPath": "/login",
+      "queryKeys": [
+        "error"
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/login",
+          "credentialInURL": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "credentialInURL": false
+        },
+        {
+          "method": "GET",
+          "path": "/login",
+          "credentialInURL": false
+        }
+      ],
+      "bodyText": "tials manually.\n\n8 PRESET ROLE ACCOUNTS:\nClick to fill\nSuper Admin\n/dashboard\n\nsuperadmin@next-generpsolutions.com\n\nOperations Admin\n/dashboard\n\nadmin@next-generpsolutions.com\n\nAccountant\n/accounts/fees\n\naccounts@next-generpsolutions.com\n\nCounsellor\n/crm/leads\n\ncounsellor@next-generpsolutions.com\n\nTrainer / Faculty\n/academics/courses\n\nvikram.fico@next-generpsolutions.com\n\nPlacement Head\n/placement\n\nplacement@next-generpsolutions.com\n\nAcademic Support\n/support\n\nsupport@next-generpsolutions.com\n\nOnboarding Team\n/onboarding\n\nonboarding@next-generpsolutions.com\n\nEnrolled Student\n/portal\n\namit.gupta@student.next-gen.com\n\nJavaScript is disabled.\n\nSecure server-side authentication is active. Form submissions are transmitted via encrypted HTTP POST.\n\nEmail address\nPassword\nForgot password?\nSign in\n\nNeed assistance or access issue?\nContact institute administrator at admin@next-generpsolutions.com"
+    }
+  ],
+  "blockedExternal": []
+}

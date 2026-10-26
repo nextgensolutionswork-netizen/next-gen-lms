@@ -15,7 +15,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3001';
+const TARGET_HOST = process.env.TEST_HOST || 'localhost';
+const TARGET_PORT = parseInt(process.env.TEST_PORT || '3001', 10);
 const ISOLATION_TENANT = 'staging-isolated-tenant';
 const PROD_PROJECT_REF = 'tgohtdzwehhjfahtgovq';
 const STAGING_PROJECT_REF = 'neiccpnxftfmmwnvtgdy';
@@ -127,8 +129,8 @@ export async function runStagingLoadTest() {
 
   // Pre-check: Health API must be responsive
   const healthRes = await executeRequest({
-    hostname: 'localhost',
-    port: 3000,
+    hostname: TARGET_HOST,
+    port: TARGET_PORT,
     path: '/api/database/health',
     method: 'GET',
     headers: { Accept: 'application/json' },
@@ -196,8 +198,8 @@ export async function runStagingLoadTest() {
       const pathTarget = roleRoutes[Math.floor(Math.random() * roleRoutes.length)];
       const reqStart = Date.now();
       const res = await executeRequest({
-        hostname: 'localhost',
-        port: 3000,
+        hostname: TARGET_HOST,
+        port: TARGET_PORT,
         path: pathTarget,
         method: 'GET',
         headers: {
@@ -249,8 +251,8 @@ export async function runStagingLoadTest() {
   const studentUsers = virtualUsers.filter((u) => u.role === 'student');
   const videoPromises = studentUsers.map((stu) =>
     executeRequest({
-      hostname: 'localhost',
-      port: 3000,
+      hostname: TARGET_HOST,
+      port: TARGET_PORT,
       path: '/api/storage/signed-url?bucket=assignments&path=courses%2Fsap-fico%2Flesson-01.m3u8&expiresIn=3600',
       method: 'GET',
       headers: {
@@ -275,8 +277,8 @@ export async function runStagingLoadTest() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const dueDateStr = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
   const admRes = await executeRequest({
-    hostname: 'localhost',
-    port: 3000,
+    hostname: TARGET_HOST,
+    port: TARGET_PORT,
     path: '/api/admissions',
     method: 'POST',
     headers: {
@@ -314,8 +316,8 @@ export async function runStagingLoadTest() {
   let paymentId = null;
   if (createdFeeId) {
     const payRes = await executeRequest({
-      hostname: 'localhost',
-      port: 3000,
+      hostname: TARGET_HOST,
+      port: TARGET_PORT,
       path: '/api/fees/payments',
       method: 'POST',
       headers: {
@@ -353,8 +355,8 @@ export async function runStagingLoadTest() {
 
     const [resA, resB] = await Promise.all([
       executeRequest({
-        hostname: 'localhost',
-        port: 3000,
+        hostname: TARGET_HOST,
+        port: TARGET_PORT,
         path: '/api/fees/payments',
         method: 'POST',
         headers: {
@@ -364,8 +366,8 @@ export async function runStagingLoadTest() {
         },
       }, { action: 'approve', paymentId, notes: 'Staging concurrent approval A' }),
       executeRequest({
-        hostname: 'localhost',
-        port: 3000,
+        hostname: TARGET_HOST,
+        port: TARGET_PORT,
         path: '/api/fees/payments',
         method: 'POST',
         headers: {
@@ -391,8 +393,8 @@ export async function runStagingLoadTest() {
     // D. Verify Onboarding Case updated with fee clearance
     const onbVU = virtualUsers.find((u) => u.role === 'onboarding_team');
     const onbRes = await executeRequest({
-      hostname: 'localhost',
-      port: 3000,
+      hostname: TARGET_HOST,
+      port: TARGET_PORT,
       path: '/api/onboarding/cases',
       method: 'GET',
       headers: {

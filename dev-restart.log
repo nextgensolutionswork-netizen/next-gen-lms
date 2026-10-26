@@ -1,0 +1,253 @@
+  ▲ Next.js 14.2.24
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 6.4s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 1338ms (129 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 9.6s (632 modules)
+ GET /login 200 in 13670ms
+ ✓ Compiled in 4.1s (327 modules)
+ GET /login 200 in 1409ms
+ GET /login 200 in 103ms
+ ○ Compiling /api/database/backup ...
+ ✓ Compiled /api/database/backup in 1810ms (402 modules)
+ GET /api/database/backup 401 in 4792ms
+ ✓ Compiled in 435ms (327 modules)
+ ✓ Compiled in 436ms (327 modules)
+ ✓ Compiled in 324ms (327 modules)
+ ✓ Compiled in 851ms (327 modules)
+ ✓ Compiled in 1000ms (327 modules)
+ ✓ Compiled in 982ms (327 modules)
+ GET /login 200 in 221ms
+ GET /login 200 in 85ms
+ ✓ Compiled /api/auth/login in 213ms (401 modules)
+ POST /api/auth/login 303 in 3260ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1533ms (870 modules)
+ GET /dashboard 200 in 2042ms
+ ○ Compiling /academics/assessments ...
+ ✓ Compiled /academics/assessments in 1368ms (894 modules)
+ GET /academics/assessments 200 in 1615ms
+ ✓ Compiled /academics/assignments in 367ms (926 modules)
+ GET /academics/assignments 200 in 545ms
+ ○ Compiling /academics/attendance ...
+ ✓ Compiled /academics/attendance in 727ms (954 modules)
+ GET /academics/attendance 200 in 865ms
+ ○ Compiling /academics/batches ...
+ ✓ Compiled /academics/batches in 757ms (966 modules)
+ GET /academics/batches 200 in 975ms
+ ○ Compiling /academics/courses ...
+ ✓ Compiled /academics/courses in 1175ms (990 modules)
+ GET /academics/courses 200 in 1431ms
+ ○ Compiling /academics/sap-servers ...
+ ✓ Compiled /academics/sap-servers in 1206ms (1010 modules)
+ GET /academics/sap-servers 200 in 1405ms
+ ✓ Compiled /academics/schedule in 459ms (1024 modules)
+ GET /academics/schedule 200 in 592ms
+ ○ Compiling /accounts/approvals ...
+ ✓ Compiled /accounts/approvals in 1413ms (1038 modules)
+ GET /accounts/approvals 200 in 1809ms
+ ○ Compiling /api/fees/payments ...
+ ✓ Compiled /api/fees/payments in 860ms (594 modules)
+ GET /api/fees/payments 200 in 3454ms
+ ○ Compiling /accounts/expenses ...
+ ✓ Compiled /accounts/expenses in 2.7s (1276 modules)
+ GET /accounts/expenses 200 in 3270ms
+ ○ Compiling /accounts/fees ...
+ ✓ Compiled /accounts/fees in 1308ms (1284 modules)
+ GET /accounts/fees 200 in 1709ms
+ GET /api/fees/payments 200 in 1370ms
+ ○ Compiling /accounts/installments ...
+ ✓ Compiled /accounts/installments in 1556ms (1293 modules)
+ GET /accounts/installments 200 in 3112ms
+ GET /api/fees/payments 200 in 1150ms
+ ○ Compiling /accounts/payments ...
+ ✓ Compiled /accounts/payments in 586ms (1303 modules)
+ GET /accounts/payments 200 in 970ms
+ GET /api/fees/payments 200 in 1417ms
+ ○ Compiling /accounts/receipts ...
+ ✓ Compiled /accounts/receipts in 1964ms (1319 modules)
+ GET /accounts/receipts 200 in 2146ms
+ ✓ Compiled /api/fees/receipts in 351ms (750 modules)
+ GET /api/fees/receipts 200 in 1845ms
+ GET /api/fees/receipts 200 in 3070ms
+ ○ Compiling /accounts/receipts/[id] ...
+ ✓ Compiled /accounts/receipts/[id] in 1017ms (1325 modules)
+ GET /accounts/receipts/81000000-0000-0000-0000-000000000001 200 in 2056ms
+ ○ Compiling /accounts/reports ...
+ ✓ Compiled /accounts/reports in 846ms (1311 modules)
+ GET /accounts/reports 200 in 1457ms
+ GET /api/fees/payments 200 in 561ms
+ ○ Compiling /accounts/vendors ...
+ ✓ Compiled /accounts/vendors in 1398ms (1325 modules)
+ GET /accounts/vendors 200 in 1668ms
+ ○ Compiling /admissions ...
+ ✓ Compiled /admissions in 799ms (1335 modules)
+ GET /admissions 200 in 997ms
+ ○ Compiling /api/admissions ...
+ ✓ Compiled /api/admissions in 684ms (748 modules)
+ GET /api/admissions 200 in 1729ms
+ GET /api/admissions 200 in 2139ms
+ GET /api/admissions 200 in 1307ms
+ GET /api/admissions 200 in 789ms
+ ○ Compiling /audit-logs ...
+ ✓ Compiled /audit-logs in 726ms (1319 modules)
+ GET /audit-logs 200 in 1143ms
+ ✓ Compiled /api/audit-logs in 370ms (724 modules)
+ GET /api/audit-logs 200 in 1253ms
+ GET /api/audit-logs 200 in 1402ms
+ ○ Compiling /certificate/verify/[id] ...
+ ✓ Compiled /certificate/verify/[id] in 743ms (1331 modules)
+ GET /certificate/verify/CERT-2026-FICO-0091 200 in 1480ms
+ ○ Compiling /certificates ...
+ ✓ Compiled /certificates in 1195ms (1343 modules)
+ GET /certificates 200 in 1405ms
+ ○ Compiling /crm/followups ...
+ ✓ Compiled /crm/followups in 2s (1357 modules)
+ GET /crm/followups 200 in 2267ms
+ ○ Compiling /crm/leads ...
+ ✓ Compiled /crm/leads in 1489ms (1372 modules)
+ GET /crm/leads 200 in 1702ms
+ ✓ Compiled /dashboard in 323ms (760 modules)
+ GET /dashboard 200 in 484ms
+ GET /login 200 in 98ms
+ ○ Compiling /onboarding ...
+ ✓ Compiled /onboarding in 1219ms (1401 modules)
+ GET /onboarding 200 in 1362ms
+ ○ Compiling /api/onboarding/cases ...
+ ✓ Compiled /api/onboarding/cases in 867ms (755 modules)
+ GET /api/onboarding/cases?status=All&courseId=All&staffId=All 200 in 4041ms
+ GET /api/onboarding/cases?status=All&courseId=All&staffId=All 200 in 4067ms
+ ✓ Compiled /api/onboarding/analytics in 297ms (757 modules)
+ GET /api/onboarding/analytics 200 in 1291ms
+ GET /api/onboarding/analytics 200 in 2345ms
+ GET /api/onboarding/analytics 200 in 1005ms
+ GET /api/onboarding/analytics 200 in 759ms
+ GET /api/onboarding/analytics 200 in 443ms
+ GET /api/onboarding/analytics 200 in 1333ms
+ GET /api/onboarding/analytics 200 in 403ms
+ GET /api/onboarding/analytics 200 in 776ms
+ GET /api/onboarding/cases?search=audit-no-match-726194&status=All&courseId=All&staffId=All 200 in 990ms
+ GET /api/onboarding/cases?status=All&courseId=All&staffId=All 200 in 759ms
+ GET /api/onboarding/analytics 200 in 328ms
+ GET /api/onboarding/analytics 200 in 42ms
+ ○ Compiling /placement ...
+ ✓ Compiled /placement in 940ms (1396 modules)
+ GET /placement 200 in 1169ms
+ ○ Compiling /placement/enrollments ...
+ ✓ Compiled /placement/enrollments in 1593ms (1412 modules)
+ GET /placement/enrollments 200 in 1885ms
+ GET /login 200 in 121ms
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 650ms (762 modules)
+ POST /api/auth/login 303 in 2417ms
+ GET /login?reason=onboarding_pending 200 in 82ms
+ GET /login 200 in 60ms
+ GET /dashboard 200 in 61ms
+ GET /login?reason=onboarding_pending 200 in 72ms
+ GET /accounts/receipts 200 in 126ms
+ ○ Compiling /settings ...
+ ✓ Compiled /settings in 1172ms (1225 modules)
+ GET /settings 200 in 1340ms
+ ✓ Compiled /api/settings in 460ms (582 modules)
+ GET /api/settings 200 in 2426ms
+ ○ Compiling /students ...
+ ✓ Compiled /api/workflow/notifications in 1771ms (1243 modules)
+ GET /students 200 in 2353ms
+ GET /api/fees/receipts 200 in 1860ms
+ GET /api/fees/receipts 200 in 1568ms
+ GET /api/workflow/notifications 200 in 3230ms
+ ✓ Compiled /students/[id] in 399ms (602 modules)
+ ✓ Compiled in 1350ms (652 modules)
+ GET /accounts/receipts 200 in 111ms
+ GET /students/stu-01 200 in 3954ms
+ GET /api/fees/receipts 200 in 83ms
+ GET /api/fees/receipts 200 in 46ms
+ GET /dashboard 200 in 72ms
+ GET /api/workflow/notifications 200 in 522ms
+ ○ Compiling /support ...
+ ✓ Compiled /support in 1940ms (1399 modules)
+ GET /support 200 in 2161ms
+ ○ Compiling /academics/batches ...
+ ✓ Compiled /academics/batches in 815ms (747 modules)
+ GET /academics/batches 200 in 1421ms
+ ○ Compiling /crm/leads ...
+ ✓ Compiled /crm/leads in 526ms (749 modules)
+ ✓ Compiled (755 modules)
+ GET /api/realtime/stream?topics=doubts%2Cdoubt%3Adbt-01 200 in 1409ms
+ GET /crm/leads 200 in 1331ms
+ ○ Compiling /todos ...
+ GET /api/realtime/stream?topics=doubts%2C 200 in 2134ms
+ ✓ Compiled /todos in 2.7s (1423 modules)
+ GET /todos 200 in 4275ms
+ ○ Compiling /users ...
+ ✓ Compiled /users in 5.1s (1433 modules)
+ GET /users 200 in 5540ms
+ GET /login 200 in 117ms
+ GET /dashboard 200 in 98ms
+ GET /accounts/receipts 200 in 170ms
+ GET /api/fees/receipts 200 in 1788ms
+ GET /api/workflow/notifications 200 in 1721ms
+ GET /api/fees/receipts 200 in 2432ms
+ GET /api/fees/receipts 200 in 1633ms
+ GET /api/fees/receipts 200 in 2252ms
+ GET /api/workflow/notifications 200 in 1792ms
+ GET /login 200 in 77ms
+ GET /dashboard 200 in 93ms
+ GET /accounts/receipts 200 in 86ms
+ GET /api/workflow/notifications 200 in 2869ms
+ GET /api/fees/receipts 200 in 2982ms
+ GET /api/fees/receipts 200 in 3753ms
+ GET /api/fees/receipts 200 in 48ms
+ GET /api/fees/receipts 200 in 75ms
+ GET /accounts/receipts/81000000-0000-0000-0000-000000000001 200 in 123ms
+ GET /api/workflow/notifications 200 in 1348ms
+ GET /api/fees/receipts 200 in 1805ms
+ GET /api/fees/receipts 200 in 2264ms
+ GET /dashboard 200 in 111ms
+ GET /api/workflow/notifications 200 in 1249ms
+ GET /login 200 in 56ms
+ GET /academics/batches 200 in 133ms
+ GET /login?reason=onboarding_pending 200 in 88ms
+ GET /api/workflow/notifications 200 in 1280ms
+ GET /crm/leads 200 in 108ms
+ GET /api/workflow/notifications 200 in 1308ms
+ GET /login 200 in 87ms
+ GET /dashboard 200 in 57ms
+ GET /accounts/receipts 200 in 120ms
+ GET /api/fees/receipts 200 in 1816ms
+ GET /api/workflow/notifications 200 in 2371ms
+ GET /api/fees/receipts 200 in 2719ms
+ GET /api/fees/receipts 200 in 72ms
+ GET /accounts/receipts/81000000-0000-0000-0000-000000000001 200 in 66ms
+ GET /api/fees/receipts 200 in 9ms
+ GET /api/workflow/notifications 200 in 1324ms
+ GET /api/fees/receipts 200 in 1794ms
+ GET /api/fees/receipts 200 in 2475ms
+ GET /students 200 in 106ms
+ GET /api/workflow/notifications 200 in 1333ms
+ GET /students/stu-01 200 in 239ms
+ GET /api/workflow/notifications 200 in 1730ms
+ GET /dashboard 200 in 80ms
+ GET /api/workflow/notifications 200 in 1747ms
+ GET /academics/batches 200 in 133ms
+ GET /api/workflow/notifications 200 in 1384ms
+ GET /crm/leads 200 in 76ms
+ GET /api/workflow/notifications 200 in 1775ms
+  ▲ Next.js 14.2.24
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 11.9s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 847ms (129 modules)
+ ○ Compiling /support ...
+ ✓ Compiled /support in 5.8s (794 modules)
+ GET /support 200 in 7547ms
+ ✓ Compiled in 1694ms (407 modules)
+ ✓ Compiled in 562ms (407 modules)
+ ✓ Compiled in 558ms (407 modules)

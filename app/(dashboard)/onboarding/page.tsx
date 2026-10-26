@@ -126,7 +126,7 @@ export default function OnboardingPage() {
   const [orientationMode, setOrientationMode] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Online');
   const [orientationNotes, setOrientationNotes] = React.useState('');
 
-  const currentUserProfile: UserProfile = user || {
+  const currentUserProfile = React.useMemo<UserProfile>(() => user || {
     id: 'usr-admin',
     email: 'admin@next-generpsolutions.com',
     full_name: 'Priya Nair (Operations Head)',
@@ -134,11 +134,11 @@ export default function OnboardingPage() {
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  };
+  }, [user, role]);
 
   const isAdmin = currentUserProfile.role === 'super_admin' || currentUserProfile.role === 'admin';
 
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
     setIsLoading(true);
     try {
       const caseList = await getOnboardingCases(currentUserProfile, {
@@ -154,8 +154,8 @@ export default function OnboardingPage() {
 
       const staffList = await getEligibleOnboardingStaff();
       setEligibleStaff(staffList);
-      if (staffList.length > 0 && !selectedStaffId) {
-        setSelectedStaffId(staffList[0].id);
+      if (staffList.length > 0) {
+        setSelectedStaffId((current) => current || staffList[0].id);
       }
 
       if (isAdmin) {
@@ -177,7 +177,7 @@ export default function OnboardingPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUserProfile, search, statusFilter, courseFilter, staffFilter, isAdmin]);
 
   const handleBackfillAdmissions = async () => {
     if (!isAdmin) return;
@@ -199,7 +199,7 @@ export default function OnboardingPage() {
     loadData();
     const timer = window.setInterval(loadData, 15000);
     return () => window.clearInterval(timer);
-  }, [search, statusFilter, courseFilter, staffFilter, role]);
+  }, [loadData]);
 
   const openCaseDetails = async (c: OnboardingCase) => {
     setSelectedCase(c);

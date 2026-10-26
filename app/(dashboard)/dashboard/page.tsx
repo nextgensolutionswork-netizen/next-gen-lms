@@ -29,6 +29,7 @@ import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Payment } from '@/types';
+import { courseBucket, paymentCourseBucket, UNASSIGNED_COURSE, formatDashboardPercentage } from '@/lib/utils/dashboard-metrics';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -53,6 +54,9 @@ function parseDateNormalized(dateStr?: string): Date | null {
 export default function DashboardPage() {
   const [filterPeriod, setFilterPeriod] = React.useState<'month' | 'today' | 'week' | 'all'>('month');
   const [filterCourse, setFilterCourse] = React.useState<string>('All');
+  const courseIdSignature = JSON.stringify((store.courses || []).map((c) => c.id));
+  const courseIds = React.useMemo<Set<string>>(() => new Set(JSON.parse(courseIdSignature)), [courseIdSignature]);
+  const matchesCourse = React.useCallback((courseId?: string) => filterCourse === 'All' || courseBucket(courseId, courseIds) === filterCourse, [filterCourse, courseIds]);
 
   // Unified dual-ledger payments (reconciles store.payments & store.studentPayments)
   const allUnifiedPayments = React.useMemo(() => {
@@ -69,16 +73,18 @@ export default function DashboardPage() {
       const key = sp.receipt_number || sp.id;
       if (!map.has(key)) {
         const student = (store.students || []).find((s) => s.id === sp.student_id);
-        const course = (store.courses || []).find((c) => c.id === student?.course_id);
+        const fee = (store.studentFees || []).find((f) => f.id === sp.fee_id);
+        const courseId = fee?.course_id || student?.course_id;
+        const course = (store.courses || []).find((c) => c.id === courseId);
         map.set(key, {
           id: sp.id.startsWith('pay-') ? sp.id : `pay-${sp.id}`,
           receipt_number: sp.receipt_number || `REC-${sp.id.slice(-6)}`,
           student_id: sp.student_id,
           student_name: sp.student_name,
           admission_number: sp.admission_number,
-          fee_account_id: `fa-${sp.fee_id}`,
+          fee_account_id: fee?.fee_account_id || `fa-${sp.fee_id}`,
           installment_id: sp.installment_id,
-          course_id: student?.course_id || 'crs-general',
+          course_id: courseId || 'crs-general',
           course_name: course?.course_name || student?.course_name || sp.fee_category || 'General Tuition',
           amount: sp.amount_paid,
           payment_date: sp.payment_date,
@@ -113,7 +119,9 @@ export default function DashboardPage() {
         return d >= todayStart && d <= todayEnd;
       }
       if (filterPeriod === 'week') {
-        const weekStart = new Date(todayStart.getTime() - 6 * 86400000);
+        // Calendar week starts on Monday, matching the academic calendar.
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
         return d >= weekStart && d <= todayEnd;
       }
       if (filterPeriod === 'month') {
@@ -131,11 +139,9 @@ export default function DashboardPage() {
       const inPeriod = isDateInSelectedPeriod(p.payment_date || p.created_at);
       if (!inPeriod) return false;
       if (filterCourse === 'All') return true;
-      if (p.course_id === filterCourse) return true;
-      const student = (store.students || []).find((s) => s.id === p.student_id);
-      return student?.course_id === filterCourse;
+      return paymentCourseBucket(p, courseIds, store.feeAccounts || [], store.students || []) === filterCourse;
     });
-  }, [allUnifiedPayments, isDateInSelectedPeriod, filterCourse]);
+  }, [allUnifiedPayments, isDateInSelectedPeriod, filterCourse, courseIds]);
 
   // Expenses list dynamically driven by filterPeriod
   const periodExpensesList = React.useMemo(() => {
@@ -149,14 +155,23 @@ export default function DashboardPage() {
     return (store.admissions || []).filter((a) => {
       const inPeriod = isDateInSelectedPeriod(a.admission_date || a.created_at);
       if (!inPeriod) return false;
-      if (filterCourse === 'All') return true;
-      return a.course_id === filterCourse;
+      return matchesCourse(a.course_id);
     });
-  }, [isDateInSelectedPeriod, filterCourse]);
+  }, [isDateInSelectedPeriod, matchesCourse]);
 
   const periodCollections = React.useMemo(() => {
     return periodPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
   }, [periodPayments]);
+
+  const courseBreakdown = [...(store.courses || []).map((c) => ({ id: c.id, name: c.course_name })),
+    { id: UNASSIGNED_COURSE, name: 'Unassigned / unknown course' }].map((course) => {
+    const payments = allUnifiedPayments.filter((p) =>
+      isDateInSelectedPeriod(p.payment_date || p.created_at) &&
+      paymentCourseBucket(p, courseIds, store.feeAccounts || [], store.students || []) === course.id);
+    return { ...course, transactions: payments.length,
+      amount: payments.reduce((sum, p) => sum + safeAmount(p.amount), 0),
+      students: (store.students || []).filter((s) => courseBucket(s.course_id, courseIds) === course.id).length };
+  });
 
   const periodExpenses = React.useMemo(() => {
     return periodExpensesList
@@ -169,33 +184,33 @@ export default function DashboardPage() {
   // Outstanding fee accounts filtered by course
   const totalOutstanding = React.useMemo(() => {
     return (store.feeAccounts || [])
-      .filter((f) => filterCourse === 'All' || f.course_id === filterCourse)
+      .filter((f) => matchesCourse(f.course_id))
       .reduce((sum, f) => sum + safeAmount(f.outstanding_amount), 0);
-  }, [filterCourse]);
+  }, [matchesCourse]);
 
   // Outstanding balances are tracked per fee account, without schedules.
   const pendingAccounts = (store.feeAccounts || []).filter((f) =>
-    f.outstanding_amount > 0 && (filterCourse === 'All' || f.course_id === filterCourse));
+    f.outstanding_amount > 0 && (matchesCourse(f.course_id)));
   const pendingAmountInPeriod = pendingAccounts.reduce((sum, f) => sum + safeAmount(f.outstanding_amount), 0);
 
   // Student roster & active counts filtered by course
   const totalStudents = React.useMemo(() => {
-    return (store.students || []).filter((s) => filterCourse === 'All' || s.course_id === filterCourse).length;
-  }, [filterCourse]);
+    return (store.students || []).filter((s) => matchesCourse(s.course_id)).length;
+  }, [matchesCourse]);
 
   const activeStudents = React.useMemo(() => {
     return (store.students || []).filter(
-      (s) => s.status === 'Active' && (filterCourse === 'All' || s.course_id === filterCourse)
+      (s) => s.status === 'Active' && (matchesCourse(s.course_id))
     ).length;
-  }, [filterCourse]);
+  }, [matchesCourse]);
 
-  const totalCourses = filterCourse === 'All' ? (store.courses || []).length : 1;
+  const totalCourses = filterCourse === 'All' ? (store.courses || []).length : filterCourse === UNASSIGNED_COURSE ? 0 : 1;
 
   const activeBatches = React.useMemo(() => {
     return (store.batches || []).filter(
-      (b) => b.status === 'Active' && (filterCourse === 'All' || b.course_id === filterCourse)
+      (b) => b.status === 'Active' && (matchesCourse(b.course_id))
     ).length;
-  }, [filterCourse]);
+  }, [matchesCourse]);
 
   const collectionsPeriodTitle = {
     today: "Today's Collections",
@@ -220,32 +235,33 @@ export default function DashboardPage() {
 
   // CRM & Admission aggregates filtered by period
   const periodLeads = React.useMemo(() => {
-    return (store.leads || []).filter((l) => isDateInSelectedPeriod(l.created_at));
-  }, [isDateInSelectedPeriod]);
-  const displayLeads = periodLeads.length > 0 ? periodLeads : (store.leads || []);
+    return (store.leads || []).filter((l) => isDateInSelectedPeriod(l.created_at) && matchesCourse(l.interested_course_id));
+  }, [isDateInSelectedPeriod, matchesCourse]);
+  const displayLeads = periodLeads;
   const totalLeads = displayLeads.length;
   const convertedLeads = displayLeads.filter((l) => l.stage === 'Converted').length;
-  const conversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+  const conversionRate = formatDashboardPercentage(convertedLeads, totalLeads);
   const upcomingDemos = (store.leads || []).filter((l) => l.stage === 'Demo Scheduled').length;
 
   // Placement aggregates calculated dynamically
-  const totalPlacementProfiles = (store.placementProfiles || []).length;
-  const approvedResumes = (store.placementProfiles || []).filter(
+  const placementProfiles = (store.placementProfiles || []).filter((p) => matchesCourse((store.students || []).find((s) => s.id === p.student_id)?.course_id));
+  const totalPlacementProfiles = placementProfiles.length;
+  const approvedResumes = placementProfiles.filter(
     (p) => p.resume_status === 'Reviewed & Approved'
   ).length;
-  const resumeApprovedPct = totalPlacementProfiles > 0 ? Math.round((approvedResumes / totalPlacementProfiles) * 100) : 85;
+  const resumeApprovedPct = formatDashboardPercentage(approvedResumes, totalPlacementProfiles);
 
-  const completedMocks = (store.placementProfiles || []).filter(
+  const completedMocks = placementProfiles.filter(
     (p) => p.mock_interview_status === 'Completed'
   ).length;
-  const mockInterviewPct = totalPlacementProfiles > 0 ? Math.round((completedMocks / totalPlacementProfiles) * 100) : 92;
+  const mockInterviewPct = formatDashboardPercentage(completedMocks, totalPlacementProfiles);
 
-  const placedProfiles = (store.placementProfiles || []).filter((p) => (p.placed_package_lpa || 0) > 0);
+  const placedProfiles = placementProfiles.filter((p) => (p.placed_package_lpa || 0) > 0);
   const avgCtcLpa = placedProfiles.length > 0
     ? (placedProfiles.reduce((sum, p) => sum + (p.placed_package_lpa || 0), 0) / placedProfiles.length).toFixed(1)
-    : '7.2';
+    : 'N/A';
 
-  const totalPlaced = (store.placementProfiles || []).filter((p) => p.placement_status === 'Placed').length;
+  const totalPlaced = placementProfiles.filter((p) => p.placement_status === 'Placed').length;
   const activeJobOpenings = (store.jobOpenings || []).filter((j) => j.status === 'Open').length;
 
   const { role } = useAuth();
@@ -272,7 +288,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Top Header & Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex max-w-full flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Enterprise Institute Executive Dashboard
@@ -283,7 +299,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Global Filter Bar */}
-        <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-xs text-xs">
+        <div className="flex max-w-full flex-wrap items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-xs text-xs">
           <div className="flex items-center space-x-1 pl-1 text-slate-500 font-medium">
             <Filter className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Period:</span>
@@ -307,7 +323,7 @@ export default function DashboardPage() {
 
           <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
 
-          <div className="flex items-center space-x-1">
+          <div className="flex flex-wrap items-center gap-1 max-w-full">
             <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">Course:</span>
             <select
               value={filterCourse}
@@ -315,6 +331,7 @@ export default function DashboardPage() {
               className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
             >
               <option value="All">All Courses ({(store.courses || []).length})</option>
+              <option value={UNASSIGNED_COURSE}>Unassigned / unknown course</option>
               {(store.courses || []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.course_name}
@@ -382,12 +399,13 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  {filterPeriod === 'all' ? 'Lifetime Net Balance' : `Net Operating Balance (${periodLabel})`}
+                  {filterCourse !== 'All' ? 'Collections before shared expenses' : filterPeriod === 'all' ? 'Lifetime Net Balance' : `Net Operating Balance (${periodLabel})`}
                 </p>
                 <h3 className={`text-2xl font-bold mt-1 ${netOperatingBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {formatINR(netOperatingBalance)}
+                  {formatINR(filterCourse === 'All' ? netOperatingBalance : periodCollections)}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">{expensesPeriodTitle}: {formatINR(periodExpenses)}</p>
+                <p className="text-xs text-slate-500 mt-1">{expensesPeriodTitle} (institute-wide): {formatINR(periodExpenses)}</p>
+                {filterCourse !== 'All' && <p className="text-xs text-slate-500 mt-1">Shared expenses are not allocated to courses; course net balance is unavailable.</p>}
               </div>
               <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <TrendingUp className="h-6 w-6" />
@@ -408,7 +426,7 @@ export default function DashboardPage() {
                   {filterPeriod === 'all' ? `${totalStudents} Enrolled Students` : `${periodAdmissions.length} New Admissions`}
                 </h3>
                 <p className="text-xs text-indigo-600 font-semibold mt-1">
-                  {activeBatches} Active {activeBatches === 1 ? 'Batch' : 'Batches'} | {conversionRate}% Conv.
+                  {activeBatches} Active {activeBatches === 1 ? 'Batch' : 'Batches'} | {conversionRate} Conv. ({convertedLeads}/{totalLeads} leads)
                 </p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
@@ -418,6 +436,27 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Course reconciliation ({periodLabel})</CardTitle>
+          <p className="text-xs text-slate-500">Collections and transactions use the selected period. Students are the current enrolled roster, not unique payers. All course rows, including unassigned records, sum to All Courses.</p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead><tr><th className="py-2">Course</th><th>Collections</th><th>Transactions</th><th>Enrolled students</th></tr></thead>
+            <tbody>{courseBreakdown.map((row) => <tr key={row.id} className="border-t border-slate-100">
+              <td className="py-2"><button className="text-blue-700 hover:underline" onClick={() => setFilterCourse(row.id)}>{row.name}</button></td>
+              <td>{formatINR(row.amount)}</td><td>{row.transactions}</td><td>{row.students}</td>
+            </tr>)}</tbody>
+            <tfoot><tr className="border-t font-semibold"><td className="py-2">All Courses</td>
+              <td>{formatINR(courseBreakdown.reduce((sum, row) => sum + row.amount, 0))}</td>
+              <td>{courseBreakdown.reduce((sum, row) => sum + row.transactions, 0)}</td>
+              <td>{courseBreakdown.reduce((sum, row) => sum + row.students, 0)}</td>
+            </tr></tfoot>
+          </table>
+        </CardContent>
+      </Card>
 
       {/* Operational Highlights Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -616,13 +655,13 @@ export default function DashboardPage() {
         <Card className="flex flex-col justify-between">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Placement Drive Overview</CardTitle>
-            <p className="text-xs text-slate-500">Student corporate interview preparedness</p>
+            <p className="text-xs text-slate-500">Student corporate interview preparedness (current roster, selected course)</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 border border-purple-100">
               <div>
                 <p className="text-xs text-purple-700 font-medium">Resume Approved</p>
-                <p className="text-lg font-bold text-purple-900">{resumeApprovedPct}%</p>
+                <p className="text-lg font-bold text-purple-900">{resumeApprovedPct} <span className="text-xs font-normal">({approvedResumes}/{totalPlacementProfiles})</span></p>
               </div>
               <CheckCircle className="h-6 w-6 text-purple-600" />
             </div>
@@ -630,7 +669,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center p-3 rounded-lg bg-blue-50 border border-blue-100">
               <div>
                 <p className="text-xs text-blue-700 font-medium">Mock Interviews Done</p>
-                <p className="text-lg font-bold text-blue-900">{mockInterviewPct}%</p>
+                <p className="text-lg font-bold text-blue-900">{mockInterviewPct} <span className="text-xs font-normal">({completedMocks}/{totalPlacementProfiles})</span></p>
               </div>
               <Users className="h-6 w-6 text-blue-600" />
             </div>
@@ -638,7 +677,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
               <div>
                 <p className="text-xs text-emerald-700 font-medium">Avg Offered CTC</p>
-                <p className="text-lg font-bold text-emerald-900">₹{avgCtcLpa} LPA</p>
+                <p className="text-lg font-bold text-emerald-900">{avgCtcLpa === 'N/A' ? 'N/A' : `₹${avgCtcLpa} LPA`}</p>
               </div>
               <Briefcase className="h-6 w-6 text-emerald-600" />
             </div>

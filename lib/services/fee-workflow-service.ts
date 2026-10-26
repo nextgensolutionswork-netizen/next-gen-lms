@@ -317,10 +317,11 @@ export class FeeWorkflowService {
 
     const accountantUser = store.users.find((u) => u.id === accountantUserId);
     if (
-      accountantUser &&
-      accountantUser.role !== 'accountant' &&
-      accountantUser.role !== 'super_admin' &&
-      accountantUser.role !== 'admin'
+      !accountantUser ||
+      accountantUser.is_active === false ||
+      (accountantUser.role !== 'accountant' &&
+        accountantUser.role !== 'super_admin' &&
+        accountantUser.role !== 'admin')
     ) {
       throw new Error('Unauthorized: Only an Accountant or Finance Director can approve fees.');
     }
@@ -440,6 +441,7 @@ export class FeeWorkflowService {
       student.updated_at = now;
     }
 
+    store.reconcileDualLedgers();
     store.persist();
     return fee;
   }
@@ -787,6 +789,15 @@ export class FeeWorkflowService {
     if (!originalFee) throw new Error(`Original fee ${revision.original_fee_id} not found.`);
 
     const accountantUser = store.users.find((u) => u.id === accountantUserId);
+    if (
+      !accountantUser ||
+      accountantUser.is_active === false ||
+      (accountantUser.role !== 'accountant' &&
+        accountantUser.role !== 'super_admin' &&
+        accountantUser.role !== 'admin')
+    ) {
+      throw new Error('Unauthorized: Only an Accountant or Finance Director can approve fee revisions.');
+    }
     const accountantName = accountantUser?.full_name || 'Accountant';
     const now = new Date().toISOString();
 
@@ -873,6 +884,7 @@ export class FeeWorkflowService {
       revStudent.updated_at = now;
     }
 
+    store.reconcileDualLedgers();
     store.persist();
     return { originalFee, newFee: newVersionFee, revision };
   }
@@ -1002,6 +1014,7 @@ export class FeeWorkflowService {
     store.users.filter((u) => isAccountsUser(u) && tenantId(u) === tenantId(recorder)).forEach((u) =>
       paymentNotification(u, 'Payment awaiting approval', `${fee.student_name}: ${amountPaid} submitted by ${recorder.full_name}.`, '/accounts/approvals?desk=payments', `payment-submitted:${paymentId}`));
 
+    store.reconcileDualLedgers();
     store.persist();
     return paymentRecord;
   }
@@ -1165,6 +1178,7 @@ export class FeeWorkflowService {
     const recorder = store.users.find((u) => u.id === payment.recorded_by && tenantId(u) === tenantId(payment));
     if (recorder) paymentNotification(recorder, 'Payment approved', `${payment.student_name}: payment approved and receipt ${payment.receipt_number} generated.`, '/accounts/payments', `payment-approved:${payment.id}`);
 
+    store.reconcileDualLedgers();
     store.persist();
     return payment;
   }
@@ -1213,6 +1227,17 @@ export class FeeWorkflowService {
     const recorder = store.users.find((u) => u.id === payment.recorded_by && tenantId(u) === tenantId(payment));
     if (recorder) paymentNotification(recorder, 'Payment returned for correction', `${payment.student_name}: ${rejectionReason.trim()}`, '/accounts/payments', `payment-rejected:${payment.id}:${payment.rejected_at}`);
 
+    if (store.payments) {
+      const legacyPayment = store.payments.find(
+        (p) => p.id === payment.id || p.id === `pay-${payment.id}` || (payment.receipt_number && p.receipt_number === payment.receipt_number)
+      );
+      if (legacyPayment) {
+        legacyPayment.status = 'Failed';
+        legacyPayment.notes = `Rejected: ${rejectionReason.trim()}`;
+      }
+    }
+
+    store.reconcileDualLedgers();
     store.persist();
     return payment;
   }

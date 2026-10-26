@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Bell, Search, ExternalLink, ShieldCheck, CheckCircle2, LogOut } from 'lucide-react';
+import { Bell, Search, ExternalLink, ShieldCheck, CheckCircle2, LogOut, Menu } from 'lucide-react';
 import { UserRole, NotificationItem } from '@/types';
 import { useAuth } from '@/components/providers/auth-provider';
 
@@ -10,13 +11,15 @@ interface HeaderProps {
   currentRole: UserRole;
   currentUserName: string;
   avatar?: string;
+  onOpenNavigation?: () => void;
+  navigationOpen?: boolean;
 }
 
-export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
+export function Header({ currentRole, currentUserName, avatar, onOpenNavigation, navigationOpen }: HeaderProps) {
   const { logout, user } = useAuth();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   React.useEffect(() => {
-    if (!user) { setNotifications([]); return; }
+    if (!user?.id) { setNotifications([]); return; }
     let active = true;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -36,9 +39,10 @@ export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
   const [showNotifications, setShowNotifications] = React.useState(false);
 
   return (
-    <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between sticky top-0 z-40">
+    <header className="min-h-16 gap-2 border-b border-slate-200 bg-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between sticky top-0 z-40 print:hidden">
+      {onOpenNavigation && <button type="button" aria-label="Open navigation" aria-controls="mobile-navigation" aria-expanded={navigationOpen} onClick={onOpenNavigation} className="lg:hidden rounded-lg border border-slate-200 p-2"><Menu className="h-5 w-5" /></button>}
       {/* Search Input */}
-      <div className="flex items-center space-x-3 w-96">
+      <div className="flex items-center min-w-0 flex-1 max-w-96">
         <div className="relative w-full">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
@@ -50,7 +54,7 @@ export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
       </div>
 
       {/* Quick Actions & User Indicators */}
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
         {/* Verification Portal Link */}
         <Link
           href="/certificate/verify/CERT-2026-FICO-0091"
@@ -83,7 +87,7 @@ export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white shadow-xl border border-slate-200 py-2 z-50 text-xs">
+            <div className="fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 mt-2 sm:w-80 rounded-xl bg-white shadow-xl border border-slate-200 py-2 z-50 text-xs">
               <div className="px-4 py-2 border-b border-slate-100 font-bold text-slate-800 flex justify-between items-center">
                 <span>Notifications ({notifications.filter((n) => !n.is_read).length} new)</span>
                 <button type="button" className="text-[10px] text-blue-600 hover:underline" onClick={async () => { const response = await fetch('/api/workflow/notifications', { method: 'POST' }); if (response.ok) setNotifications((items) => items.map((n) => ({ ...n, is_read: true }))); }}>Mark all read</button>
@@ -105,7 +109,9 @@ export function Header({ currentRole, currentUserName, avatar }: HeaderProps) {
         {/* User Badge */}
         <div className="flex items-center space-x-2 pl-2 border-l border-slate-200">
           {avatar ? (
-            <img
+            <Image
+              width={32}
+              height={32}
               src={avatar}
               alt={currentUserName}
               className="h-8 w-8 rounded-full object-cover shadow-sm border border-slate-200"
