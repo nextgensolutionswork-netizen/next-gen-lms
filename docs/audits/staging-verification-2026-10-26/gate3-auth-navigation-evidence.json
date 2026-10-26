@@ -1,0 +1,55 @@
+{
+  "baseUrl": "http://localhost:3001",
+  "stagingProject": "neiccpnxftfmmwnvtgdy",
+  "results": [
+    {
+      "name": "Test 3.1: Live Student Auth & Session Refresh Persistence",
+      "pass": true,
+      "timestamp": "2026-10-26T12:00:27.855Z",
+      "user": "staging.student.1@next-gen-staging.local",
+      "finalUrl": "http://localhost:3001/portal",
+      "cookieCount": 3
+    },
+    {
+      "name": "Test 3.2: Student LMS Boundary Isolation (Protected Routes Redirect to /portal)",
+      "pass": true,
+      "timestamp": "2026-10-26T12:00:31.965Z",
+      "checkedRoutes": [
+        "/dashboard",
+        "/students",
+        "/accounts/fees",
+        "/crm/leads"
+      ]
+    },
+    {
+      "name": "Test 3.3: Student Financial Privacy & Receipt Negative Isolation",
+      "pass": true,
+      "timestamp": "2026-10-26T12:00:34.949Z",
+      "receiptDenialVerified": true,
+      "nonexistentHandledCorrectly": true
+    },
+    {
+      "name": "Test 3.4: Live Admin Auth, Directory & Student Profile Navigation",
+      "pass": true,
+      "timestamp": "2026-10-26T12:00:43.585Z",
+      "directoryVerified": true,
+      "profileLoadsByUUID": true,
+      "profileSurvivesReload": true,
+      "invalidProfileShowsNotFound": true
+    },
+    {
+      "name": "Test 3.5: Admin Receipt Navigation & Negative State",
+      "pass": true,
+      "timestamp": "2026-10-26T12:00:48.469Z",
+      "adminReceiptAccessVerified": true,
+      "receiptNotFoundStateVerified": true
+    },
+    {
+      "name": "Test 3.6: Anonymous Access Denied & Public Route Accessible",
+      "pass": true,
+      "timestamp": "2026-10-26T12:00:49.823Z",
+      "anonymousDashboardRedirected": true,
+      "publicCertificateAccessible": true
+    }
+  ]
+}
