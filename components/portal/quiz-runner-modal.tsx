@@ -63,57 +63,11 @@ export function QuizRunnerModal({
     return quiz.passing_percentage ?? quiz.pass_percentage ?? 70;
   }, [quiz]);
 
-  // Reset state when modal opens or quiz changes
-  React.useEffect(() => {
-    if (isOpen) {
-      setCurrentIndex(0);
-      setUserAnswers({});
-      setVisitedQuestions(new Set([0]));
-      setIsSubmitted(false);
-      setEvaluation(null);
-      setAttempt(null);
-      setShowConfirmSubmit(false);
-      setStartTime(Date.now());
-      setTimeLeft(timeLimitMinutes * 60);
-    }
-  }, [isOpen, quiz?.id, timeLimitMinutes]);
+  const submissionStarted = React.useRef(false);
 
-  // Countdown timer effect
-  React.useEffect(() => {
-    if (!isOpen || isSubmitted || questions.length === 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleFinalSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isOpen, isSubmitted, questions.length]);
-
-  // Auto-record visit when currentIndex changes
-  React.useEffect(() => {
-    setVisitedQuestions((prev) => new Set([...Array.from(prev), currentIndex]));
-  }, [currentIndex]);
-
-  if (!isOpen) return null;
-
-  const currentQuestion = questions[currentIndex];
-
-  const handleSelectOption = (questionId: string, optionId: string) => {
-    if (isSubmitted) return;
-    setUserAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionId,
-    }));
-  };
-
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = React.useCallback(async () => {
+    if (submissionStarted.current) return;
+    submissionStarted.current = true;
     try {
       if (typeof window !== 'undefined') {
         const res = await fetch('/api/quizzes/submit', {
@@ -155,8 +109,61 @@ export function QuizRunnerModal({
     setIsSubmitted(true);
     setShowConfirmSubmit(false);
     onQuizCompleted();
-  };
+  }, [quiz, questions, userAnswers, startTime, studentId, onQuizCompleted]);
 
+  const submitLatestAnswers = React.useRef(handleFinalSubmit);
+  React.useEffect(() => {
+    submitLatestAnswers.current = handleFinalSubmit;
+  }, [handleFinalSubmit]);
+
+  // Reset state when modal opens or quiz changes
+  React.useEffect(() => {
+    if (isOpen) {
+      submissionStarted.current = false;
+      setCurrentIndex(0);
+      setUserAnswers({});
+      setVisitedQuestions(new Set([0]));
+      setIsSubmitted(false);
+      setEvaluation(null);
+      setAttempt(null);
+      setShowConfirmSubmit(false);
+      setStartTime(Date.now());
+      setTimeLeft(timeLimitMinutes * 60);
+    }
+  }, [isOpen, quiz?.id, timeLimitMinutes]);
+
+  // Countdown timer effect
+  React.useEffect(() => {
+    if (!isOpen || isSubmitted || questions.length === 0) return;
+
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((startTime + timeLimitMinutes * 60000 - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0) {
+        clearInterval(timer);
+        void submitLatestAnswers.current();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isOpen, isSubmitted, questions.length, startTime, timeLimitMinutes]);
+
+  // Auto-record visit when currentIndex changes
+  React.useEffect(() => {
+    setVisitedQuestions((prev) => new Set([...Array.from(prev), currentIndex]));
+  }, [currentIndex]);
+
+  if (!isOpen) return null;
+
+  const currentQuestion = questions[currentIndex];
+
+  const handleSelectOption = (questionId: string, optionId: string) => {
+    if (isSubmitted) return;
+    setUserAnswers((prev) => ({
+      ...prev,
+      [questionId]: optionId,
+    }));
+  };
   const formatTimer = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;

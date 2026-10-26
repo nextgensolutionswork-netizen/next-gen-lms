@@ -196,13 +196,13 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(isActiveUser && (userEmail || userId));
 
   if (isSupabaseLive && isAuthenticated && userRole === 'student' && (pathname.startsWith('/portal') || pathname.startsWith('/api/conference') || pathname.startsWith('/api/attendance'))) {
-    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const checkClient = adminKey ? createServerClient(supabaseUrl, adminKey, { cookies: { getAll: () => [], setAll: () => {} } }) : supabase;
-    const { data: access, error: accessError } = await checkClient.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
+    // The own_lms_access SELECT policy authorizes this lookup using the verified
+    // student's session. Never elevate an LMS-access check to service_role.
+    const { data: access, error: accessError } = await supabase.from('student_lms_access').select('enabled').eq('user_id', userId).maybeSingle();
     // G03: Fail-closed. Only explicit enabled === true is permitted; missing row or error must block
     if (accessError || !access || access.enabled !== true) {
       if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Onboarding checks must be completed before LMS access is activated.' }, { status: 403 });
-      return createRedirect('/login?reason=onboarding_pending');
+      return createRedirect(accessError ? '/login?error=access_unavailable' : '/login?error=onboarding_pending');
     }
   }
 
@@ -229,12 +229,12 @@ export async function middleware(request: NextRequest) {
   // Let the login page process them even when a session already exists.
   if (pathname === '/login') return response;
 
-  // 10. Student boundary isolation: students can only access /portal, /certificate/verify, and their receipts
+  // 10. Student boundary isolation: students can only access /portal, /certificate/verify, and their individual receipts
   if (isAuthenticated && userRole === 'student') {
     const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
     const isVerifyRoute = pathname.startsWith('/certificate/verify');
-    const isReceiptRoute = pathname === '/accounts/receipts' || pathname.startsWith('/accounts/receipts/');
-    if (!isPortalRoute && !isVerifyRoute && !isReceiptRoute) {
+    const isReceiptDetail = pathname.startsWith('/accounts/receipts/') && pathname.length > '/accounts/receipts/'.length;
+    if (!isPortalRoute && !isVerifyRoute && !isReceiptDetail) {
       return createRedirect('/portal');
     }
   }
@@ -296,9 +296,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 15. Financial workspace boundary: /accounts/approvals, /accounts/expenses, /accounts/vendors
-  if (isAuthenticated && ['/accounts/approvals', '/accounts/expenses', '/accounts/vendors'].some((p) => pathname.startsWith(p))) {
-    if (!['super_admin', 'admin', 'accountant'].includes(userRole || '')) {
+  // 15. Financial workspace boundary: Deny-by-default for all /accounts/* routes (NG-03)
+  if (isAuthenticated && (pathname === '/accounts' || pathname.startsWith('/accounts/'))) {
+    const isSensitiveDesk = ['/accounts/approvals', '/accounts/expenses', '/accounts/vendors', '/accounts/reports'].some((p) => pathname.startsWith(p));
+    const isOperationalDesk = ['/accounts/fees', '/accounts/payments', '/accounts/installments', '/accounts/receipts'].some((p) => pathname.startsWith(p));
+
+    let isAllowed = false;
+    if (userRole === 'super_admin' || userRole === 'admin' || userRole === 'accountant') {
+      isAllowed = true;
+    } else if (userRole === 'counsellor' && isOperationalDesk && !isSensitiveDesk) {
+      isAllowed = true;
+    } else if (userRole === 'student' && pathname.startsWith('/accounts/receipts/') && pathname.length > '/accounts/receipts/'.length) {
+      isAllowed = true;
+    }
+
+    if (!isAllowed) {
       const fallback =
         {
           student: '/portal',

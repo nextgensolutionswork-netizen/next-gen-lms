@@ -1,0 +1,8 @@
+{
+  "pid": 28400,
+  "base": "http://localhost:3001",
+  "mode": "isolated local synthetic adapter; NOT verified Supabase staging",
+  "storage": "E:\\my erp hub\\next gen lms\\staging-runtime\\browser-fix-synthetic",
+  "distDir": ".next-audit",
+  "remoteDatabaseEnabled": false
+}

@@ -134,9 +134,9 @@ export default function LeadsPage() {
     if (user?.id && !counsellorId) {
       setCounsellorId(user.id);
     }
-  }, [user?.id]);
+  }, [user?.id, counsellorId]);
 
-  const refreshLeads = () => {
+  const refreshLeads = React.useCallback(() => {
     let list = [...(store.leads || [])];
     if (selectedStage !== 'All') {
       list = list.filter((l) => l.stage === selectedStage);
@@ -152,7 +152,7 @@ export default function LeadsPage() {
       );
     }
     setLeads(list);
-  };
+  }, [search, selectedStage]);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -174,7 +174,7 @@ export default function LeadsPage() {
 
   React.useEffect(() => {
     refreshLeads();
-  }, [search, selectedStage]);
+  }, [refreshLeads]);
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();

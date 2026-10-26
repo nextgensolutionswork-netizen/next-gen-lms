@@ -154,7 +154,7 @@ export default function PlacementEnrollmentsPage() {
     });
   }, [candidateStudentId, settings]);
 
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
     setLoading(true);
     try {
       const data = await getPlacementEnrollments({
@@ -169,11 +169,11 @@ export default function PlacementEnrollmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, moduleFilter, searchQuery]);
 
   React.useEffect(() => {
     loadData();
-  }, [statusFilter, moduleFilter, searchQuery]);
+  }, [loadData]);
 
   const handleOpenReview = async (enrollment: PlacementEnrollment) => {
     setSelectedEnrollment(enrollment);
@@ -449,7 +449,7 @@ export default function PlacementEnrollmentsPage() {
   };
 
   // KPI Calculations
-  const { totalCount, underReviewCount, approvedCount, eligibleCount, onHoldCount } = React.useMemo(() => {
+  const { totalCount, underReviewCount, approvedCount, eligibleCount, onHoldCount } = (() => {
     const placementList = store.placementEnrollments || [];
     return {
       totalCount: placementList.length,
@@ -465,7 +465,7 @@ export default function PlacementEnrollmentsPage() {
       eligibleCount: placementList.filter((e) => e.is_placement_eligible).length,
       onHoldCount: placementList.filter((e) => e.enrollment_status === 'Enrollment On Hold').length,
     };
-  }, [enrollments]);
+  })();
 
   const canAccess =
     ['super_admin', 'admin', 'placement_coordinator'].includes(role || '') ||
@@ -498,7 +498,7 @@ export default function PlacementEnrollmentsPage() {
             Manage student enrollment requests, document verification, placement eligibility rules, and corporate vetting lifecycle.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {canManage && (
             <Button
               variant="sap"
@@ -596,7 +596,7 @@ export default function PlacementEnrollmentsPage() {
           />
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           <div className="flex items-center space-x-1.5 text-xs text-slate-500">
             <Filter className="h-3.5 w-3.5" />
             <span>Filter:</span>
@@ -872,7 +872,7 @@ export default function PlacementEnrollmentsPage() {
               }`}
             >
               <div>
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2 max-w-full">
                   <span className="font-bold text-sm">Enrollment Status: {selectedEnrollment.enrollment_status}</span>
                   {selectedEnrollment.is_placement_eligible ? (
                     <Badge variant="success">Placement Eligible</Badge>
@@ -896,7 +896,7 @@ export default function PlacementEnrollmentsPage() {
               </div>
 
               {canManage && (
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2 max-w-full">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1035,7 +1035,7 @@ export default function PlacementEnrollmentsPage() {
                       File: {selectedEnrollment.resume_name || 'Resume.pdf'} · Status: {selectedEnrollment.resume_status}
                     </p>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2 max-w-full">
                     <Badge
                       variant={selectedEnrollment.resume_status === 'Reviewed & Approved' ? 'success' : 'warning'}
                     >
@@ -1048,7 +1048,7 @@ export default function PlacementEnrollmentsPage() {
                 {selectedEnrollment.documents?.map((doc) => (
                   <div key={doc.id} className="p-3 flex items-center justify-between">
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2 max-w-full">
                         <span className="font-bold text-slate-800">{doc.document_type}</span>
                         {doc.is_verified ? (
                           <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
@@ -1066,7 +1066,7 @@ export default function PlacementEnrollmentsPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2 max-w-full">
                       <Button
                         variant={doc.is_verified ? 'outline' : 'sap'}
                         size="sm"
@@ -1219,7 +1219,7 @@ export default function PlacementEnrollmentsPage() {
                   enrollmentHistory.map((hist) => (
                     <div key={hist.id} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-2 max-w-full">
                           <span className="font-mono text-[10px] text-slate-500">{hist.old_status}</span>
                           <ArrowRight className="h-3 w-3 text-slate-400" />
                           <span className="font-bold text-slate-900">{hist.new_status}</span>
@@ -1242,7 +1242,7 @@ export default function PlacementEnrollmentsPage() {
 
             {/* Admin Action Buttons Footer */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-200">
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2 max-w-full">
                 <Button
                   type="button"
                   variant="outline"

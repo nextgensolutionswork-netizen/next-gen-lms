@@ -44,9 +44,9 @@ export default function CertificateVerifyPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-between p-4 md:p-8 font-sans">
+    <div className="certificate-verification min-h-screen min-w-0 bg-slate-100 flex flex-col justify-between p-4 md:p-8 font-sans [overflow-wrap:anywhere] print:bg-white print:p-0">
       {/* Top Navbar */}
-      <div className="max-w-4xl w-full mx-auto flex items-center justify-between pb-6">
+      <div className="max-w-4xl w-full mx-auto flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-4 pb-6 print:hidden">
         <div className="flex items-center space-x-3">
           <div className="h-10 w-10 rounded-lg bg-[#0A6ED1] text-white flex items-center justify-center font-bold text-lg shadow">
             SAP
@@ -57,7 +57,7 @@ export default function CertificateVerifyPage() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {cert && !isRevoked && (
             <>
               <a
@@ -176,7 +176,7 @@ export default function CertificateVerifyPage() {
             )}
 
             {/* Certificate Canvas / Card */}
-            <div className={`bg-white p-8 md:p-12 rounded-2xl shadow-xl border-4 ${isRevoked ? 'border-rose-400 opacity-90' : 'border-slate-900'} text-center relative overflow-hidden`}>
+            <div className={`bg-white p-4 sm:p-8 md:p-12 print:p-12 rounded-2xl shadow-xl border-4 ${isRevoked ? 'border-rose-400 opacity-90' : 'border-slate-900'} text-center relative overflow-hidden print:shadow-none`}>
               {isRevoked && (
                 <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none">
                   <div className="border-4 border-rose-600 text-rose-600 px-8 py-3 rounded-2xl rotate-[-15deg] font-black text-3xl tracking-widest uppercase opacity-90 shadow-lg">
@@ -219,7 +219,7 @@ export default function CertificateVerifyPage() {
                 </div>
 
                 {/* Score & Benchmark Grid */}
-                <div className="grid grid-cols-3 gap-3 max-w-md mx-auto pt-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-3 max-w-md mx-auto pt-2 text-xs">
                   <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-400 font-semibold uppercase">Attendance</p>
                     <p className="font-bold text-slate-800 text-sm mt-0.5">{cert.attendance_percentage ?? 0}%</p>

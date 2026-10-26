@@ -1,4 +1,4 @@
-// Audit-only reproductions. Passing assertions demonstrate defects, not fixes.
+// Audit reproductions retained as regressions for the corrected behavior.
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
@@ -38,5 +38,7 @@ it.each(['missing row', 'database error'])('F03: student access gate fails close
   const val = identity('student');
   const sig = await generateAuthCookieSignature(val);
   const response = await middleware(new NextRequest('http://localhost:3117/portal', { headers: { cookie: `${AUTH_COOKIE_NAME}=${val}; ${AUTH_SIG_COOKIE_NAME}=${sig}` } }));
-  expect(response.headers.get('location')).toContain('/login?reason=onboarding_pending');
+  expect(response.headers.get('location')).toContain(condition === 'database error'
+    ? '/login?error=access_unavailable'
+    : '/login?error=onboarding_pending');
 });

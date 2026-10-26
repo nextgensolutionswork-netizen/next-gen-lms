@@ -3,7 +3,7 @@ import { paymentTransaction } from '@/lib/services/payment-workflow-transaction'
 import { tenantId } from '@/lib/auth/tenant';
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/services/data-store';
-import { generateReceiptPdfBuffer } from '@/lib/services/pdf-service';
+import { generateReceiptPdfBuffer, ReceiptPdfDataError } from '@/lib/services/pdf-service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -46,9 +46,34 @@ export async function GET(
       );
     }
 
-    const ownStudent = store.students.find((s) => s.id === receipt.student_id && s.user_id === actor.id);
-    if (tenantId(receipt) !== tenantId(actor) || !['student', 'counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role) || (actor.role === 'student' && !ownStudent)) return NextResponse.json({ error: 'Receipt access denied.' }, { status: 403 });
-    const pdfBuffer = await generateReceiptPdfBuffer(receipt);
+    const ownStudent = store.students.find(
+      (s) =>
+        s.id === receipt.student_id &&
+        (s.user_id === actor.id || s.id === actor.id || s.email?.toLowerCase() === actor.email?.toLowerCase())
+    );
+    const isOwnReceipt =
+      actor.role === 'student' &&
+      (receipt.student_id === actor.id ||
+        receipt.student_email?.toLowerCase() === actor.email?.toLowerCase() ||
+        Boolean(ownStudent));
+
+    const isStaff = ['counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role);
+
+    if (!isStaff && !isOwnReceipt) {
+      return NextResponse.json({ error: 'Receipt access denied.' }, { status: 403 });
+    }
+
+    if (actor.role !== 'super_admin' && tenantId(receipt) !== tenantId(actor)) {
+      return NextResponse.json({ error: 'Cross-tenant receipt access denied.' }, { status: 403 });
+    }
+    // Recover absent legacy amounts only from the exact payment for this student
+    // and tenant. Never use today's account balance as a historical balance.
+    const linkedPayment = store.payments.find((p) => p.id === receipt.payment_id &&
+      p.student_id === receipt.student_id && tenantId(p) === tenantId(receipt));
+    const pdfBuffer = await generateReceiptPdfBuffer({
+      ...receipt,
+      payment_amount: receipt.payment_amount ?? linkedPayment?.amount,
+    } as typeof receipt);
 
     const { searchParams } = new URL(request.url);
     const isDownload = searchParams.get('download') === 'true';
@@ -72,7 +97,7 @@ export async function GET(
         success: false,
         error: error.message || 'Failed to generate receipt PDF',
       },
-      { status: error?.message?.startsWith('Unauthorized') ? 401 : 500 }
+      { status: error instanceof ReceiptPdfDataError ? 422 : error?.message?.startsWith('Unauthorized') ? 401 : 500 }
     );
   }
 }

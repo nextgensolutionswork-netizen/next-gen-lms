@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3001';
 
 async function executeJson(url, options = {}) {
   const res = await fetch(`${BASE_URL}${url}`, {
@@ -26,6 +26,14 @@ async function launchBrowser() {
   } catch {
     return await chromium.launch({ channel: 'msedge', headless: true });
   }
+}
+
+async function waitForAuthCookies(page, context) {
+  await page.waitForFunction(() => {
+    return document.cookie.includes('next_gen_auth_user=') && document.cookie.includes('next_gen_auth_user_sig=');
+  }, { timeout: 8000 }).catch(() => {});
+  const cookies = await context.cookies();
+  return cookies.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
 export async function runCompleteBusinessWorkflow() {
@@ -59,13 +67,12 @@ export async function runCompleteBusinessWorkflow() {
     const counsellorPage = await counsellorContext.newPage();
 
     await counsellorPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-    await counsellorPage.fill('input#email', 'counsellor@next-generpsolutions.com');
-    await counsellorPage.fill('input#password', 'CounsellorPass#2026');
+    await counsellorPage.fill('input#email', 'staging.counsellor.1@next-gen-staging.local');
+    await counsellorPage.fill('input#password', 'StagingPass#2026');
     await counsellorPage.click('button[type="submit"]');
     await counsellorPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 
-    const counsellorCookies = await counsellorContext.cookies();
-    const counsellorCookieHeader = counsellorCookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    const counsellorCookieHeader = await waitForAuthCookies(counsellorPage, counsellorContext);
 
     // -------------------------------------------------------------
     // STEP 2 & 3: Follow-up, Demo & Admission Confirmation
@@ -146,13 +153,12 @@ export async function runCompleteBusinessWorkflow() {
       const accountsContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const accountsPage = await accountsContext.newPage();
       await accountsPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-      await accountsPage.fill('input#email', 'accounts@next-generpsolutions.com');
-      await accountsPage.fill('input#password', 'AccountsPass#2026');
+      await accountsPage.fill('input#email', 'staging.accounts.1@next-gen-staging.local');
+      await accountsPage.fill('input#password', 'StagingPass#2026');
       await accountsPage.click('button[type="submit"]');
       await accountsPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 
-      const accountsCookies = await accountsContext.cookies();
-      const accountsCookieHeader = accountsCookies.map((c) => `${c.name}=${c.value}`).join('; ');
+      const accountsCookieHeader = await waitForAuthCookies(accountsPage, accountsContext);
 
       if (paymentId) {
         const approveRes = await executeJson('/api/fees/payments', {
@@ -187,18 +193,17 @@ export async function runCompleteBusinessWorkflow() {
       const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const adminPage = await adminContext.newPage();
       await adminPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-      await adminPage.fill('input#email', 'admin@next-generpsolutions.com');
-      await adminPage.fill('input#password', 'AdminPass#2026');
+      await adminPage.fill('input#email', 'staging.admin.1@next-gen-staging.local');
+      await adminPage.fill('input#password', 'StagingPass#2026');
       await adminPage.click('button[type="submit"]');
       await adminPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 
-      const adminCookies = await adminContext.cookies();
-      const adminCookieHeader = adminCookies.map((c) => `${c.name}=${c.value}`).join('; ');
+      const adminCookieHeader = await waitForAuthCookies(adminPage, adminContext);
 
       // Fetch eligible staff dynamically from live directory
       const analyticsRes = await executeJson('/api/onboarding/analytics', { headers: { Cookie: adminCookieHeader } });
-      const staffMember = (analyticsRes.body.eligibleStaff || []).find((s) => s.role === 'onboarding_team') || analyticsRes.body.eligibleStaff?.[0];
-      const targetStaffId = staffMember?.id || '8048c986-cca8-4afe-b68b-d45a907000b1';
+      const staffMember = (analyticsRes.body?.eligibleStaff || []).find((s) => s.role === 'onboarding_team') || analyticsRes.body?.eligibleStaff?.[0];
+      const targetStaffId = staffMember?.id || '4b9abb4a-1ef8-4e39-a162-a34e32381922';
       console.log(` - Assigning onboarding case to staff ID: ${targetStaffId} (${staffMember?.full_name || 'Onboarding Staff'})`);
 
       // Admin ensures onboarding case and assigns to Onboarding Staff
@@ -216,13 +221,12 @@ export async function runCompleteBusinessWorkflow() {
       const onbContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const onbPage = await onbContext.newPage();
       await onbPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-      await onbPage.fill('input#email', 'onboarding@next-generpsolutions.com');
-      await onbPage.fill('input#password', 'OnboardPass#2026');
+      await onbPage.fill('input#email', 'staging.onboarding.1@next-gen-staging.local');
+      await onbPage.fill('input#password', 'StagingPass#2026');
       await onbPage.click('button[type="submit"]');
       await onbPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 
-      const onbCookies = await onbContext.cookies();
-      const onbCookieHeader = onbCookies.map((c) => `${c.name}=${c.value}`).join('; ');
+      const onbCookieHeader = await waitForAuthCookies(onbPage, onbContext);
 
       if (!onboardingCaseId) {
         const casesRes = await executeJson('/api/onboarding/cases', { headers: { Cookie: onbCookieHeader } });
@@ -305,15 +309,16 @@ export async function runCompleteBusinessWorkflow() {
       const studentContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const studentPage = await studentContext.newPage();
       await studentPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-      await studentPage.fill('input#email', 'amit.gupta@student.next-gen.com');
-      await studentPage.fill('input#password', 'StudentPass#2026');
+      await studentPage.fill('input#email', 'staging.student.1@next-gen-staging.local');
+      await studentPage.fill('input#password', 'StagingPass#2026');
       await studentPage.click('button[type="submit"]');
       await studentPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
       console.log(` - Student Login URL: ${studentPage.url()}`);
+      const studentCookieHeader = await waitForAuthCookies(studentPage, studentContext);
 
       // Test signed URL generation for video
       const signedUrlRes = await executeJson('/api/storage/signed-url?bucket=assignments&path=lessons%2Fintro.mp4', {
-        headers: { Cookie: counsellorCookieHeader },
+        headers: { Cookie: studentCookieHeader },
       });
       console.log(` - Video Signed URL API: HTTP ${signedUrlRes.status}`);
       const signedUrl = signedUrlRes.body.signedUrl || signedUrlRes.body.signed_url;
@@ -332,8 +337,8 @@ export async function runCompleteBusinessWorkflow() {
       const trainerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const trainerPage = await trainerContext.newPage();
       await trainerPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-      await trainerPage.fill('input#email', 'vikram.fico@next-generpsolutions.com');
-      await trainerPage.fill('input#password', 'TrainerPass#2026');
+      await trainerPage.fill('input#email', 'staging.trainer.1@next-gen-staging.local');
+      await trainerPage.fill('input#password', 'StagingPass#2026');
       await trainerPage.click('button[type="submit"]');
       await trainerPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 
@@ -356,8 +361,8 @@ export async function runCompleteBusinessWorkflow() {
       const placementContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const placementPage = await placementContext.newPage();
       await placementPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-      await placementPage.fill('input#email', 'placement@next-generpsolutions.com');
-      await placementPage.fill('input#password', 'PlacementPass#2026');
+      await placementPage.fill('input#email', 'staging.admin.1@next-gen-staging.local');
+      await placementPage.fill('input#password', 'StagingPass#2026');
       await placementPage.click('button[type="submit"]');
       await placementPage.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 

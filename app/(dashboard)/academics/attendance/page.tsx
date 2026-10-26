@@ -250,7 +250,7 @@ export default function AttendancePage() {
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Attendance Registers & Automated Tracking</h1>
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] flex items-center space-x-1">
               <Radio className="h-3 w-3 text-emerald-600 animate-pulse" />
@@ -262,7 +262,7 @@ export default function AttendancePage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {canMark && (
             <Button
               variant="outline"
@@ -326,7 +326,7 @@ export default function AttendancePage() {
 
       {savedSuccess && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center justify-between animate-in fade-in duration-200">
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <CheckCircle className="h-4 w-4 text-emerald-600" />
             <span>Attendance register updated and synced across LMS & multi-channel notification engine!</span>
           </div>
@@ -338,7 +338,7 @@ export default function AttendancePage() {
 
       {saveError && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-semibold flex items-center justify-between animate-in fade-in duration-200">
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <XCircle className="h-4 w-4 text-red-600" />
             <span>{saveError}</span>
           </div>
@@ -351,7 +351,7 @@ export default function AttendancePage() {
       {/* Filter & Batch Selection Card */}
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="flex items-center space-x-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             <div>
               <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Batch</label>
               <select
@@ -391,7 +391,7 @@ export default function AttendancePage() {
             )}
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <span className="text-xs text-slate-500 font-medium">Quick Mark:</span>
             <Button
               variant="outline"
@@ -428,7 +428,7 @@ export default function AttendancePage() {
         <Card className="border-blue-200 bg-blue-50/20">
           <CardHeader className="py-3 px-4 border-b border-blue-100">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2 max-w-full">
                 <Radio className="h-4 w-4 text-blue-600 animate-pulse" />
                 <CardTitle className="text-xs font-bold text-slate-800">
                   Live Meeting Webhook Stream (Zoom & Google Meet)
@@ -448,7 +448,7 @@ export default function AttendancePage() {
               <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
                 {recentLogs.map((log) => (
                   <div key={log.id} className="p-3 text-xs flex items-center justify-between hover:bg-white transition-colors">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex flex-wrap items-center gap-3 max-w-full">
                       <Badge
                         variant="outline"
                         className={
@@ -716,7 +716,7 @@ export default function AttendancePage() {
                   : 'bg-amber-50 border border-amber-200 text-amber-800'
               }`}
             >
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2 max-w-full">
                 <CheckCircle className="h-4 w-4 text-emerald-600" />
                 <span>{syncResult.message}</span>
               </div>

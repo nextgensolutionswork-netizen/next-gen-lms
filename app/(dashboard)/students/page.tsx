@@ -28,9 +28,11 @@ import { store } from '@/lib/services/data-store';
 import { Student } from '@/types';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
+import { useRecordLoad } from '@/lib/hooks/use-record-load';
+import { getStudents } from '@/lib/services/student-service';
 
 export default function StudentsListPage() {
-  const { user, role, hasPermission } = useAuth();
+  const { user, role, hasPermission, isLoading: authLoading } = useAuth();
   const canAccessStudents =
     role === 'super_admin' ||
     role === 'admin' ||
@@ -45,7 +47,11 @@ export default function StudentsListPage() {
   const canExport = role === 'super_admin' || role === 'admin' || hasPermission('students:export');
   const canImport = role === 'super_admin' || role === 'admin' || hasPermission('students:write');
 
-  const [allStudents, setAllStudents] = React.useState<Student[]>(store.students || []);
+  const loadStudents = React.useCallback((signal: AbortSignal) => getStudents(undefined, signal), []);
+  const { data, status: loadStatus, error: loadError, reload } = useRecordLoad<Student[]>(
+    !authLoading && user?.id && canAccessStudents ? user.id : null, loadStudents
+  );
+  const allStudents = React.useMemo(() => data || [], [data]);
   const [search, setSearch] = React.useState('');
   const [courseFilter, setCourseFilter] = React.useState('All');
   const [statusFilter, setStatusFilter] = React.useState('All');
@@ -57,7 +63,7 @@ export default function StudentsListPage() {
   const [pageSize, setPageSize] = React.useState(10);
 
   const refreshList = () => {
-    setAllStudents([...(store.students || [])]);
+    void reload();
   };
 
   // Full filtered dataset (all matching students, not limited to current page)
@@ -156,6 +162,9 @@ export default function StudentsListPage() {
     exportToCSV(`sap_enrolled_students_${new Date().toISOString().slice(0, 10)}`, exportData);
   };
 
+  if (!authLoading && !user) return <p role="alert">Please sign in to view students.</p>;
+  if (canAccessStudents && loadStatus === 'loading') return <p role="status">Loading student directory…</p>;
+  if (canAccessStudents && loadStatus === 'error') return <div className="space-y-3"><p role="alert">{loadError}</p><Button onClick={() => void reload()}>Retry loading students</Button></div>;
   if (!canAccessStudents) {
     return (
       <div className="max-w-md mx-auto my-16 text-center space-y-4">
@@ -189,7 +198,7 @@ export default function StudentsListPage() {
             Comprehensive student profiles tracking academic progress, attendance, LMS milestones, fee ledger, and placement readiness.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           {canImport && (
             <Button
               variant="outline"
@@ -429,13 +438,13 @@ export default function StudentsListPage() {
           {/* Pagination Footer */}
           {filteredStudents.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-600 bg-slate-50/50">
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2 max-w-full">
                 <span>
                   Showing <strong>{startIndex + 1}</strong> to <strong>{endIndex}</strong> of{' '}
                   <strong>{totalStudents}</strong> students
                 </span>
                 <span className="text-slate-300">|</span>
-                <div className="flex items-center space-x-1">
+                <div className="flex flex-wrap items-center gap-1 max-w-full">
                   <span className="text-slate-500">Per page:</span>
                   <select
                     value={pageSize}
@@ -453,7 +462,7 @@ export default function StudentsListPage() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-1">
+              <div className="flex flex-wrap items-center gap-1 max-w-full">
                 <Button
                   variant="outline"
                   size="sm"

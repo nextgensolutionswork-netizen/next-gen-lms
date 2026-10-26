@@ -401,7 +401,7 @@ export default function SchedulePage() {
       {/* Timetable Navigation & View Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
         {/* Date Stepper Controls */}
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2 max-w-full">
           <Button
             type="button"
             variant="outline"
@@ -440,7 +440,7 @@ export default function SchedulePage() {
         </div>
 
         {/* View Switcher and Direct Date Jump */}
-        <div className="flex items-center space-x-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 max-w-full">
           <Badge variant="secondary" className="text-xs">
             {filteredSessions.length} {filteredSessions.length === 1 ? 'session' : 'sessions'}
           </Badge>
@@ -535,7 +535,7 @@ export default function SchedulePage() {
               : 'bg-rose-50 text-rose-800 border border-rose-200'
           }`}
         >
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             {statusMessage.type === 'success' ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
             ) : (
@@ -700,7 +700,7 @@ export default function SchedulePage() {
                     )}
 
                     {canSchedule && (
-                      <div className="flex items-center space-x-1">
+                      <div className="flex flex-wrap items-center gap-1 max-w-full">
                         <Button
                           variant="outline"
                           size="sm"

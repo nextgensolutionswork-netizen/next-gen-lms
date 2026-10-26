@@ -9,6 +9,9 @@
 
 # next.js
 /.next/
+/.next-audit/
+/.next-build-check/
+/.audit-build-check/
 /out/
 
 # production
@@ -41,3 +44,6 @@ data/payment-proofs/
 
 # Local Supabase CLI connection metadata
 supabase/.temp/
+
+# Local staging isolated runtime
+staging-runtime/

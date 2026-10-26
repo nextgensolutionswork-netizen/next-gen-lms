@@ -178,7 +178,10 @@ export function getStoredUser(): UserProfile | null {
       const cookies = cookieStr.split('; ');
       const authCookie = cookies.find((c) => c.startsWith(`${AUTH_COOKIE_NAME}=`));
       if (authCookie) {
-        const raw = decodeURIComponent(authCookie.split('=')[1]);
+        // Server cookie serialization may encode the already encoded JSON once
+        // more. Browser-written cookies have only one layer.
+        let raw = decodeURIComponent(authCookie.slice(authCookie.indexOf('=') + 1));
+        if (raw.startsWith('%7B')) raw = decodeURIComponent(raw);
         const parsed = JSON.parse(raw);
         // Match full record from store
         const full = store.users.find((u) => u.email.toLowerCase() === parsed.email?.toLowerCase());

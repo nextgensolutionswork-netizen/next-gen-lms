@@ -1,0 +1,247 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mE:/my erp hub/.pages-current-alb5AV[39m
+
+ [32m✓[39m tests/portal-assessments.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 346[2mms[22m[39m
+[90mstdout[2m | tests/onboarding.test.ts[2m > [22m[2m24. Student Onboarding Team & Lifecycle Management Tests[2m > [22m[2m4. Checklist Rules, Document Verification & Completion[2m > [22m[2mprovisions LMS account idempotently without exposing credentials
+[22m[39m[Resend Email Mock] (To: pooja.sharma@example.com | Subject: "Welcome to Next-Gen ERP LMS – Student Portal Credentials & Batch Schedule")
+[Resend Email Mock] (To: pooja.sharma@example.com | Subject: "LMS Student Portal Provisioned & Activated")
+[WhatsApp Cloud Mock] (To: 919833344455 | Message: "*LMS Student Portal Provisioned & Activated*
+
+Your student portal account is now active. Log in at /...")
+
+[90mstdout[2m | tests/onboarding.test.ts[2m > [22m[2m24. Student Onboarding Team & Lifecycle Management Tests[2m > [22m[2m4. Checklist Rules, Document Verification & Completion[2m > [22m[2msuccessfully completes onboarding and logs academic handover when all mandatory items are done
+[22m[39m[Resend Email Mock] (To: vikram.fico@next-generpsolutions.com | Subject: "Academic Handover: Pooja Sharma (SAP FICO Morning Fast-Track Batch)")
+[Resend Email Mock] (To: admin@next-generpsolutions.com | Subject: "Academic Handover Dispatched: Pooja Sharma (SAP FICO Morning Fast-Track Batch)")
+[Resend Email Mock] (To: support@next-generpsolutions.com | Subject: "Academic Handover Dispatched: Pooja Sharma (SAP FICO Morning Fast-Track Batch)")
+
+[90mstdout[2m | tests/onboarding.test.ts[2m > [22m[2m24. Student Onboarding Team & Lifecycle Management Tests[2m > [22m[2m4. Checklist Rules, Document Verification & Completion[2m > [22m[2mdefends against unprovisioned student login with clear onboarding guidance
+[22m[39m[Resend Email Mock] (To: unprov.1792240230598@example.com | Subject: "Welcome to Next-Gen ERP LMS – Student Portal Credentials & Batch Schedule")
+[Resend Email Mock] (To: unprov.1792240230598@example.com | Subject: "LMS Student Portal Provisioned & Activated")
+[WhatsApp Cloud Mock] (To: 919999911111 | Message: "*LMS Student Portal Provisioned & Activated*
+
+Your student portal account is now active. Log in at /...")
+
+[90mstdout[2m | tests/onboarding.test.ts[2m > [22m[2m24. Student Onboarding Team & Lifecycle Management Tests[2m > [22m[2m4. Checklist Rules, Document Verification & Completion[2m > [22m[2mdispatches multi-channel welcome notification and orientation kit via email & whatsapp
+[22m[39m[Resend Email Mock] (To: unprov.1792240230598@example.com | Subject: "Welcome to Next-Gen ERP: SAP S/4HANA Finance (FICO) Orientation Kit")
+[WhatsApp Cloud Mock] (To: 919999911111 | Message: "*Welcome to Next-Gen ERP: SAP S/4HANA Finance (FICO) Orientation Kit*
+
+Welcome to SAP S/4HANA Financ...")
+
+ [32m✓[39m tests/placement-enrollment.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 508[2mms[22m[39m
+[90mstderr[2m | tests/onboarding-api.test.ts[2m > [22m[2mServer-Side /api/onboarding Route Handlers & Session Security[2m > [22m[2mGET & PATCH /api/onboarding/cases/[id][2m > [22m[2mprovisions student LMS portal access via PATCH /api/onboarding/cases/[id]
+[22m[39m[API /api/onboarding/cases/[id]] PATCH error: Error: Cannot activate LMS access until admission, identity, documents, course, batch, and payment checks are completed.
+    at Module.provisionStudentLmsAccount [90m(E:\my erp hub\.pages-current-alb5AV\[39mlib\services\onboarding-service.ts:690:81[90m)[39m
+    at [90mE:\my erp hub\.pages-current-alb5AV\[39mapp\api\onboarding\cases\[id]\route.ts:244:30
+    at [90mE:\my erp hub\.pages-current-alb5AV\[39mlib\services\payment-workflow-transaction.ts:80:22
+
+ [32m✓[39m tests/onboarding.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 423[2mms[22m[39m
+[90mstdout[2m | tests/platform-admin-operations.test.ts[2m > [22m[2mPlatform, Operations, Support & Admin Test Suite (Modules 22-35)[2m > [22m[2m2. Support & Academic Doubt Ticket Workflow[2m > [22m[2mappends staff reply and updates status to In Progress
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Mentor Reply on Doubt #DBT-2026-003")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Mentor Reply on Doubt #DBT-2026-003*
+
+Vikram Rao (Faculty Lead): "Please check configuration in SPR...")
+
+[90mstdout[2m | tests/platform-admin-operations.test.ts[2m > [22m[2mPlatform, Operations, Support & Admin Test Suite (Modules 22-35)[2m > [22m[2m2. Support & Academic Doubt Ticket Workflow[2m > [22m[2massigns doubt to mentor and resolves doubt with mandatory resolution notes
+[22m[39m[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Doubt Ticket Resolved: #DBT-2026-003*
+
+Your query "Clarification on Module 3 Assignment questions" ...")
+
+ [32m✓[39m tests/crm-admissions-operations.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 446[2mms[22m[39m
+ [32m✓[39m tests/onboarding-api.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 502[2mms[22m[39m
+ [32m✓[39m tests/financial-operations.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 394[2mms[22m[39m
+ [32m✓[39m tests/platform-admin-operations.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 626[2mms[22m[39m
+ [32m✓[39m tests/student-fee-payment-approval-workflow.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 409[2mms[22m[39m
+ [32m✓[39m tests/course-management.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 357[2mms[22m[39m
+ [32m✓[39m tests/fee-approval-workflow.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 449[2mms[22m[39m
+[90mstdout[2m | tests/meeting-attendance.test.ts[2m > [22m[2m11. Zoom / Google Meet Automated Webhook Attendance Tracking Tests[2m > [22m[2mAtomic Recalculation & Certificate Impact[2m > [22m[2mdispatches alert and updates certificate eligibility when student is absent
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Absence Alert: Live SAP Session Missed")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Absence Alert: Live SAP Session Missed*
+
+You were marked ABSENT for session "Financial Statement Ve...")
+
+ [32m✓[39m tests/auth-provider.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 445[2mms[22m[39m
+ [32m✓[39m tests/meeting-attendance.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 423[2mms[22m[39m
+ [32m✓[39m tests/login-security.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 437[2mms[22m[39m
+[90mstdout[2m | tests/realtime-notifications.test.ts[2m > [22m[2mRealtime PubSub & Multi-Channel Notification Service[2m > [22m[2m2. Resend Email Integration[2m > [22m[2msimulates transactional email delivery when RESEND_API_KEY is not configured
+[22m[39m[Resend Email Mock] (To: student@example.com | Subject: "Official Fee Receipt - REC-2026-0042")
+
+[90mstdout[2m | tests/realtime-notifications.test.ts[2m > [22m[2mRealtime PubSub & Multi-Channel Notification Service[2m > [22m[2m3. WhatsApp Business / Cloud API Integration[2m > [22m[2msimulates WhatsApp message delivery gracefully when credentials are not configured
+[22m[39m[WhatsApp Cloud Mock] (To: 919876543210 | Message: "Your SAP lab access credentials have been renewed....")
+
+[90mstdout[2m | tests/realtime-notifications.test.ts[2m > [22m[2mRealtime PubSub & Multi-Channel Notification Service[2m > [22m[2m4. Unified Multi-Channel Dispatcher[2m > [22m[2mcreates in-app notification, publishes to realtime stream, and invokes channels
+[22m[39m[Resend Email Mock] (To: amit.gupta@example.com | Subject: "Fee Payment Received")
+[WhatsApp Cloud Mock] (To: 919876543210 | Message: "*Fee Payment Received*
+
+Your payment of ₹25,000 has been credited.
+
+View details: /accounts/receipts...")
+
+[90mstdout[2m | tests/realtime-notifications.test.ts[2m > [22m[2mRealtime PubSub & Multi-Channel Notification Service[2m > [22m[2m5. Realtime Doubt Ticket Workflow Integration[2m > [22m[2mpublishes doubt_reply to both doubts and doubt:id topic on reply
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Mentor Reply on Doubt #DBT-2026-003")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Mentor Reply on Doubt #DBT-2026-003*
+
+Ananya Deshmukh: "Mentor live response via WebSocket / SSE st...")
+
+[90mstdout[2m | tests/realtime-notifications.test.ts[2m > [22m[2mRealtime PubSub & Multi-Channel Notification Service[2m > [22m[2m5. Realtime Doubt Ticket Workflow Integration[2m > [22m[2mpublishes doubt_resolved to real-time subscribers on ticket resolution
+[22m[39m[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Doubt Ticket Resolved: #DBT-2026-003*
+
+Your query "Realtime WebSocket Integration Test Query" has b...")
+
+ [32m✓[39m tests/middleware.test.ts [2m([22m[2m42 tests[22m[2m)[22m[33m 567[2mms[22m[39m
+ [32m✓[39m tests/security-hardening.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 577[2mms[22m[39m
+ [32m✓[39m tests/realtime-notifications.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 527[2mms[22m[39m
+ [32m✓[39m tests/storage.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 458[2mms[22m[39m
+ [32m✓[39m tests/rls-policies.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 393[2mms[22m[39m
+[90mstdout[2m | tests/fee-workflow-audit-reproductions.test.ts[2m > [22m[2mRemediated Audit Acceptance Tests (All 14 Findings)[2m > [22m[2mB12: academic handover strictly scopes recipient notifications to the case tenant
+[22m[39m[Resend Email Mock] (To: trainer-default@example.test | Subject: "Academic Handover: New Student (SAP FICO Morning)")
+
+ [32m✓[39m tests/fee-workflow-audit-reproductions.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 419[2mms[22m[39m
+[90mstdout[2m | tests/critical.test.ts[2m > [22m[2m3. Financial Operations & Atomic Payment Transactions[2m > [22m[2mRecords payment, updates fee account, updates installment, and produces official receipt atomically
+[22m[39m[Resend Email Mock] (To: test.student.1792240236073@example.com | Subject: "Fee Payment Received: ₹5,000")
+[WhatsApp Cloud Mock] (To: 919999988888 | Message: "*Fee Payment Received: ₹5,000*
+
+Tuition fee payment of ₹5,000 for SAP S/4HANA Finance (FICO) recorde...")
+
+[90mstdout[2m | tests/critical.test.ts[2m > [22m[2m3. Financial Operations & Atomic Payment Transactions[2m > [22m[2mDetects and prevents duplicate payment transactions with the same transaction reference
+[22m[39m[Resend Email Mock] (To: test.student.1792240236073@example.com | Subject: "Fee Payment Received: ₹1,000")
+[WhatsApp Cloud Mock] (To: 919999988888 | Message: "*Fee Payment Received: ₹1,000*
+
+Tuition fee payment of ₹1,000 for SAP S/4HANA Finance (FICO) recorde...")
+
+[90mstdout[2m | tests/critical.test.ts[2m > [22m[2m7. Student Doubts & Academic Support Desk[2m > [22m[2mSupports two-way threaded replies between mentor and student
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Mentor Reply on Doubt #DBT-2026-003")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Mentor Reply on Doubt #DBT-2026-003*
+
+Ananya Deshmukh (Support): "Please check your document splitt...")
+
+[90mstdout[2m | tests/critical.test.ts[2m > [22m[2m7. Student Doubts & Academic Support Desk[2m > [22m[2mAllows support mentor or trainer to resolve ticket with resolution summary
+[22m[39m[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Doubt Ticket Resolved: #DBT-2026-003*
+
+Your query "Document splitting error during customer payment...")
+
+ [32m✓[39m tests/bulk-import.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 525[2mms[22m[39m
+ [32m✓[39m tests/payment-approval-automation.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 717[2mms[22m[39m
+ [32m✓[39m tests/critical.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 857[2mms[22m[39m
+   [33m[2m✓[22m[39m 3. Financial Operations & Atomic Payment Transactions[2m > [22mRecords payment, updates fee account, updates installment, and produces official receipt atomically [33m364[2mms[22m[39m
+ [32m✓[39m tests/database-persistence.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 616[2mms[22m[39m
+[90mstdout[2m | tests/conference-integration.test.ts[2m > [22m[2mLive Class Conference Integration & Automated Attendance Tracking[2m > [22m[2m5. Real-Time Helpdesk Messaging via Supabase Realtime Channel[2m > [22m[2mcreates doubt and dispatches real-time broadcast payload
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Mentor Reply on Doubt #DBT-2026-003")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Mentor Reply on Doubt #DBT-2026-003*
+
+Rajesh Kumar (Senior SAP FICO Architect): "Please check posti...")
+
+ [32m✓[39m tests/conference-integration.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 603[2mms[22m[39m
+[90mstdout[2m | tests/payment-gateway.test.ts[2m > [22m[2m10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22m[2mWebhook Event Processing & Auto-Reconciliation[2m > [22m[2mauto-reconciles payment.captured event and credits student fee ledger atomically
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Fee Payment Received: ₹10,000")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Fee Payment Received: ₹10,000*
+
+Tuition fee payment of ₹10,000 for SAP S/4HANA Finance (FICO) recor...")
+
+[90mstdout[2m | tests/payment-gateway.test.ts[2m > [22m[2m10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22m[2mPayment API Endpoints[2m > [22m[2mreconciles via POST /api/webhooks/razorpay with valid signature
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Fee Payment Received: ₹5,000")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Fee Payment Received: ₹5,000*
+
+Tuition fee payment of ₹5,000 for SAP S/4HANA Finance (FICO) recorde...")
+
+[90mstderr[2m | tests/payment-gateway.test.ts[2m > [22m[2m10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22m[2mPayment API Endpoints[2m > [22m[2mauthenticates and processes payment verification from student or accounts
+[22m[39mPayment verification API error: Error: Payment amount (₹5000) exceeds outstanding balance (₹0)
+    at Module.recordPaymentAtomic [90m(E:\my erp hub\.pages-current-alb5AV\[39mlib\services\finance-service.ts:189:11[90m)[39m
+    at Module.POST [90m(E:\my erp hub\.pages-current-alb5AV\[39mapp\api\payments\verify\route.ts:117:26[90m)[39m
+    at [90mE:\my erp hub\.pages-current-alb5AV\[39mtests\payment-gateway.test.ts:306:19
+    at file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:533:5
+    at runTest (file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:1056:11)
+    at runSuite (file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:1205:15)
+    at runSuite (file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:1205:15)
+    at runSuite (file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:1205:15)
+    at runFiles (file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:1262:5)
+    at startTests (file:///E:/my%20erp%20hub/next%20gen%20lms/node_modules/[4m@vitest/runner[24m/dist/index.js:1271:3)
+
+ [31m❯[39m tests/payment-gateway.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 2016[2mms[22m[39m
+   [33m[2m✓[22m[39m 10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22mWebhook Event Processing & Auto-Reconciliation[2m > [22mauto-reconciles payment.captured event and credits student fee ledger atomically [33m953[2mms[22m[39m
+   [33m[2m✓[22m[39m 10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22mPayment API Endpoints[2m > [22mreconciles via POST /api/webhooks/razorpay with valid signature [33m413[2mms[22m[39m
+[31m   [31m×[31m 10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22mPayment API Endpoints[2m > [22mauthenticates and processes payment verification from student or accounts[90m 107[2mms[22m[31m[39m
+[31m     → expected 500 to be 200 // Object.is equality[39m
+[90mstdout[2m | tests/student-360-operations.test.ts[2m > [22m[2mDomain 4: Student 360 Profile & Operations Suite[2m > [22m[2m3. Certificate Issuance & 3-Tier Eligibility Criteria[2m > [22m[2mverifies eligibility requirements (attendance >= 80%, progress >= 80%, outstanding = 0)
+[22m[39m[Resend Email Mock] (To: karan.mehra@test-360.com | Subject: "SAP Certificate Awarded: SAP S/4HANA Finance (FICO)")
+[WhatsApp Cloud Mock] (To: 919988776655 | Message: "*SAP Certificate Awarded: SAP S/4HANA Finance (FICO)*
+
+Congratulations Karan Mehra! Your course cert...")
+
+ [32m✓[39m tests/counsellor-payment-workflow.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 439[2mms[22m[39m
+ [32m✓[39m tests/student-360-operations.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1015[2mms[22m[39m
+   [33m[2m✓[22m[39m Domain 4: Student 360 Profile & Operations Suite[2m > [22m3. Certificate Issuance & 3-Tier Eligibility Criteria[2m > [22mverifies eligibility requirements (attendance >= 80%, progress >= 80%, outstanding = 0) [33m664[2mms[22m[39m
+ [32m✓[39m tests/schedule-management.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 362[2mms[22m[39m
+ [32m✓[39m tests/portal-hardening.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 456[2mms[22m[39m
+[90mstdout[2m | tests/dual-ledger-sync.test.ts[2m > [22m[2mDual-Ledger Bi-Directional Financial Synchronization Suite[2m > [22m[2m3. Legacy recordPaymentAtomic Updates Advanced Store[2m > [22m[2mupdates StudentFee balances, pushes verified StudentPaymentRecord, and posts to studentFinancialLedgers
+[22m[39m[Resend Email Mock] (To: atomic.sync.1792240240337@example.com | Subject: "Fee Payment Received: ₹20,000")
+[WhatsApp Cloud Mock] (To: 919777766666 | Message: "*Fee Payment Received: ₹20,000*
+
+Tuition fee payment of ₹20,000 for SAP S/4HANA Materials Management...")
+
+ [32m✓[39m tests/dual-ledger-sync.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1219[2mms[22m[39m
+   [33m[2m✓[22m[39m Dual-Ledger Bi-Directional Financial Synchronization Suite[2m > [22m3. Legacy recordPaymentAtomic Updates Advanced Store[2m > [22mupdates StudentFee balances, pushes verified StudentPaymentRecord, and posts to studentFinancialLedgers [33m771[2mms[22m[39m
+ [32m✓[39m tests/excel-export-and-ads-import.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 461[2mms[22m[39m
+ [32m✓[39m tests/sap-lab-management.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 375[2mms[22m[39m
+ [32m✓[39m tests/assignments-management.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 379[2mms[22m[39m
+ [32m✓[39m tests/user-management.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 621[2mms[22m[39m
+ [32m✓[39m tests/database-api-security.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 504[2mms[22m[39m
+ [32m✓[39m tests/pdf-generation.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 2493[2mms[22m[39m
+   [33m[2m✓[22m[39m PDF Generation Service & API Routes[2m > [22mgenerateReceiptPdfBuffer[2m > [22mprints payment and balance without tax details, including for historical receipts [33m404[2mms[22m[39m
+   [33m[2m✓[22m[39m PDF Generation Service & API Routes[2m > [22mgenerateCertificatePdfBuffer[2m > [22mgenerates a valid A4 Landscape PDF buffer for a certificate [33m385[2mms[22m[39m
+ [32m✓[39m tests/hls-player.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 364[2mms[22m[39m
+ [32m✓[39m tests/crm-finance-enhancements.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 347[2mms[22m[39m
+ [32m✓[39m docs/audits/evidence-20261017/finance-reproductions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 364[2mms[22m[39m
+[90mstderr[2m | docs/audits/evidence-20261017/provisioning-reproduction.test.ts[2m > [22m[2mF07: Auth provisioning rejection fails closed and prevents unauthorized LMS activation
+[22m[39mLive Supabase Auth provisioning failure: Synthetic Auth rejection
+
+[90mstdout[2m | tests/gst-compliance.test.ts[2m > [22m[2mPlain Fee Receipts and Formatting[2m > [22m[2mFinance Service Payments Without Tax[2m > [22m[2mrecords the full payment amount without tax for a Telangana student
+[22m[39m[Resend Email Mock] (To: amit.gupta@student.next-gen.com | Subject: "Fee Payment Received: ₹5,000")
+[WhatsApp Cloud Mock] (To: 919811122233 | Message: "*Fee Payment Received: ₹5,000*
+
+Tuition fee payment of ₹5,000 for SAP S/4HANA Finance (FICO) recorde...")
+
+[90mstdout[2m | tests/gst-compliance.test.ts[2m > [22m[2mPlain Fee Receipts and Formatting[2m > [22m[2mFinance Service Payments Without Tax[2m > [22m[2mrecords the full payment amount without tax for an out-of-state student
+[22m[39m[Resend Email Mock] (To: sneha.k@student.next-gen.com | Subject: "Fee Payment Received: ₹5,000")
+[WhatsApp Cloud Mock] (To: 919822233344 | Message: "*Fee Payment Received: ₹5,000*
+
+Tuition fee payment of ₹5,000 for SAP S/4HANA Materials Management (...")
+
+ [32m✓[39m docs/audits/evidence-20261017/provisioning-reproduction.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 347[2mms[22m[39m
+ [32m✓[39m tests/gst-compliance.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 919[2mms[22m[39m
+   [33m[2m✓[22m[39m Plain Fee Receipts and Formatting[2m > [22mFinance Service Payments Without Tax[2m > [22mrecords the full payment amount without tax for a Telangana student [33m336[2mms[22m[39m
+ [32m✓[39m tests/attendance-management.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 345[2mms[22m[39m
+ [32m✓[39m docs/audits/evidence-20261017/auth-reproductions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 400[2mms[22m[39m
+ [32m✓[39m tests/payment-transaction-reads.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 417[2mms[22m[39m
+ [32m✓[39m tests/live-session-middleware.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 410[2mms[22m[39m
+ [32m✓[39m tests/payment-session-configuration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 346[2mms[22m[39m
+ [32m✓[39m tests/payment-workflow-client.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 335[2mms[22m[39m
+ [32m✓[39m tests/auth-session-client.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 319[2mms[22m[39m
+ [32m✓[39m tests/auth-hydration.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 335[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/payment-gateway.test.ts[2m > [22m10. Razorpay / Cashfree Gateway & Webhook Reconciliation Tests[2m > [22mPayment API Endpoints[2m > [22mauthenticates and processes payment verification from student or accounts
+[31m[1mAssertionError[22m: expected 500 to be 200 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 200[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m tests/payment-gateway.test.ts:[2m307:26[22m[39m
+    [90m305| [39m
+    [90m306| [39m      [35mconst[39m res [33m=[39m [35mawait[39m [34mverifyRouteHandler[39m(req)[33m;[39m
+    [90m307| [39m      [34mexpect[39m(res[33m.[39mstatus)[33m.[39m[34mtoBe[39m([34m200[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m308| [39m      [35mconst[39m data [33m=[39m [35mawait[39m res[33m.[39m[34mjson[39m()[33m;[39m
+    [90m309| [39m      [34mexpect[39m(data[33m.[39msuccess)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m48 passed[39m[22m[90m (49)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m651 passed[39m[22m[90m (652)[39m
+[2m   Start at [22m 18:00:27
+[2m   Duration [22m 21.48s[2m (transform 12.82s, setup 2.38s, collect 40.34s, tests 27.61s, environment 54ms, prepare 20.17s)[22m
+

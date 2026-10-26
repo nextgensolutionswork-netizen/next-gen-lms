@@ -76,6 +76,22 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+/* Let nested dashboard flex/grid children shrink; wide data belongs in a
+   scrollable table container, not in a clipped page viewport. */
+.dashboard-content :is(.grid, .flex) > * {
+  min-width: 0;
+}
+.dashboard-content :has(> table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+@media (max-width: 639px) {
+  .dashboard-content .flex.justify-between {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -104,4 +120,8 @@ body {
   .print-only {
     display: block !important;
   }
+}
+.dashboard-content select {
+  min-width: 0;
+  max-width: 100%;
 }

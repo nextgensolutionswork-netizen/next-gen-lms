@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -31,9 +32,10 @@ interface SidebarProps {
   currentRole: UserRole;
   currentUserName: string;
   avatar?: string;
+  className?: string;
 }
 
-export function Sidebar({ currentRole, currentUserName, avatar }: SidebarProps) {
+export function Sidebar({ currentRole, currentUserName, avatar, className = '' }: SidebarProps) {
   const pathname = usePathname();
   const [openSection, setOpenSection] = React.useState<string | null>('academics');
 
@@ -65,7 +67,7 @@ export function Sidebar({ currentRole, currentUserName, avatar }: SidebarProps) 
   const isStudent = currentRole === 'student';
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col h-screen sticky top-0">
+    <aside className={`w-64 flex-shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col h-screen sticky top-0 ${className}`}>
       {/* Brand Header */}
       <div className="p-4 border-b border-slate-800 flex items-center space-x-3 bg-slate-950/50">
         <div className="h-10 w-10 rounded-lg bg-[#0A6ED1] flex items-center justify-center font-bold text-white shadow-md text-lg">
@@ -477,7 +479,9 @@ export function Sidebar({ currentRole, currentUserName, avatar }: SidebarProps) 
       {/* User Footer Profile */}
       <div className="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center space-x-3">
         {avatar ? (
-          <img
+          <Image
+            width={32}
+            height={32}
             src={avatar}
             alt={currentUserName}
             className="h-8 w-8 rounded-full object-cover border border-slate-700"

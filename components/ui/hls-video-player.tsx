@@ -82,6 +82,12 @@ export function HlsVideoPlayer({
   // Auto-hide controls timer
   const hideControlsTimer = React.useRef<NodeJS.Timeout | null>(null);
 
+  // Capture resume updates without reloading an already playing source.
+  const initialPositionRef = React.useRef(initialPosition);
+  React.useEffect(() => {
+    initialPositionRef.current = initialPosition;
+  }, [initialPosition]);
+
   // 1. Initialize HLS / Video Stream
   React.useEffect(() => {
     const video = videoRef.current;
@@ -92,6 +98,7 @@ export function HlsVideoPlayer({
       hlsRef.current = null;
     }
 
+    const resumePosition = initialPositionRef.current;
     const isHls = src.includes('.m3u8') || src.includes('/hls/');
 
     if (isHls && Hls.isSupported()) {
@@ -114,8 +121,8 @@ export function HlsVideoPlayer({
         levels.sort((a, b) => b.height - a.height);
         setQualityLevels(levels);
 
-        if (initialPosition > 0) {
-          video.currentTime = initialPosition;
+        if (resumePosition > 0) {
+          video.currentTime = resumePosition;
         }
       });
 
@@ -141,14 +148,14 @@ export function HlsVideoPlayer({
     } else if (video.canPlayType('application/vnd.apple.mpegurl') && isHls) {
       // Native Apple HLS (Safari / iOS)
       video.src = src;
-      if (initialPosition > 0) {
-        video.currentTime = initialPosition;
+      if (resumePosition > 0) {
+        video.currentTime = resumePosition;
       }
     } else {
       // Standard Direct MP4/WebM Source Fallback
       video.src = src;
-      if (initialPosition > 0) {
-        video.currentTime = initialPosition;
+      if (resumePosition > 0) {
+        video.currentTime = resumePosition;
       }
     }
 
@@ -404,7 +411,7 @@ export function HlsVideoPlayer({
     }
   };
 
-  const togglePlay = () => {
+  const togglePlay = React.useCallback(() => {
     const video = videoRef.current;
     if (!video || isTamperDetected) return;
 
@@ -414,7 +421,7 @@ export function HlsVideoPlayer({
       video.pause();
       setIsPlaying(false);
     }
-  };
+  }, [isTamperDetected]);
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     const video = videoRef.current;
@@ -448,7 +455,7 @@ export function HlsVideoPlayer({
     setIsMuted(clamped === 0);
   };
 
-  const toggleMute = () => {
+  const toggleMute = React.useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (isMuted) {
@@ -459,7 +466,7 @@ export function HlsVideoPlayer({
       video.muted = true;
       setIsMuted(true);
     }
-  };
+  }, [isMuted, volume]);
 
   const handleSpeedChange = (rate: number) => {
     const video = videoRef.current;
@@ -521,7 +528,7 @@ export function HlsVideoPlayer({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, volume, isMuted]);
+  }, [volume, togglePlay, toggleMute]);
 
   // Controls auto-hide on inactivity
   const handleMouseMove = () => {

@@ -181,10 +181,29 @@ class InstituteDataStore {
         (f) =>
           f.id === `fee-${fa.id}` ||
           f.id === fa.id.replace('fa-', '') ||
-          (f.student_id === fa.student_id && (f.course_id === fa.course_id || f.reference_id === fa.course_id))
+          (f.fee_account_id ? f.fee_account_id === fa.id : false)
       );
 
       if (!sf) {
+        sf = this.studentFees.find(
+          (f) =>
+            f.student_id === fa.student_id &&
+            ((fa.course_id && (f.course_id === fa.course_id || f.reference_id === fa.course_id)) ||
+              (!fa.course_id && !f.course_id)) &&
+            !this.feeAccounts.some(
+              (otherFa) =>
+                otherFa.id !== fa.id &&
+                (f.id === `fee-${otherFa.id}` ||
+                  f.id === otherFa.id.replace('fa-', '') ||
+                  f.fee_account_id === otherFa.id)
+            )
+        );
+      }
+
+      if (sf) {
+        if (!sf.fee_account_id) sf.fee_account_id = fa.id;
+        (fa as any).student_fee_id = sf.id;
+      } else {
         const student = (this.students || []).find((s) => s.id === fa.student_id);
         const newSf: StudentFee = {
           tenant_id: fa.tenant_id, enrollment_id: fa.admission_id, fee_account_id: fa.id,
@@ -226,6 +245,7 @@ class InstituteDataStore {
           created_at: fa.created_at || new Date().toISOString(),
           updated_at: fa.updated_at || new Date().toISOString(),
         };
+        (fa as any).student_fee_id = newSf.id;
         this.studentFees.push(newSf);
       }
     }
@@ -233,13 +253,31 @@ class InstituteDataStore {
     // 2. For every approved StudentFee, ensure a StudentFeeAccount exists and is kept in sync
     for (const sf of this.studentFees) {
       if (sf.approval_status !== 'Approved') continue;
+      // First try exact ID binding
       let fa = this.feeAccounts.find(
         (a) =>
           a.id === `fa-${sf.id}` ||
           a.id === sf.id.replace('fee-', '') ||
-          (a.student_id === sf.student_id && a.course_id === sf.course_id) ||
-          a.student_id === sf.student_id
+          (sf.fee_account_id ? a.id === sf.fee_account_id : false) ||
+          (a as any).student_fee_id === sf.id
       );
+
+      // If not bound by exact ID, search unassigned feeAccount for same student & course
+      if (!fa) {
+        fa = this.feeAccounts.find(
+          (a) =>
+            a.student_id === sf.student_id &&
+            ((sf.course_id && a.course_id === sf.course_id) || (!sf.course_id && !a.course_id)) &&
+            !(a as any).student_fee_id &&
+            !this.studentFees.some(
+              (other) =>
+                other.id !== sf.id &&
+                (a.id === `fa-${other.id}` ||
+                  a.id === other.id.replace('fee-', '') ||
+                  other.fee_account_id === a.id)
+            )
+        );
+      }
 
       if (!fa) {
         fa = {

@@ -18,8 +18,58 @@ function receiptRequest(url: string) {
   return new NextRequest(url, { headers: { cookie: AUTH_COOKIE_NAME + '=' + value + '; ' + AUTH_SIG_COOKIE_NAME + '=' + generateAuthCookieSignatureSync(value) } });
 }
 
+function pdfText(buffer: Buffer): string {
+  let text = '';
+  for (const match of buffer.toString('latin1').matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    let stream: string;
+    try { stream = inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1'); } catch { continue; }
+    for (const token of stream.matchAll(/<([a-f0-9]+)>/gi)) text += Buffer.from(token[1], 'hex').toString('latin1');
+  }
+  return text;
+}
+
 describe('PDF Generation Service & API Routes', () => {
   describe('generateReceiptPdfBuffer', () => {
+    it('exports a legacy receipt without a recorded remaining balance', async () => {
+      const receipt = { ...store.receipts[0], receipt_number: 'REC-2026-0001', student_name: 'Amit Gupta' };
+      delete (receipt as Partial<typeof receipt>).remaining_balance;
+      const buffer = await generateReceiptPdfBuffer(receipt);
+      expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+      expect(pdfText(buffer)).toContain('Remaining balance: Not recorded on this receipt');
+      expect(pdfText(buffer)).toContain('Amit Gupta');
+    });
+
+    it('formats numeric strings and preserves a genuine zero balance', async () => {
+      const receipt = { ...store.receipts[0], payment_amount: '40000.50', remaining_balance: '0' };
+      const text = pdfText(await generateReceiptPdfBuffer(receipt as any));
+      expect(text).toContain('40,000.50');
+      expect(text).toContain('Remaining balance: INR 0.00');
+    });
+
+    it.each([undefined, null, '', 'invalid', NaN, Infinity])('rejects invalid payment amount %s before PDF construction', async (payment_amount) => {
+      await expect(generateReceiptPdfBuffer({ ...store.receipts[0], payment_amount } as any))
+        .rejects.toThrow('has no valid payment amount');
+    });
+    it('exports a 40000 receipt with absent institute metadata without mutating it', async () => {
+      const receipt = { ...store.receipts[0], receipt_number: 'REC-2026-0002', payment_amount: 40000 };
+      delete (receipt as Partial<typeof receipt>).institute_name;
+      delete (receipt as Partial<typeof receipt>).institute_address;
+      delete (receipt as Partial<typeof receipt>).institute_phone;
+      const before = structuredClone(receipt);
+      const buffer = await generateReceiptPdfBuffer(receipt);
+      expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+      expect(buffer.toString('latin1')).toContain('%%EOF');
+      let text = '';
+      for (const match of buffer.toString('latin1').matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+        let stream: string;
+        try { stream = inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1'); } catch { continue; }
+        for (const token of stream.matchAll(/<([a-f0-9]+)>/gi)) text += Buffer.from(token[1], 'hex').toString('latin1');
+      }
+      expect(text).toContain('REC-2026-0002');
+      expect(text).toContain('40,000.00');
+      expect(receipt).toEqual(before);
+    });
+
     it('prints payment and balance without tax details, including for historical receipts', async () => {
       const receipt = { ...store.receipts[0], institute_gst: 'LEGACY-GST-ID', total_tax: 900, irn: 'LEGACY-INVOICE-ID' };
       const before = structuredClone(receipt);
@@ -103,6 +153,35 @@ describe('PDF Generation Service & API Routes', () => {
   });
 
   describe('GET /api/receipts/[id]/pdf Route Handler', () => {
+    it('downloads a legacy receipt using its linked payment without changing stored data', async () => {
+      const receipt = store.receipts[0];
+      const before = structuredClone(receipt);
+      const payment = store.payments.find((p) => p.id === receipt.payment_id)!;
+      expect(payment).toBeDefined();
+      try {
+        delete (receipt as Partial<typeof receipt>).payment_amount;
+        delete (receipt as Partial<typeof receipt>).remaining_balance;
+        const res = await getReceiptPdfRoute(receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf?download=true`), { params: { id: receipt.id } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-disposition')).toContain('attachment');
+        const text = pdfText(Buffer.from(await res.arrayBuffer()));
+        expect(text).toContain(payment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        expect(text).toContain('Not recorded on this receipt');
+        expect(receipt.payment_amount).toBeUndefined();
+      } finally { store.receipts = store.receipts.map((r) => r.id === before.id ? before : r); }
+    });
+
+    it('returns 422 when neither receipt nor linked payment provides an amount', async () => {
+      const receipt = store.receipts[0];
+      const before = structuredClone(receipt);
+      try {
+        delete (receipt as Partial<typeof receipt>).payment_amount;
+        receipt.payment_id = 'missing-linked-payment';
+        const res = await getReceiptPdfRoute(receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`), { params: { id: receipt.id } });
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toContain('has no valid payment amount');
+      } finally { store.receipts = store.receipts.map((r) => r.id === before.id ? before : r); }
+    });
     it('returns 200 with inline application/pdf for a valid receipt ID', async () => {
       const receipt = store.receipts[0];
       const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`);

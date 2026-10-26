@@ -1,0 +1,60 @@
+[
+  {
+    "check": "Receipt via registry link",
+    "path": "/accounts/receipts/81000000-0000-0000-0000-000000000001",
+    "finalPath": "/accounts/receipts/81000000-0000-0000-0000-000000000001",
+    "headings": [
+      "",
+      "Official Fee Receipt"
+    ]
+  },
+  {
+    "check": "Same receipt after reload",
+    "headings": [
+      "",
+      "Official Fee Receipt"
+    ]
+  },
+  {
+    "check": "Student via directory link",
+    "path": "/students/stu-01",
+    "notFound": true,
+    "headings": []
+  },
+  {
+    "check": "Same student after reload",
+    "notFound": false,
+    "headings": [
+      "Amit Gupta",
+      "Academic & Enrollment Snapshot",
+      "Fee Summary"
+    ]
+  },
+  {
+    "check": "Mobile workspace geometry",
+    "route": "/dashboard",
+    "viewport": 375,
+    "sidebarWidth": 256,
+    "mainWidth": 119,
+    "mainScrollWidth": 423,
+    "mainClientWidth": 119
+  },
+  {
+    "check": "Mobile workspace geometry",
+    "route": "/academics/batches",
+    "viewport": 375,
+    "sidebarWidth": 256,
+    "mainWidth": 119,
+    "mainScrollWidth": 217,
+    "mainClientWidth": 119
+  },
+  {
+    "check": "Mobile workspace geometry",
+    "route": "/crm/leads",
+    "viewport": 375,
+    "sidebarWidth": 256,
+    "mainWidth": 119,
+    "mainScrollWidth": 263,
+    "mainClientWidth": 119
+  }
+]

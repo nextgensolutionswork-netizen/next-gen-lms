@@ -45,11 +45,12 @@ import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { transferStudentBatch } from '@/lib/services/academics-service';
 import { issueCertificate } from '@/lib/services/certificate-service';
 import { PaymentMethod } from '@/types';
+import { useRecordLoad } from '@/lib/hooks/use-record-load';
 
 export default function StudentDetailsPage() {
-  const { user, role } = useAuth();
+  const { user, role, isLoading: authLoading } = useAuth();
   const params = useParams();
-  const studentId = params?.id as string;
+  const studentId = typeof params?.id === 'string' ? params.id : '';
   const [activeTab, setActiveTab] = React.useState<
     | 'overview'
     | 'onboarding'
@@ -67,17 +68,12 @@ export default function StudentDetailsPage() {
     | 'activity'
   >('overview');
 
-  const [data, setData] = React.useState<any>(null);
-
-  const reloadData = React.useCallback(async () => {
-    if (!studentId) return;
-    const details = await getStudentProfileFullDetails(studentId);
-    setData(details);
+  const loadDetails = React.useCallback(async () => {
+    return getStudentProfileFullDetails(studentId);
   }, [studentId]);
-
-  React.useEffect(() => {
-    reloadData();
-  }, [reloadData]);
+  const { data, status: loadStatus, error: loadError, reload: reloadData } = useRecordLoad<any>(
+    !authLoading && user?.id && studentId ? `${user.id}:${studentId}` : null, loadDetails
+  );
 
   // Quick Record Payment Modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = React.useState(false);
@@ -106,7 +102,10 @@ export default function StudentDetailsPage() {
   const [isIssuingCert, setIsIssuingCert] = React.useState(false);
   const [certMsg, setCertMsg] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  if (!data || !data.student) {
+  if (!authLoading && !user) return <p role="alert">Please sign in to view this student profile.</p>;
+  if (loadStatus === 'loading') return <p role="status" className="p-8 text-center">Loading student profile…</p>;
+  if (loadStatus === 'error') return <div className="p-8 text-center space-y-3"><p role="alert">{loadError}</p><Button onClick={() => void reloadData()}>Retry loading profile</Button></div>;
+  if (loadStatus === 'missing' || !data?.student) {
     return (
       <div className="p-8 text-center">
         <p className="text-slate-500">Student profile not found.</p>

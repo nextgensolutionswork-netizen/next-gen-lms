@@ -27,6 +27,7 @@ import {
 } from '@/lib/utils/excel-export';
 import { Payment, Expense } from '@/types';
 import { TemporalPeriod, getDateRangeForPeriod } from '@/lib/services/finance-service';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -49,6 +50,18 @@ export default function FinanceReportsPage() {
   const [refreshTick, setRefreshTick] = React.useState(0);
 
   React.useEffect(() => {
+    paymentWorkflowClient
+      .refresh()
+      .then(() => {
+        store.reconcileDualLedgers();
+        setRefreshTick((t) => t + 1);
+      })
+      .catch(() => {
+        store.reconcileDualLedgers();
+      });
+  }, []);
+
+  React.useEffect(() => {
     store.reconcileDualLedgers();
   }, [refreshTick]);
 
@@ -67,7 +80,7 @@ export default function FinanceReportsPage() {
 
   const dateRange = getDateRangeForPeriod(period, customStart, customEnd);
 
-  const allUnifiedPayments = React.useMemo(() => {
+  const allUnifiedPayments = (() => {
     store.reconcileDualLedgers();
     const map = new Map<string, Payment>();
 
@@ -108,7 +121,7 @@ export default function FinanceReportsPage() {
     }
 
     return Array.from(map.values());
-  }, [refreshTick]);
+  })();
 
   // Filtered Payments & Expenses for Selected Temporal Range
   const filteredPayments = React.useMemo(() => {
@@ -117,11 +130,11 @@ export default function FinanceReportsPage() {
     );
   }, [allUnifiedPayments, dateRange.start, dateRange.end]);
 
-  const filteredExpenses = React.useMemo(() => {
+  const filteredExpenses = (() => {
     return (store.expenses || []).filter((e) =>
       isDateInRange(e.expense_date, dateRange.start, dateRange.end)
     );
-  }, [dateRange.start, dateRange.end, refreshTick]);
+  })();
 
   // Aggregated Period Metrics
   const periodCollections = React.useMemo(() => {
@@ -136,9 +149,9 @@ export default function FinanceReportsPage() {
 
   const netCashFlow = periodCollections - periodExpenses;
 
-  const totalOutstanding = React.useMemo(() => {
+  const totalOutstanding = (() => {
     return (store.feeAccounts || []).reduce((sum, f) => sum + safeAmount(f.outstanding_amount), 0);
-  }, [refreshTick]);
+  })();
 
   // Course-wise Revenue Contribution Map for Period
   const courseRevenueMap = React.useMemo(() => {

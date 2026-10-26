@@ -1,0 +1,143 @@
+{
+  "base": "http://localhost:3001",
+  "mode": "isolated local synthetic adapter; NOT verified Supabase staging",
+  "logins": [
+    {
+      "role": "super_admin",
+      "success": true,
+      "path": "/dashboard"
+    }
+  ],
+  "results": [
+    {
+      "route": "/students",
+      "target": "/students",
+      "role": "super_admin",
+      "errors": [],
+      "viewports": [
+        {
+          "width": 375,
+          "documentWidth": 375,
+          "overflow": false,
+          "mainWidth": 375,
+          "mainScrollWidth": 375,
+          "candidates": [],
+          "drawer": true,
+          "screenshot": "_students-375.png"
+        },
+        {
+          "width": 768,
+          "documentWidth": 768,
+          "overflow": false,
+          "mainWidth": 768,
+          "mainScrollWidth": 768,
+          "candidates": [],
+          "drawer": true,
+          "screenshot": "_students-768.png"
+        },
+        {
+          "width": 1366,
+          "documentWidth": 1366,
+          "overflow": false,
+          "mainWidth": 1110,
+          "mainScrollWidth": 1110,
+          "candidates": [],
+          "drawer": null,
+          "screenshot": "_students-1366.png"
+        },
+        {
+          "width": 1440,
+          "documentWidth": 1440,
+          "overflow": false,
+          "mainWidth": 1184,
+          "mainScrollWidth": 1184,
+          "candidates": [],
+          "drawer": null,
+          "screenshot": "_students-1440.png"
+        }
+      ],
+      "http": 200,
+      "finalPath": "/students",
+      "headings": [
+        "NEXT-GEN ERP",
+        "NEXT-GEN ERP",
+        "Student Directory (360° Management)"
+      ],
+      "notFound": false,
+      "alerts": [
+        ""
+      ],
+      "session": {
+        "storedRole": null,
+        "header": "Verify Certificate\nStudent Portal\nR\n\nRajesh Sharma (Director)\n\nSuper Admin\n\nSign Out"
+      },
+      "pass": true
+    },
+    {
+      "route": "/students/[id]",
+      "target": "/students/stu-01",
+      "role": "super_admin",
+      "errors": [],
+      "viewports": [
+        {
+          "width": 375,
+          "documentWidth": 375,
+          "overflow": false,
+          "mainWidth": 375,
+          "mainScrollWidth": 375,
+          "candidates": [],
+          "drawer": true,
+          "screenshot": "_students__id_-375.png"
+        },
+        {
+          "width": 768,
+          "documentWidth": 768,
+          "overflow": false,
+          "mainWidth": 768,
+          "mainScrollWidth": 768,
+          "candidates": [],
+          "drawer": true,
+          "screenshot": "_students__id_-768.png"
+        },
+        {
+          "width": 1366,
+          "documentWidth": 1366,
+          "overflow": false,
+          "mainWidth": 1110,
+          "mainScrollWidth": 1110,
+          "candidates": [],
+          "drawer": null,
+          "screenshot": "_students__id_-1366.png"
+        },
+        {
+          "width": 1440,
+          "documentWidth": 1440,
+          "overflow": false,
+          "mainWidth": 1184,
+          "mainScrollWidth": 1184,
+          "candidates": [],
+          "drawer": null,
+          "screenshot": "_students__id_-1440.png"
+        }
+      ],
+      "http": 200,
+      "finalPath": "/students/stu-01",
+      "headings": [
+        "NEXT-GEN ERP",
+        "NEXT-GEN ERP",
+        "Amit Gupta",
+        "Academic & Enrollment Snapshot",
+        "Fee Summary"
+      ],
+      "notFound": false,
+      "alerts": [
+        ""
+      ],
+      "session": {
+        "storedRole": null,
+        "header": "Verify Certificate\nStudent Portal\nR\n\nRajesh Sharma (Director)\n\nSuper Admin\n\nSign Out"
+      },
+      "pass": true
+    }
+  ]
+}

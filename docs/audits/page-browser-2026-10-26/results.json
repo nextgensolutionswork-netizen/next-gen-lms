@@ -1,0 +1,892 @@
+{
+  "base": "http://localhost:3000",
+  "auth": [
+    {
+      "role": "super_admin",
+      "success": true,
+      "landing": "/dashboard"
+    },
+    {
+      "role": "student",
+      "success": false,
+      "reason": "Login did not reach an authenticated page"
+    }
+  ],
+  "results": [
+    {
+      "route": "/",
+      "target": "/",
+      "role": "public",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 1085,
+      "httpStatus": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "visibleButtons": 12,
+      "visibleForms": 1,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/assessments",
+      "target": "/academics/assessments",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 2745,
+      "httpStatus": 200,
+      "finalPath": "/academics/assessments",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Assessments & Certification Exams",
+        "SAP FICO Module 1 Certification Assessment",
+        "Question Bank: SAP FICO Module 1 Certification Assessment",
+        "Trainee Exam Attempts Audit Log"
+      ],
+      "visibleButtons": 17,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/assignments",
+      "target": "/academics/assignments",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 1408,
+      "httpStatus": 200,
+      "finalPath": "/academics/assignments",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Assignments & Evaluation Desk",
+        "Company Code & Chart of Accounts Configuration Exercise",
+        "Student Submission Evaluation Queue"
+      ],
+      "visibleButtons": 14,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/attendance",
+      "target": "/academics/attendance",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 2001,
+      "httpStatus": 200,
+      "finalPath": "/academics/attendance",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Attendance Registers & Automated Tracking"
+      ],
+      "visibleButtons": 14,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/batches",
+      "target": "/academics/batches",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 2012,
+      "httpStatus": 200,
+      "finalPath": "/academics/batches",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "SAP Batch Management",
+        "No batches available",
+        "Batch Transfer Audit Trail"
+      ],
+      "visibleButtons": 10,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/courses",
+      "target": "/academics/courses",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 2811,
+      "httpStatus": 200,
+      "finalPath": "/academics/courses",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "SAP Course & Curriculum LMS",
+        "SAP S/4HANA Finance (FICO)",
+        "SAP S/4HANA Materials Management (MM)",
+        "SAP Sales & Distribution (SD)",
+        "SAP ABAP on HANA & RESTful Application Programming (RAP)",
+        "SAP S/4HANA Finance (FICO)"
+      ],
+      "visibleButtons": 52,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/sap-servers",
+      "target": "/academics/sap-servers",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 2494,
+      "httpStatus": 200,
+      "finalPath": "/academics/sap-servers",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "SAP Server Management & Sandbox Allocations",
+        "SAP S/4HANA 2022 FPS02 Enterprise Sandbox",
+        "SAP ECC 6.0 EHP8 Production Simulation"
+      ],
+      "visibleButtons": 26,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/academics/schedule",
+      "target": "/academics/schedule",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 1949,
+      "httpStatus": 200,
+      "finalPath": "/academics/schedule",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Class Schedule & Timetable",
+        "Financial Statement Version (FSV) & General Ledger Configuration",
+        "Purchase Requisition to Purchase Order Workflow & Pricing Schema"
+      ],
+      "visibleButtons": 21,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/approvals",
+      "target": "/accounts/approvals",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 7812,
+      "httpStatus": 200,
+      "finalPath": "/accounts/approvals",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Global LMS Fee Approvals Desk",
+        "0",
+        "13",
+        "0",
+        "13"
+      ],
+      "visibleButtons": 16,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/expenses",
+      "target": "/accounts/expenses",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 5236,
+      "httpStatus": 200,
+      "finalPath": "/accounts/expenses",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Institute Expense & Vendor Outflows",
+        "₹1,11,500",
+        "₹0",
+        "₹0",
+        "₹1,11,500"
+      ],
+      "visibleButtons": 23,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/fees",
+      "target": "/accounts/fees",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 3157,
+      "httpStatus": 200,
+      "finalPath": "/accounts/fees",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Student Fee Accounts Ledger",
+        "₹79,000",
+        "₹39,000",
+        "2 Students"
+      ],
+      "visibleButtons": 17,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/installments",
+      "target": "/accounts/installments",
+      "role": "super_admin",
+      "status": "REDIRECTED",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 6031,
+      "httpStatus": 200,
+      "finalPath": "/accounts/fees",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management"
+    },
+    {
+      "route": "/accounts/payments",
+      "target": "/accounts/payments",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 3232,
+      "httpStatus": 200,
+      "finalPath": "/accounts/payments",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Fee Payments & Verification Desk",
+        "0",
+        "₹0",
+        "3"
+      ],
+      "visibleButtons": 12,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/receipts",
+      "target": "/accounts/receipts",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 7116,
+      "httpStatus": 200,
+      "finalPath": "/accounts/receipts",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Signed Official Receipts Registry",
+        "14",
+        "₹2,62,000",
+        "0"
+      ],
+      "visibleButtons": 52,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/receipts/[id]",
+      "target": "/accounts/receipts/81000000-0000-0000-0000-000000000001",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 3147,
+      "httpStatus": 200,
+      "finalPath": "/accounts/receipts/81000000-0000-0000-0000-000000000001",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Receipt Not Found"
+      ],
+      "visibleButtons": 8,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/reports",
+      "target": "/accounts/reports",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 3136,
+      "httpStatus": 200,
+      "finalPath": "/accounts/reports",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Financial Intelligence & Analytics",
+        "₹83,000",
+        "₹1,11,500",
+        "-₹28,500",
+        "₹39,000",
+        "Course Revenue Contribution",
+        "Payment Mode Distribution"
+      ],
+      "visibleButtons": 11,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/accounts/vendors",
+      "target": "/accounts/vendors",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 3186,
+      "httpStatus": 200,
+      "finalPath": "/accounts/vendors",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Vendor Management",
+        "Amazon Web Services India Pvt Ltd",
+        "Silicon Towers Facilities Management"
+      ],
+      "visibleButtons": 17,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/admissions",
+      "target": "/admissions",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 5374,
+      "httpStatus": 200,
+      "finalPath": "/admissions",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Student Admissions"
+      ],
+      "visibleButtons": 51,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/audit-logs",
+      "target": "/audit-logs",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 2325,
+      "httpStatus": 200,
+      "finalPath": "/audit-logs",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "System Security & Audit Trail"
+      ],
+      "visibleButtons": 31,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/certificate/verify/[id]",
+      "target": "/certificate/verify/CERT-2026-FICO-0091",
+      "role": "public",
+      "status": "ISSUES",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 3443,
+      "httpStatus": 200,
+      "finalPath": "/certificate/verify/CERT-2026-FICO-0091",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Next-Gen ERP Solutions",
+        "Authentic & Verified Certificate",
+        "Next-Gen ERP Solutions",
+        "Amit Gupta"
+      ],
+      "visibleButtons": 4,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": true
+    },
+    {
+      "route": "/certificates",
+      "target": "/certificates",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 3306,
+      "httpStatus": 200,
+      "finalPath": "/certificates",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Course Completion Certificates"
+      ],
+      "visibleButtons": 12,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/crm/followups",
+      "target": "/crm/followups",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 3426,
+      "httpStatus": 200,
+      "finalPath": "/crm/followups",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Follow-ups & Demo Calendar",
+        "Vikas Sharma",
+        "Deepika Reddy"
+      ],
+      "visibleButtons": 26,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/crm/leads",
+      "target": "/crm/leads",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 3394,
+      "httpStatus": 200,
+      "finalPath": "/crm/leads",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "CRM & Lead Management"
+      ],
+      "visibleButtons": 26,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "target": "/dashboard",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 1672,
+      "httpStatus": 200,
+      "finalPath": "/dashboard",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Enterprise Institute Executive Dashboard",
+        "₹0",
+        "₹39,000",
+        "₹0",
+        "0 New Admissions",
+        "Course reconciliation (This Month)",
+        "Recent Admissions",
+        "Recent Payments & Receipts",
+        "Recent Operating Expenses",
+        "Placement Drive Overview"
+      ],
+      "visibleButtons": 20,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/login",
+      "target": "/login",
+      "role": "public",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 1024,
+      "httpStatus": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Build skills.Create your future.",
+        "Sign in to your account"
+      ],
+      "visibleButtons": 12,
+      "visibleForms": 1,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/onboarding",
+      "target": "/onboarding",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 11813,
+      "httpStatus": 200,
+      "finalPath": "/onboarding",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Student Onboarding & Handoff Workspace",
+        "Assigned Onboarding Cases (13)"
+      ],
+      "visibleButtons": 38,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/placement",
+      "target": "/placement",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 2169,
+      "httpStatus": 200,
+      "finalPath": "/placement",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Placement Cell & Corporate Hiring",
+        "SAP FICO Associate Consultant",
+        "SAP MM Functional Analyst",
+        "Student Placement Profiles & Interview Scores"
+      ],
+      "visibleButtons": 21,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/placement/enrollments",
+      "target": "/placement/enrollments",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 3477,
+      "httpStatus": 200,
+      "finalPath": "/placement/enrollments",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Placement Enrollments & Candidate Review",
+        "1",
+        "0",
+        "1",
+        "0",
+        "0"
+      ],
+      "visibleButtons": 9,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/portal",
+      "target": "/portal",
+      "role": "student",
+      "status": "BLOCKED_LOGIN",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 1230,
+      "httpStatus": 200,
+      "finalPath": "/login",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management"
+    },
+    {
+      "route": "/settings",
+      "target": "/settings",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 2477,
+      "httpStatus": 200,
+      "finalPath": "/settings",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Institute System Settings",
+        "Institute Identity & Campus Details",
+        "Financial, Statutory & Regional Localization",
+        "Official Bank & Settlement Accounts",
+        "Automated Multi-Channel Notifications",
+        "Supabase PostgreSQL EngineLive PostgreSQL Connected"
+      ],
+      "visibleButtons": 10,
+      "visibleForms": 1,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/students",
+      "target": "/students",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 4949,
+      "httpStatus": 200,
+      "finalPath": "/students",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Student Directory (360° Management)"
+      ],
+      "visibleButtons": 14,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/students/[id]",
+      "target": "/students/stu-01",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 5733,
+      "httpStatus": 200,
+      "finalPath": "/students/stu-01",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP"
+      ],
+      "visibleButtons": 7,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/support",
+      "target": "/support",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 5178,
+      "httpStatus": 200,
+      "finalPath": "/support",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Academic & Technical Support Desk",
+        "2",
+        "1",
+        "1",
+        "0",
+        "Error F5151: Company code 1000 is not defined in transaction FB50"
+      ],
+      "visibleButtons": 15,
+      "visibleForms": 1,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/todos",
+      "target": "/todos",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [],
+      "loadMs": 6984,
+      "httpStatus": 200,
+      "finalPath": "/todos",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "Postgres Database Diagnostic Console"
+      ],
+      "visibleButtons": 0,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    },
+    {
+      "route": "/users",
+      "target": "/users",
+      "role": "super_admin",
+      "status": "PASS_SMOKE",
+      "errors": [],
+      "apiFailures": [],
+      "interactions": [
+        {
+          "control": "Search",
+          "outcome": "Accepts input; cleared after check"
+        }
+      ],
+      "loadMs": 6661,
+      "httpStatus": 200,
+      "finalPath": "/users",
+      "title": "Next-Gen ERP LMS | Enterprise Training & Institute Management",
+      "headings": [
+        "NEXT-GEN ERP",
+        "Faculty & Staff RBAC Administration"
+      ],
+      "visibleButtons": 52,
+      "visibleForms": 0,
+      "desktopOverflow": false,
+      "mobileOverflow": false
+    }
+  ]
+}

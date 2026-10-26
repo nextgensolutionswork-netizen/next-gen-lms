@@ -1,0 +1,1 @@
+PASS: migration, stale-write conflict, rollback, LMS gate, tenant RLS, profile authority, and private proof policies. Executed against frozen 0000e5e source using local PGlite; exit 0. No live Supabase accessed.

@@ -1,0 +1,38 @@
+[
+  {
+    "width": 375,
+    "controls": [
+      "C1274",
+      "C1275",
+      "C1265"
+    ],
+    "result": "PASS: show/hide, forgot open, back; keyboard activation; no recovery submission"
+  },
+  {
+    "width": 768,
+    "controls": [
+      "C1274",
+      "C1275",
+      "C1265"
+    ],
+    "result": "PASS: show/hide, forgot open, back; keyboard activation; no recovery submission"
+  },
+  {
+    "width": 1366,
+    "controls": [
+      "C1274",
+      "C1275",
+      "C1265"
+    ],
+    "result": "PASS: show/hide, forgot open, back; keyboard activation; no recovery submission"
+  },
+  {
+    "width": 1920,
+    "controls": [
+      "C1274",
+      "C1275",
+      "C1265"
+    ],
+    "result": "PASS: show/hide, forgot open, back; keyboard activation; no recovery submission"
+  }
+]

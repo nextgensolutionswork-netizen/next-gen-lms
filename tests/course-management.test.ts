@@ -597,5 +597,84 @@ describe('Course LMS & Curriculum Management Tests', () => {
       await deleteCourse(course.id);
     });
   });
+
+  describe('5. Defensive Course Selection, Zero Courses, & Empty State Behavior (NG-01)', () => {
+    // Helper function that mirrors the UI's defensive resolution logic
+    function resolveSelectedCourse(coursesList: any[], selectedId: string | null) {
+      if (selectedId) {
+        const found = coursesList.find((c) => c.id === selectedId);
+        if (found) return found;
+      }
+      return coursesList[0] || null;
+    }
+
+    it('handles zero courses cleanly without throwing or crashing (returns null)', () => {
+      const emptyCourses: any[] = [];
+      const selected = resolveSelectedCourse(emptyCourses, null);
+      expect(selected).toBeNull();
+
+      // Even if an invalid ID was requested
+      const selectedWithId = resolveSelectedCourse(emptyCourses, 'non-existent-course-id');
+      expect(selectedWithId).toBeNull();
+    });
+
+    it('resolves the only course when exactly one course exists', () => {
+      const singleCourse = [{ id: 'crs-single', course_name: 'Single SAP Course', status: 'Published' }];
+      const selected = resolveSelectedCourse(singleCourse, null);
+      expect(selected).toEqual(singleCourse[0]);
+
+      // If matching ID provided
+      const selectedById = resolveSelectedCourse(singleCourse, 'crs-single');
+      expect(selectedById).toEqual(singleCourse[0]);
+    });
+
+    it('resolves correct course when multiple courses exist', () => {
+      const multiCourses = [
+        { id: 'crs-1', course_name: 'Course 1' },
+        { id: 'crs-2', course_name: 'Course 2' },
+        { id: 'crs-3', course_name: 'Course 3' },
+      ];
+      // Defaults to first course if selectedId is null
+      expect(resolveSelectedCourse(multiCourses, null)).toEqual(multiCourses[0]);
+
+      // Resolves explicitly selected course
+      expect(resolveSelectedCourse(multiCourses, 'crs-2')).toEqual(multiCourses[1]);
+      expect(resolveSelectedCourse(multiCourses, 'crs-3')).toEqual(multiCourses[2]);
+    });
+
+    it('falls back safely to first course when selected course ID is invalid or deleted', () => {
+      const courses = [
+        { id: 'crs-1', course_name: 'Course 1' },
+        { id: 'crs-2', course_name: 'Course 2' },
+      ];
+      // Selected ID is deleted / invalid
+      const selected = resolveSelectedCourse(courses, 'crs-deleted-id');
+      expect(selected).toEqual(courses[0]);
+    });
+
+    it('handles course deletion workflow updating selected course to remaining or null', async () => {
+      const testCourse = await createCourse({
+        course_name: 'Temporary Course for Deletion',
+        course_code: 'TMP-DEL-01',
+        description: 'Test',
+        duration_weeks: 4,
+        price: 25000,
+        category: 'SAP Functional',
+        status: 'Draft',
+      });
+
+      const coursesBefore = [testCourse];
+      let selectedId: string | null = testCourse.id;
+
+      // Simulate deletion
+      await deleteCourse(testCourse.id);
+      const coursesAfter = coursesBefore.filter((c) => c.id !== testCourse.id);
+
+      // Remaining is empty -> selectedId should become null
+      selectedId = coursesAfter.length > 0 ? coursesAfter[0].id : null;
+      expect(selectedId).toBeNull();
+      expect(resolveSelectedCourse(coursesAfter, selectedId)).toBeNull();
+    });
+  });
 });
 

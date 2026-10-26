@@ -196,7 +196,7 @@ describe('Domain 4: Student Learning Portal Hardening & Edge Cases', () => {
       expect(res.headers.get('location')).toBeNull();
     });
 
-    it('allows student session to access /accounts/receipts path without trailing slash', async () => {
+    it('strictly bounces student session from global /accounts/receipts registry to /portal', async () => {
       const studentPayload = {
         id: 'usr-student-portal',
         email: 'student.portal@lms.internal',
@@ -205,8 +205,9 @@ describe('Domain 4: Student Learning Portal Hardening & Edge Cases', () => {
       const req = createMockRequest('http://localhost:3000/accounts/receipts', studentPayload);
       const res = await middleware(req);
 
-      expect(res.status).toBe(200);
-      expect(res.headers.get('location')).toBeNull();
+      expect(res.status).toBe(307);
+      const location = res.headers.get('location');
+      expect(location).toContain('/portal');
     });
 
     it('strictly bounces student session from /accounts/fees back to /portal', async () => {

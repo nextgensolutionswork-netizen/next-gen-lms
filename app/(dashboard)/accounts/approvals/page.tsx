@@ -47,6 +47,11 @@ import {
   PaymentMethod,
 } from '@/types';
 import { formatINR } from '@/lib/utils/formatters';
+import { feeCourseName } from '@/lib/utils/fee-course';
+
+function courseLabel(fee: StudentFee) {
+  return feeCourseName(fee, store.courses || [], store.feeAccounts || [], store.admissions || []);
+}
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -230,7 +235,7 @@ export default function FeeApprovalsPage() {
         const q = searchQuery.toLowerCase();
         const matchesName = fee.student_name?.toLowerCase().includes(q);
         const matchesCode = fee.student_code?.toLowerCase().includes(q);
-        const matchesCourse = fee.course_name?.toLowerCase().includes(q) || fee.sap_module?.toLowerCase().includes(q);
+        const matchesCourse = courseLabel(fee).toLowerCase().includes(q);
         const matchesCategory = fee.fee_category?.toLowerCase().includes(q);
         const matchesCounsellor = fee.counsellor_name?.toLowerCase().includes(q);
         if (!matchesName && !matchesCode && !matchesCourse && !matchesCategory && !matchesCounsellor) {
@@ -1056,8 +1061,8 @@ export default function FeeApprovalsPage() {
                         {/* Course & Batch */}
                         <td className="px-4 py-3 text-slate-600">
                           <div className="max-w-[180px]">
-                            <p className="font-semibold text-slate-800 truncate" title={fee.course_name}>
-                              {fee.course_name || fee.sap_module || 'General ERP'}
+                            <p className="font-semibold text-slate-800 truncate" title={courseLabel(fee)}>
+                              {courseLabel(fee)}
                             </p>
                             <p className="text-[10px] text-slate-400 truncate">
                               {fee.batch_name || 'Direct Enrollment'}
@@ -1657,7 +1662,7 @@ export default function FeeApprovalsPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Course / Module:</span>
-                <span className="text-slate-800">{selectedFee.course_name || selectedFee.sap_module}</span>
+                <span className="text-slate-800">{courseLabel(selectedFee)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Counsellor:</span>
@@ -1868,7 +1873,7 @@ export default function FeeApprovalsPage() {
               </label>
               {isResubmitting && selectedFee ? (
                 <div className="p-2 border border-slate-200 bg-slate-100 rounded-lg text-slate-800 font-medium">
-                  {selectedFee.student_name} ({selectedFee.student_code} - {selectedFee.course_name})
+                  {selectedFee.student_name} ({selectedFee.student_code} - {courseLabel(selectedFee)})
                   <span className="text-[10px] text-slate-500 block">Student locked during correction resubmission</span>
                 </div>
               ) : (
@@ -2619,7 +2624,7 @@ export default function FeeApprovalsPage() {
                 .filter((f) => f.approval_status === 'Approved' && f.outstanding_amount > 0)
                 .map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.student_name} ({f.admission_number || f.student_code}) — {f.course_name || f.fee_category} [Due: {formatINR(f.outstanding_amount)}]
+                    {f.student_name} ({f.admission_number || f.student_code}) — {courseLabel(f)} [Due: {formatINR(f.outstanding_amount)}]
                   </option>
                 ))}
             </select>

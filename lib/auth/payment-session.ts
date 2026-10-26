@@ -41,8 +41,25 @@ export async function authenticatePaymentRequest(request: NextRequest): Promise<
       : parsedCookie && signature && await verifyAuthCookieSignature(parsedCookie, signature) ? parsedCookie : null;
     if (!signedValue) throw new Error('Unauthorized: Signed session required.');
     const decoded = JSON.parse(decodeURIComponent(signedValue));
-    const targetId = (decoded.payload || decoded).id;
-    const matchedUser = store.users.find((u) => u.id === targetId);
+    const targetPayload = decoded.payload || decoded;
+    const targetId = targetPayload.id;
+    const targetEmail = targetPayload.email;
+    let matchedUser = store.users.find((u) => u.id === targetId || (targetEmail && u.email?.toLowerCase() === targetEmail.toLowerCase()));
+    if (!matchedUser && isLiveSupabaseEnabled()) {
+      try {
+        const adminClient = createAdminClient();
+        let query = adminClient.from('profiles').select('*');
+        if (targetId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)) {
+          query = query.eq('id', targetId);
+        } else if (targetEmail) {
+          query = query.eq('email', targetEmail.toLowerCase());
+        }
+        const { data: profile } = await query.maybeSingle();
+        if (profile) {
+          matchedUser = profile as UserProfile;
+        }
+      } catch {}
+    }
     if (!matchedUser) {
       throw new Error('Unauthorized: Unknown or unverified user profile.');
     }

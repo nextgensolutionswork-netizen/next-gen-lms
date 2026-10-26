@@ -20,25 +20,38 @@ import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { amountToWordsINR } from '@/lib/services/finance-formatters';
 import { useAuth } from '@/components/providers/auth-provider';
 
-export default function ReceiptPrintPage() {
-  const { user, role } = useAuth();
-  const params = useParams();
-  const id = params?.id as string;
-  const [, refresh] = React.useState(0);
-  React.useEffect(() => {
-    if (!user) return;
-    fetch('/api/fees/receipts', { cache: 'no-store' }).then((res) => res.json()).then((data) => { if (data.success) { mergeWorkflowSnapshot(data.snapshot); refresh((n) => n + 1); } }).catch(() => {});
-  }, [id, user?.id]);
+import { tenantId } from '@/lib/auth/tenant';
+import { useRecordLoad } from '@/lib/hooks/use-record-load';
+import type { Receipt } from '@/types';
 
-  const receipt = (store.receipts || []).find(
-    (r) => r.id === id || r.receipt_number === id || r.payment_id === id
+export default function ReceiptPrintPage() {
+  const { user, role, isLoading: authLoading } = useAuth();
+  const params = useParams();
+  const id = typeof params?.id === 'string' ? params.id : '';
+  const loadReceipt = React.useCallback(async (signal: AbortSignal) => {
+    const response = await fetch('/api/fees/receipts', { cache: 'no-store', signal });
+    if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'Receipt access denied. Sign in with an authorized account.' : 'Unable to load receipts. Please retry.');
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.snapshot?.receipts)) throw new Error('Unable to verify this receipt. Please retry.');
+    if (signal.aborted) return null;
+    mergeWorkflowSnapshot(data.snapshot);
+    // Only the authorized response is authoritative; never render a cached fallback.
+    return (data.snapshot.receipts as Receipt[]).find((r) => r.id === id || r.receipt_number === id || r.payment_id === id) || null;
+  }, [id]);
+  const { data: receipt, status, error, reload } = useRecordLoad<Receipt>(
+    !authLoading && user?.id && id ? `${user.id}:${id}` : null, loadReceipt
   );
 
+  if (!authLoading && !user) return <p role="alert">Please sign in to view this receipt.</p>;
+  if (status === 'loading') return <p role="status" className="p-8 text-center">Loading authorized receipt…</p>;
+  if (status === 'error') return <div className="p-8 text-center space-y-3"><p role="alert">{error}</p><Button onClick={() => void reload()}>Retry loading receipt</Button></div>;
+
+  // Nonexistent receipt: return clear 404 empty state, NEVER fall back to another receipt
   if (!receipt) {
     return (
       <div className="max-w-md mx-auto my-16 text-center space-y-4">
         <div className="h-12 w-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-          <ShieldCheck className="h-6 w-6" />
+          <ShieldAlert className="h-6 w-6" />
         </div>
         <h2 className="text-lg font-bold text-slate-900">Receipt Not Found</h2>
         <p className="text-xs text-slate-500">
@@ -55,8 +68,55 @@ export default function ReceiptPrintPage() {
     );
   }
 
-  // Student ownership security validation
-  if (role === 'student' && user) {
+  // Role authorization: only authorized staff and students may view receipts
+  const isAuthorizedStaff = ['super_admin', 'admin', 'accountant', 'counsellor'].includes(role || '');
+  const isStudent = role === 'student';
+
+  if (!isAuthorizedStaff && !isStudent) {
+    return (
+      <div className="max-w-md mx-auto my-16 text-center space-y-4">
+        <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Access Restricted</h2>
+        <p className="text-xs text-slate-500">
+          Your role ({role || 'Guest'}) does not have permission to view institutional fee receipts.
+        </p>
+        <div className="pt-2">
+          <Link href="/dashboard">
+            <Button variant="sap" size="sm" className="text-xs">
+              Return to Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Cross-tenant boundary check: deny access if receipt belongs to another tenant
+  if (role !== 'super_admin' && user && tenantId(receipt) !== tenantId(user)) {
+    return (
+      <div className="max-w-md mx-auto my-16 text-center space-y-4">
+        <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Cross-Tenant Access Denied</h2>
+        <p className="text-xs text-slate-500">
+          This receipt belongs to another institutional tenant and cannot be accessed.
+        </p>
+        <div className="pt-2">
+          <Link href={role === 'student' ? '/portal' : '/dashboard'}>
+            <Button variant="sap" size="sm" className="text-xs">
+              Return to Portal
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Student ownership security validation: students can only view their own receipts
+  if (isStudent && user) {
     const currentStudent = (store.students || []).find(
       (s) => s.user_id === user.id || s.id === user.id || s.email?.toLowerCase() === user.email?.toLowerCase()
     );
@@ -65,13 +125,13 @@ export default function ReceiptPrintPage() {
       receipt.student_id === user.id ||
       (currentStudent && receipt.student_id === currentStudent.id) ||
       (receipt.student_email && receipt.student_email.toLowerCase() === user.email?.toLowerCase()) ||
-      (receiptStudent && receiptStudent.email?.toLowerCase() === user.email?.toLowerCase());
+      (receiptStudent && (receiptStudent.user_id === user.id || receiptStudent.email?.toLowerCase() === user.email?.toLowerCase()));
 
     if (!isOwnReceipt) {
       return (
         <div className="max-w-md mx-auto my-16 text-center space-y-4">
           <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
-            <ShieldCheck className="h-6 w-6" />
+            <ShieldAlert className="h-6 w-6" />
           </div>
           <h2 className="text-lg font-bold text-slate-900">Access Restricted</h2>
           <p className="text-xs text-slate-500">

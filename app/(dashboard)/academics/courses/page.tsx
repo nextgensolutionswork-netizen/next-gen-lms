@@ -39,6 +39,7 @@ import { store } from '@/lib/services/data-store';
 import { Course, CourseModule, Lesson, LessonType } from '@/types';
 import { useAuth } from '@/components/providers/auth-provider';
 import {
+  getCourses,
   createCourse,
   updateCourse,
   deleteCourse,
@@ -58,6 +59,27 @@ export default function CoursesPage() {
   const { user, role, hasPermission } = useAuth();
   const [courses, setCourses] = React.useState<Course[]>(store.courses);
   const [selectedCourseId, setSelectedCourseId] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchCourses = React.useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await getCourses();
+      setCourses(data);
+    } catch (err: any) {
+      console.error('Failed to load courses:', err);
+      setError(err?.message || 'Failed to load courses. Please try again.');
+      setCourses([...store.courses]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
 
   // RBAC Course Scoping: Trainers only see assigned courses; Admins see all.
   const allowedCourses = React.useMemo(() => {
@@ -161,8 +183,7 @@ export default function CoursesPage() {
   const [editContentUrl, setEditContentUrl] = React.useState('');
   const [editIsPublished, setEditIsPublished] = React.useState(true);
 
-  const refreshData = () => {
-    setCourses([...store.courses]);
+  const refreshCurriculum = React.useCallback(() => {
     if (selectedCourse) {
       const cMods = store.modules
         .filter((m) => m.course_id === selectedCourse.id)
@@ -176,11 +197,16 @@ export default function CoursesPage() {
       setModules([]);
       setLessons([]);
     }
+  }, [selectedCourse]);
+
+  const refreshData = () => {
+    setCourses([...store.courses]);
+    refreshCurriculum();
   };
 
   React.useEffect(() => {
-    refreshData();
-  }, [selectedCourse, courses]);
+    refreshCurriculum();
+  }, [refreshCurriculum, courses]);
 
   // Curriculum Review Approval Workflows
   const handleSubmitForReview = async () => {
@@ -285,9 +311,11 @@ export default function CoursesPage() {
   // Delete Course Handler
   const handleDeleteCourse = async () => {
     if (!selectedCourse || !canDeleteCourse) return;
-    await deleteCourse(selectedCourse.id);
+    const deletedId = selectedCourse.id;
+    await deleteCourse(deletedId);
     setIsDeleteCourseModal(false);
-    setSelectedCourseId(null);
+    const remaining = allowedCourses.filter((c) => c.id !== deletedId);
+    setSelectedCourseId(remaining.length > 0 ? remaining[0].id : null);
     refreshData();
   };
 
@@ -453,6 +481,24 @@ export default function CoursesPage() {
         </div>
       )}
 
+      {/* Error & Loading States */}
+      {error && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <ShieldAlert className="h-4 w-4 text-rose-600 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => fetchCourses()} className="text-xs h-7">
+            Retry
+          </Button>
+        </div>
+      )}
+      {isLoading && (
+        <div className="p-4 text-center text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl">
+          Loading course catalog and curriculum data...
+        </div>
+      )}
+
       {/* Course Selector Tabs */}
       {allowedCourses.length === 0 ? (
         <Card className="border-dashed">
@@ -518,7 +564,8 @@ export default function CoursesPage() {
       )}
 
       {/* Course Curriculum Tree */}
-      <Card>
+      {selectedCourse && (
+        <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
@@ -949,6 +996,7 @@ export default function CoursesPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* CREATE COURSE MODAL */}
       <Modal
