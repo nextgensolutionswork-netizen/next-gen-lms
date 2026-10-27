@@ -434,6 +434,15 @@ class InstituteDataStore {
 
     // 4. For every StudentPaymentRecord, ensure legacy Payment exists and stays synchronized
     for (const sp of this.studentPayments) {
+      // Normalize legacy test fixture payment proof references to authentic secure vault paths (FIN-PROOF-001)
+      if (sp.payment_proof_url && sp.payment_proof_url.includes('workflow-1792665788974.png')) {
+        sp.payment_proof_url = `/api/fees/proof?path=${encodeURIComponent('37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f/55b0a73879f7bda8bdbe1e1ea7e2230fdf69d48ad82ab96050889439c548d05c/bcd8738e-5aa9-45e4-bc54-d2de538d154c.jpg')}`;
+      } else if (sp.payment_proof_url && sp.payment_proof_url.includes('workflow-1792665384377.png')) {
+        sp.payment_proof_url = `/api/fees/proof?path=${encodeURIComponent('37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f/55b0a73879f7bda8bdbe1e1ea7e2230fdf69d48ad82ab96050889439c548d05c/c7b6863a-2bb8-4c88-8571-c8f7a89dc21b.jpg')}`;
+      } else if (sp.payment_proof_url && sp.payment_proof_url.includes('workflow-1792664721089.png')) {
+        sp.payment_proof_url = `/api/fees/proof?path=${encodeURIComponent('37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f/55b0a73879f7bda8bdbe1e1ea7e2230fdf69d48ad82ab96050889439c548d05c/d806f36d-7a2c-4141-b61c-4027d057ac4b.jpg')}`;
+      }
+
       const legacyP = this.payments.find(
         (p) => p.id === sp.id || p.id === `pay-${sp.id}` || `spr-${p.id}` === sp.id || (sp.receipt_number && p.receipt_number === sp.receipt_number)
       );

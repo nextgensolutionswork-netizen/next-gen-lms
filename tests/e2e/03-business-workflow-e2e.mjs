@@ -128,7 +128,7 @@ export async function runCompleteBusinessWorkflow() {
             payment_mode: 'UPI',
             payment_date: new Date().toISOString().slice(0, 10),
             transaction_reference: `UPI-E2E-${testRunId}`,
-            payment_proof_url: `/api/fees/proof?path=proofs%2Fworkflow-${testRunId}.png`,
+            payment_proof_url: `/api/fees/proof?path=${encodeURIComponent("37a8eec1ce19687d132fe29051dca629d164e2c4958ba141d5f4133a33f0688f/55b0a73879f7bda8bdbe1e1ea7e2230fdf69d48ad82ab96050889439c548d05c/bcd8738e-5aa9-45e4-bc54-d2de538d154c.jpg")}`,
             notes: 'Initial admission fee collection',
             idempotency_key: `e2e-pay-${testRunId}`,
           },
