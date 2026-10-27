@@ -414,8 +414,8 @@ export function generateReceiptsExcelXml(receipts: Receipt[]): string {
       { header: 'Payment Mode', width: 18 }, { header: 'Reference', width: 24 },
       { header: 'Status', width: 14 },
     ],
-    rows: receipts.map(r => [r.receipt_number, r.student_name, r.course_name, r.payment_date,
-      r.payment_amount, r.remaining_balance, r.payment_mode, r.transaction_reference || '', r.status || 'Valid']),
+    rows: receipts.map(r => [r.receipt_number, r.student_name, r.course_name, r.payment_date || (r as any).receipt_date || '',
+      r.payment_amount ?? (r as any).amount ?? 0, r.remaining_balance ?? 0, r.payment_mode, r.transaction_reference || '', r.status || 'Valid']),
   }]);
 }
 export function exportReceiptsToExcel(receipts: Receipt[]): void {

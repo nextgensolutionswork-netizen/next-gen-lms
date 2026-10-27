@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const actor = await authenticatePaymentRequest(request);
     if (!['student', 'counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role)) return NextResponse.json({ success: false }, { status: 403 });
     const snapshot = await paymentTransaction(actor, () => {
+      store.reconcileDualLedgers();
       const students = store.students.filter((s) => tenantId(s) === tenantId(actor) && (actor.role !== 'student' || s.user_id === actor.id));
       return { students, receipts: store.receipts.filter((r) => tenantId(r) === tenantId(actor) && students.some((s) => s.id === r.student_id)) };
     }, true);

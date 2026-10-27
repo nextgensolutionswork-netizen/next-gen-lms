@@ -416,6 +416,83 @@ class InstituteDataStore {
         student.outstanding_amount = Math.max(0, studentFeeAcc.net_payable - studentPaid);
       }
     }
+
+    // 6. Normalize and reconcile Receipts across SQL schemas and workflow state (FIN-REC-001)
+    if (!this.receipts) this.receipts = [];
+    for (const r of this.receipts as any[]) {
+      // Normalize payment amount across database column amount and workflow property payment_amount
+      if (r.payment_amount === undefined || r.payment_amount === null || isNaN(r.payment_amount)) {
+        const linkedP = this.payments.find((p) => p.id === r.payment_id || p.receipt_number === r.receipt_number);
+        const linkedSp = this.studentPayments.find((sp) => sp.id === r.payment_id || sp.receipt_number === r.receipt_number);
+        r.payment_amount = r.amount ?? linkedP?.amount ?? linkedSp?.amount_paid ?? 0;
+      }
+      if (r.amount === undefined || r.amount === null) {
+        r.amount = r.payment_amount;
+      }
+      // Normalize payment date and receipt date
+      if (!r.payment_date) {
+        const linkedP = this.payments.find((p) => p.id === r.payment_id || p.receipt_number === r.receipt_number);
+        r.payment_date = r.receipt_date || linkedP?.payment_date || r.created_at?.split('T')[0] || new Date().toISOString().split('T')[0];
+      }
+      if (!r.receipt_date) {
+        r.receipt_date = r.payment_date;
+      }
+      // Normalize admission number and student code
+      if (!r.admission_number || r.admission_number === '—') {
+        const student = (this.students || []).find((s) => s.id === r.student_id);
+        r.admission_number = r.student_code || student?.admission_number || student?.student_code || student?.id || '—';
+      }
+      if (!r.student_code) {
+        r.student_code = r.admission_number;
+      }
+      // Normalize authorizer and issuer
+      if (!r.authorized_by) {
+        const issuer = (this.users || []).find((u) => u.id === r.issued_by);
+        r.authorized_by = (issuer as any)?.name || issuer?.full_name || (r.issued_by ? `Finance Officer (${r.issued_by.slice(0, 8)})` : 'Suresh Kumar (Chief Accountant)');
+      }
+      // Normalize remaining balance
+      if (r.remaining_balance === undefined || r.remaining_balance === null) {
+        const student = (this.students || []).find((s) => s.id === r.student_id);
+        const feeAcc = (this.feeAccounts || []).find((fa) => fa.student_id === r.student_id);
+        const sf = (this.studentFees || []).find((f) => f.student_id === r.student_id);
+        r.remaining_balance = student?.outstanding_amount ?? feeAcc?.outstanding_amount ?? sf?.outstanding_amount ?? 0;
+      }
+      // Normalize institute details
+      if (!r.institute_name) r.institute_name = this.settings?.institute_name || 'Next-Gen ERP Solutions';
+      if (!r.institute_address) r.institute_address = this.settings?.address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081';
+      if (!r.institute_phone) r.institute_phone = this.settings?.phone || '+91 98765 43210';
+    }
+    // Generate missing receipt objects for verified payments
+    for (const p of this.payments.filter((p) => p.status === 'Success' && p.receipt_number)) {
+      if (!this.receipts.some((r) => r.receipt_number === p.receipt_number || r.payment_id === p.id)) {
+        const student = (this.students || []).find((s) => s.id === p.student_id);
+        const feeAcc = (this.feeAccounts || []).find((fa) => fa.id === p.fee_account_id || fa.student_id === p.student_id);
+        this.receipts.push({
+          tenant_id: p.tenant_id,
+          id: `rcpt-${p.id}`,
+          receipt_number: p.receipt_number,
+          payment_id: p.id,
+          student_id: p.student_id,
+          student_name: p.student_name || (student as any)?.name || student?.full_name || 'Student',
+          admission_number: p.admission_number || student?.admission_number || '—',
+          student_code: p.admission_number || student?.admission_number || '—',
+          course_name: p.course_name || feeAcc?.course_name || 'SAP Course',
+          payment_amount: p.amount,
+          amount: p.amount,
+          payment_mode: p.payment_mode,
+          transaction_reference: p.transaction_reference || '—',
+          payment_date: p.payment_date,
+          receipt_date: p.payment_date,
+          remaining_balance: student?.outstanding_amount ?? feeAcc?.outstanding_amount ?? 0,
+          authorized_by: p.collected_by_name || 'Accounts Department',
+          institute_name: this.settings?.institute_name || 'Next-Gen ERP Solutions',
+          institute_address: this.settings?.address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
+          institute_phone: this.settings?.phone || '+91 98765 43210',
+          institute_gst: '',
+          created_at: p.created_at || new Date().toISOString(),
+        });
+      }
+    }
   }
 
   public persist(): void {
