@@ -160,6 +160,42 @@ export default function ReceiptPrintPage() {
   const instituteAddress = receipt.institute_address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081';
   const institutePhone = receipt.institute_phone || '+91 98765 43210';
 
+  // Financial completeness guard:
+  // An official fee receipt must have a valid positive payment amount, student name, and receipt number.
+  // Incomplete financial records (such as zero-amount or unverified payments) must never appear as finalized receipts.
+  const isComplete = paymentAmount > 0 && Boolean(receipt.student_name) && Boolean(receipt.receipt_number);
+
+  if (!isComplete) {
+    return (
+      <div className="max-w-xl mx-auto my-12 space-y-4 print:hidden" role="alert">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-center space-y-3">
+          <div className="h-12 w-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+            <ShieldAlert className="h-6 w-6" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900">Incomplete Financial Record</h2>
+          <p className="text-xs text-amber-900 max-w-md mx-auto">
+            This fee receipt record (&ldquo;{receipt.receipt_number || id}&rdquo;) contains unverified or incomplete financial data (Payment Amount: {formatINR(paymentAmount)}).
+          </p>
+          <div className="p-3 bg-white rounded-lg border border-amber-200 text-xs text-left max-w-sm mx-auto space-y-1 text-slate-700">
+            <p className="font-semibold text-slate-900">Official Receipt Restrictions:</p>
+            <p>• Official fee receipts cannot be finalized or issued with zero or unverified payment amounts.</p>
+            <p>• Printing and PDF downloads are strictly disabled until payment clearance.</p>
+          </div>
+          <div className="pt-2 flex justify-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => void reload()} className="text-xs">
+              Retry Verification
+            </Button>
+            <Link href={role === 'student' ? '/portal' : '/accounts/receipts'}>
+              <Button variant="sap" size="sm" className="text-xs">
+                {role === 'student' ? 'Back to Student Portal' : 'Back to Receipts Registry'}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const pdfUrl = `/api/receipts/${receipt.id}/pdf`;
 
   const handlePrint = () => {

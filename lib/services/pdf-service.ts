@@ -26,8 +26,8 @@ function receiptNumber(value: unknown): number | null {
 export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer> {
   const paymentAmount = receiptNumber(receipt.payment_amount);
   const remainingBalance = receiptNumber(receipt.remaining_balance);
-  if (paymentAmount === null) {
-    throw new ReceiptPdfDataError(`Receipt ${receipt.receipt_number} has no valid payment amount. Correct the receipt or its linked payment before downloading.`);
+  if (paymentAmount === null || paymentAmount <= 0) {
+    throw new ReceiptPdfDataError(`Receipt ${receipt.receipt_number || 'N/A'} has no valid payment amount. Incomplete or zero-amount receipts cannot be generated or downloaded.`);
   }
   // Legacy/imported receipts may omit institute details despite the static type.
   // PDFKit calls valueOf() on every metadata value during construction.
