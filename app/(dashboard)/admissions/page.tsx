@@ -160,6 +160,7 @@ export default function AdmissionsPage() {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      setSearch(params.get('search') || '');
       const leadId = params.get('convertLeadId');
       if (leadId) {
         setConvertedLeadId(leadId);
