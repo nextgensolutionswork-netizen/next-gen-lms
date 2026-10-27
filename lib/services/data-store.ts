@@ -175,6 +175,57 @@ class InstituteDataStore {
     if (!this.studentPayments) this.studentPayments = [];
     if (!this.studentFinancialLedgers) this.studentFinancialLedgers = [];
 
+    // 0. Pre-normalize fee accounts across SQL schemas (collected_amount / outstanding_balance) and in-memory types (FIN-LED-002)
+    for (const fa of this.feeAccounts as any[]) {
+      if (fa.paid_amount === undefined || fa.paid_amount === null || isNaN(fa.paid_amount)) {
+        fa.paid_amount = fa.collected_amount !== undefined && fa.collected_amount !== null ? Number(fa.collected_amount) : 0;
+      }
+      if (fa.collected_amount === undefined || fa.collected_amount === null) {
+        fa.collected_amount = fa.paid_amount;
+      }
+      if (fa.outstanding_amount === undefined || fa.outstanding_amount === null || isNaN(fa.outstanding_amount)) {
+        if (fa.outstanding_balance !== undefined && fa.outstanding_balance !== null) {
+          fa.outstanding_amount = Number(fa.outstanding_balance);
+        } else {
+          fa.outstanding_amount = Math.max(0, (Number(fa.net_payable) || 0) - Number(fa.paid_amount || 0));
+        }
+      }
+      if (fa.outstanding_balance === undefined || fa.outstanding_balance === null) {
+        fa.outstanding_balance = fa.outstanding_amount;
+      }
+
+      // Resolve student, admission, and course details
+      const student = (this.students || []).find((s) => s.id === fa.student_id);
+      const admission = (this.admissions || []).find((a) => a.id === fa.admission_id || (student && student.admission_id === a.id));
+      const course = (this.courses || []).find((c) => c.id === fa.course_id || (student && student.course_id === c.id) || (admission && admission.course_id === c.id));
+
+      if (!fa.student_name || fa.student_name === 'Student') {
+        fa.student_name = student?.full_name || (student as any)?.name || admission?.student_name || (admission as any)?.full_name || 'Student';
+      }
+      if (!fa.admission_number) {
+        fa.admission_number = student?.admission_number || student?.student_code || admission?.admission_number || fa.admission_id;
+      }
+      if (!fa.course_id) {
+        fa.course_id = course?.id || student?.course_id || admission?.course_id || 'crs-sap-gen';
+      }
+      if (!fa.course_name) {
+        fa.course_name = course?.course_name || (course as any)?.name || admission?.course_name || (admission as any)?.course || (student as any)?.course_name || 'SAP S/4HANA Enterprise Program';
+      }
+
+      // Canonical status normalization
+      if (fa.outstanding_amount <= 0 && fa.paid_amount > 0) {
+        fa.status = 'Paid';
+      } else if (fa.paid_amount > 0 && fa.outstanding_amount > 0) {
+        fa.status = 'Partially Paid';
+      } else if (fa.status === 'Partial') {
+        fa.status = 'Partially Paid';
+      } else if (fa.status === 'Pending') {
+        fa.status = 'Unpaid';
+      } else if (!fa.status) {
+        fa.status = 'Unpaid';
+      }
+    }
+
     // 1. For every legacy feeAccount, ensure an approved StudentFee exists
     for (const fa of this.feeAccounts) {
       let sf = this.studentFees.find(
@@ -203,6 +254,10 @@ class InstituteDataStore {
       if (sf) {
         if (!sf.fee_account_id) sf.fee_account_id = fa.id;
         (fa as any).student_fee_id = sf.id;
+        if (!sf.student_name || sf.student_name === 'Student') sf.student_name = fa.student_name || sf.student_name;
+        if (!sf.course_name) sf.course_name = fa.course_name || sf.course_name;
+        if (sf.paid_amount === undefined || sf.paid_amount === null || isNaN(sf.paid_amount)) sf.paid_amount = fa.paid_amount;
+        if (sf.outstanding_amount === undefined || sf.outstanding_amount === null || isNaN(sf.outstanding_amount)) sf.outstanding_amount = fa.outstanding_amount;
       } else {
         const student = (this.students || []).find((s) => s.id === fa.student_id);
         const newSf: StudentFee = {
@@ -299,6 +354,8 @@ class InstituteDataStore {
           created_at: sf.created_at,
           updated_at: sf.updated_at,
         };
+        (fa as any).collected_amount = fa.paid_amount;
+        (fa as any).outstanding_balance = fa.outstanding_amount;
         this.feeAccounts.push(fa);
       } else {
         // Backport approved fee figures so feeAccounts always displays accurate approved financial figures
@@ -306,10 +363,26 @@ class InstituteDataStore {
         fa.discount = sf.discount_amount;
         fa.discount_reason = sf.discount_reason || fa.discount_reason;
         fa.net_payable = sf.final_payable;
-        fa.paid_amount = sf.paid_amount;
-        fa.outstanding_amount = sf.outstanding_amount;
+        if (sf.paid_amount !== undefined && sf.paid_amount !== null && !isNaN(sf.paid_amount)) {
+          fa.paid_amount = sf.paid_amount;
+        } else if (fa.paid_amount === undefined || fa.paid_amount === null || isNaN(fa.paid_amount)) {
+          fa.paid_amount = (fa as any).collected_amount ?? 0;
+        }
+        if (sf.outstanding_amount !== undefined && sf.outstanding_amount !== null && !isNaN(sf.outstanding_amount)) {
+          fa.outstanding_amount = sf.outstanding_amount;
+        } else if (fa.outstanding_amount === undefined || fa.outstanding_amount === null || isNaN(fa.outstanding_amount)) {
+          fa.outstanding_amount = (fa as any).outstanding_balance ?? Math.max(0, (fa.net_payable || 0) - (fa.paid_amount || 0));
+        }
+        (fa as any).collected_amount = fa.paid_amount;
+        (fa as any).outstanding_balance = fa.outstanding_amount;
+        if (!fa.student_name || fa.student_name === 'Student') {
+          fa.student_name = sf.student_name || fa.student_name;
+        }
+        if (!fa.course_name) {
+          fa.course_name = sf.course_name || fa.course_name;
+        }
         fa.payment_plan = sf.payment_plan || fa.payment_plan;
-        fa.status = sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+        fa.status = fa.outstanding_amount === 0 ? 'Paid' : (fa.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
         fa.updated_at = sf.updated_at || new Date().toISOString();
       }
 
@@ -412,8 +485,8 @@ class InstituteDataStore {
         .reduce((sum, p) => sum + p.amount, 0);
       const studentFeeAcc = this.feeAccounts.find((fa) => fa.student_id === student.id);
       if (studentFeeAcc) {
-        student.paid_amount = studentPaid;
-        student.outstanding_amount = Math.max(0, studentFeeAcc.net_payable - studentPaid);
+        student.paid_amount = studentPaid > 0 ? studentPaid : (studentFeeAcc.paid_amount || (studentFeeAcc as any).collected_amount || 0);
+        student.outstanding_amount = Math.max(0, studentFeeAcc.net_payable - student.paid_amount);
       }
     }
 
