@@ -6,14 +6,66 @@ import type { StudentPaymentRecord } from '@/types';
 const pending = new Map<string, Promise<any>>();
 const keys = new Map<string, string>();
 let refreshTask: Promise<any> | undefined;
+
+let dbHealthStatus: 'connected' | 'disconnected' | 'reconnecting' = 'connected';
+let lastSuccessfulSync: Date | null = null;
+let lastSyncError: string | null = null;
+
 async function request(body?: unknown, endpoint = '/api/fees/payments') {
-  const res = await fetch(endpoint, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'same-origin' });
-  const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.error || 'Payment request failed.');
-  if (data.snapshot) mergeWorkflowSnapshot(data.snapshot);
-  return data;
+  const isReadOnly = !body || (typeof body === 'object' && !(body as any).action);
+  const maxRetries = isReadOnly ? 3 : 1;
+  let lastError: any;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(endpoint, {
+        method: body ? 'POST' : 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
+
+      const data = await res.json().catch(() => ({ success: false, error: 'Invalid response from server.' }));
+      if (!res.ok || !data.success) {
+        const errorMsg = data.error || 'Payment request failed.';
+        if (isReadOnly && attempt < maxRetries && /database unavailable|terminated|fetch failed|network|socket/i.test(errorMsg)) {
+          await new Promise((r) => setTimeout(r, attempt * 250));
+          continue;
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (data.snapshot) mergeWorkflowSnapshot(data.snapshot);
+      dbHealthStatus = 'connected';
+      lastSuccessfulSync = new Date();
+      lastSyncError = null;
+      return data;
+    } catch (err: any) {
+      lastError = err;
+      if (isReadOnly && attempt < maxRetries && /database unavailable|terminated|fetch failed|network|socket/i.test(err?.message || '')) {
+        await new Promise((r) => setTimeout(r, attempt * 250));
+        continue;
+      }
+      if (/database unavailable|terminated|network|socket|fetch failed/i.test(err?.message || '')) {
+        dbHealthStatus = 'disconnected';
+        lastSyncError = err.message;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError;
 }
+
 export const paymentWorkflowClient = {
+  getDbHealth() {
+    return {
+      status: dbHealthStatus,
+      lastSync: lastSuccessfulSync,
+      error: lastSyncError,
+    };
+  },
   async feeOperation(method: string, ...args: any[]) {
     return (await request({ method, args }, '/api/fees/proposals')).result;
   },

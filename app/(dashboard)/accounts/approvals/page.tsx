@@ -28,6 +28,7 @@ import {
   Edit3,
   ExternalLink,
   CheckCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -164,19 +165,36 @@ export default function FeeApprovalsPage() {
   const [newCatRefType, setNewCatRefType] = React.useState<'Course' | 'Placement' | 'Certification' | 'Assessment' | 'Fast Track' | 'General' | 'Other'>('General');
   const [newCatDesc, setNewCatDesc] = React.useState('');
 
-  const loadData = React.useCallback(async () => {
-    try { await paymentWorkflowClient.refresh(); } catch (error: any) { setActionError(error.message); return; }
-    store.reconcileDualLedgers();
-    setFees([...(store.studentFees || [])]);
-    setCategories([...(store.feeCategories || [])]);
-    setPayments([...(store.studentPayments || [])]);
+  // Database Connection & Stale Data State (FIN-DB-001)
+  const [dbStatus, setDbStatus] = React.useState<'connected' | 'disconnected'>('connected');
+  const [lastSyncTime, setLastSyncTime] = React.useState<Date | null>(null);
+  const [isRetryingSync, setIsRetryingSync] = React.useState(false);
+
+  const loadData = React.useCallback(async (isManualRetry = false) => {
+    if (isManualRetry) setIsRetryingSync(true);
+    try {
+      await paymentWorkflowClient.refresh();
+      store.reconcileDualLedgers();
+      setFees([...(store.studentFees || [])]);
+      setCategories([...(store.feeCategories || [])]);
+      setPayments([...(store.studentPayments || [])]);
+      setDbStatus('connected');
+      setLastSyncTime(new Date());
+      // Auto-clear connection/database errors when connection is restored
+      setActionError((prev) => (prev && /database unavailable|terminated|network|socket|connection/i.test(prev) ? null : prev));
+    } catch (error: any) {
+      setDbStatus('disconnected');
+      setActionError(error.message || 'Payment database unavailable');
+    } finally {
+      if (isManualRetry) setIsRetryingSync(false);
+    }
   }, []);
 
   React.useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      if (document.visibilityState !== 'hidden') await loadData();
+      if (document.visibilityState !== 'hidden') await loadData(false);
       if (active) timer = setTimeout(poll, 15000);
     };
     void poll();
@@ -311,6 +329,10 @@ export default function FeeApprovalsPage() {
   // Payment Actions
   const handleVerifyPayment = async () => {
     if (!selectedPayment) return;
+    if (dbStatus === 'disconnected') {
+      setActionError('Action blocked: Database connection is currently unavailable. Please reconnect before verifying payments.');
+      return;
+    }
     if (!user) {
       setActionError('You must be logged in to verify payments.');
       return;
@@ -336,6 +358,10 @@ export default function FeeApprovalsPage() {
 
   const handleRejectPayment = async () => {
     if (!selectedPayment) return;
+    if (dbStatus === 'disconnected') {
+      setActionError('Action blocked: Database connection is currently unavailable. Please reconnect before rejecting payments.');
+      return;
+    }
     if (!user) {
       setActionError('You must be logged in to reject payments.');
       return;
@@ -456,6 +482,10 @@ export default function FeeApprovalsPage() {
   // Actions
   const handleApprove = async () => {
     if (!selectedFee) return;
+    if (dbStatus === 'disconnected') {
+      setActionError('Action blocked: Database connection is currently unavailable. Please reconnect before approving fees.');
+      return;
+    }
     if (!canApproveFees) {
       setActionError('Unauthorized: Only an Accountant, Admin, or Super Admin can approve fee proposals.');
       return;
@@ -484,6 +514,10 @@ export default function FeeApprovalsPage() {
 
   const handleReject = async () => {
     if (!selectedFee) return;
+    if (dbStatus === 'disconnected') {
+      setActionError('Action blocked: Database connection is currently unavailable. Please reconnect before rejecting fees.');
+      return;
+    }
     if (!canApproveFees) {
       setActionError('Unauthorized: Only an Accountant, Admin, or Super Admin can reject fee proposals.');
       return;
@@ -770,6 +804,8 @@ export default function FeeApprovalsPage() {
             <Button
               variant="sap"
               size="sm"
+              disabled={dbStatus === 'disconnected'}
+              title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before proposing fees' : undefined}
               onClick={() => {
                 setSelectedFee(null);
                 setIsResubmitting(false);
@@ -800,6 +836,8 @@ export default function FeeApprovalsPage() {
             <Button
               variant="sap"
               size="sm"
+              disabled={dbStatus === 'disconnected'}
+              title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before recording payments' : undefined}
               onClick={handleOpenRecordPaymentModal}
               className="text-xs flex items-center space-x-1.5 shadow-sm bg-emerald-600 hover:bg-emerald-700"
             >
@@ -853,7 +891,61 @@ export default function FeeApprovalsPage() {
             </span>
           )}
         </button>
+
+        {/* Database Status Indicator (FIN-DB-001) */}
+        <div className="ml-auto flex items-center space-x-2">
+          {dbStatus === 'connected' ? (
+            <span className="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+              Database Live
+              {lastSyncTime && (
+                <span className="text-emerald-600/70 ml-1 text-[10px]">
+                  ({lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-300">
+              <span className="h-2 w-2 rounded-full bg-rose-600 mr-1.5" />
+              Database Disconnected
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* FIN-DB-001: Stale Data Warning Banner & Reconnect Control */}
+      {dbStatus === 'disconnected' && (
+        <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg shadow-xs text-amber-900 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="flex items-center space-x-2">
+                <h4 className="font-semibold text-xs text-amber-950">
+                  Payment Database Interrupted — Displaying Stale Cached Records
+                </h4>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
+                  Read-Only Cache
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 mt-1">
+                The connection to the payment database was interrupted. The records displayed below represent local cached state
+                {lastSyncTime ? ` from last verification at ${lastSyncTime.toLocaleTimeString()}` : ''}.
+                To prevent financial discrepancies or duplicate actions, fee approvals and payment verifications are paused until connectivity is re-established.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => loadData(true)}
+            disabled={isRetryingSync}
+            className="text-xs bg-white hover:bg-amber-100 text-amber-900 border-amber-300 flex-shrink-0 self-end sm:self-auto"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRetryingSync ? 'animate-spin' : ''}`} />
+            {isRetryingSync ? 'Reconnecting...' : 'Retry Connection'}
+          </Button>
+        </div>
+      )}
 
       {/* Notification Toasts */}
       {actionSuccess && (
@@ -1147,19 +1239,21 @@ export default function FeeApprovalsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  disabled={!canAccountantAct}
+                                  disabled={!canAccountantAct || dbStatus === 'disconnected'}
                                   onClick={() => {
                                     setSelectedFee(fee);
                                     setActionError(null);
                                     setApprovalModalOpen(true);
                                   }}
                                   className={`text-xs px-2 py-1 h-7 ${
-                                    canAccountantAct
+                                    canAccountantAct && dbStatus === 'connected'
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                                       : 'opacity-50 cursor-not-allowed text-slate-400'
                                   }`}
                                   title={
-                                    isOwnSubmission
+                                    dbStatus === 'disconnected'
+                                      ? 'Database disconnected: Reconnect before approving'
+                                      : isOwnSubmission
                                       ? 'Separation of duties: You cannot approve your own fee proposal.'
                                       : 'Approve this fee proposal'
                                   }
@@ -1170,18 +1264,18 @@ export default function FeeApprovalsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  disabled={!canAccountantAct}
+                                  disabled={!canAccountantAct || dbStatus === 'disconnected'}
                                   onClick={() => {
                                     setSelectedFee(fee);
                                     setActionError(null);
                                     setCorrectionModalOpen(true);
                                   }}
                                   className={`text-xs px-2 py-1 h-7 ${
-                                    canAccountantAct
+                                    canAccountantAct && dbStatus === 'connected'
                                       ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
                                       : 'opacity-50 cursor-not-allowed text-slate-400'
                                   }`}
-                                  title="Request Correction"
+                                  title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before requesting correction' : 'Request Correction'}
                                 >
                                   Correct
                                 </Button>
@@ -1189,18 +1283,18 @@ export default function FeeApprovalsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  disabled={!canAccountantAct}
+                                  disabled={!canAccountantAct || dbStatus === 'disconnected'}
                                   onClick={() => {
                                     setSelectedFee(fee);
                                     setActionError(null);
                                     setRejectModalOpen(true);
                                   }}
                                   className={`text-xs px-2 py-1 h-7 ${
-                                    canAccountantAct
+                                    canAccountantAct && dbStatus === 'connected'
                                       ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
                                       : 'opacity-50 cursor-not-allowed text-slate-400'
                                   }`}
-                                  title="Reject fee proposal"
+                                  title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before rejecting' : 'Reject this fee proposal'}
                                 >
                                   Reject
                                 </Button>
@@ -1551,9 +1645,12 @@ export default function FeeApprovalsPage() {
                                       <Button
                                         variant="outline"
                                         size="sm"
+                                        disabled={dbStatus === 'disconnected'}
                                         onClick={() => handleOpenUpdatePaymentModal(p)}
-                                        className="text-xs px-2 py-1 h-7 text-blue-700 border-blue-300 hover:bg-blue-50 flex items-center space-x-1"
-                                        title="Counsellor: Update payment amount, UTR reference, proof slip, or notes"
+                                        className={`text-xs px-2 py-1 h-7 text-blue-700 border-blue-300 hover:bg-blue-50 flex items-center space-x-1 ${
+                                          dbStatus === 'disconnected' ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
+                                        title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before updating payment' : 'Counsellor: Update payment amount, UTR reference, proof slip, or notes'}
                                       >
                                         <Edit3 className="h-3 w-3" />
                                         <span>Update</span>
@@ -1564,7 +1661,7 @@ export default function FeeApprovalsPage() {
                                     <Button
                                       variant="sap"
                                       size="sm"
-                                      disabled={!canAccountantVerify}
+                                      disabled={!canAccountantVerify || dbStatus === 'disconnected'}
                                       onClick={() => {
                                         setSelectedPayment(p);
                                         setPaymentVerificationNotes('');
@@ -1572,12 +1669,14 @@ export default function FeeApprovalsPage() {
                                         setPaymentVerifyModalOpen(true);
                                       }}
                                       className={`text-xs px-2.5 py-1 h-7 ${
-                                        canAccountantVerify
+                                        canAccountantVerify && dbStatus === 'connected'
                                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                                           : 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-600'
                                       }`}
                                       title={
-                                        isOwn && role !== 'admin' && role !== 'super_admin'
+                                        dbStatus === 'disconnected'
+                                          ? 'Database disconnected: Reconnect before verifying payment'
+                                          : isOwn && role !== 'admin' && role !== 'super_admin'
                                           ? 'Separation of duties: Payment recorder cannot verify their own payment entry.'
                                           : 'Accountant: Verify bank credit and issue official payment receipt'
                                       }
@@ -1591,14 +1690,17 @@ export default function FeeApprovalsPage() {
                                       <Button
                                         variant="outline"
                                         size="sm"
+                                        disabled={dbStatus === 'disconnected'}
                                         onClick={() => {
                                           setSelectedPayment(p);
                                           setPaymentRejectionReason('');
                                           setActionError(null);
                                           setPaymentRejectModalOpen(true);
                                         }}
-                                        className="text-xs px-2 py-1 h-7 text-rose-600 border-rose-300 hover:bg-rose-50"
-                                        title="Reject payment entry"
+                                        className={`text-xs px-2 py-1 h-7 text-rose-600 border-rose-300 hover:bg-rose-50 ${
+                                          dbStatus === 'disconnected' ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
+                                        title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before rejecting payment' : 'Reject payment entry'}
                                       >
                                         <XCircle className="h-3 w-3 mr-1" />
                                         <span>Reject</span>
@@ -1719,9 +1821,10 @@ export default function FeeApprovalsPage() {
               <Button
                 variant="sap"
                 size="sm"
-                disabled={isCreatorOfFee(selectedFee)}
+                disabled={isCreatorOfFee(selectedFee) || dbStatus === 'disconnected'}
                 onClick={handleApprove}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before confirming' : undefined}
               >
                 Confirm & Approve Fee Proposal
               </Button>
@@ -2384,9 +2487,10 @@ export default function FeeApprovalsPage() {
               <Button
                 variant="sap"
                 size="sm"
-                disabled={isOwnRecordedPayment(selectedPayment)}
+                disabled={isOwnRecordedPayment(selectedPayment) || dbStatus === 'disconnected'}
                 onClick={handleVerifyPayment}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before confirming' : undefined}
               >
                 <CheckCircle2 className="h-4 w-4 mr-1.5" />
                 <span>Confirm & Approve Payment</span>
@@ -2433,8 +2537,9 @@ export default function FeeApprovalsPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                disabled={!paymentRejectionReason.trim()}
+                disabled={!paymentRejectionReason.trim() || dbStatus === 'disconnected'}
                 onClick={handleRejectPayment}
+                title={dbStatus === 'disconnected' ? 'Database disconnected: Reconnect before rejecting' : undefined}
               >
                 Reject Payment
               </Button>
