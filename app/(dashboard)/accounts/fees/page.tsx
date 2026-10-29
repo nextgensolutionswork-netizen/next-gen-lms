@@ -55,37 +55,16 @@ export default function StudentFeesPage() {
     store.reconcileDualLedgers();
     let list = [...(store.feeAccounts || [])];
     if (statusFilter !== 'All') {
-      list = list.filter((f) => {
-        if (statusFilter === 'Partially Paid') {
-          return f.status === 'Partially Paid' || (f.status as any) === 'Partial';
-        }
-        if (statusFilter === 'Unpaid') {
-          return f.status === 'Unpaid' || (f.status as any) === 'Pending';
-        }
-        return f.status === statusFilter;
-      });
+      list = list.filter((f) => f.status === statusFilter);
     }
     if (search.trim()) {
-      const q = search.toLowerCase().trim();
-      list = list.filter((f) => {
-        const student = store.students?.find((s) => s.id === f.student_id);
-        const name = (f.student_name || student?.full_name || (student as any)?.name || '').toLowerCase();
-        const course = (f.course_name || (student as any)?.course_name || '').toLowerCase();
-        const sid = (f.student_id || '').toLowerCase();
-        const admId = (f.admission_id || '').toLowerCase();
-        const admNumber = (student?.admission_number || (f as any).admission_number || '').toLowerCase();
-        const code = (student?.student_code || (f as any).student_code || '').toLowerCase();
-        const email = (student?.email || '').toLowerCase();
-        return (
-          name.includes(q) ||
-          course.includes(q) ||
-          sid.includes(q) ||
-          admId.includes(q) ||
-          admNumber.includes(q) ||
-          code.includes(q) ||
-          email.includes(q)
-        );
-      });
+      const q = search.toLowerCase();
+      list = list.filter(
+        (f) =>
+          f.student_name?.toLowerCase().includes(q) ||
+          f.course_name?.toLowerCase().includes(q) ||
+          f.student_id?.toLowerCase().includes(q)
+      );
     }
     setFeeAccounts(list);
   }, [search, statusFilter]);
@@ -123,11 +102,11 @@ export default function StudentFeesPage() {
   }
 
   const totalOutstanding = (store.feeAccounts || []).reduce(
-    (sum, f) => sum + safeAmount(f.outstanding_amount ?? (f as any).outstanding_balance ?? Math.max(0, safeAmount(f.net_payable) - safeAmount(f.paid_amount ?? (f as any).collected_amount))),
+    (sum, f) => sum + safeAmount(f.outstanding_amount),
     0
   );
   const totalCollected = (store.feeAccounts || []).reduce(
-    (sum, f) => sum + safeAmount(f.paid_amount ?? (f as any).collected_amount),
+    (sum, f) => sum + safeAmount(f.paid_amount),
     0
   );
   const activeCount = (store.feeAccounts || []).length;
@@ -140,9 +119,9 @@ export default function StudentFeesPage() {
     exportFeeLedgerToExcel(feeAccounts);
   };
 
-  const firstWithDue = feeAccounts.find((f) => safeAmount(f.outstanding_amount ?? (f as any).outstanding_balance ?? Math.max(0, safeAmount(f.net_payable) - safeAmount(f.paid_amount ?? (f as any).collected_amount))) > 0);
+  const firstWithDue = feeAccounts.find((f) => safeAmount(f.outstanding_amount) > 0);
   const recordPaymentUrl = firstWithDue
-    ? `/accounts/payments?studentId=${encodeURIComponent(firstWithDue.student_id)}&student_id=${encodeURIComponent(firstWithDue.student_id)}&student_name=${encodeURIComponent(firstWithDue.student_name || '')}&feeAccountId=${encodeURIComponent(firstWithDue.id)}&fee_id=${encodeURIComponent(firstWithDue.id)}&amount=${encodeURIComponent(safeAmount(firstWithDue.outstanding_amount ?? (firstWithDue as any).outstanding_balance))}&amount_due=${encodeURIComponent(safeAmount(firstWithDue.outstanding_amount ?? (firstWithDue as any).outstanding_balance))}`
+    ? `/accounts/payments?studentId=${encodeURIComponent(firstWithDue.student_id)}&student_id=${encodeURIComponent(firstWithDue.student_id)}&student_name=${encodeURIComponent(firstWithDue.student_name || '')}&feeAccountId=${encodeURIComponent(firstWithDue.id)}&fee_id=${encodeURIComponent(firstWithDue.id)}&amount=${encodeURIComponent(safeAmount(firstWithDue.outstanding_amount))}&amount_due=${encodeURIComponent(safeAmount(firstWithDue.outstanding_amount))}`
     : '/accounts/payments';
 
   return (
@@ -272,56 +251,47 @@ export default function StudentFeesPage() {
                     </td>
                   </tr>
                 ) : (
-                  feeAccounts.map((fa) => {
-                    const student = store.students?.find((s) => s.id === fa.student_id);
-                    const studentName = fa.student_name || student?.full_name || (student as any)?.name || 'Student';
-                    const courseName = fa.course_name || (student as any)?.course_name || 'SAP Enterprise Program';
-                    const paid = safeAmount(fa.paid_amount ?? (fa as any).collected_amount);
-                    const outstanding = safeAmount(fa.outstanding_amount ?? (fa as any).outstanding_balance ?? Math.max(0, safeAmount(fa.net_payable) - paid));
-                    const displayStatus = (fa.status as string) === 'Partial' ? 'Partially Paid' : (fa.status as string) === 'Pending' ? 'Unpaid' : (fa.status || (outstanding === 0 ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Unpaid')));
-
-                    return (
-                      <tr key={fa.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
+                  feeAccounts.map((fa) => (
+                    <tr key={fa.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/students/${fa.student_id}`}
+                          className="font-semibold text-slate-900 hover:text-[#0A6ED1] hover:underline inline-flex items-center space-x-1"
+                        >
+                          <span>{fa.student_name}</span>
+                          <ExternalLink className="h-3 w-3 opacity-40 hover:opacity-100" />
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{fa.course_name}</td>
+                      <td className="px-4 py-3 font-medium text-slate-700">{formatINR(safeAmount(fa.original_fee))}</td>
+                      <td className="px-4 py-3 text-emerald-600 font-medium">
+                        {safeAmount(fa.discount) > 0 ? `-${formatINR(safeAmount(fa.discount))}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{formatINR(safeAmount(fa.net_payable))}</td>
+                      <td className="px-4 py-3 font-bold text-emerald-600">{formatINR(safeAmount(fa.paid_amount))}</td>
+                      <td className="px-4 py-3 font-bold text-amber-600">{formatINR(safeAmount(fa.outstanding_amount))}</td>
+                      
+                      <td className="px-4 py-3">
+                        <Badge variant={fa.status === 'Paid' ? 'success' : 'warning'}>{fa.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {safeAmount(fa.outstanding_amount) > 0 ? (
                           <Link
-                            href={`/students/${fa.student_id}`}
-                            className="font-semibold text-slate-900 hover:text-[#0A6ED1] hover:underline inline-flex items-center space-x-1"
+                            href={`/accounts/payments?studentId=${encodeURIComponent(fa.student_id)}&student_id=${encodeURIComponent(fa.student_id)}&student_name=${encodeURIComponent(fa.student_name || '')}&feeAccountId=${encodeURIComponent(fa.id)}&fee_id=${encodeURIComponent(fa.id)}&amount=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&amount_due=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&course_name=${encodeURIComponent(fa.course_name || '')}`}
                           >
-                            <span>{studentName}</span>
-                            <ExternalLink className="h-3 w-3 opacity-40 hover:opacity-100" />
+                            <Button variant="sap" size="sm" className="text-xs px-2.5 py-1">
+                              Collect
+                            </Button>
                           </Link>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{courseName}</td>
-                        <td className="px-4 py-3 font-medium text-slate-700">{formatINR(safeAmount(fa.original_fee))}</td>
-                        <td className="px-4 py-3 text-emerald-600 font-medium">
-                          {safeAmount(fa.discount) > 0 ? `-${formatINR(safeAmount(fa.discount))}` : '—'}
-                        </td>
-                        <td className="px-4 py-3 font-bold text-slate-900">{formatINR(safeAmount(fa.net_payable))}</td>
-                        <td className="px-4 py-3 font-bold text-emerald-600">{formatINR(paid)}</td>
-                        <td className="px-4 py-3 font-bold text-amber-600">{formatINR(outstanding)}</td>
-                        
-                        <td className="px-4 py-3">
-                          <Badge variant={displayStatus === 'Paid' ? 'success' : displayStatus === 'Overdue' ? 'destructive' : 'warning'}>{displayStatus}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {outstanding > 0 ? (
-                            <Link
-                              href={`/accounts/payments?studentId=${encodeURIComponent(fa.student_id)}&student_id=${encodeURIComponent(fa.student_id)}&student_name=${encodeURIComponent(studentName)}&feeAccountId=${encodeURIComponent(fa.id)}&fee_id=${encodeURIComponent(fa.id)}&amount=${encodeURIComponent(outstanding)}&amount_due=${encodeURIComponent(outstanding)}&course_name=${encodeURIComponent(courseName)}`}
-                            >
-                              <Button variant="sap" size="sm" className="text-xs px-2.5 py-1">
-                                Collect
-                              </Button>
-                            </Link>
-                          ) : (
-                            <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end space-x-1">
-                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                              <span>Cleared</span>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
+                        ) : (
+                          <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end space-x-1">
+                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                            <span>Cleared</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

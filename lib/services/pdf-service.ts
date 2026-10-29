@@ -26,8 +26,8 @@ function receiptNumber(value: unknown): number | null {
 export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer> {
   const paymentAmount = receiptNumber(receipt.payment_amount);
   const remainingBalance = receiptNumber(receipt.remaining_balance);
-  if (paymentAmount === null || paymentAmount <= 0) {
-    throw new ReceiptPdfDataError(`Receipt ${receipt.receipt_number || 'N/A'} has no valid payment amount. Incomplete or zero-amount receipts cannot be generated or downloaded.`);
+  if (paymentAmount === null) {
+    throw new ReceiptPdfDataError(`Receipt ${receipt.receipt_number} has no valid payment amount. Correct the receipt or its linked payment before downloading.`);
   }
   // Legacy/imported receipts may omit institute details despite the static type.
   // PDFKit calls valueOf() on every metadata value during construction.
@@ -53,14 +53,14 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       doc.moveDown();
       doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(16).text('OFFICIAL FEE RECEIPT');
       doc.font('Helvetica').fontSize(10).text('Receipt: ' + receipt.receipt_number);
-      doc.text('Payment date: ' + formatDate(receipt.payment_date || (receipt as any).receipt_date)).moveDown();
+      doc.text('Payment date: ' + formatDate(receipt.payment_date)).moveDown();
       if (receipt.status === 'Void') {
         doc.fillColor('#BE123C').font('Helvetica-Bold').text('VOID / CANCELLED');
         doc.font('Helvetica').text('Credit note: ' + (receipt.credit_note_number || ''));
         doc.text('Reason: ' + (receipt.void_reason || '')).moveDown();
       }
       doc.fillColor('#0F172A').font('Helvetica-Bold').text(receipt.student_name);
-      doc.font('Helvetica').text('Admission: ' + (receipt.admission_number || (receipt as any).student_code || '—'));
+      doc.font('Helvetica').text('Admission: ' + receipt.admission_number);
       doc.text('Course: ' + receipt.course_name);
       if (receipt.student_email) doc.text(receipt.student_email);
       doc.moveDown().text('Payment mode: ' + receipt.payment_mode);
@@ -68,7 +68,7 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       doc.font('Helvetica-Bold').fontSize(14).text('Amount received: ' + money(paymentAmount));
       doc.font('Helvetica').fontSize(10).text(amountToWordsINR(paymentAmount)).moveDown();
       doc.font('Helvetica-Bold').text('Remaining balance: ' + (remainingBalance === null ? 'Not recorded on this receipt' : money(remainingBalance))).moveDown(2);
-      doc.font('Helvetica').text('Authorized by: ' + (receipt.authorized_by || (receipt as any).issued_by || 'Finance & Accounts Office'));
+      doc.font('Helvetica').text('Authorized by: ' + receipt.authorized_by);
       doc.text('Generated: ' + formatDateTime(receipt.created_at)).moveDown();
       const qrY = doc.y;
       doc.image(qr, 45, qrY, { width: 75, height: 75 });

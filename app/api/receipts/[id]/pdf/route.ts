@@ -70,19 +70,9 @@ export async function GET(
     // and tenant. Never use today's account balance as a historical balance.
     const linkedPayment = store.payments.find((p) => p.id === receipt.payment_id &&
       p.student_id === receipt.student_id && tenantId(p) === tenantId(receipt));
-    const effectiveAmount = receipt.payment_amount ?? linkedPayment?.amount;
-    if (effectiveAmount === undefined || effectiveAmount === null || Number(effectiveAmount) <= 0 || !Number.isFinite(Number(effectiveAmount))) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Fee receipt '${receipt.receipt_number || rawId}' has no valid payment amount. Incomplete or zero-amount receipts cannot be generated or downloaded as official PDFs.`,
-        },
-        { status: 422 }
-      );
-    }
     const pdfBuffer = await generateReceiptPdfBuffer({
       ...receipt,
-      payment_amount: effectiveAmount,
+      payment_amount: receipt.payment_amount ?? linkedPayment?.amount,
     } as typeof receipt);
 
     const { searchParams } = new URL(request.url);

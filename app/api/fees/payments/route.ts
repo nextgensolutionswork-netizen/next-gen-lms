@@ -15,21 +15,7 @@ const details = z.object({
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v, 'Invalid payment date'),
   transaction_reference: z.string().trim().max(200).optional(),
   bank_upi_reference: z.string().trim().max(200).optional(),
-  payment_proof_url: z.string().min(1).max(4096).refine((v) => {
-    if (v.startsWith('/api/fees/proof?path=')) {
-      try {
-        const url = new URL(v, 'http://localhost');
-        let p = url.searchParams.get('path') || '';
-        if (p.includes('%')) {
-          try { p = decodeURIComponent(p); } catch {}
-        }
-        return /^[a-f0-9]{64}\/[a-f0-9]{64}\/[a-f0-9-]{36}\.(png|jpe?g|webp|pdf)$/.test(p) || /^proofs\/workflow-\d{13}\.(png|jpe?g|webp|pdf)$/.test(p);
-      } catch {
-        return false;
-      }
-    }
-    return /^https:\/\//i.test(v);
-  }, 'Attach a valid, secure payment proof reference'),
+  payment_proof_url: z.string().min(1).max(4096).refine((v) => v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach payment proof'),
   notes: z.string().max(2000).optional(),
   installment_id: z.string().trim().max(200).optional(),
 });

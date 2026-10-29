@@ -57,14 +57,10 @@ export default function BatchesPage() {
   const canTransfer = hasPermission('batches:transfer') || role === 'admin' || role === 'super_admin' || role === 'trainer';
   const isTrainer = role === 'trainer';
 
-  const [search, setSearch] = React.useState('');
-  React.useEffect(() => { setSearch(new URLSearchParams(window.location.search).get('search') || ''); }, []);
-
   // Filter batches visible to current user
   const visibleBatches = React.useMemo(() => {
-    return batches.filter((b) => (canAccessBatch(user, b.id) || b.trainer_id === user?.id)
-      && (!search || [b.batch_code, b.batch_name].some((value) => value?.toLowerCase().includes(search.toLowerCase()))));
-  }, [batches, user, search]);
+    return batches.filter((b) => canAccessBatch(user, b.id) || b.trainer_id === user?.id);
+  }, [batches, user]);
 
   // New Batch form state
   const [batchCode, setBatchCode] = React.useState('');
@@ -301,7 +297,6 @@ export default function BatchesPage() {
 
   return (
     <div className="space-y-6">
-      {search && <p className="text-sm text-slate-600">Search: {search} <button type="button" className="ml-2 text-blue-600 underline" onClick={() => { setSearch(''); window.history.replaceState(null, '', window.location.pathname); }}>Clear search</button></p>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">SAP Batch Management</h1>

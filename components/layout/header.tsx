@@ -3,8 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Bell, ExternalLink, ShieldCheck, LogOut, Menu } from 'lucide-react';
-import { GlobalSearch } from './global-search';
+import { Bell, Search, ExternalLink, ShieldCheck, CheckCircle2, LogOut, Menu } from 'lucide-react';
 import { UserRole, NotificationItem } from '@/types';
 import { useAuth } from '@/components/providers/auth-provider';
 
@@ -42,7 +41,17 @@ export function Header({ currentRole, currentUserName, avatar, onOpenNavigation,
   return (
     <header className="min-h-16 gap-2 border-b border-slate-200 bg-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between sticky top-0 z-40 print:hidden">
       {onOpenNavigation && <button type="button" aria-label="Open navigation" aria-controls="mobile-navigation" aria-expanded={navigationOpen} onClick={onOpenNavigation} className="lg:hidden rounded-lg border border-slate-200 p-2"><Menu className="h-5 w-5" /></button>}
-      <GlobalSearch key={user?.id || 'anonymous'} />
+      {/* Search Input */}
+      <div className="flex items-center min-w-0 flex-1 max-w-96">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search students, admissions, leads, receipts, batches..."
+            className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0A6ED1] focus:bg-white transition-all"
+          />
+        </div>
+      </div>
 
       {/* Quick Actions & User Indicators */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-4">

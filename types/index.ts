@@ -561,23 +561,18 @@ export interface Receipt {
   student_name: string;
   student_email?: string;
   admission_number: string;
-  student_code?: string;
   course_name: string;
   payment_amount: number;
-  amount?: number;
   payment_mode: PaymentMethod;
   transaction_reference?: string;
   payment_date: string;
-  receipt_date?: string;
   remaining_balance: number;
   authorized_by: string;
-  issued_by?: string;
   institute_name: string;
   institute_address: string;
   institute_phone: string;
   institute_gst: string;
   created_at: string;
-  amount_in_words?: string;
 
   // GST & e-Invoice Compliance Fields
   supply_type?: 'INTRA_STATE' | 'INTER_STATE';

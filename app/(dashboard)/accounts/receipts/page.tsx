@@ -93,7 +93,7 @@ export default function ReceiptsListPage() {
   const allReceipts = receipts || [];
   const activeReceipts = allReceipts.filter((r) => r.status !== 'Void');
   const voidedReceipts = allReceipts.filter((r) => r.status === 'Void');
-  const totalCollected = activeReceipts.reduce((sum, r) => sum + safeAmount(r.payment_amount ?? r.amount), 0);
+  const totalCollected = activeReceipts.reduce((sum, r) => sum + safeAmount(r.payment_amount), 0);
 
   const handleConfirmVoid = async () => {
     if (!selectedReceiptForVoid || !user || !canVoidReceipt) return;
@@ -159,14 +159,14 @@ export default function ReceiptsListPage() {
       CreditNoteNumber: r.credit_note_number || 'N/A',
       VoidReason: r.void_reason || 'N/A',
       StudentName: r.student_name,
-      AdmissionNumber: r.admission_number || r.student_code || 'N/A',
+      AdmissionNumber: r.admission_number,
       Course: r.course_name,
-      AmountPaid: r.payment_amount ?? r.amount ?? 0,
+      AmountPaid: r.payment_amount,
       PaymentMode: r.payment_mode,
       TransactionReference: r.transaction_reference || 'N/A',
-      RemainingBalance: r.remaining_balance ?? 0,
-      PaymentDate: r.payment_date || r.receipt_date || 'N/A',
-      AuthorizedBy: r.authorized_by || r.issued_by || 'Accounts Staff',
+      RemainingBalance: r.remaining_balance,
+      PaymentDate: r.payment_date,
+      AuthorizedBy: r.authorized_by,
     }));
     exportToCSV('signed_official_receipts_registry', exportData);
   };
@@ -360,13 +360,13 @@ export default function ReceiptsListPage() {
                             <ExternalLink className="h-2.5 w-2.5 text-slate-400 opacity-60" />
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">{r.admission_number || r.student_code || '—'}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">{r.admission_number}</td>
                         <td className="px-4 py-3 text-slate-600 truncate max-w-[150px]" title={r.course_name}>
                           {r.course_name}
                         </td>
                         <td className="px-4 py-3 font-bold font-mono text-xs">
                           <span className={isVoid ? 'line-through text-slate-400' : 'text-emerald-600'}>
-                            {formatINR(r.payment_amount ?? r.amount ?? 0)}
+                            {formatINR(r.payment_amount)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -375,9 +375,9 @@ export default function ReceiptsListPage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-3 font-bold text-amber-700 font-mono text-xs">
-                          {formatINR(r.remaining_balance ?? 0)}
+                          {formatINR(r.remaining_balance)}
                         </td>
-                        <td className="px-4 py-3 text-slate-500">{formatDate(r.payment_date || r.receipt_date)}</td>
+                        <td className="px-4 py-3 text-slate-500">{formatDate(r.payment_date)}</td>
                         <td className="px-4 py-3">
                           {isVoid ? (
                             <div className="space-y-0.5">

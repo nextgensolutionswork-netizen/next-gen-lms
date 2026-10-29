@@ -20,7 +20,6 @@ export function mergeWorkflowSnapshot(snapshot: Partial<WorkflowSnapshot>, tenan
     const ids = new Set(rows.map((r) => r.id));
     (store as any)[key] = typeof window !== 'undefined' ? [...rows] : [...rows, ...(store[key] as any[]).filter((r) => !ids.has(r.id) && (!tenant || tenantId(r) !== tenant))];
   }
-  store.reconcileDualLedgers();
 }
 
 export function visibleWorkflowSnapshot(actor: UserProfile): Partial<WorkflowSnapshot> {

@@ -149,53 +149,6 @@ export default function ReceiptPrintPage() {
     }
   }
 
-  // Normalized receipt fields across SQL schemas (amount, receipt_date, student_code, issued_by)
-  // and workflow state (payment_amount, payment_date, admission_number, authorized_by)
-  const paymentAmount = receipt.payment_amount ?? receipt.amount ?? 0;
-  const paymentDate = receipt.payment_date || receipt.receipt_date || receipt.created_at;
-  const admissionNumber = receipt.admission_number || receipt.student_code || '—';
-  const authorizedBy = receipt.authorized_by || receipt.issued_by || 'Finance & Accounts Office';
-  const remainingBalance = receipt.remaining_balance ?? 0;
-  const instituteName = receipt.institute_name || 'Next-Gen ERP Solutions';
-  const instituteAddress = receipt.institute_address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081';
-  const institutePhone = receipt.institute_phone || '+91 98765 43210';
-
-  // Financial completeness guard:
-  // An official fee receipt must have a valid positive payment amount, student name, and receipt number.
-  // Incomplete financial records (such as zero-amount or unverified payments) must never appear as finalized receipts.
-  const isComplete = paymentAmount > 0 && Boolean(receipt.student_name) && Boolean(receipt.receipt_number);
-
-  if (!isComplete) {
-    return (
-      <div className="max-w-xl mx-auto my-12 space-y-4 print:hidden" role="alert">
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-center space-y-3">
-          <div className="h-12 w-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-            <ShieldAlert className="h-6 w-6" />
-          </div>
-          <h2 className="text-lg font-bold text-slate-900">Incomplete Financial Record</h2>
-          <p className="text-xs text-amber-900 max-w-md mx-auto">
-            This fee receipt record (&ldquo;{receipt.receipt_number || id}&rdquo;) contains unverified or incomplete financial data (Payment Amount: {formatINR(paymentAmount)}).
-          </p>
-          <div className="p-3 bg-white rounded-lg border border-amber-200 text-xs text-left max-w-sm mx-auto space-y-1 text-slate-700">
-            <p className="font-semibold text-slate-900">Official Receipt Restrictions:</p>
-            <p>• Official fee receipts cannot be finalized or issued with zero or unverified payment amounts.</p>
-            <p>• Printing and PDF downloads are strictly disabled until payment clearance.</p>
-          </div>
-          <div className="pt-2 flex justify-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => void reload()} className="text-xs">
-              Retry Verification
-            </Button>
-            <Link href={role === 'student' ? '/portal' : '/accounts/receipts'}>
-              <Button variant="sap" size="sm" className="text-xs">
-                {role === 'student' ? 'Back to Student Portal' : 'Back to Receipts Registry'}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const pdfUrl = `/api/receipts/${receipt.id}/pdf`;
 
   const handlePrint = () => {
@@ -210,7 +163,7 @@ export default function ReceiptPrintPage() {
       : pdfUrl;
 
     const text = encodeURIComponent(
-      `Official Fee Receipt: ${receipt.receipt_number}\nInstitute: ${instituteName}\nStudent: ${receipt.student_name}\nAmount Paid: ${formatINR(paymentAmount)}\nDate: ${formatDate(paymentDate)}\n\nDownload Official PDF Receipt:\n${fullPdfUrl}`
+      `Official Fee Receipt: ${receipt.receipt_number}\nInstitute: ${receipt.institute_name}\nStudent: ${receipt.student_name}\nAmount Paid: ${formatINR(receipt.payment_amount)}\nDate: ${formatDate(receipt.payment_date)}\n\nDownload Official PDF Receipt:\n${fullPdfUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
@@ -226,22 +179,22 @@ export default function ReceiptPrintPage() {
         </div>
       </div>
       <article className="bg-white border border-slate-200 rounded-xl p-8 print:border-0 print:p-0 space-y-6">
-        {receipt.status === 'Void' && <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800"><strong>VOID / CANCELLED — {receipt.credit_note_number}</strong><p>{receipt.void_reason}</p><p>Voided by {receipt.void_by} on {formatDate(receipt.void_at || paymentDate)}</p></div>}
+        {receipt.status === 'Void' && <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800"><strong>VOID / CANCELLED — {receipt.credit_note_number}</strong><p>{receipt.void_reason}</p><p>Voided by {receipt.void_by} on {formatDate(receipt.void_at || receipt.payment_date)}</p></div>}
         <div className="flex justify-between gap-6 border-b pb-6">
-          <div><h1 className="text-2xl font-bold">{instituteName}</h1><p className="text-sm text-slate-500">{instituteAddress}</p><p className="text-sm">{institutePhone}</p></div>
-          <div className="text-right"><h2 className="font-bold text-blue-700">Official Fee Receipt</h2><p className="font-mono">{receipt.receipt_number}</p><p>{formatDate(paymentDate)}</p></div>
+          <div><h1 className="text-2xl font-bold">{receipt.institute_name}</h1><p className="text-sm text-slate-500">{receipt.institute_address}</p><p className="text-sm">{receipt.institute_phone}</p></div>
+          <div className="text-right"><h2 className="font-bold text-blue-700">Official Fee Receipt</h2><p className="font-mono">{receipt.receipt_number}</p><p>{formatDate(receipt.payment_date)}</p></div>
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><p className="text-slate-500">Student</p><p className="font-bold">{receipt.student_name}</p><p>{admissionNumber}</p><p>{receipt.student_email}</p></div>
+          <div><p className="text-slate-500">Student</p><p className="font-bold">{receipt.student_name}</p><p>{receipt.admission_number}</p><p>{receipt.student_email}</p></div>
           <div><p className="text-slate-500">Course</p><p className="font-bold">{receipt.course_name}</p><p>Payment mode: {receipt.payment_mode}</p><p>Reference: {receipt.transaction_reference || '—'}</p></div>
         </div>
-        <table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="text-left p-3">Description</th><th className="text-right p-3">Amount received</th></tr></thead><tbody><tr className="border-b"><td className="p-3">Fee payment — {receipt.course_name}</td><td className="p-3 text-right font-bold">{formatINR(paymentAmount)}</td></tr></tbody></table>
-        <p className="text-sm">{amountToWordsINR(paymentAmount)}</p>
+        <table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="text-left p-3">Description</th><th className="text-right p-3">Amount received</th></tr></thead><tbody><tr className="border-b"><td className="p-3">Fee payment — {receipt.course_name}</td><td className="p-3 text-right font-bold">{formatINR(receipt.payment_amount)}</td></tr></tbody></table>
+        <p className="text-sm">{amountToWordsINR(receipt.payment_amount)}</p>
         <dl className="ml-auto max-w-sm space-y-2 text-sm">
-          <div className="flex justify-between"><dt>This payment</dt><dd>{formatINR(paymentAmount)}</dd></div>
-          <div className="flex justify-between border-t pt-2 font-bold"><dt>Remaining balance</dt><dd>{formatINR(remainingBalance)}</dd></div>
+          <div className="flex justify-between"><dt>This payment</dt><dd>{formatINR(receipt.payment_amount)}</dd></div>
+          <div className="flex justify-between border-t pt-2 font-bold"><dt>Remaining balance</dt><dd>{formatINR(receipt.remaining_balance)}</dd></div>
         </dl>
-        <footer className="border-t pt-4 text-sm text-slate-500"><p>Authorized by: {authorizedBy}</p><p>Generated: {formatDateTime(receipt.created_at)}</p><p>This receipt records the payment credited to the student account.</p></footer>
+        <footer className="border-t pt-4 text-sm text-slate-500"><p>Authorized by: {receipt.authorized_by}</p><p>Generated: {formatDateTime(receipt.created_at)}</p><p>This receipt records the payment credited to the student account.</p></footer>
       </article>
     </div>
   );
