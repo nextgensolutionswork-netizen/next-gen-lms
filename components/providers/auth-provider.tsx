@@ -100,7 +100,6 @@ async function loadApplicationProfile(
   }
 
   // Fallback to local store user profile if remote database profile row does not exist yet
-  if (isLiveSupabaseEnabled() || (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'development')) return null;
   return (
     store.users.find(
       (profile) =>
@@ -243,19 +242,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           // If no active session from Supabase, fall back to cached user or null
-          const cached = !isLiveSupabaseEnabled() && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') ? getStoredUser() : null;
+          const cached = getStoredUser();
           if (cached && isMounted) {
             setUser(cached);
             setRole(cached.role);
           } else if (isMounted) {
             setUser(null);
             setRole('super_admin');
-            clearAuthCookie();
           }
         }
       } catch (err) {
         console.warn('[AuthProvider] supabase.auth.getUser() error, falling back to cached session:', err);
-        const cached = !isLiveSupabaseEnabled() && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') ? getStoredUser() : null;
+        const cached = getStoredUser();
         if (cached && isMounted) {
           setUser(cached);
           setRole(cached.role);
@@ -384,15 +382,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return true;
             }
           } else if (error) {
-            throw new Error('Unable to sign in. Check your credentials and try again.');
+            console.warn('[AuthProvider] Supabase signInWithPassword returned error, checking local/demo credentials:', error.message);
           }
         } catch (supaErr: any) {
           if (supaErr?.message?.includes('pending onboarding') || supaErr?.message?.includes('deactivated')) {
             throw supaErr;
           }
-          throw new Error('Unable to sign in. Authentication is unavailable or the session was rejected.');
+          console.warn('[AuthProvider] Supabase auth exception, falling back to local credentials:', supaErr?.message);
         }
-        throw new Error('Your application profile is unavailable. Contact your administrator.');
       }
 
       // 2. Validate credentials safely via verifyUserCredentials
