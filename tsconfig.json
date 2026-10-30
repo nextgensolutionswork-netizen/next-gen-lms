@@ -41,7 +41,6 @@
     ".audit-build-check",
     "staging-runtime",
     ".next-audit",
-    ".next-build-check",
-    "qa-checkpoints"
+    ".next-build-check"
   ]
 }

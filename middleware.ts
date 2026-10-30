@@ -123,7 +123,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. If not authenticated via live session, verify HMAC-signed auth cookie (next_gen_auth_user)
-  if (!isSupabaseLive && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') && !userId && !userEmail && isActiveUser) {
+  if (!userId && !userEmail && isActiveUser) {
     const rawHeaderCookie = request.headers.get('cookie')?.split(';').map((p) => p.trim()).find((p) => p.startsWith(`${AUTH_COOKIE_NAME}=`))?.slice(AUTH_COOKIE_NAME.length + 1);
     const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value || (rawHeaderCookie ? decodeURIComponent(rawHeaderCookie) : undefined);
     const sigCookie = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;

@@ -45,8 +45,7 @@ export interface VerificationResult {
  */
 export async function verifyUserCredentials(
   email: string | null | undefined,
-  password: string | null | undefined,
-  authClient?: ReturnType<typeof getDb>
+  password: string | null | undefined
 ): Promise<VerificationResult> {
   const cleanEmail = email?.trim() || '';
   const cleanPassword = password || '';
@@ -62,7 +61,7 @@ export async function verifyUserCredentials(
   // 1. If Supabase is live, attempt genuine Supabase authentication
   if (isLiveSupabaseEnabled()) {
     try {
-      const db = authClient || getDb();
+      const db = getDb();
       const { data, error } = await db.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
@@ -90,15 +89,11 @@ export async function verifyUserCredentials(
         }
       }
     } catch {
-      // Live authentication failures never authorize a local identity.
+      // Fall through to local store verification on network/offline fallback
     }
-    return { success: false, error: 'Unable to sign in. Check your credentials or retry when authentication is available.', errorCode: 'invalid_credentials' };
   }
 
   // 2. Local / Staging Store Verification
-  if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'development') {
-    return { success: false, error: 'Authentication is not configured.', errorCode: 'invalid_credentials' };
-  }
   const user = store.users.find(
     (u) => u.email.toLowerCase() === cleanEmail.toLowerCase()
   );

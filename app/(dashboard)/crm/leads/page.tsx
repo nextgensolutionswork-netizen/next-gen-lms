@@ -30,9 +30,8 @@ import { BulkImportModal } from '@/components/bulk-import-modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { Lead, LeadStage } from '@/types';
-import { createLead, updateLeadStage, bulkAssignLeads, bulkUpdateLeadStage, getLeads } from '@/lib/services/crm-service';
+import { createLead, updateLeadStage, bulkAssignLeads, bulkUpdateLeadStage } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 
 export default function LeadsPage() {
@@ -100,22 +99,12 @@ export default function LeadsPage() {
   const [fullName, setFullName] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
-  const [courseId, setCourseId] = React.useState('');
-  const [coursesList, setCoursesList] = React.useState<Array<{ id: string; course_name: string; price?: number }>>([]);
-  const [counsellorsList, setCounsellorsList] = React.useState<Array<{ id: string; full_name: string; role: string }>>([]);
-  const [isLoadingOptions, setIsLoadingOptions] = React.useState(false);
-  const [optionsLoadError, setOptionsLoadError] = React.useState<string | null>(null);
-  const [counsellorId, setCounsellorId] = React.useState<string>('');
+  const [courseId, setCourseId] = React.useState(store.courses?.[0]?.id || '');
+  const [counsellorId, setCounsellorId] = React.useState<string>(user?.id || '');
   const [status, setStatus] = React.useState('Working Professional');
   const [trainingPref, setTrainingPref] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Hybrid');
   const [source, setSource] = React.useState<'Website' | 'Google Ads' | 'Meta Ads' | 'Referral' | 'Walk-in' | 'Other'>('Website');
   const [notes, setNotes] = React.useState('');
-  const [isCreatingLead, setIsCreatingLead] = React.useState(false);
-  const [createLeadError, setCreateLeadError] = React.useState<string | null>(null);
-  const [leadsLoadError, setLeadsLoadError] = React.useState<string | null>(null);
-  const [stageSaveError, setStageSaveError] = React.useState<string | null>(null);
-  const [isSavingStage, setIsSavingStage] = React.useState(false);
-  const refreshRequest = React.useRef(0);
 
   // Follow-up notes update state
   const [updateNotes, setUpdateNotes] = React.useState('');
@@ -141,92 +130,29 @@ export default function LeadsPage() {
   const [discount, setDiscount] = React.useState(0);
   const [discountReason, setDiscountReason] = React.useState('');
 
-// Submissions use authoritative counsellorId from loaded counsellorsList; no blind user.id override
-
-  const refreshLeads = React.useCallback(async () => {
-    const request = ++refreshRequest.current;
-    try {
-      setLeadsLoadError(null);
-      const serverLeads = await getLeads();
-      let list = [...serverLeads];
-      if (selectedStage !== 'All') {
-        list = list.filter((l) => l.stage === selectedStage);
-      }
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        list = list.filter(
-          (l) =>
-            l.full_name?.toLowerCase().includes(q) ||
-            l.phone?.includes(q) ||
-            l.email?.toLowerCase().includes(q) ||
-            l.lead_code?.toLowerCase().includes(q)
-        );
-      }
-      if (request === refreshRequest.current) setLeads(list);
-    } catch (error) {
-      if (request !== refreshRequest.current) return;
-      setLeads([]);
-      setLeadsLoadError(error instanceof Error ? error.message : 'Unable to load leads. Please retry.');
-    }
-  }, [search, selectedStage]);
-
   React.useEffect(() => {
-    let isMounted = true;
-    const loadOptions = async () => {
-      setIsLoadingOptions(true);
-      setOptionsLoadError(null);
-      try {
-        if (isLiveSupabaseEnabled()) {
-          const supabase = createClient();
-          const [coursesRes, staffRes] = await Promise.all([
-            supabase.from('courses').select('id, course_name, price').order('course_name'),
-            supabase.from('profiles').select('id, full_name, role, is_active').eq('is_active', true).in('role', ['counsellor', 'admin', 'super_admin']).order('full_name'),
-          ]);
-          if (!isMounted) return;
-          if (coursesRes.error || staffRes.error) throw new Error('Unable to load authorized courses or counsellors.');
-          let courses = coursesRes.data || [];
-          let staff = (staffRes.data || []).filter((u: any) => u.is_active !== false);
-          staff = staff.filter((s: any) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.id));
-          setCoursesList(courses);
-          setCounsellorsList(staff);
-          setCourseId((current) => courses.some((c: any) => c.id === current) ? current : courses[0]?.id || '');
-          setCounsellorId((current) => {
-            if (staff.some((s: any) => s.id === current)) return current;
-            const userUuid = user?.id === 'usr-counsellor' ? '44444444-4444-4444-4444-444444444444' : user?.id;
-            const matched = staff.find((s: any) => s.id === userUuid) || staff[0];
-            return matched?.id || '';
-          });
-        } else {
-          const courses = (store.courses || []).map((c) => ({ id: c.id, course_name: c.course_name, price: c.price }));
-          let staff = (store.users || [])
-            .filter((u: any) => u.is_active !== false && ['counsellor', 'admin', 'super_admin'].includes(u.role))
-            .map((u: any) => ({ id: u.id, full_name: u.full_name, role: u.role }))
-            .filter((s: any) => s.id !== 'usr-counsellor');
-          setCoursesList(courses);
-          setCounsellorsList(staff);
-          setCourseId((current) => courses.some((c) => c.id === current) ? current : courses[0]?.id || '');
-          setCounsellorId((current) => {
-            if (staff.some((s: any) => s.id === current)) return current;
-            const userUuid = user?.id === 'usr-counsellor' ? '44444444-4444-4444-4444-444444444444' : user?.id;
-            const matched = staff.find((s: any) => s.id === userUuid) || staff[0];
-            return matched?.id || '';
-          });
-        }
-      } catch (err) {
-        if (isMounted) {
-          setOptionsLoadError('Failed to load courses or counsellors. Refresh and retry.');
-          setCoursesList([]);
-          setCounsellorsList([]);
-          setCourseId('');
-          setCounsellorId('');
-        }
-      } finally {
-        if (isMounted) setIsLoadingOptions(false);
-      }
-    };
-    loadOptions();
-    return () => { isMounted = false; };
-  }, [user?.id]);
+    if (user?.id && !counsellorId) {
+      setCounsellorId(user.id);
+    }
+  }, [user?.id, counsellorId]);
+
+  const refreshLeads = React.useCallback(() => {
+    let list = [...(store.leads || [])];
+    if (selectedStage !== 'All') {
+      list = list.filter((l) => l.stage === selectedStage);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (l) =>
+          l.full_name?.toLowerCase().includes(q) ||
+          l.phone?.includes(q) ||
+          l.email?.toLowerCase().includes(q) ||
+          l.lead_code?.toLowerCase().includes(q)
+      );
+    }
+    setLeads(list);
+  }, [search, selectedStage]);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -252,69 +178,42 @@ export default function LeadsPage() {
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreateLeadError(null);
-
-    if (!fullName || !fullName.trim()) {
-      setCreateLeadError('Please enter candidate full name.');
-      return;
-    }
-    if (!phone || !phone.trim()) {
-      setCreateLeadError('Please enter phone number.');
-      return;
-    }
-    if (!email || !email.trim()) {
-      setCreateLeadError('Please enter email address.');
-      return;
-    }
+    if (!fullName || !phone || !email) return;
     if (!user) {
-      setCreateLeadError('Authentication required: Please sign in to create leads.');
+      alert('Authentication required: Please sign in to create leads.');
       return;
     }
 
-    if (isLoadingOptions || optionsLoadError || !coursesList.some((c) => c.id === courseId)) {
-      setCreateLeadError('Please select an available course after the options finish loading.');
-      return;
-    }
-    const assignedCounsellorId = counsellorId;
-    if (!counsellorsList.some((c) => c.id === assignedCounsellorId)) {
-      setCreateLeadError('Please select an assigned counsellor.');
+    const assignedCounsellorId = counsellorId || user.id || availableCounsellors[0]?.id;
+    if (!assignedCounsellorId) {
+      alert('Please select an assigned counsellor.');
       return;
     }
 
-    try {
-      setIsCreatingLead(true);
-      await createLead({
-        full_name: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        interested_course_id: courseId,
-        current_status: status,
-        experience_years: 1,
-        training_preference: trainingPref,
-        lead_source: source,
-        counsellor_id: assignedCounsellorId,
-        notes,
-        stage: 'New',
-      }, user);
+    await createLead({
+      full_name: fullName,
+      phone,
+      email,
+      interested_course_id: courseId,
+      current_status: status,
+      experience_years: 1,
+      training_preference: trainingPref,
+      lead_source: source,
+      counsellor_id: assignedCounsellorId,
+      notes,
+      stage: 'New',
+    });
 
-      setIsAddModalOpen(false);
-      setFullName('');
-      setPhone('');
-      setEmail('');
-      setNotes('');
-      setCreateLeadError(null);
-      refreshLeads();
-    } catch (err: any) {
-      console.error('Failed to create lead:', err);
-      setCreateLeadError(err?.message || 'Failed to create lead. Please try again.');
-    } finally {
-      setIsCreatingLead(false);
-    }
+    setIsAddModalOpen(false);
+    setFullName('');
+    setPhone('');
+    setEmail('');
+    setNotes('');
+    refreshLeads();
   };
 
   const handleUpdateStage = async () => {
-    if (!selectedLead || isSavingStage) return;
-    setStageSaveError(null);
+    if (!selectedLead) return;
     if (!user) {
       alert('Authentication required: Please sign in to update lead stages.');
       return;
@@ -328,17 +227,21 @@ export default function LeadsPage() {
       ? (followUpTime ? `${followUpDate}T${followUpTime}:00` : followUpDate)
       : null;
 
-    try {
-      setIsSavingStage(true);
-      await updateLeadStage(selectedLead.id, nextStage, updateNotes, user.id, scheduledDate);
-      setUpdateNotes('');
-      setSelectedLead(null);
-      await refreshLeads();
-    } catch (error) {
-      setStageSaveError(error instanceof Error ? error.message : 'Unable to save lead stage. Please retry.');
-    } finally {
-      setIsSavingStage(false);
+    const actorId = user.id;
+    await updateLeadStage(selectedLead.id, nextStage, updateNotes, actorId, scheduledDate);
+
+    if (nextStage === 'Demo Scheduled') {
+      const l = (store.leads || []).find((lead) => lead.id === selectedLead.id);
+      if (l) {
+        l.demo_date = scheduledDate || undefined;
+        l.demo_preference = true;
+        store.persist();
+      }
     }
+
+    setUpdateNotes('');
+    setSelectedLead(null);
+    refreshLeads();
   };
 
   const handleOpenConvert = (lead: Lead) => {
@@ -502,14 +405,6 @@ export default function LeadsPage() {
         actorId
       );
 
-      const targetLead = store.leads.find((l) => l.id === selectedLead.id);
-      if (targetLead) {
-        targetLead.stage = 'Converted';
-        targetLead.updated_at = new Date().toISOString();
-      }
-      selectedLead.stage = 'Converted';
-      store.persist();
-
       setIsConvertModalOpen(false);
       setSelectedLead(null);
       refreshLeads();
@@ -564,7 +459,6 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-6">
-      {leadsLoadError && <div role="alert">{leadsLoadError}</div>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -758,11 +652,11 @@ export default function LeadsPage() {
                     </td>
                   </tr>
                 ) : (
-                  leads.map((lead, idx) => {
+                  leads.map((lead) => {
                     const isSelected = selectedLeadIds.includes(lead.id);
                     return (
                       <tr
-                        key={`${lead.id}-${idx}`}
+                        key={lead.id}
                         className={`transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50/80' : 'hover:bg-slate-50/80'}`}
                       >
                         <td className="px-4 py-3">
@@ -869,13 +763,6 @@ export default function LeadsPage() {
         description="Record prospective student inquiry for SAP training."
       >
         <form onSubmit={handleCreateLead} className="space-y-4 text-xs">
-          {optionsLoadError && <div role="alert">{optionsLoadError}</div>}
-          {createLeadError && (
-            <div role="alert" className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-              <span className="font-semibold text-red-800">Error:</span>
-              <span>{createLeadError}</span>
-            </div>
-          )}
           <Input
             label="Full Name *"
             placeholder="e.g. Ramesh Kumar"
@@ -910,14 +797,11 @@ export default function LeadsPage() {
                 value={courseId}
                 onChange={(e) => setCourseId(e.target.value)}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
-                required
               >
-                {isLoadingOptions ? (
-                  <option value="">Loading courses...</option>
-                ) : coursesList.length === 0 ? (
+                {(store.courses || []).length === 0 ? (
                   <option value="">No courses available</option>
                 ) : (
-                  coursesList.map((c) => (
+                  (store.courses || []).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.course_name}
                     </option>
@@ -933,14 +817,11 @@ export default function LeadsPage() {
                 value={counsellorId}
                 onChange={(e) => setCounsellorId(e.target.value)}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
-                required
               >
-                {isLoadingOptions ? (
-                  <option value="">Loading counsellors...</option>
-                ) : counsellorsList.length === 0 ? (
-                  <option value="">No authorized counsellors available</option>
+                {availableCounsellors.length === 0 ? (
+                  <option value={user?.id || ''}>{user?.full_name || 'Current User'} (Staff)</option>
                 ) : (
-                  counsellorsList.map((c) => (
+                  availableCounsellors.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.full_name} ({c.role})
                     </option>
@@ -1007,8 +888,8 @@ export default function LeadsPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="sap" size="sm" disabled={isCreatingLead || isLoadingOptions || !!optionsLoadError || !courseId || !counsellorId}>
-              {isCreatingLead ? 'Creating Lead...' : 'Create Lead'}
+            <Button type="submit" variant="sap" size="sm">
+              Create Lead
             </Button>
           </div>
         </form>
@@ -1110,9 +991,8 @@ export default function LeadsPage() {
               <Button variant="outline" size="sm" onClick={() => setSelectedLead(null)}>
                 Cancel
               </Button>
-              {stageSaveError && <div role="alert">{stageSaveError}</div>}
-              <Button variant="sap" size="sm" onClick={handleUpdateStage} disabled={isSavingStage}>
-                {isSavingStage ? 'Saving...' : 'Save Updates'}
+              <Button variant="sap" size="sm" onClick={handleUpdateStage}>
+                Save Updates
               </Button>
             </div>
           </div>

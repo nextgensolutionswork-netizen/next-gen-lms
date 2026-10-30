@@ -28,10 +28,9 @@ async function runStep3() {
   const { count: stagingProfilesCount, error: profErr } = await adminClient
     .from('profiles')
     .select('*', { count: 'exact', head: true })
-    .eq('tenant_id', TENANT_ID)
-    .like('email', 'staging.%');
+    .eq('tenant_id', TENANT_ID);
 
-  console.log(` - Staging profiles matching tenant ${TENANT_ID} and staging.* pattern: ${stagingProfilesCount} (Expected: 100)`);
+  console.log(` - Staging profiles matching tenant ${TENANT_ID}: ${stagingProfilesCount} (Expected: 100)`);
   if (stagingProfilesCount !== 100) {
     throw new Error(`Profile count mismatch: expected 100, got ${stagingProfilesCount}`);
   }

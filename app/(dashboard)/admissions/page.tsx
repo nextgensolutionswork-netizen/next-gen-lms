@@ -30,7 +30,6 @@ import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
 import { createAdmissionWorkflow, getAdmissions } from '@/lib/services/admission-service';
-import { getCourses } from '@/lib/services/academics-service';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -159,57 +158,40 @@ export default function AdmissionsPage() {
   } | null>(null);
 
   React.useEffect(() => {
-    let isMounted = true;
-    const initAdmissions = async () => {
-      try {
-        await getCourses();
-      } catch (e) {
-        console.warn('Failed to prefetch courses in admissions page:', e);
-      }
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const leadId = params.get('convertLeadId');
-        if (leadId) {
-          setConvertedLeadId(leadId);
-          let lead = store.leads.find((l) => l.id === leadId);
-          if (!lead) {
-            try {
-              const { getLeads } = await import('@/lib/services/crm-service');
-              const allLeads = await getLeads();
-              lead = allLeads.find((l) => l.id === leadId);
-            } catch {}
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const leadId = params.get('convertLeadId');
+      if (leadId) {
+        setConvertedLeadId(leadId);
+        const lead = store.leads.find((l) => l.id === leadId);
+        if (lead) {
+          setName(lead.full_name || '');
+          setPhone(lead.phone || '');
+          setEmail(lead.email || '');
+          if (lead.interested_course_id) {
+            setCourseId(lead.interested_course_id);
+            const matchingBatches = (store.batches || []).filter((b) => b.course_id === lead.interested_course_id);
+            const availableBatch = matchingBatches.find(
+              (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
+            );
+            setBatchId(availableBatch?.id || '');
           }
-          if (lead && isMounted) {
-            setName(lead.full_name || '');
-            setPhone(lead.phone || '');
-            setEmail(lead.email || '');
-            if (lead.interested_course_id) {
-              setCourseId(lead.interested_course_id);
-              const matchingBatches = (store.batches || []).filter((b) => b.course_id === lead.interested_course_id);
-              const availableBatch = matchingBatches.find(
-                (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
-              );
-              setBatchId(availableBatch?.id || '');
-            }
-            if (lead.counsellor_id) {
-              setCounsellorId(lead.counsellor_id);
-            }
-            if (lead.training_preference) {
-              setTrainingMode(lead.training_preference);
-            }
-            if (lead.experience_years) {
-              setExperienceYears(lead.experience_years);
-            }
-            if (lead.current_status) {
-              setEducation(lead.current_status);
-            }
-            setIsNewModalOpen(true);
+          if (lead.counsellor_id) {
+            setCounsellorId(lead.counsellor_id);
           }
+          if (lead.training_preference) {
+            setTrainingMode(lead.training_preference);
+          }
+          if (lead.experience_years) {
+            setExperienceYears(lead.experience_years);
+          }
+          if (lead.current_status) {
+            setEducation(lead.current_status);
+          }
+          setIsNewModalOpen(true);
         }
       }
-    };
-    initAdmissions();
-    return () => { isMounted = false; };
+    }
   }, []);
 
   const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];

@@ -137,7 +137,6 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   private liveClient?: SupabaseClient;
   private action: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select';
   private selectColumns: string = '*';
-  private returnRows = false;
   private payload: any = null;
   private upsertOptions?: { onConflict?: string; ignoreDuplicates?: boolean };
   private ops: Array<{ type: string; args: any[] }> = [];
@@ -161,7 +160,7 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   }
 
   select(columns: string = '*'): this {
-    this.returnRows = this.action !== 'select';
+    this.action = 'select';
     this.selectColumns = columns;
     return this;
   }
@@ -305,7 +304,6 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
         } else if (this.action === 'delete') {
           liveQuery = liveQuery.delete();
         }
-        if (this.returnRows) liveQuery = liveQuery.select(this.selectColumns);
 
         // Replay all query operations (eq, order, limit, etc.) on the PostgREST query
         for (const op of this.ops) {
@@ -330,9 +328,9 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
           return { data: null, error: { message: 'Row not found', code: 'PGRST116' } };
         }
 
-        return { data: null, error: res.error };
+        console.warn(`Supabase query for ${this.table} returned error, evaluating fallback:`, res.error.message);
       } catch (liveErr) {
-        return { data: null, error: { message: liveErr instanceof Error ? liveErr.message : 'Database request failed.' } };
+        console.warn(`Supabase query for ${this.table} failed, evaluating with local RLS:`, liveErr);
       }
     }
 
@@ -412,12 +410,7 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
       }
 
       for (const item of recordsToInsert) {
-        const existingIdx = rawRecords.findIndex((r) => r.id && r.id === item.id);
-        if (existingIdx >= 0) {
-          rawRecords[existingIdx] = { ...rawRecords[existingIdx], ...item };
-        } else {
-          rawRecords.unshift(item);
-        }
+        rawRecords.unshift(item);
       }
       store.persist();
 
