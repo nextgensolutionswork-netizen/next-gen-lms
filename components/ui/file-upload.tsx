@@ -96,7 +96,11 @@ export function FileUpload({
 
       if (bucket === 'payment-proofs') {
         const error = await res.json().catch(() => ({}));
-        throw new Error(error.error || 'Payment proof upload failed. Please retry.');
+        let errMsg = error.error || 'Payment proof upload failed. Please retry.';
+        if (/fetch failed/i.test(errMsg)) {
+          errMsg = 'Payment proof upload failed: Remote storage service is unreachable.';
+        }
+        throw new Error(errMsg);
       }
 
       // 2. Direct client fallback via storage-service

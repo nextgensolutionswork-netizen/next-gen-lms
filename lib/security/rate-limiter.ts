@@ -77,10 +77,11 @@ export function validateCsrfOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
 
-  // Extract host from Host header, X-Forwarded-Host, or request URL
+  // Extract host from X-Forwarded-Host (reverse proxy/ingress), Host header, or request URL
+  const forwardedHost = request.headers.get('x-forwarded-host');
   const rawHost =
+    forwardedHost ||
     request.headers.get('host') ||
-    request.headers.get('x-forwarded-host') ||
     (() => {
       try {
         return request.url ? new URL(request.url).host : null;
@@ -99,7 +100,13 @@ export function validateCsrfOrigin(request: Request): boolean {
   if (origin) {
     try {
       const originUrl = new URL(origin);
-      return originUrl.host.toLowerCase() === expectedHost;
+      const isMatch = originUrl.host.toLowerCase() === expectedHost;
+      if (isMatch) return true;
+      if (process.env.NODE_ENV !== 'production') {
+        const isLocalHostMatch = /^localhost:\d+$/.test(originUrl.host.toLowerCase()) && /^localhost:\d+$/.test(expectedHost);
+        if (isLocalHostMatch) return true;
+      }
+      return false;
     } catch {
       return false;
     }
@@ -109,7 +116,13 @@ export function validateCsrfOrigin(request: Request): boolean {
   if (referer) {
     try {
       const refererUrl = new URL(referer);
-      return refererUrl.host.toLowerCase() === expectedHost;
+      const isMatch = refererUrl.host.toLowerCase() === expectedHost;
+      if (isMatch) return true;
+      if (process.env.NODE_ENV !== 'production') {
+        const isLocalHostMatch = /^localhost:\d+$/.test(refererUrl.host.toLowerCase()) && /^localhost:\d+$/.test(expectedHost);
+        if (isLocalHostMatch) return true;
+      }
+      return false;
     } catch {
       return false;
     }

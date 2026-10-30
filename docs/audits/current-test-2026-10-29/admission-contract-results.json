@@ -1,0 +1,9 @@
+[
+  {
+    "name": "admission-contract",
+    "command": "npm.cmd test -- tests/audit-admission-failure-contract.test.ts --silent --maxWorkers=1 --minWorkers=1",
+    "exitCode": 1,
+    "started": "2026-10-29T11:23:07.466Z",
+    "finished": "2026-10-29T11:23:13.073Z"
+  }
+]

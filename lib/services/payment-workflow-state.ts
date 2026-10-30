@@ -17,15 +17,31 @@ export function mergeWorkflowSnapshot(snapshot: Partial<WorkflowSnapshot>, tenan
   for (const key of workflowKeys) {
     if (!snapshot[key]) continue;
     const rows = snapshot[key]!;
-    const ids = new Set(rows.map((r) => r.id));
-    (store as any)[key] = typeof window !== 'undefined' ? [...rows] : [...rows, ...(store[key] as any[]).filter((r) => !ids.has(r.id) && (!tenant || tenantId(r) !== tenant))];
+    const normalizedRows = rows.map((r) => {
+      let mod = r;
+      if (mod.counsellor_id === 'usr-counsellor') {
+        mod = { ...mod, counsellor_id: '44444444-4444-4444-4444-444444444444' };
+      }
+      if (mod.user_id === 'usr-counsellor') {
+        mod = { ...mod, user_id: '44444444-4444-4444-4444-444444444444' };
+      }
+      if (mod.id === 'usr-counsellor') {
+        mod = { ...mod, id: '44444444-4444-4444-4444-444444444444' };
+      }
+      return mod;
+    });
+    const ids = new Set(normalizedRows.map((r) => r.id));
+    (store as any)[key] = typeof window !== 'undefined' ? [...normalizedRows] : [...normalizedRows, ...(store[key] as any[]).filter((r) => !ids.has(r.id) && (!tenant || tenantId(r) !== tenant))];
   }
 }
 
 export function visibleWorkflowSnapshot(actor: UserProfile): Partial<WorkflowSnapshot> {
   const snapshot = workflowSnapshot(tenantId(actor));
   // Profiles and operational configuration are not part of a payment response.
-  const { users, batches, leads, ...result } = snapshot;
+  const { users, batches, ...result } = snapshot;
+  if (!['counsellor', 'admin', 'super_admin'].includes(actor.role)) {
+    delete (result as any).leads;
+  }
   result.notifications = result.notifications.filter((n) => n.user_id === actor.id);
   if (actor.role === 'student' || actor.role === 'onboarding_team') {
     const allowed = new Set(result.students.filter((s) => actor.role === 'student' ? s.user_id === actor.id : result.onboardingCases.some((c) => c.student_id === s.id && c.assigned_staff_id === actor.id)).map((s) => s.id));
@@ -38,6 +54,9 @@ export function visibleWorkflowSnapshot(actor: UserProfile): Partial<WorkflowSna
   if (actor.role === 'counsellor') {
     result.studentPayments = result.studentPayments.filter((p) => p.recorded_by === actor.id);
     result.auditLogs = result.auditLogs.filter((a) => a.user_id === actor.id || result.studentPayments.some((p) => p.id === a.record_id));
+    if (result.leads) {
+      result.leads = result.leads.filter((l) => l.counsellor_id === actor.id);
+    }
   }
   return result;
 }

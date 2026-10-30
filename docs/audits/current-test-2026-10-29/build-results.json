@@ -1,0 +1,9 @@
+[
+  {
+    "name": "build",
+    "command": "npm.cmd run build",
+    "exitCode": 0,
+    "started": "2026-10-29T11:19:04.117Z",
+    "finished": "2026-10-29T11:22:07.502Z"
+  }
+]

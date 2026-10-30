@@ -1,0 +1,22 @@
+{
+  ".env.local": {
+    "urlPresent": true,
+    "urlValid": true,
+    "matchesConnectedProduction": true,
+    "publicKeyPresent": true,
+    "publicKeyKind": "publishable",
+    "legacyJwtProjectMatchesUrl": null,
+    "serviceRoleOnlyServerVariable": true,
+    "isolatedStagingVerified": false
+  },
+  ".env.staging": {
+    "urlPresent": true,
+    "urlValid": true,
+    "matchesConnectedProduction": false,
+    "publicKeyPresent": true,
+    "publicKeyKind": "publishable",
+    "legacyJwtProjectMatchesUrl": null,
+    "serviceRoleOnlyServerVariable": true,
+    "isolatedStagingVerified": false
+  }
+}

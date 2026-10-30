@@ -68,9 +68,24 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         ...store.users.filter((u) => tenantId(u) !== tenant || (u.role === 'student' && !profileIds.has(u.id))),
         ...(roster.data || []) as UserProfile[],
       ];
+      const currentActorProfile = (roster.data || []).find((u) => u.id === actor.id);
+      if (!currentActorProfile || currentActorProfile.is_active === false) {
+        throw new Error('Unauthorized: Actor is inactive or no longer in staff roster.');
+      }
+      actor.role = currentActorProfile.role;
+      actor.is_active = currentActorProfile.is_active;
+    } else {
+      const localProfile = (store.users || []).find((u) => u.id === actor.id);
+      if (!localProfile || localProfile.is_active === false) {
+        throw new Error('Unauthorized: Actor is inactive or no longer in staff roster.');
+      }
+      if (tenantId(localProfile) !== tenant) {
+        throw new Error('Unauthorized: Actor belongs to another tenant.');
+      }
+      actor.role = localProfile.role;
+      actor.is_active = localProfile.is_active;
+      actor.tenant_id = localProfile.tenant_id;
     }
-    const userIndex = store.users.findIndex((u) => u.id === actor.id);
-    if (userIndex < 0) store.users.push(actor); else store.users[userIndex] = actor;
     const before = Object.fromEntries(workflowKeys.map((key) => [key, structuredClone(store[key])]));
     const originalPersist = store.persist;
     store.persist = () => {}; // no intermediate durable snapshots
@@ -84,6 +99,22 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         if (db) {
           const response = await db.rpc('commit_fee_workflow', { p_tenant: tenant, p_revision: revision, p_snapshot: snapshot });
           if (response.error || !response.data) throw new Error('Conflict: Payment state changed or could not be committed. Refresh and retry.');
+
+          // Synchronize converted leads to relational public.leads table
+          const convertedLeads = store.leads.filter(
+            (l) => l.stage === 'Converted' && (before.leads as any[])?.find((b) => b.id === l.id)?.stage !== 'Converted'
+          );
+          for (const cl of convertedLeads) {
+            try {
+              await db.from('leads').update({
+                stage: 'Converted',
+                notes: cl.notes,
+                updated_at: cl.updated_at || new Date().toISOString(),
+              }).eq('id', cl.id);
+            } catch (leadSyncErr) {
+              console.warn('Failed to sync converted lead stage to relational table:', leadSyncErr);
+            }
+          }
         } else if (!store.persistSync()) {
           throw new Error('Payment storage failed; no changes were committed.');
         }

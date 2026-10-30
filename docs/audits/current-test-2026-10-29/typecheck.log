@@ -1,0 +1,4 @@
+
+> next-gen-lms@1.0.0 typecheck
+> tsc --noEmit --incremental false
+

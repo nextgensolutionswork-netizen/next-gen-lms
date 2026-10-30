@@ -1,0 +1,20 @@
+ M app/(dashboard)/crm/leads/page.tsx
+ M app/api/admissions/route.ts
+ M app/api/fees/proof/route.ts
+ M lib/services/admission-service.ts
+ M lib/services/crm-service.ts
+ M lib/services/payment-workflow-state.ts
+ M lib/services/payment-workflow-transaction.ts
+ M lib/supabase/db.ts
+ M lib/supabase/rls.ts
+ M tsconfig.json
+ M types/index.ts
+?? TEST-REPORT.md
+?? docs/audits/current-test-2026-10-29/
+?? qa-checkpoints/
+?? supabase/migrations/010_admission_lead_id_unique.sql
+?? tests/audit-admission-failure-contract.test.ts
+?? tests/audit-crm-live-contract.test.ts
+?? tests/audit-payment-roster-contract.test.ts
+?? tests/lead-conversion-atomicity.test.ts
+?? tests/remediation-contract.test.ts

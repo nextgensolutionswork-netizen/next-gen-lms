@@ -1,0 +1,17 @@
+{
+    "head":  "5b6744cb286a64e67ffe63044ba9d410df75ccf1",
+    "changedSourceFiles":  [
+
+                           ],
+    "workflowFailed":  0,
+    "sourceFilesChecked":  268,
+    "workflowChecks":  15,
+    "createdFiles":  [
+                         "TEST-REPORT.md",
+                         "docs/audits/current-test-2026-10-29/"
+                     ],
+    "trackedDiff":  {
+
+                    },
+    "serverStopped":  true
+}

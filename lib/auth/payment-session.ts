@@ -10,7 +10,15 @@ import { UserProfile } from '@/types';
 export async function authenticatePaymentRequest(request: NextRequest): Promise<UserProfile> {
   if (request.method !== 'GET') {
     const origin = request.headers.get('origin');
-    if (origin && origin !== request.nextUrl.origin) throw new Error('Forbidden: Invalid request origin.');
+    const xForwardedHost = request.headers.get('x-forwarded-host');
+    const expectedOrigin = xForwardedHost ? `${request.nextUrl.protocol}//${xForwardedHost}` : request.nextUrl.origin;
+    if (origin && origin !== request.nextUrl.origin && origin !== expectedOrigin) {
+      const isLocalDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+      const isLocalhost = /^https?:\/\/localhost(:\d+)?$/.test(origin) && /^https?:\/\/localhost(:\d+)?$/.test(request.nextUrl.origin);
+      if (!isLocalDev || !isLocalhost) {
+        throw new Error('Forbidden: Invalid request origin.');
+      }
+    }
   }
   let user: UserProfile | undefined;
   if (isLiveSupabaseEnabled()) {
@@ -34,6 +42,9 @@ export async function authenticatePaymentRequest(request: NextRequest): Promise<
   }
   
   if (!user) {
+    // A rejected live session cannot be replaced by an application cookie.
+    if (isLiveSupabaseEnabled()) throw new Error('Unauthorized: A valid Supabase session is required.');
+    if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'development') throw new Error('Unauthorized: Live authentication is required.');
     const value = request.headers.get('cookie')?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`))?.slice(AUTH_COOKIE_NAME.length + 1);
     const signature = request.cookies.get(AUTH_SIG_COOKIE_NAME)?.value;
     const parsedCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;

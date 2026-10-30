@@ -31,9 +31,12 @@ it('F02: financial authentication rejects a cookie-only unknown actor after live
   const signature = await generateAuthCookieSignature(value);
   await expect(
     authenticatePaymentRequest(new NextRequest('http://localhost:3117/api/fees/payments', { headers: { cookie: `${AUTH_COOKIE_NAME}=${value}; ${AUTH_SIG_COOKIE_NAME}=${signature}` } }))
-  ).rejects.toThrow('Unauthorized: Unknown or unverified user profile.');
+  ).rejects.toThrow('Unauthorized: A valid Supabase session is required.');
 });
 it.each(['missing row', 'database error'])('F03: student access gate fails closed for %s', async (condition) => {
+  // Exercise the access gate only after genuine session/profile verification.
+  mocks.getUser.mockResolvedValue({ data: { user: { id: 'verified-student', email: 'audit@example.test' } }, error: null });
+  mocks.gate.mockResolvedValueOnce({ data: { role: 'student', is_active: true }, error: null });
   mocks.gate.mockResolvedValue({ data: null, error: condition === 'database error' ? new Error('database unavailable') : null });
   const val = identity('student');
   const sig = await generateAuthCookieSignature(val);

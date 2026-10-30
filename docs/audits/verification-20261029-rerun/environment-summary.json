@@ -1,0 +1,14 @@
+[
+    {
+        "file":  ".env.local",
+        "endpointKind":  "remote",
+        "serviceKeyPresent":  true,
+        "isolatedDatabaseVerified":  false
+    },
+    {
+        "file":  ".env.staging",
+        "endpointKind":  "remote",
+        "serviceKeyPresent":  true,
+        "isolatedDatabaseVerified":  false
+    }
+]

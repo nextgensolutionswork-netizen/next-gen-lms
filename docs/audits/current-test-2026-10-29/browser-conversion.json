@@ -1,0 +1,19 @@
+{
+  "mode": "synthetic local adapter",
+  "dialogs": [
+    "Lead Audit Conversion converted to confirmed admission successfully!"
+  ],
+  "pageErrors": [],
+  "responses": [
+    {
+      "status": 200,
+      "success": true,
+      "admissionCreated": true
+    }
+  ],
+  "followupSaved": true,
+  "followupAfterRefresh": true,
+  "authoritativeAdmissionSaved": true,
+  "convertedVisible": true,
+  "convertedAfterRefresh": true
+}
