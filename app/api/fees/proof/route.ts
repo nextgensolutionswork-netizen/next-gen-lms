@@ -14,7 +14,10 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 const root = path.resolve(process.cwd(), 'data', 'payment-proofs');
 const mime: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', pdf: 'application/pdf' };
 function fail(error: unknown) {
-  const message = error instanceof Error ? error.message : 'Payment proof operation failed.';
+  let message = error instanceof Error ? error.message : 'Payment proof operation failed.';
+  if (/fetch failed/i.test(message)) {
+    message = 'Payment proof upload failed: Remote storage service is unreachable.';
+  }
   return NextResponse.json({ success: false, error: message }, { status: message.startsWith('Unauthorized') ? 401 : /Forbidden/.test(message) ? 403 : 400 });
 }
 export async function POST(request: NextRequest) {
@@ -31,7 +34,9 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     if (isLiveSupabaseEnabled()) {
       const { error } = await createAdminClient().storage.from('payment-proofs').upload(objectPath, buffer, { contentType: mime[extension], upsert: false });
-      if (error) throw new Error(error.message);
+      if (error) {
+        throw new Error(`Payment proof upload to remote storage failed: ${error.message}`);
+      }
     } else {
       const target = path.join(root, objectPath);
       await mkdir(path.dirname(target), { recursive: true });
@@ -50,7 +55,9 @@ export async function GET(request: NextRequest) {
     if (tenant !== hash(tenantId(actor)) || (actor.role === 'counsellor' && owner !== hash(actor.id))) throw new Error('Forbidden: Payment proof belongs to another account.');
     if (isLiveSupabaseEnabled()) {
       const { data, error } = await createAdminClient().storage.from('payment-proofs').createSignedUrl(objectPath, 60);
-      if (error || !data) throw new Error('Payment proof not found.');
+      if (error || !data?.signedUrl) {
+        throw new Error('Payment proof not found in remote storage.');
+      }
       return NextResponse.redirect(data.signedUrl, { headers: { 'Cache-Control': 'private, no-store' } });
     }
     const bytes = await readFile(path.join(root, objectPath));

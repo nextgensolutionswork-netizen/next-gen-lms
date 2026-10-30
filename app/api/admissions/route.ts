@@ -50,7 +50,10 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, ...data });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Admission failed.';
+    let message = error instanceof Error ? error.message : 'Admission failed.';
+    if (error instanceof z.ZodError) {
+      message = error.errors.map((e) => `${e.path.join('.') || 'field'}: ${e.message}`).join('; ');
+    }
     return NextResponse.json({ success: false, error: message }, { status: message.startsWith('Unauthorized') ? 401 : message.startsWith('Forbidden') ? 403 : 400 });
   }
 }

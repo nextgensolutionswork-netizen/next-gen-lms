@@ -1,0 +1,37 @@
+
+> next-gen-lms@1.0.0 test
+> vitest run tests/audit-admission-failure-contract.test.ts --silent --maxWorkers=1 --minWorkers=1
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 E:/my erp hub/lms-test-run-20261029
+
+ ❯ tests/audit-admission-failure-contract.test.ts (1 test | 1 failed) 337ms
+   × does not create a local successful admission after the authoritative server rejects it 27ms
+     → expected { rejected: false, …(1) } to deeply equal { rejected: true, …(1) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/audit-admission-failure-contract.test.ts > does not create a local successful admission after the authoritative server rejects it
+AssertionError: expected { rejected: false, …(1) } to deeply equal { rejected: true, …(1) }
+
+- Expected
++ Received
+
+  Object {
+-   "localAdmissionsAdded": 0,
+-   "rejected": true,
++   "localAdmissionsAdded": 1,
++   "rejected": false,
+  }
+
+ ❯ tests/audit-admission-failure-contract.test.ts:11:74
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  16:53:09
+   Duration  2.90s (transform 618ms, setup 66ms, collect 830ms, tests 337ms, environment 0ms, prepare 246ms)
+

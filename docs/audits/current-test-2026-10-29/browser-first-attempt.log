@@ -1,0 +1,81 @@
+  ▲ Next.js 14.2.24
+  - Local:        http://localhost:3013
+
+ ✓ Starting...
+ ✓ Ready in 3.1s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 2.9s (129 modules)
+ ○ Compiling /login ...
+ ⨯ Module not found: Error: Can't resolve './E:/my erp hub/next gen lms/node_modules/next/dist/client/app-next-dev.js' in 'C:\Users\THINKPAD T490\AppData\Local\Temp\lms-current-test-149f897b589e4d7b92fb08c8c091564f'
+ ⨯ Module not found: Error: Can't resolve './E:/my erp hub/next gen lms/node_modules/next/dist/client/app-next-dev.js' in 'C:\Users\THINKPAD T490\AppData\Local\Temp\lms-current-test-149f897b589e4d7b92fb08c8c091564f'
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (113kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (268kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ⨯ Module not found: Error: Can't resolve './E:/my erp hub/next gen lms/node_modules/next/dist/client/next-dev.js' in 'C:\Users\THINKPAD T490\AppData\Local\Temp\lms-current-test-149f897b589e4d7b92fb08c8c091564f'
+ ⨯ Error: ENOENT: no such file or directory, open 'C:\Users\THINKPAD T490\AppData\Local\Temp\lms-current-test-149f897b589e4d7b92fb08c8c091564f\.next-browser-test\fallback-build-manifest.json'
+    at readFileSync (node:fs:484:20)
+    at loadManifest (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-manifest.js:36:52)
+    at loadManifestWithRetries (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-components.js:40:51)
+    at async loadDefaultErrorComponentsImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-default-error-components.js:30:24)
+    at async DevServer.getFallbackErrorComponents (E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:594:16)
+    at async DevServer.renderErrorToResponseImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:2203:40)
+    at async DevServer.renderToResponseImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:2019:30)
+    at async DevServer.pipeImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:818:17)
+    at async E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (E:\my erp hub\next gen lms\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:178:21)
+    at async handleRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:355:24)
+    at async requestHandlerImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:379:13)
+    at async Server.requestListener (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\THINKPAD T490\\AppData\\Local\\Temp\\lms-current-test-149f897b589e4d7b92fb08c8c091564f\\.next-browser-test\\fallback-build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\THINKPAD T490\AppData\Local\Temp\lms-current-test-149f897b589e4d7b92fb08c8c091564f\.next-browser-test\fallback-build-manifest.json'
+    at readFileSync (node:fs:484:20)
+    at loadManifest (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-manifest.js:36:52)
+    at loadManifestWithRetries (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-components.js:40:51)
+    at async loadDefaultErrorComponentsImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-default-error-components.js:30:24)
+    at async DevServer.getFallbackErrorComponents (E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:594:16)
+    at async DevServer.renderErrorToResponseImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:2203:40)
+    at async DevServer.renderToResponseImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:2019:30)
+    at async DevServer.pipeImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:818:17)
+    at async E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (E:\my erp hub\next gen lms\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:178:21)
+    at async handleRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:355:24)
+    at async requestHandlerImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:379:13)
+    at async Server.requestListener (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\THINKPAD T490\\AppData\\Local\\Temp\\lms-current-test-149f897b589e4d7b92fb08c8c091564f\\.next-browser-test\\fallback-build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\THINKPAD T490\AppData\Local\Temp\lms-current-test-149f897b589e4d7b92fb08c8c091564f\.next-browser-test\fallback-build-manifest.json'
+    at readFileSync (node:fs:484:20)
+    at loadManifest (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-manifest.js:36:52)
+    at loadManifestWithRetries (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-components.js:40:51)
+    at async loadDefaultErrorComponentsImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\load-default-error-components.js:30:24)
+    at async DevServer.getFallbackErrorComponents (E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:594:16)
+    at async DevServer.renderErrorToResponseImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:2203:40)
+    at async pipe.req.req (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:2056:30)
+    at async DevServer.pipeImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\base-server.js:922:25)
+    at async E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (E:\my erp hub\next gen lms\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (E:\my erp hub\next gen lms\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:178:21)
+    at async requestHandlerImpl (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\router-server.js:391:24)
+    at async Server.requestListener (E:\my erp hub\next gen lms\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\THINKPAD T490\\AppData\\Local\\Temp\\lms-current-test-149f897b589e4d7b92fb08c8c091564f\\.next-browser-test\\fallback-build-manifest.json'
+}
+ GET /login 500 in 31907ms
+ GET /login 500 in 235ms

@@ -1,0 +1,20 @@
+{
+  "mode": "actual AuthProvider with mocked live auth and synthetic cached admin",
+  "checks": [
+    {
+      "mode": "rejected",
+      "cacheIgnored": true,
+      "noPermissions": true,
+      "loginRejected": true,
+      "noLocalFallback": true
+    },
+    {
+      "mode": "profile-missing",
+      "cacheIgnored": true,
+      "noPermissions": true,
+      "loginRejected": true,
+      "noLocalFallback": true
+    }
+  ],
+  "pageErrors": []
+}

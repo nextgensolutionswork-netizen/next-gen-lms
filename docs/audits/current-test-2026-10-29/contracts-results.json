@@ -1,0 +1,9 @@
+[
+  {
+    "name": "contracts",
+    "command": "npm.cmd test -- tests/audit-crm-live-contract.test.ts tests/audit-payment-roster-contract.test.ts --silent --maxWorkers=1 --minWorkers=1",
+    "exitCode": 1,
+    "started": "2026-10-29T11:26:34.624Z",
+    "finished": "2026-10-29T11:26:37.997Z"
+  }
+]

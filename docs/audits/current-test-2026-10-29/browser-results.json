@@ -1,0 +1,220 @@
+{
+  "mode": "current source; synthetic local adapter; outbound browser traffic blocked",
+  "roles": [
+    {
+      "role": "super_admin",
+      "permissions": [],
+      "login": true,
+      "landed": "/dashboard",
+      "expected": "/dashboard",
+      "redirectPass": true
+    },
+    {
+      "role": "admin",
+      "permissions": [],
+      "login": true,
+      "landed": "/dashboard",
+      "expected": "/dashboard",
+      "redirectPass": true
+    },
+    {
+      "role": "counsellor",
+      "permissions": [
+        {
+          "route": "/settings",
+          "final": "/crm/leads",
+          "blocked": true
+        },
+        {
+          "route": "/audit-logs",
+          "final": "/crm/leads",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/approvals",
+          "final": "/crm/leads",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/expenses",
+          "final": "/crm/leads",
+          "blocked": true
+        }
+      ],
+      "login": true,
+      "landed": "/crm/leads",
+      "expected": "/crm/leads",
+      "redirectPass": true
+    },
+    {
+      "role": "accountant",
+      "permissions": [
+        {
+          "route": "/settings",
+          "final": "/accounts/fees",
+          "blocked": true
+        },
+        {
+          "route": "/audit-logs",
+          "final": "/accounts/fees",
+          "blocked": true
+        },
+        {
+          "route": "/crm/leads",
+          "final": "/accounts/fees",
+          "blocked": true
+        }
+      ],
+      "login": true,
+      "landed": "/accounts/fees",
+      "expected": "/accounts/fees",
+      "redirectPass": true
+    },
+    {
+      "role": "onboarding_team",
+      "permissions": [
+        {
+          "route": "/settings",
+          "final": "/onboarding",
+          "blocked": true
+        },
+        {
+          "route": "/audit-logs",
+          "final": "/onboarding",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/approvals",
+          "final": "/onboarding",
+          "blocked": true
+        }
+      ],
+      "login": true,
+      "landed": "/onboarding",
+      "expected": "/onboarding",
+      "redirectPass": true
+    },
+    {
+      "role": "trainer",
+      "permissions": [
+        {
+          "route": "/accounts/fees",
+          "final": "/academics/courses",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/approvals",
+          "final": "/academics/courses",
+          "blocked": true
+        },
+        {
+          "route": "/settings",
+          "final": "/academics/courses",
+          "blocked": true
+        },
+        {
+          "route": "/audit-logs",
+          "final": "/academics/courses",
+          "blocked": true
+        },
+        {
+          "route": "/crm/leads",
+          "final": "/academics/courses",
+          "blocked": true
+        }
+      ],
+      "login": true,
+      "landed": "/academics/courses",
+      "expected": "/academics/courses",
+      "redirectPass": true
+    },
+    {
+      "role": "student",
+      "permissions": [
+        {
+          "route": "/dashboard",
+          "final": "/portal",
+          "blocked": true
+        },
+        {
+          "route": "/crm/leads",
+          "final": "/portal",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/fees",
+          "final": "/portal",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/approvals",
+          "final": "/portal",
+          "blocked": true
+        },
+        {
+          "route": "/settings",
+          "final": "/portal",
+          "blocked": true
+        },
+        {
+          "route": "/audit-logs",
+          "final": "/portal",
+          "blocked": true
+        },
+        {
+          "route": "/onboarding",
+          "final": "/portal",
+          "blocked": true
+        }
+      ],
+      "login": true,
+      "landed": "/portal",
+      "expected": "/portal",
+      "redirectPass": true
+    },
+    {
+      "role": "placement_coordinator",
+      "permissions": [
+        {
+          "route": "/settings",
+          "final": "/placement",
+          "blocked": true
+        },
+        {
+          "route": "/audit-logs",
+          "final": "/placement",
+          "blocked": true
+        },
+        {
+          "route": "/accounts/approvals",
+          "final": "/placement",
+          "blocked": true
+        }
+      ],
+      "login": true,
+      "landed": "/placement",
+      "expected": "/placement",
+      "redirectPass": true
+    }
+  ],
+  "crm": {
+    "open": true,
+    "requiredFields": 3,
+    "selectionValues": [
+      {
+        "value": "crs-fico-01",
+        "exists": true
+      },
+      {
+        "value": "usr-counsellor",
+        "exists": true
+      }
+    ],
+    "savedVisible": true,
+    "persistedAfterRefresh": true,
+    "searchExcludes": true,
+    "stageFilterExcludes": true
+  },
+  "network": [],
+  "pageErrors": []
+}

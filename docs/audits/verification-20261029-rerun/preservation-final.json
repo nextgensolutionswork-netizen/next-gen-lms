@@ -1,0 +1,14 @@
+{
+    "checked":  854,
+    "existingReportBytesPreserved":  true,
+    "changed":  [
+                    "TEST-REPORT.md",
+                    "tests/lead-conversion-atomicity.test.ts",
+                    "app/(dashboard)/admissions/page.tsx",
+                    "app/(dashboard)/crm/leads/page.tsx",
+                    "app/api/fees/proof/route.ts",
+                    "components/ui/file-upload.tsx",
+                    "lib/services/admission-service.ts",
+                    "lib/services/payment-workflow-transaction.ts"
+                ]
+}

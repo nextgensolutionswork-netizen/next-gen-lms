@@ -58,16 +58,19 @@ export async function recordAuditLog(
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(log.user_id || '');
       await supabase.from('audit_logs').insert({
-        id: log.id,
-        user_id: log.user_id,
-        user_name: log.user_name,
-        user_role: log.user_role,
+        user_id: isUuid ? log.user_id : null,
+        user_email: log.user_name || 'system@next-generpsolutions.com',
         action: log.action,
         module: log.module,
         record_id: log.record_id,
-        old_value: log.old_value,
-        new_value: log.new_value,
+        payload: {
+          user_name: log.user_name,
+          user_role: log.user_role,
+          old_value: log.old_value,
+          new_value: log.new_value,
+        },
         created_at: log.created_at,
       });
     } catch (err) {

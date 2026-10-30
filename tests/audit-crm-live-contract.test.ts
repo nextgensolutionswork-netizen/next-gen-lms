@@ -1,0 +1,23 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+const mocks=vi.hoisted(()=>({insert:vi.fn(),persist:vi.fn(),persistSync:vi.fn(),audit:vi.fn()}));
+vi.mock('@/lib/services/data-store',()=>({store:{leads:[],courses:[],users:[],persist:mocks.persist,persistSync:mocks.persistSync}}));
+vi.mock('@/lib/services/audit-service',()=>({recordAuditLog:mocks.audit}));
+vi.mock('@/lib/supabase/db',()=>({isLiveSupabaseEnabled:()=>true,createClient:()=>({from:()=>({insert:mocks.insert,select:()=>({eq:()=>({maybeSingle:async()=>({data:{id:'22222222-2222-4222-8222-222222222222',full_name:'Synthetic Counsellor',role:'counsellor',is_active:true},error:null})})})})})}));
+import {createLead} from '@/lib/services/crm-service';
+import {store} from '@/lib/services/data-store';
+const data:any={full_name:'Synthetic Audit',phone:'9990001234',email:'audit@example.invalid',interested_course_id:'11111111-1111-4111-8111-111111111111',counsellor_id:'22222222-2222-4222-8222-222222222222',stage:'New',lead_source:'Website',training_preference:'Online'};
+beforeEach(()=>{vi.clearAllMocks();store.leads=[];mocks.insert.mockResolvedValue({error:null});});
+it('live lead insert uses a UUID and preserves valid related IDs',async()=>{
+ await createLead(data);const row=mocks.insert.mock.calls[0][0];
+ expect(row.interested_course_id).toBe(data.interested_course_id);expect(row.counsellor_id).toBe(data.counsellor_id);
+ expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+});
+it('failed insert rejects and removes the lead without a success audit',async()=>{
+ mocks.insert.mockResolvedValue({error:{code:'22P02',message:'Live database query failed.'}});
+ await expect(createLead(data)).rejects.toThrow('Live database query failed');expect(store.leads).toHaveLength(0);expect(mocks.audit).not.toHaveBeenCalled();
+});
+it('does not persist an unacknowledged lead before the live insert finishes',async()=>{
+ let finish:any;mocks.insert.mockImplementation(()=>new Promise(resolve=>{finish=resolve}));
+ const pending=createLead(data);await vi.waitFor(()=>expect(mocks.insert).toHaveBeenCalledOnce());const writesBeforeAcknowledgement=mocks.persist.mock.calls.length;
+ finish({error:null});await pending;expect(writesBeforeAcknowledgement).toBe(0);
+});

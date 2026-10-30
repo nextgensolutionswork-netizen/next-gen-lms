@@ -1,0 +1,23 @@
+[
+  {
+    "name": "typecheck",
+    "command": "npm.cmd run typecheck",
+    "exitCode": 0,
+    "started": "2026-10-29T11:15:57.614Z",
+    "finished": "2026-10-29T11:16:24.365Z"
+  },
+  {
+    "name": "lint",
+    "command": "npm.cmd run lint",
+    "exitCode": 0,
+    "started": "2026-10-29T11:16:24.369Z",
+    "finished": "2026-10-29T11:17:19.871Z"
+  },
+  {
+    "name": "tests",
+    "command": "npm.cmd test -- --silent --maxWorkers=2 --minWorkers=2",
+    "exitCode": 1,
+    "started": "2026-10-29T11:17:19.873Z",
+    "finished": "2026-10-29T11:18:13.907Z"
+  }
+]

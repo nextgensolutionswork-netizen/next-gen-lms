@@ -1,0 +1,1080 @@
+{
+    "excluded":  "env, docs, staging-runtime, persisted data and image/PDF/zip artifacts",
+    "scratch":  "E:\\my erp hub\\lms-test-run-20261029",
+    "files":  [
+                  {
+                      "sha256":  "44507369ED9935A408180A886BF1FC850AEB68DDEFF17AC4E675DCA36AA9A407",
+                      "path":  ".eslintrc.json"
+                  },
+                  {
+                      "sha256":  "1B32A693D61F47259B8FCCBFBB5586FA10BFA0075F4BC3AF38FAA3B598F7D490",
+                      "path":  ".github/workflows/ci-cd.yml"
+                  },
+                  {
+                      "sha256":  "F878A6E27732EC7654AB7F3A4E8E5659CCF1D139358DE0D5155544E2DCE99BCF",
+                      "path":  ".github/workflows/ci.yml"
+                  },
+                  {
+                      "sha256":  "802DBAA48510885A7517135960D97E9D85F32EC679B030DD914C482BF404DA51",
+                      "path":  ".gitignore"
+                  },
+                  {
+                      "sha256":  "4CFC4923335275CDD606A2FEFB6E986BEFC1C550B2DFAB24363B2793D1F9BF1D",
+                      "path":  "Dockerfile"
+                  },
+                  {
+                      "sha256":  "1EF7C9971F52C3EC9582C93A7D0FCDF50F3E9283C12766AC106E07B8EEF4FA0B",
+                      "path":  "README.md"
+                  },
+                  {
+                      "sha256":  "863AB32208FF6807B4287DDA22BD248392AF862C8E07659DF8C92EB33B2B5CC6",
+                      "path":  "app/(dashboard)/academics/assessments/page.tsx"
+                  },
+                  {
+                      "sha256":  "1274B80E9AC264D4F20DB9CB8394B4D19827D0D39D65628706F18C1F72DB0BBD",
+                      "path":  "app/(dashboard)/academics/assignments/page.tsx"
+                  },
+                  {
+                      "sha256":  "B6DBC013ECA69F06C2EFC5A7BB9C7B12C1D86AB8EC02D6171DC6675A5F9596F5",
+                      "path":  "app/(dashboard)/academics/attendance/page.tsx"
+                  },
+                  {
+                      "sha256":  "3824474FE376C5FEA0DBED52EF9DFC3AFA260FC637E6C2C3B2A75596D1DC543B",
+                      "path":  "app/(dashboard)/academics/batches/page.tsx"
+                  },
+                  {
+                      "sha256":  "4FB2166E04E0F4CEA41280FB416B50093C25DF352111FD2AA694ACAD4AFD5587",
+                      "path":  "app/(dashboard)/academics/courses/page.tsx"
+                  },
+                  {
+                      "sha256":  "17B7F4BA4F85A45979E5789C0588324F1B0C38C625E3E8DB31A2BDAB51E4BF7D",
+                      "path":  "app/(dashboard)/academics/sap-servers/page.tsx"
+                  },
+                  {
+                      "sha256":  "F9C1BFEFB86A89C3CA7409F43332C8FD6110D9FF5E9299E541E68DAB869774A4",
+                      "path":  "app/(dashboard)/academics/schedule/page.tsx"
+                  },
+                  {
+                      "sha256":  "6EE97E0A46FB3B7DB114B21765B10A1BC9E215FAC3E0D6C5C2384A934B31905B",
+                      "path":  "app/(dashboard)/accounts/approvals/page.tsx"
+                  },
+                  {
+                      "sha256":  "7EB236E410468DCC73EB2CB530AC2A7D289FE850C1B0CC7BF3690F5831A0DAE6",
+                      "path":  "app/(dashboard)/accounts/expenses/page.tsx"
+                  },
+                  {
+                      "sha256":  "C1219EB01779A7E56CEE5E721F18C8D41FE8370AC764F9CA3BB9B249084B3CFA",
+                      "path":  "app/(dashboard)/accounts/fees/page.tsx"
+                  },
+                  {
+                      "sha256":  "EB10BCC3701C622FAF5103DA14DA087E3B43A6525C162105040EBC79EA768E78",
+                      "path":  "app/(dashboard)/accounts/installments/page.tsx"
+                  },
+                  {
+                      "sha256":  "B2D81ED9921570252D4A6D57F7E7CAA9351646114F1CE505E53E794046014441",
+                      "path":  "app/(dashboard)/accounts/payments/page.tsx"
+                  },
+                  {
+                      "sha256":  "65672B9A6339C1D45F44E6EBC8FDA8B3C05C1EE7FC74D6CA20D8E2D9B656A5A6",
+                      "path":  "app/(dashboard)/accounts/receipts/[id]/page.tsx"
+                  },
+                  {
+                      "sha256":  "553717A5EAD8C580A68DEF867E196396FF01399EE82120E1F48086EAA0E244DC",
+                      "path":  "app/(dashboard)/accounts/receipts/page.tsx"
+                  },
+                  {
+                      "sha256":  "5BFCBDDC93B7529659A9C5725BA177E44E8A02C0D7955849315D5539ED32B7A9",
+                      "path":  "app/(dashboard)/accounts/reports/page.tsx"
+                  },
+                  {
+                      "sha256":  "26BED4A6FDA3CF8E933168A24ABFDACED4B4A5F19E336954541559E9D422FC3D",
+                      "path":  "app/(dashboard)/accounts/vendors/page.tsx"
+                  },
+                  {
+                      "sha256":  "A690F5196ABD914AC9A99A0835A9116A3686DB4249FCD7DC0BC83325705B3B19",
+                      "path":  "app/(dashboard)/admissions/page.tsx"
+                  },
+                  {
+                      "sha256":  "063D4E69E877D32B764729EA243E7EF2DA985DA53DA9C711A42B4FACC3075C1F",
+                      "path":  "app/(dashboard)/audit-logs/page.tsx"
+                  },
+                  {
+                      "sha256":  "9C3D15CD8EE8DC83AE2268A55EBF2B368E982CC994DB017ECEF6F0548F922A33",
+                      "path":  "app/(dashboard)/certificates/page.tsx"
+                  },
+                  {
+                      "sha256":  "8738A6ABF96876588C60E069D84DF17AECD8629E85687B19704D325B6F4C1B1F",
+                      "path":  "app/(dashboard)/crm/followups/page.tsx"
+                  },
+                  {
+                      "sha256":  "E2753D8AB5EA6C9964189B298083BDC62374B3779C29918CE683761237C50143",
+                      "path":  "app/(dashboard)/crm/leads/page.tsx"
+                  },
+                  {
+                      "sha256":  "ABEDF4DF22496F662A134749CBCBBA1A751504B4284AE294C0E6D4D947CC16A4",
+                      "path":  "app/(dashboard)/dashboard/page.tsx"
+                  },
+                  {
+                      "sha256":  "F32C26EA13A8A04ED94DB2AEBE3AED60A08C2947F93A0123C2017152051F9613",
+                      "path":  "app/(dashboard)/layout.tsx"
+                  },
+                  {
+                      "sha256":  "4439CC2F6D822C2412236EB036BBFC60D57F7F1AE85CA665227A525856EDD691",
+                      "path":  "app/(dashboard)/onboarding/page.tsx"
+                  },
+                  {
+                      "sha256":  "496731A7D269753D456637F7AD25C3A2A9F87B47BE5D232075292EA82B703E1B",
+                      "path":  "app/(dashboard)/placement/enrollments/page.tsx"
+                  },
+                  {
+                      "sha256":  "8F4B5DA79348BD42EAE86A12B18556C8F5A614362F8E9455ADC13066F7CB1954",
+                      "path":  "app/(dashboard)/placement/page.tsx"
+                  },
+                  {
+                      "sha256":  "F2D3FC10ECE116E35BFF690F359FA2C41849BEB65B553B9C08E949D3C34F8A2E",
+                      "path":  "app/(dashboard)/settings/page.tsx"
+                  },
+                  {
+                      "sha256":  "53F1E82DE2F809EB98532DC90E208FEC5084231EA42C93B5E498C179A2EE0ABD",
+                      "path":  "app/(dashboard)/students/[id]/page.tsx"
+                  },
+                  {
+                      "sha256":  "321084BCBF0FC122DAE88D675E2E2DA0BF91F73655C3D1047DBE4FAE9C1D68B3",
+                      "path":  "app/(dashboard)/students/page.tsx"
+                  },
+                  {
+                      "sha256":  "55E170B239251850B8D97FE6058DEF59F371203A312698A5DDD0D298DBA2438E",
+                      "path":  "app/(dashboard)/support/page.tsx"
+                  },
+                  {
+                      "sha256":  "2BD851053FD47BF58EFDE5D112855068FAE72C2231EEF972CF41212880ABB9D4",
+                      "path":  "app/(dashboard)/users/page.tsx"
+                  },
+                  {
+                      "sha256":  "EDE7BB8D1B6EB97979BD8672A6811DE90188A04D609AB46CBCB24B12075EFC57",
+                      "path":  "app/api/admissions/route.ts"
+                  },
+                  {
+                      "sha256":  "49D5B6B7EEF55FE16E12EF1B2EF678F3B91B7D61EFC82D205B2FB1569CEC4DDC",
+                      "path":  "app/api/attendance/sync-meeting/route.ts"
+                  },
+                  {
+                      "sha256":  "D5AE7386FBB922964E083EC8F4245311C9860E8DB1462F459A6D281D96D4ACBC",
+                      "path":  "app/api/audit-logs/route.ts"
+                  },
+                  {
+                      "sha256":  "BD57D63D75363F40DC56E0B2163273B08D1FBDE9A1E5734D8A460B6C5A210D59",
+                      "path":  "app/api/auth/login/route.ts"
+                  },
+                  {
+                      "sha256":  "C6AB7620F6500BF95CB341C74E63F45D6721F274C317CED0B81CB415423989E4",
+                      "path":  "app/api/auth/logout/route.ts"
+                  },
+                  {
+                      "sha256":  "0655E8E2A991D125B8E5EDD0210A9FD7CB6C1D72C026AF806DD51FDA320F1FE3",
+                      "path":  "app/api/bulk-import/execute/route.ts"
+                  },
+                  {
+                      "sha256":  "36F8652EFBF0DFB6146060281164EFB03EDBB158E9EB7D3CAAE71C8A83A9A216",
+                      "path":  "app/api/bulk-import/preview/route.ts"
+                  },
+                  {
+                      "sha256":  "BD1CF9BB455429CBC82441A5C9BDB4696300A216AFE6AACF480C0ECF2EB99A7B",
+                      "path":  "app/api/bulk-import/template/route.ts"
+                  },
+                  {
+                      "sha256":  "1277F7B018AE00C7443B84F9E196A62C2B07DF1154D82AF5E89E667A3D396F33",
+                      "path":  "app/api/certificates/[id]/pdf/route.ts"
+                  },
+                  {
+                      "sha256":  "790CC9C9D504AE68D07A0138AFF4E1C74884ED3157DBE8634B27CDD9C826D637",
+                      "path":  "app/api/conference/create-meeting/route.ts"
+                  },
+                  {
+                      "sha256":  "757D393B485BB33AAD5B923A62E8E2AA780E7CD902D742AC66DF5B343C4DD258",
+                      "path":  "app/api/database/backup/route.ts"
+                  },
+                  {
+                      "sha256":  "C06E72CA30AE322F02F9DD26D91CCBF4CEFDA936CDB750657BA4F03E0C6EADEE",
+                      "path":  "app/api/database/health/route.ts"
+                  },
+                  {
+                      "sha256":  "26A1F09B347A1D365760403AF35204D825ED5C7D1AF138F280648F95CDEEBE60",
+                      "path":  "app/api/database/sync/route.ts"
+                  },
+                  {
+                      "sha256":  "FA4293ED235AABAD327D5CCF208F342F7817843BD2D750EE9E7CC456A0C1F2B4",
+                      "path":  "app/api/fees/payments/route.ts"
+                  },
+                  {
+                      "sha256":  "17E8EA26B76E14F2765C2DD63371C967329385F4CEE3F50A7C276940072C6BD0",
+                      "path":  "app/api/fees/proof/route.ts"
+                  },
+                  {
+                      "sha256":  "96675132DFCE2CDBA55E3576FDF6EBBA8CFA6B94158A24B08C4C72526C501B11",
+                      "path":  "app/api/fees/proposals/route.ts"
+                  },
+                  {
+                      "sha256":  "64B7331F36A1ABA4F29D42D2777DC0F23264F7A708ABA5551AF546CA337134B2",
+                      "path":  "app/api/fees/receipts/route.ts"
+                  },
+                  {
+                      "sha256":  "462561A9F699BC4FEB755E96427940308B2BF6961FEC697262A6AA5944DF52B6",
+                      "path":  "app/api/onboarding/[id]/route.ts"
+                  },
+                  {
+                      "sha256":  "11D7C907D79C0EF270C98766DB518C2EB0E246972B734A732193295CFF5BE97D",
+                      "path":  "app/api/onboarding/analytics/route.ts"
+                  },
+                  {
+                      "sha256":  "0D8310322667093E90E394D6A59016DB61301D32761FD74D54097492B7BBED55",
+                      "path":  "app/api/onboarding/backfill/route.ts"
+                  },
+                  {
+                      "sha256":  "B54A5269CF8A0437FF51AC5B376DA8E76BA2E9340D952D3B2712BE45A53E788F",
+                      "path":  "app/api/onboarding/cases/[id]/route.ts"
+                  },
+                  {
+                      "sha256":  "4CEEE6D88004C75DCC9C598BCF495997F38A2650701D22597AD2FEC07459DB2E",
+                      "path":  "app/api/onboarding/cases/route.ts"
+                  },
+                  {
+                      "sha256":  "9F35DA9717C89329CCA03766E7D916CE8BE896DF22DF1F89EF846FBC9E9DDAB3",
+                      "path":  "app/api/onboarding/route.ts"
+                  },
+                  {
+                      "sha256":  "63E8913B281A66F0A2C9764DE386CF6A6ED053FE2DACC4CBDE97715D71D23752",
+                      "path":  "app/api/payments/create-order/route.ts"
+                  },
+                  {
+                      "sha256":  "E838E232F91DAC6B03969F15EF05ABDE7A5394294529101E30C602730E2F5863",
+                      "path":  "app/api/payments/verify/route.ts"
+                  },
+                  {
+                      "sha256":  "88BAEB13D59DF50AB683BB46CDF0113CC2256A14D30FA966135F26E7D18DA823",
+                      "path":  "app/api/quizzes/submit/route.ts"
+                  },
+                  {
+                      "sha256":  "06D7656A42E9F1A9DDBF7F7CCC9E916BBB6B660F88AE760F01AAD52BE9A652AB",
+                      "path":  "app/api/realtime/broadcast/route.ts"
+                  },
+                  {
+                      "sha256":  "13FFC4562C7DC090F6E87EFCB9BBFCBF442600FD2678636E049EB8B78DD22677",
+                      "path":  "app/api/realtime/stream/route.ts"
+                  },
+                  {
+                      "sha256":  "54104EBBDD8281E9D5450BC1FF8972A70A1D0D710B6DB6CDEDF6AD64A6D00D46",
+                      "path":  "app/api/receipts/[id]/pdf/route.ts"
+                  },
+                  {
+                      "sha256":  "A6348929C920728D8FC5C70F752A11D138335BA75CA9AD3FF5E196F313DFBC75",
+                      "path":  "app/api/settings/route.ts"
+                  },
+                  {
+                      "sha256":  "2EFAFB0EE775350F8C9881013F0E7DAE01D6CDC6C818E65406CFFE4898952EB0",
+                      "path":  "app/api/storage/signed-url/route.ts"
+                  },
+                  {
+                      "sha256":  "6DB67DA88DB60CE3DEDF820F168759782839E7492C595CAA01B484D9620C60EF",
+                      "path":  "app/api/storage/signed/route.ts"
+                  },
+                  {
+                      "sha256":  "10C3A898000ADAEAB8BC69DED98010E9582628CB74282ABF55A0E486A25DDD3C",
+                      "path":  "app/api/upload/route.ts"
+                  },
+                  {
+                      "sha256":  "E253AC7E35EDD16AD2292D31E031D479C75D65A93D102803D10A912FD126655F",
+                      "path":  "app/api/users/reset-password/route.ts"
+                  },
+                  {
+                      "sha256":  "82AF689694A33A08901E5B2D4CFDA4BC0D119E2B685E5976A050C41DC22A257A",
+                      "path":  "app/api/users/route.ts"
+                  },
+                  {
+                      "sha256":  "24524657C67B10918C75329AC430B207D57600F6B6B85B62BBD650B7DAC366F4",
+                      "path":  "app/api/webhooks/google-meet/route.ts"
+                  },
+                  {
+                      "sha256":  "70DA05E80DDFCF599AABCE9F676537CA0F371CACEDE9D6DD430D9572BFF01431",
+                      "path":  "app/api/webhooks/razorpay/route.ts"
+                  },
+                  {
+                      "sha256":  "64AA25B0B53500E49F8BFA8B29E152C24A58E0B72E4BD84D9E0A5B7A695E8349",
+                      "path":  "app/api/webhooks/zoom/route.ts"
+                  },
+                  {
+                      "sha256":  "CBF01569C7C5FB1F41F2B34DD11654FC766ED22F354EC6F6E2BBA5197D47FBBC",
+                      "path":  "app/api/workflow/notifications/route.ts"
+                  },
+                  {
+                      "sha256":  "65741ECB9DF9D849D4AF39CD2C73AB68EE372CC6D93B6DF191F0AEAA4628872C",
+                      "path":  "app/certificate/verify/[id]/page.tsx"
+                  },
+                  {
+                      "sha256":  "98F464CF229431783F1DD12D4E5E4753015366C3939B704091C12C0674F5DC07",
+                      "path":  "app/globals.css"
+                  },
+                  {
+                      "sha256":  "0648417008C9C82D0B16480D2C53829F4C3C5A2C4D2329CC8DC1DE3B345FB25C",
+                      "path":  "app/layout.tsx"
+                  },
+                  {
+                      "sha256":  "9921A0185539C8686656D8EBE04F15E806DFA361895C86676665722FD143659B",
+                      "path":  "app/login/page.tsx"
+                  },
+                  {
+                      "sha256":  "2203E6C641AD0EBEC1613FEA6E074CCF9F5B8927D290910D201AD87B34D2B9D0",
+                      "path":  "app/page.tsx"
+                  },
+                  {
+                      "sha256":  "60A9A5A0EC6B39EAD64DA555145F15A902AAD245F089F9CD2E4625A448B033EB",
+                      "path":  "app/portal/page.tsx"
+                  },
+                  {
+                      "sha256":  "53075D3EA57810043C9B876866C7CA7933F969364003F772A69EDB9BDC93116D",
+                      "path":  "app/todos/page.tsx"
+                  },
+                  {
+                      "sha256":  "C3D5FA2359B7F529888923872F6EAC62FB1274DA1599011ED3CA7E87C6F496EE",
+                      "path":  "build-check-path.txt"
+                  },
+                  {
+                      "sha256":  "343629D4FF82AAB8A17E19E707703F03403FD53D50302C5FFC042FA1A7900E73",
+                      "path":  "components/bulk-import-modal.tsx"
+                  },
+                  {
+                      "sha256":  "8A76562C3C1B9204EE0FE74468AA303B40DD92D67A9F2E6C92961E97BF1468C9",
+                      "path":  "components/layout/header.tsx"
+                  },
+                  {
+                      "sha256":  "7DD1974EE9F50B6F0FAAC820C728AFCD7075A3FB6F7427B5F222DB55FC8891E7",
+                      "path":  "components/layout/sidebar.tsx"
+                  },
+                  {
+                      "sha256":  "84E1A7E4F59E41E276D56C9F032F67DD7427BF7C05BF90BC48E0A723B4318495",
+                      "path":  "components/portal/quiz-runner-modal.tsx"
+                  },
+                  {
+                      "sha256":  "E9DF447FF6F373300036D0CDD4C059FE3254F961E42056A399436B62368D57C3",
+                      "path":  "components/portal/student-placement-hub.tsx"
+                  },
+                  {
+                      "sha256":  "D168E290D1F74805DEE494152D98744C563690E27932DD942B5747E11EFBF506",
+                      "path":  "components/providers/auth-provider.tsx"
+                  },
+                  {
+                      "sha256":  "C6DACE6891078D56FE3626AEAB5A7E7C2C167885C21D075312B29F82FC42EBD6",
+                      "path":  "components/ui/badge.tsx"
+                  },
+                  {
+                      "sha256":  "4A30F18039210412584B551DAFE9A51EA140EA017A2EA0792977A9174A936685",
+                      "path":  "components/ui/button.tsx"
+                  },
+                  {
+                      "sha256":  "35F0D7DC570C187857790673E4FDC3FCC491EC051E2F5F71B0B7F4839D5686C6",
+                      "path":  "components/ui/card.tsx"
+                  },
+                  {
+                      "sha256":  "7E25B8B86C9AAEF009E2BE53AF22D6F4D52B475FD223815EF8D8E587BAC3D876",
+                      "path":  "components/ui/file-upload.tsx"
+                  },
+                  {
+                      "sha256":  "89633F2BBE35C90966AAA8E07B0578CCACA26B0E5BA365145D036C98F938949E",
+                      "path":  "components/ui/hls-video-player.tsx"
+                  },
+                  {
+                      "sha256":  "51D96C9F0C95E4DC643089C77B175BDE9ED31A6AF7C1FCA818C3773549E018F3",
+                      "path":  "components/ui/input.tsx"
+                  },
+                  {
+                      "sha256":  "1C8F2B8D380F1F8D7DCB700970AE995AC8527053284C0F8F20508AE72319254B",
+                      "path":  "components/ui/modal.tsx"
+                  },
+                  {
+                      "sha256":  "65ED1920D0EDF22FA9C95325F91D4DCE1ABD99345D245C613DA682F8094FD9FF",
+                      "path":  "dev-restart-error.log"
+                  },
+                  {
+                      "sha256":  "3FF09A4572915960E91C42333E894E41337E7D67ED482435B62C54B8D2CF447C",
+                      "path":  "dev-restart.log"
+                  },
+                  {
+                      "sha256":  "CCC1F21AFD0D216C535E7E7B3A4FD57227DDE46D144229C34A4FB7177AC0426B",
+                      "path":  "lib/auth/credentials.ts"
+                  },
+                  {
+                      "sha256":  "5D48D81C79CF49DED1914DABEF9E7213ACE6C4AE3BB9BCD56293A77C88DA6ECA",
+                      "path":  "lib/auth/payment-session.ts"
+                  },
+                  {
+                      "sha256":  "C813A61AE0FFE9705077959BF9A342DB286B3855A5BA86D5E2572B606CC029A5",
+                      "path":  "lib/auth/rbac.ts"
+                  },
+                  {
+                      "sha256":  "F578911B76E630EDBC0373F02FC1BB0035AB7DC17803BB8DA45F6005860EEC2F",
+                      "path":  "lib/auth/server-session.ts"
+                  },
+                  {
+                      "sha256":  "7608CBB3E6B5AE67FEE86BBC223FD4395D4A6312BEA74BB9FE3670DA42B63C9E",
+                      "path":  "lib/auth/tenant.ts"
+                  },
+                  {
+                      "sha256":  "64805D20CAE16B5ED335D52F7CE920EDA8EDDD3B6E6014F3811CF0917BC35B4E",
+                      "path":  "lib/hooks/use-realtime.ts"
+                  },
+                  {
+                      "sha256":  "583EAF8F82D21BE1FDFB58B6481F012068808088D9BEB498165B23C58AAB3D67",
+                      "path":  "lib/hooks/use-record-load.ts"
+                  },
+                  {
+                      "sha256":  "8618C096A053FCDD7A0015D13B5209CA250346FA2FD3B59EFA36C321A5819444",
+                      "path":  "lib/security/auth-cookie.ts"
+                  },
+                  {
+                      "sha256":  "1FE14091098E954F1BA3E5B3F31CD135C02A1A83086FB512085219EC3A8677BB",
+                      "path":  "lib/security/rate-limiter.ts"
+                  },
+                  {
+                      "sha256":  "741A7801EF8161D43B709AD2EDD9D659695A18A0C3AEFDCEE5A119C2EEDEDB06",
+                      "path":  "lib/services/academics-service.ts"
+                  },
+                  {
+                      "sha256":  "DF7A772760AF49805E7C15139047E5EFCC3C3832E45F38DE5CC48A1A5C07389F",
+                      "path":  "lib/services/admission-service.ts"
+                  },
+                  {
+                      "sha256":  "06A4CFF824407F651F442C43365C5F8A3D5E155A50CCF4CDBD413505E4AC33E3",
+                      "path":  "lib/services/audit-service.ts"
+                  },
+                  {
+                      "sha256":  "1F60426B9CA3D9F93D7F8FEBFB9B4A9249C01284A229F78FBCE89989C269AEB8",
+                      "path":  "lib/services/auth-service.ts"
+                  },
+                  {
+                      "sha256":  "3362F08B626E2F11542F672FDEF34E6C064D1F73509D87191EF809E670D74EC7",
+                      "path":  "lib/services/bulk-import-service.ts"
+                  },
+                  {
+                      "sha256":  "325999FD471FED525AF594BDF4A0B1B1EEE4BAB136AFD5A96868020FD7713DA8",
+                      "path":  "lib/services/certificate-service.ts"
+                  },
+                  {
+                      "sha256":  "8A8F3CF9A5026602C5EBC7CAE31407167D2B070EC8246C656518E1B5E96EC338",
+                      "path":  "lib/services/conference-service.ts"
+                  },
+                  {
+                      "sha256":  "D8BE0E5C15D07F302799B81DF0F5FFBBA1061415D80DFE3DE94FD5A86655DF62",
+                      "path":  "lib/services/crm-service.ts"
+                  },
+                  {
+                      "sha256":  "71C724F51DD59D7292F6BDCBEE977517F19281704F07E213929A976EE0F3B85A",
+                      "path":  "lib/services/data-store.ts"
+                  },
+                  {
+                      "sha256":  "29F6F60748F35E5B86D727B9B6CCE32C30DEE0F434D9DE55F4E6C569A93CEC67",
+                      "path":  "lib/services/doubt-service.ts"
+                  },
+                  {
+                      "sha256":  "F26CC1AE7DF7681F66F4A3D7ED61352E2BC0236EA57A80CF306BA954472EF786",
+                      "path":  "lib/services/fee-workflow-service.ts"
+                  },
+                  {
+                      "sha256":  "94D79888B8B623349DF59AA6B629992BCCA71495A962397C645C0F16661AAE1F",
+                      "path":  "lib/services/finance-formatters.ts"
+                  },
+                  {
+                      "sha256":  "CF126A5F2C223905291F9B56E40ACC8F37A828D16E6DA98B82B2CFD7657CF23D",
+                      "path":  "lib/services/finance-service.ts"
+                  },
+                  {
+                      "sha256":  "211FABE91F771859B575A3336BC9D8E2BEE2AF639951DC962776B0F22927BCF1",
+                      "path":  "lib/services/meeting-attendance-service.ts"
+                  },
+                  {
+                      "sha256":  "7DDE9243841C0ED91F39933309B5B5C8621DCD226E5E0EC457FA13ADD9640EE6",
+                      "path":  "lib/services/notification-service.ts"
+                  },
+                  {
+                      "sha256":  "46FDE94F1C6FE6F6F9BD9DCD57DE36D41F53AC2625B35EC3F7B72D6068CCD407",
+                      "path":  "lib/services/onboarding-client.ts"
+                  },
+                  {
+                      "sha256":  "57CEBFD58B3A78A43F7023693FB2D650E7AC3E60766E015BA8444FE542D1B295",
+                      "path":  "lib/services/onboarding-service.ts"
+                  },
+                  {
+                      "sha256":  "2601DDB5989EF45B0AC666778314B62B1232F59F5B43CC37416E0FB24068A311",
+                      "path":  "lib/services/payment-events.ts"
+                  },
+                  {
+                      "sha256":  "D4899618B2001DD453CF3EF531EB46978219A3F170900C942931E896ED770732",
+                      "path":  "lib/services/payment-gateway-service.ts"
+                  },
+                  {
+                      "sha256":  "52BB7F8F083C9476B30EF55C4D4FCF35E4DC3FCA86436A512510993422C6100F",
+                      "path":  "lib/services/payment-workflow-client.ts"
+                  },
+                  {
+                      "sha256":  "EADBDA5BE4F77CA9526AC3D999BACFC39545B212D8AD1A1180A358C4C94DC06A",
+                      "path":  "lib/services/payment-workflow-state.ts"
+                  },
+                  {
+                      "sha256":  "A53A99AE82235F7DFD6945B1F1A212836303725007E28FAC88965F5E7F0D6D91",
+                      "path":  "lib/services/payment-workflow-transaction.ts"
+                  },
+                  {
+                      "sha256":  "F3BF1176EC1FCAB97AC34F2257E2D093CD89843A65F69C08FFB5C6DC82A67502",
+                      "path":  "lib/services/pdf-service.ts"
+                  },
+                  {
+                      "sha256":  "A753D3D4B46A90D489833F995C617D1491BBB0D6CE6B22B7EB4CBD90780051BC",
+                      "path":  "lib/services/persistent-storage-adapter.ts"
+                  },
+                  {
+                      "sha256":  "2F995A484A6814B6C98B9A3325FFA8DBA5DDE69BEEFEADA9602EEF8AB760EDAB",
+                      "path":  "lib/services/placement-service.ts"
+                  },
+                  {
+                      "sha256":  "71EB124CA3C17D3FF7F376E24E0A0B3CBAD2D71497704CC2BFA64C9A9ACBC52D",
+                      "path":  "lib/services/realtime-service.ts"
+                  },
+                  {
+                      "sha256":  "797DA6F28B904625133B7107D4D6223DF4F1DBE153434EBBE205B7BC6DBE72FA",
+                      "path":  "lib/services/receipt-amounts.ts"
+                  },
+                  {
+                      "sha256":  "A71810B1F7D71765007B75C79BCD28845D481D79046105EFAD1CA4FD85B31F02",
+                      "path":  "lib/services/sap-lab-service.ts"
+                  },
+                  {
+                      "sha256":  "A05D38F86E98E914A0E64E91B8B8F7FFFCE6ACAF1B0416B8545BAAFFB9C97B77",
+                      "path":  "lib/services/storage-service.ts"
+                  },
+                  {
+                      "sha256":  "2B690FE49BC22F2D0872C0DF81C85AF8BF6C64EB101B5488941E3AF5CD806E08",
+                      "path":  "lib/services/student-service.ts"
+                  },
+                  {
+                      "sha256":  "2C1259CA6B361019CE56CE694D12EB4ADFA2D06FE7E59499A5825FEAC2D50C8C",
+                      "path":  "lib/supabase/admin.ts"
+                  },
+                  {
+                      "sha256":  "9773884C58616004482B432A045EFFBC9F385763306C5576CA90C465FC49DC7F",
+                      "path":  "lib/supabase/client.ts"
+                  },
+                  {
+                      "sha256":  "E2595800825326416F13E06037B5075C97AAAFA5D49E6A42B605AB3B548AFABD",
+                      "path":  "lib/supabase/db-service.ts"
+                  },
+                  {
+                      "sha256":  "030E2C564CF75DFF183A35AFC24EDFA72CFA11F7D325A4288D8F6A7E330F3660",
+                      "path":  "lib/supabase/db.ts"
+                  },
+                  {
+                      "sha256":  "C950AE53BA2D254400B91D58DEDBFCCA576806BA23A8E6EFD4291D83D3181780",
+                      "path":  "lib/supabase/repository.ts"
+                  },
+                  {
+                      "sha256":  "F7E28F451A749F7112D825F2ED101BD3F59FF819D112FCAD980C7F40B7BFC0FB",
+                      "path":  "lib/supabase/rls.ts"
+                  },
+                  {
+                      "sha256":  "525D574A690911CD90CC25938A8B821DD13064F288DDED98BE1296C9D79CE242",
+                      "path":  "lib/supabase/seeder.ts"
+                  },
+                  {
+                      "sha256":  "02C59C75018C7456287F9EFC4378806DC6978BA7C50FC0592A1BBB4F40C8DDCB",
+                      "path":  "lib/supabase/server.ts"
+                  },
+                  {
+                      "sha256":  "52D8805E020C2611FD5A7559816570F318E1186C49851DCC25E9DC3E620613BA",
+                      "path":  "lib/supabase/sync-service.ts"
+                  },
+                  {
+                      "sha256":  "029A4B9DDAE9F9A7A38FD9B633B9958274FD5ED000DC7F549A3EF925605CC47C",
+                      "path":  "lib/utils/dashboard-metrics.ts"
+                  },
+                  {
+                      "sha256":  "CF19D72E73D852E538CEE3E6B1667D186E351B9BB3D81B8B5B6DD7E37AB30FB2",
+                      "path":  "lib/utils/excel-export.ts"
+                  },
+                  {
+                      "sha256":  "F1E86FFB8E1C0355155A8F7C39A0D07D8BE55509AC050F79E57F6DB0C935370B",
+                      "path":  "lib/utils/fee-course.ts"
+                  },
+                  {
+                      "sha256":  "8FDB101EDD527EC304AEC645D2D4A2602F84673CB7518F9436E75DF192357E0F",
+                      "path":  "lib/utils/formatters.ts"
+                  },
+                  {
+                      "sha256":  "68F46B486221EEF9EAB5F6E1B5A2A79FA297BCB8C106EE6B7D396D1F47D3F845",
+                      "path":  "lib/utils/zip-export.ts"
+                  },
+                  {
+                      "sha256":  "8919EF6EE90A0014903D061D1F83CE7FA3E506361FA50B23D0EB63459F490B2B",
+                      "path":  "lib/validations/index.ts"
+                  },
+                  {
+                      "sha256":  "9243F40E9F56AEE8772586E50E48F1A56651C0BD8FF075EAD2CDBE064879CFE3",
+                      "path":  "middleware.ts"
+                  },
+                  {
+                      "sha256":  "8F8DFF716072236114231E2966DA6A97385F48A6C98EECDED432A055E8E64653",
+                      "path":  "next.config.mjs"
+                  },
+                  {
+                      "sha256":  "88789148A576F5536C84047A6D9987A7CA877CCD5DCAA5D9FFF2013989523284",
+                      "path":  "package-lock.json"
+                  },
+                  {
+                      "sha256":  "C0A8A877CC8E19707CAA5DAAD9CF481C103939211AD34100239AC2D577D73879",
+                      "path":  "package.json"
+                  },
+                  {
+                      "sha256":  "EFA65C65E17D51D58570EDCE9D702B0604FDF6A9B8DB65AFAED8F075AF8867C7",
+                      "path":  "postcss.config.mjs"
+                  },
+                  {
+                      "sha256":  "CF06DF37995C3DA971FD5BBF2013141084404C67F2A4A222121D7C0B32DE31C4",
+                      "path":  "render.yaml"
+                  },
+                  {
+                      "sha256":  "0B630A04B3502131680C7F6B0F61E21635F9C51BE0F0A42ECF3EB4E111E346E2",
+                      "path":  "scripts/apply-staging-migrations.mjs"
+                  },
+                  {
+                      "sha256":  "9534A4D8C37CD5BFFAB641C308EA4C2D16F7F75FC3B262AD31C4B0D50992CB90",
+                      "path":  "scripts/audit-smoke-check.mjs"
+                  },
+                  {
+                      "sha256":  "50892B2E8AFCEA4BA26A1B244C515C0D69DF6112FB545D69D4BBCB519D2C4EBC",
+                      "path":  "scripts/generate-100-synthetic-staging-accounts.mjs"
+                  },
+                  {
+                      "sha256":  "AE8C264079FE80EEB5437382E47F55A78C34CB055ABD148BC347B1DA0BFA6D20",
+                      "path":  "scripts/page-audit-followup.mjs"
+                  },
+                  {
+                      "sha256":  "1DF14B3A360B12B461A2380684E78D01BFBCDC3871E104E1CBB99779A01509AF",
+                      "path":  "scripts/page-by-page-audit.mjs"
+                  },
+                  {
+                      "sha256":  "3CDBDD7F37E217BBF320BF120BB6F8C8507879A936011D733DFE0F2504B89A00",
+                      "path":  "scripts/performance-audit.ts"
+                  },
+                  {
+                      "sha256":  "06E63C43A2C71A8946C52E2370CF5C95C6F98DE80FA98E16289C6A9C6AF9D098",
+                      "path":  "scripts/provision-staging-auth-users.mjs"
+                  },
+                  {
+                      "sha256":  "89FDAAE6B2B05085502C4C66E1BAC6AFB27D7B1A0D0B6E4FB1EE5EFC90011C3A",
+                      "path":  "scripts/run-100-user-performance-test.mjs"
+                  },
+                  {
+                      "sha256":  "2BC8948791B7CD945982FDAF12F7D8C3E955BB1C5D70AAA39AC1066EA61BDE96",
+                      "path":  "scripts/seed-staging-database.mjs"
+                  },
+                  {
+                      "sha256":  "8BBB364456B6493D88BD174F9324BD17A0A92EC5B4528F1AA0D306CA3EAFBA52",
+                      "path":  "scripts/start-browser-audit-server.mjs"
+                  },
+                  {
+                      "sha256":  "180B2958EC442986547FAC7E5B489085F656105894427C743701E4CD4DEE516E",
+                      "path":  "scripts/supabase-status.cjs"
+                  },
+                  {
+                      "sha256":  "A7022F2547BD8679F7066405D42FFF5DC63F86D4726FD71A98B24C7283B66B80",
+                      "path":  "scripts/verify-browser-fixes.mjs"
+                  },
+                  {
+                      "sha256":  "60D4F10731A935F9E3BBA0FB625B29C6946BDFC6D27903D3A808BE029A4B43E4",
+                      "path":  "scripts/verify-certificate-layout.mjs"
+                  },
+                  {
+                      "sha256":  "677E05653008C139FDF8AE406BE7CBFACDB7A19BF8814C28FBEF976DD53B6383",
+                      "path":  "scripts/verify-detail-navigation.mjs"
+                  },
+                  {
+                      "sha256":  "18FFB977D38690C95F42C2D5704F2EB2C04C1AB37F78823029519EC41171C6AD",
+                      "path":  "scripts/verify-isolated-build.mjs"
+                  },
+                  {
+                      "sha256":  "EAB97B8D5FE23D400027695249D8351A2F1D380E1AF7969E488610F0EB46096F",
+                      "path":  "scripts/verify-staging-gate3-suite.mjs"
+                  },
+                  {
+                      "sha256":  "BA02F8AC167EEA3697567E0D6E996D8EF6B06D650C83C5EBCD9AD411371F2E9C",
+                      "path":  "scripts/verify-staging-gate4-suite.mjs"
+                  },
+                  {
+                      "sha256":  "51BDACE52C7CFC9B805AFFD0189E045E32B0AE582AA36F9C1AC74F0C7050B972",
+                      "path":  "scripts/verify-step3-synthetic-accounts.mjs"
+                  },
+                  {
+                      "sha256":  "507699EB91144818EDF61D3A079212CACF31D8DB520EAE428E3B48FCF0D6919C",
+                      "path":  "supabase/.gitignore"
+                  },
+                  {
+                      "sha256":  "3F6C9B59F4444D218D994150A51DC11BC30FC6F2D13DBCA74126D41C9DF2D661",
+                      "path":  "supabase/config.toml"
+                  },
+                  {
+                      "sha256":  "B194FD629500617744222C9F2CA2F8E8367EAC86903AC8EEA040BC2F4E45842C",
+                      "path":  "supabase/migrations/000_full_schema_rls_and_seed.sql"
+                  },
+                  {
+                      "sha256":  "7676BE41EA1F43D7DA5D738A43EEB0D200731B86B7747FF7474D61A408DCE69F",
+                      "path":  "supabase/migrations/001_initial_schema.sql"
+                  },
+                  {
+                      "sha256":  "6DE007E818AB6D335EEBE1BC25EA4C43405014BF1D6D990D84574EE3C071BDB1",
+                      "path":  "supabase/migrations/002_rls_policies.sql"
+                  },
+                  {
+                      "sha256":  "2277D3C8CE949DB75CB4F7EFC0AB140C7D07E788BD36494776173B1A6D57A8BF",
+                      "path":  "supabase/migrations/003_seed_data.sql"
+                  },
+                  {
+                      "sha256":  "17AF732C74E1E1F75FFBD3A8F1D1548D1756429D8CB5E803F6080803B814E772",
+                      "path":  "supabase/migrations/004_sap_lab_servers.sql"
+                  },
+                  {
+                      "sha256":  "53C3078A4420DA9ABDFF6425DF16425D64FB8E7268704D3F25DC4D53EE9C5C41",
+                      "path":  "supabase/migrations/005_student_doubts.sql"
+                  },
+                  {
+                      "sha256":  "074DB4EF3C2B14701F9854770F08D8F2607E0328C99FB30E41B180B72D938EE5",
+                      "path":  "supabase/migrations/006_all_role_accounts.sql"
+                  },
+                  {
+                      "sha256":  "CA6AA746430B6CC6F9743131B8A55C6888C8B6AA7947CEBDAEE71E952EF90CAC",
+                      "path":  "supabase/migrations/006_onboarding_team_and_cases.sql"
+                  },
+                  {
+                      "sha256":  "FEC5D76B27D0D6184869C0E46584B3D306AA731E2A040248E6955E6384BA76CE",
+                      "path":  "supabase/migrations/007_gst_and_compliance.sql"
+                  },
+                  {
+                      "sha256":  "20B446509A8DB3694D90C3E8026881DAD0F32DA9478E63DCB9965F499D2AE7D6",
+                      "path":  "supabase/migrations/20261012094737_payment_approval_workflow.sql"
+                  },
+                  {
+                      "sha256":  "A34438B9034DE4C9655C6BF49F6449AF0E739C33B53567EADE5FFEEAD2FF3797",
+                      "path":  "supabase/migrations/20261022_fix_profile_rls_recursion.sql"
+                  },
+                  {
+                      "sha256":  "D62574ACC4DB16E80AE8ECD5A82051F370B221A7B13E0D3406B817169A074A55",
+                      "path":  "supabase/storage_setup.sql"
+                  },
+                  {
+                      "sha256":  "F779D9F92FD0DF9A612117DC754CB01A489E8B1FDA73792DD19DB02EF3A173DF",
+                      "path":  "tailwind.config.ts"
+                  },
+                  {
+                      "sha256":  "3C956DF88E18CC10B22FFD894A6A35EC89148D084B6834A37C19B49E3B338C98",
+                      "path":  "tests/assignments-management.test.ts"
+                  },
+                  {
+                      "sha256":  "419A19F3A61645DEAAFBDD209BF8EF8745DD735814F0AB667D8557F3B04E399D",
+                      "path":  "tests/attendance-management.test.ts"
+                  },
+                  {
+                      "sha256":  "1E32D1FB17F2FA9AB7685B83EA1DA33E5F8CC5FFD46ADBF983B48C58EF488901",
+                      "path":  "tests/audit_report_accounts.md"
+                  },
+                  {
+                      "sha256":  "4CEC785DC8D3F55E3140A44622231357001663C0842BFF4EFFDFCFA014A53F66",
+                      "path":  "tests/audit_report_students.md"
+                  },
+                  {
+                      "sha256":  "EB93493DCDC79CA9993F971FF42B1D9F73FAA55E09022E3A4DC0D5AC453DAF25",
+                      "path":  "tests/auth-cookie-restoration.test.ts"
+                  },
+                  {
+                      "sha256":  "B5F21393AC98D562643371C47E8FBF712E6A150A155B3A5E3D41DB608C7DBFC1",
+                      "path":  "tests/auth-hydration.test.tsx"
+                  },
+                  {
+                      "sha256":  "DF3B900B093D031722C90F91CBA8BB4065517F2B8FB648DFCBE7EF2E17EBC792",
+                      "path":  "tests/auth-provider.test.ts"
+                  },
+                  {
+                      "sha256":  "7BF0628743817561CD51536E346896698158CAAAEDDD674A77867AAA369EAB13",
+                      "path":  "tests/auth-session-client.test.ts"
+                  },
+                  {
+                      "sha256":  "5EF8BA5854AD6E761FC050DCCC44D7AC87C467F34400D569C6D372823D3A62DB",
+                      "path":  "tests/bulk-import.test.ts"
+                  },
+                  {
+                      "sha256":  "6B71F8C94F5747520CE9384C0C9BF2B9F0D11DBCA82917D94569A20256CE970A",
+                      "path":  "tests/conference-integration.test.ts"
+                  },
+                  {
+                      "sha256":  "A7D893DE637B15AF50F0D770B2682B0C21E07B0870DABA5F7702DB3F72A7DADE",
+                      "path":  "tests/counsellor-payment-workflow.test.ts"
+                  },
+                  {
+                      "sha256":  "7886FD8B461C02930036FECF4A41F72B8A9411CAFCD0F2B2A263AAE8AC48D031",
+                      "path":  "tests/course-management.test.ts"
+                  },
+                  {
+                      "sha256":  "1F33D907A68B16A9C427242FC44F098DEE973240C0B257D34CDEE8E8A5F27813",
+                      "path":  "tests/critical-p0-fixes.test.ts"
+                  },
+                  {
+                      "sha256":  "1677B2964F09A51043489EE6EBDC7F4B34DB6E92511A1002188788F6F4392120",
+                      "path":  "tests/critical.test.ts"
+                  },
+                  {
+                      "sha256":  "D5B4033DEC62FED92066582FEE93DCDB5522FF9676420E77747B6D2611D55317",
+                      "path":  "tests/crm-admissions-operations.test.ts"
+                  },
+                  {
+                      "sha256":  "735B0A4A57D1B228BEC345F73D2349925E31864C0AE7215E61B61FD5F037CACF",
+                      "path":  "tests/crm-finance-enhancements.test.ts"
+                  },
+                  {
+                      "sha256":  "B779A21158692440905354F0EF8668A8886D23CEF82B653AEDE831B675FAFF4E",
+                      "path":  "tests/dashboard-metrics.test.ts"
+                  },
+                  {
+                      "sha256":  "4AB207FE9E0C7ED8C396E789DD43A7D55C77B1D73CA56F859026F93AD6EACE3E",
+                      "path":  "tests/database-api-security.test.ts"
+                  },
+                  {
+                      "sha256":  "C6ECB86250FCA208E7AC04BA4BCC533B787FFE59F38F6FFCACF4DE3F4144AE05",
+                      "path":  "tests/database-persistence.test.ts"
+                  },
+                  {
+                      "sha256":  "39E2C8FDEECF6572D3E57A6A8775DF42D30F6D6E435E0C222CF6C09E47804A65",
+                      "path":  "tests/dual-ledger-sync.test.ts"
+                  },
+                  {
+                      "sha256":  "ED98334CE96064B389AFA6EBA99E5CA16C2D4B7B41CB3165071210617DCF85F7",
+                      "path":  "tests/e2e/01-auth-roles-e2e.mjs"
+                  },
+                  {
+                      "sha256":  "E16B87D42311AB793E56BF9C3671729DEDF11B296DA967BA6524FE75091083DC",
+                      "path":  "tests/e2e/02-modules-and-forms-e2e.mjs"
+                  },
+                  {
+                      "sha256":  "B3ACCAA67C0CEBD953C509C2B30F011817126E93DD63F8DAF982B3D53359B01B",
+                      "path":  "tests/e2e/03-business-workflow-e2e.mjs"
+                  },
+                  {
+                      "sha256":  "8DDA5B3FF3AF24D8C4EC884E23D86A17E90173744FFC85C000BF8E43156CF495",
+                      "path":  "tests/e2e/04-multi-tier-concurrency.mjs"
+                  },
+                  {
+                      "sha256":  "54EE08F37A2EC2D7CB458331759495C546189053A9922D2FEDEB08DD6D8A7EAD",
+                      "path":  "tests/e2e/05-responsive-ui-e2e.mjs"
+                  },
+                  {
+                      "sha256":  "8B4B5BF60F55CCD1D233789B0A4D1AF26BD1018C66C29C1E98BC7F6393F3716B",
+                      "path":  "tests/e2e/login-security-e2e.mjs"
+                  },
+                  {
+                      "sha256":  "BAD36A12A0ACFCA3C25E8B67ADB99F93625951D1363F3E1E8A6F50D79A95B0B9",
+                      "path":  "tests/e2e/probe-console-errors.mjs"
+                  },
+                  {
+                      "sha256":  "263FCD18A7D14675C697DC001D2FB82E5B0D9FB90BC402AADC5D0A73F28118F3",
+                      "path":  "tests/e2e/probe-crm.mjs"
+                  },
+                  {
+                      "sha256":  "436E45A5EF4F7C9A512F5A76E1A9FD2F9860418A9E4BAA80AA5A1C50C291A274",
+                      "path":  "tests/e2e/probe-eligible-staff.mjs"
+                  },
+                  {
+                      "sha256":  "CA49860E6BDF5FA2A3B0BDCA0CCEF570D9BDB97A6C1AB8C13080B758563EC74E",
+                      "path":  "tests/e2e/quiz-timer-regression.mjs"
+                  },
+                  {
+                      "sha256":  "CBD46684CB8399D95E5CE1769CD3CC2668B5D6E628A92B944C714EA9DC310852",
+                      "path":  "tests/e2e/record-loading-regression.mjs"
+                  },
+                  {
+                      "sha256":  "26F4DE6D1343F5D1248D5D3294525B70B5203C85D956B4691589ADB8B1D4F014",
+                      "path":  "tests/e2e/staging-100-user-performance-test.mjs"
+                  },
+                  {
+                      "sha256":  "9D658C2A3858E284FD9FB170F41CDEA4A314F203EAA7DB5E7F57B60A84D1B297",
+                      "path":  "tests/e2e/test-browser-init.mjs"
+                  },
+                  {
+                      "sha256":  "D63CBB05509FDB6047192F88CEE878C4CF2A006D56E5E789D50B02EDEBAF5EFB",
+                      "path":  "tests/excel-export-and-ads-import.test.ts"
+                  },
+                  {
+                      "sha256":  "2BB35659928F912F48215294911886B031F90863F9FDF4CB09EB970D9F0AB48A",
+                      "path":  "tests/fee-approval-workflow.test.ts"
+                  },
+                  {
+                      "sha256":  "E057F44D0ECE747ED34F2F8CADC0A7E5A664A0FCD508E0201DEDD8C0949993DB",
+                      "path":  "tests/fee-course.test.ts"
+                  },
+                  {
+                      "sha256":  "02977455B578ACA4C33C028A10A07CA6B42B71FF0004A7BFA9CA4438D145B819",
+                      "path":  "tests/fee-workflow-audit-reproductions.test.ts"
+                  },
+                  {
+                      "sha256":  "EBC515A7F4A93B686B0031264367980AFE6E753245A75C721258FDE66A71BD7E",
+                      "path":  "tests/financial-operations.test.ts"
+                  },
+                  {
+                      "sha256":  "ECD6143F58E3045583CDE7205B024241799C83FA15810B9E96BD68711E908E83",
+                      "path":  "tests/gst-compliance.test.ts"
+                  },
+                  {
+                      "sha256":  "F83352C71A44934A95943296B315BDB26DCAC4CD9F0F9402101FE2C718FD21A7",
+                      "path":  "tests/hls-player.test.ts"
+                  },
+                  {
+                      "sha256":  "EE4BB031CBFEA48572AB02A890B782F59485F90A176F3ECE3F319A35DE030170",
+                      "path":  "tests/live-session-middleware.test.ts"
+                  },
+                  {
+                      "sha256":  "F39B9084B609744B3F3633AC9C6116FFDCAF33A88E8D4E8F5EBCED45DF954BFC",
+                      "path":  "tests/login-security.test.ts"
+                  },
+                  {
+                      "sha256":  "106CA3F2C76DFB4B3DB011E8035A04DD1E7B227E0743336EC3E14BA119C3D35B",
+                      "path":  "tests/meeting-attendance.test.ts"
+                  },
+                  {
+                      "sha256":  "0D370DA782281C04A52D3DFBB0580DB78977D43E23500B288D52DC06A59929EB",
+                      "path":  "tests/middleware.test.ts"
+                  },
+                  {
+                      "sha256":  "127EAC6B14717FFFA3FABCED43269F3AEDAEACD2621DE99F48ED6BF63D212A0F",
+                      "path":  "tests/onboarding-api.test.ts"
+                  },
+                  {
+                      "sha256":  "616860802CBAE058B1EC1D4D47693EDC5A2B57B40DABD2538AA5345FF7B2AE85",
+                      "path":  "tests/onboarding.test.ts"
+                  },
+                  {
+                      "sha256":  "2F8919EDEC2AC1F4C03A805F23411AC1A01960687BB38A9407F227EBEFE3DD2F",
+                      "path":  "tests/payment-approval-automation.test.ts"
+                  },
+                  {
+                      "sha256":  "AE8DDE37320BBC29CBF59AF08D73BE99FB59E2507982CAD8D100F9FD13021B11",
+                      "path":  "tests/payment-gateway.test.ts"
+                  },
+                  {
+                      "sha256":  "9A1D1EE145141DC2EDD75F669582AE50E4F35E822C8EA6B2CD003DB504D08392",
+                      "path":  "tests/payment-session-configuration.test.ts"
+                  },
+                  {
+                      "sha256":  "3493E07D66FD2E864FAE2E6F745CC1C98E5C5F23F2F67E4D850CC963728B0255",
+                      "path":  "tests/payment-transaction-reads.test.ts"
+                  },
+                  {
+                      "sha256":  "1ED03DF1102E8CF3DE16979E1DD52B29FD58CD849888048D478385D3FE2278E8",
+                      "path":  "tests/payment-workflow-client.test.ts"
+                  },
+                  {
+                      "sha256":  "743345334071248D2F9249FC38A278C80273582907D89BF18F2848990166A72D",
+                      "path":  "tests/payment-workflow-database.cjs"
+                  },
+                  {
+                      "sha256":  "834050CEC3E2220F3DE968F6346B090C6EEFEF5D546E2FFD5671C3963E567E6D",
+                      "path":  "tests/pdf-generation.test.ts"
+                  },
+                  {
+                      "sha256":  "2B1A2637034C8A621F9A55288A4E50D1A7A231BF37285683112BCD53C2152C66",
+                      "path":  "tests/performance-benchmark-results.json"
+                  },
+                  {
+                      "sha256":  "7F60BB36E0B3D0B4FAC8CBD979C6FA7178EB7C9C36603A1C0D3A433B3B1E6256",
+                      "path":  "tests/placement-enrollment.test.ts"
+                  },
+                  {
+                      "sha256":  "FDC9FCFD324815BDDF439A6ACB021B2D7D7EE884C29A203B26029C8A0530CE3C",
+                      "path":  "tests/platform-admin-operations.test.ts"
+                  },
+                  {
+                      "sha256":  "6EAC4757F78D1236E5157A5E73884A80E29E07B7AFA6A64E57C3F33C4C264999",
+                      "path":  "tests/portal-assessments.test.ts"
+                  },
+                  {
+                      "sha256":  "29FD22D20B31877838F0522D7F6AA44DD303BD544D41AEE992667A90D6D6A337",
+                      "path":  "tests/portal-hardening.test.ts"
+                  },
+                  {
+                      "sha256":  "A4C0CE37323EAD01F12D760F9B9DA3436724EB659D57C759B71AD2BCB9092CB1",
+                      "path":  "tests/realtime-notifications.test.ts"
+                  },
+                  {
+                      "sha256":  "227B9E90F7E5BED4B9941177F15039634C77955D9D5C8C393D142F16460684C6",
+                      "path":  "tests/rls-policies.test.ts"
+                  },
+                  {
+                      "sha256":  "16920AD85F4515B6966530CF7C8B928493F6F0C6C5488DEA747F95EEE0FAB091",
+                      "path":  "tests/sap-lab-management.test.ts"
+                  },
+                  {
+                      "sha256":  "36ECE6AA4119F4822218FC21E05A102FFA0CC38BF1953784EC13EAB80FF785CB",
+                      "path":  "tests/schedule-management.test.ts"
+                  },
+                  {
+                      "sha256":  "2B4BBA5A7907A859350FA8303780334F7EE54CC5D817FDEE1983AF2A3B083AFF",
+                      "path":  "tests/security-hardening.test.ts"
+                  },
+                  {
+                      "sha256":  "DE65A918D9520C1FFA32573B8BBE8188110BFD76D4FAE01EE7D23F8E57C6577F",
+                      "path":  "tests/setup-storage.ts"
+                  },
+                  {
+                      "sha256":  "8639F2EC154374696566772F1B2C0FBABCAA2C62A26DFD9A2887A847530EDF1F",
+                      "path":  "tests/storage.test.ts"
+                  },
+                  {
+                      "sha256":  "08A66DCB40CDD07D22D11C727BEF5B8FA9BCBDA8B4819C6CAB81D3430E5228F4",
+                      "path":  "tests/student-360-operations.test.ts"
+                  },
+                  {
+                      "sha256":  "B16D9A02130FE877191D4099E45AB316F7DE3ADFF1A675C902385908183F64F7",
+                      "path":  "tests/student-access-feedback.test.ts"
+                  },
+                  {
+                      "sha256":  "4042575738A0CD0B7A593574D35CE26999EABDEF46A82DB7701C388F449B812F",
+                      "path":  "tests/student-fee-payment-approval-workflow.test.ts"
+                  },
+                  {
+                      "sha256":  "982C98ACCA1A316ABA31204278803C74D59B8E7CAC83EA30E4A6E6960185F53E",
+                      "path":  "tests/student-record-loading.test.ts"
+                  },
+                  {
+                      "sha256":  "7121F7B5245645531FA837B894E429E396EFB98081A9C4B7EE541710D1DB5835",
+                      "path":  "tests/user-management.test.ts"
+                  },
+                  {
+                      "sha256":  "1E8322D58E7DE215990A2040739A9DBB75937C6E5D83D2444FF37CD17773F887",
+                      "path":  "tsconfig.json"
+                  },
+                  {
+                      "sha256":  "61C97C3C497B43197532366D4B197620E7C617FDE7359A2D444C9ADE3A8A3EDE",
+                      "path":  "types/index.ts"
+                  },
+                  {
+                      "sha256":  "E12BB67074C68D394E6DFB19612D6CAE0FFC789D4377258518FA0C8FCB826DEA",
+                      "path":  "utils/supabase/client.ts"
+                  },
+                  {
+                      "sha256":  "80DFC35C950DF17F7EDA9089323B03204B67821264544F96AC8DACEA1899B7E3",
+                      "path":  "utils/supabase/middleware.ts"
+                  },
+                  {
+                      "sha256":  "B0D2C6F58622CEE941A5A8899FF1063D65AFA9AB51A647B371D071BB3B089395",
+                      "path":  "utils/supabase/server.ts"
+                  },
+                  {
+                      "sha256":  "DCE4523A54B08833CB1DC6B4286BAA589EC0D8C23813C617668E2FAA7B3B2EE2",
+                      "path":  "vitest.config.ts"
+                  }
+              ],
+    "head":  "5b6744cb286a64e67ffe63044ba9d410df75ccf1",
+    "copied":  268
+}
