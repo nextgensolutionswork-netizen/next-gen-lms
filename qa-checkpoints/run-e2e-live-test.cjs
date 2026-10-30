@@ -125,7 +125,7 @@ async function runEndToEndLiveTest() {
 
   const utrInput = page.locator('input[placeholder*="UTR-9823419082"]');
   if (await utrInput.count() > 0) {
-    await utrInput.fill('UTR-9823419082');
+    await utrInput.fill(`UTR-${Date.now()}`);
   }
 
   const testFilePath = path.resolve('qa-checkpoints/sample-proof.png');

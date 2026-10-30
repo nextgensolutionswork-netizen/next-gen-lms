@@ -14,6 +14,8 @@ if (fs.existsSync(qaDir)) {
     'app/api/admissions/route.ts',
     'lib/supabase/db.ts',
     'lib/supabase/rls.ts',
+    'lib/services/data-store.ts',
+    'data/institute_store.json',
     'tsconfig.json',
   ];
 
