@@ -540,7 +540,7 @@ export interface Payment {
   amount: number;
   payment_date: string;
   payment_mode: PaymentMethod;
-  transaction_reference?: string;
+  transaction_reference?: string | null;
   gateway_order_id?: string;
   gateway_payment_id?: string;
   gateway_signature?: string;
@@ -564,7 +564,7 @@ export interface Receipt {
   course_name: string;
   payment_amount: number;
   payment_mode: PaymentMethod;
-  transaction_reference?: string;
+  transaction_reference?: string | null;
   payment_date: string;
   remaining_balance: number;
   authorized_by: string;
@@ -1316,7 +1316,7 @@ export interface StudentPaymentRecord {
   amount_paid: number;
   payment_date: string;
   payment_mode: PaymentMethod;
-  transaction_reference?: string;
+  transaction_reference?: string | null;
   bank_upi_reference?: string;
   receipt_number?: string;
   payment_proof_url?: string;
@@ -1331,6 +1331,7 @@ export interface StudentPaymentRecord {
   verified_by_name?: string;
   verified_at?: string;
   verification_notes?: string;
+  manual_verification?: { reference?: string; amount: string; payment_date: string };
 
   updated_at?: string;
   updated_by?: string;
@@ -1386,7 +1387,7 @@ export interface StudentRefundRequest {
   processed_by?: string;
   processed_by_name?: string;
   processed_at?: string;
-  transaction_reference?: string;
+  transaction_reference?: string | null;
   created_at: string;
 }
 

@@ -1,3 +1,5 @@
+import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
+import { validateManualPaymentVerification, type ManualPaymentVerification } from './manual-payment-verification';
 import { store } from './data-store';
 import { assertSameTenant, isAccountsUser, tenantId } from '@/lib/auth/tenant';
 import { paymentAudit, paymentNotification } from './payment-events';
@@ -903,7 +905,7 @@ export class FeeWorkflowService {
       amount_paid: number;
       payment_mode: PaymentMethod;
       payment_date?: string;
-      transaction_reference?: string;
+      transaction_reference?: string | null;
       bank_upi_reference?: string;
       payment_proof_url?: string;
       notes?: string;
@@ -912,6 +914,7 @@ export class FeeWorkflowService {
     recorderUserId: string,
     recorderRole = 'counsellor'
   ): StudentPaymentRecord {
+    input = normalizePaymentFields(input);
     const fee = this.getStudentFeeById(input.fee_id);
     if (!fee) throw new Error(`Fee with ID ${input.fee_id} not found.`);
     const recorder = store.users.find((u) => u.id === recorderUserId);
@@ -953,11 +956,12 @@ export class FeeWorkflowService {
       throw new Error('Payment amount must be greater than zero.');
     }
     this.validatePaymentDetails(fee, amountPaid, input.transaction_reference || input.bank_upi_reference);
+    validatePaymentEntry(input);
 
     const recorderUser = store.users.find((u) => u.id === recorderUserId);
     const recorderName = recorderUser?.full_name || 'Staff User';
     const now = new Date().toISOString();
-    const paymentDate = input.payment_date || now.split('T')[0];
+    const paymentDate = input.payment_date || actualPaymentDate();
 
     // Manual entries are cleared only by a separate Accounts decision.
 
@@ -1030,7 +1034,7 @@ export class FeeWorkflowService {
       amount_paid?: number;
       payment_mode?: PaymentMethod;
       payment_date?: string;
-      transaction_reference?: string;
+      transaction_reference?: string | null;
       bank_upi_reference?: string;
       payment_proof_url?: string;
       notes?: string;
@@ -1054,8 +1058,10 @@ export class FeeWorkflowService {
 
     const fee = this.getStudentFeeById(payment.fee_id);
     if (!fee) throw new Error('Associated fee not found.');
+    updates = normalizePaymentFields({ ...updates, payment_mode: updates.payment_mode || payment.payment_mode });
+    validatePaymentEntry({ ...payment, ...updates });
     this.validatePaymentDetails(fee, updates.amount_paid ?? payment.amount_paid,
-      updates.transaction_reference ?? payment.transaction_reference ?? updates.bank_upi_reference ?? payment.bank_upi_reference,
+      updates.payment_mode === 'Cash' ? undefined : updates.transaction_reference ?? payment.transaction_reference ?? updates.bank_upi_reference ?? payment.bank_upi_reference,
       payment.id);
 
     const updaterUser = store.users.find((u) => u.id === updaterUserId);
@@ -1096,6 +1102,7 @@ export class FeeWorkflowService {
       payment.installment_id = updates.installment_id;
     }
 
+    if (payment.payment_mode === 'Cash') Object.assign(payment, normalizePaymentFields(payment));
     payment.verification_status = 'Pending Verification';
     payment.status = 'Pending Approval';
     payment.updated_at = now;
@@ -1114,7 +1121,7 @@ export class FeeWorkflowService {
       legacyP.amount = payment.amount_paid;
       legacyP.payment_mode = payment.payment_mode;
       legacyP.payment_date = payment.payment_date;
-      legacyP.transaction_reference = payment.transaction_reference || payment.bank_upi_reference || legacyP.transaction_reference;
+      legacyP.transaction_reference = payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference;
       legacyP.notes = payment.notes;
       legacyP.status = 'Pending';
     }
@@ -1132,7 +1139,8 @@ export class FeeWorkflowService {
   public verifyPayment(
     paymentId: string,
     accountantUserId: string,
-    verificationNotes?: string
+    verificationNotes?: string,
+    verification?: ManualPaymentVerification
   ): StudentPaymentRecord {
     const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
@@ -1158,8 +1166,9 @@ export class FeeWorkflowService {
     if (!fee) throw new Error(`Associated fee ${payment.fee_id} not found.`);
     assertSameTenant(accountantUser, payment);
     assertSameTenant(accountantUser, fee);
-    this.validatePaymentDetails(fee, payment.amount_paid, payment.transaction_reference || payment.bank_upi_reference, payment.id);
+    this.validatePaymentDetails(fee, payment.amount_paid, payment.payment_mode === 'Cash' ? undefined : payment.transaction_reference || payment.bank_upi_reference, payment.id);
     if (store.receipts.some((r) => r.payment_id === payment.id) || store.studentFinancialLedgers.some((l) => l.reference_id === payment.id && l.entry_type === 'Payment Verified')) throw new Error('Payment already has financial entries.');
+    const enteredVerification = validateManualPaymentVerification(payment, verification);
     const before = structuredClone(payment);
 
     const accountantName = accountantUser?.full_name || 'Accountant';
@@ -1171,6 +1180,7 @@ export class FeeWorkflowService {
     payment.verified_by_name = accountantName;
     payment.verified_at = now;
     payment.verification_notes = verificationNotes;
+    payment.manual_verification = enteredVerification;
 
     this.finalizeVerifiedPayment(payment, fee, accountantUserId, accountantName);
     paymentAudit('PAYMENT_APPROVED', payment, accountantUser, before);
@@ -1367,7 +1377,7 @@ export class FeeWorkflowService {
       course_name: fee.course_name || fee.sap_module || fee.fee_category,
       payment_amount: payment.amount_paid,
       payment_mode: payment.payment_mode,
-      transaction_reference: payment.transaction_reference || payment.bank_upi_reference || 'N/A',
+      transaction_reference: payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference,
       payment_date: payment.payment_date,
       remaining_balance: fee.outstanding_amount,
       authorized_by: verifierName,
@@ -1418,7 +1428,7 @@ export class FeeWorkflowService {
         amount: payment.amount_paid,
         payment_date: payment.payment_date,
         payment_mode: payment.payment_mode,
-        transaction_reference: payment.transaction_reference || payment.bank_upi_reference,
+        transaction_reference: payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference,
         status: 'Success',
         collected_by: payment.recorded_by,
         collected_by_name: payment.recorded_by_name,
@@ -1430,7 +1440,7 @@ export class FeeWorkflowService {
       Object.assign(existingLegacyPayment, {
         amount: payment.amount_paid, receipt_number: receiptNumber, status: 'Success',
         payment_mode: payment.payment_mode, payment_date: payment.payment_date,
-        transaction_reference: payment.transaction_reference || payment.bank_upi_reference,
+        transaction_reference: payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference,
         notes: payment.notes,
       });
     }

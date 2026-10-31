@@ -1,3 +1,4 @@
+import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
@@ -300,7 +301,7 @@ describe('Domain 4: Student 360 Profile & Operations Suite', () => {
       expect(payment.status).toBe('Pending Approval');
 
       // Verify payment by authorized staff / accountant (different from recorder)
-      const verifiedPayment = feeWorkflowService.verifyPayment(payment.id, testAccountantId, 'Verified via Bank UTR');
+      const verifiedPayment = feeWorkflowService.verifyPayment(payment.id, testAccountantId, 'Verified via Bank UTR', enteredPaymentVerification(payment.id));
       expect(verifiedPayment.verification_status).toBe('Verified');
       expect(fee.outstanding_amount).toBe(beforeOutstanding - paymentAmount);
     });

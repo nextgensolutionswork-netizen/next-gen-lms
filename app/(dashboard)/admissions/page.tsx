@@ -32,6 +32,7 @@ import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
 import { createAdmissionWorkflow, getAdmissions } from '@/lib/services/admission-service';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
+import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
@@ -146,6 +147,15 @@ export default function AdmissionsPage() {
   const [initialPaymentAmount, setInitialPaymentAmount] = React.useState(0);
   const [initialPaymentMode, setInitialPaymentMode] = React.useState<PaymentMethod>('UPI');
   const [initialPaymentRef, setInitialPaymentRef] = React.useState('');
+  const [initialPaymentDate, setInitialPaymentDate] = React.useState(actualPaymentDate);
+  const paymentProofGeneration = React.useRef(0);
+  const paymentProofVersion = paymentProofGeneration.current;
+  const changeInitialPaymentMode = (mode: PaymentMethod) => {
+    paymentProofGeneration.current += 1;
+    setInitialPaymentMode(mode);
+    setIsPaymentProofUploading(false);
+    if (mode === 'Cash') { setInitialPaymentRef(''); setInitialPaymentProofUrl(''); }
+  };
   const [initialPaymentProofUrl, setInitialPaymentProofUrl] = React.useState('');
   const [isPaymentProofUploading, setIsPaymentProofUploading] = React.useState(false);
   const [initialPaymentNotes, setInitialPaymentNotes] = React.useState('');
@@ -228,7 +238,9 @@ export default function AdmissionsPage() {
 
   const handleCreateAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isPaymentProofUploading) return;
+    if (initialPaymentMode !== 'Cash' && isPaymentProofUploading) return;
+    if (collectInitialPayment && (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0)) { alert('Amount to Collect must be greater than zero.'); return; }
+    if (collectInitialPayment && initialPaymentMode !== 'Cash' && !initialPaymentRef.trim()) { alert('Transaction reference is required for non-cash payments.'); return; }
     if (!name || !phone || !email || !address) return;
     if (!user) {
       alert('Authentication required: Please sign in to register admissions.');
@@ -281,10 +293,12 @@ export default function AdmissionsPage() {
         payment_plan: 'Full Payment',
         counsellor_id: counsellorId || user.id,
         lead_id: convertedLeadId,
+        collect_initial_payment: collectInitialPayment,
         initial_payment_amount: collectInitialPayment ? initialPaymentAmount : 0,
         payment_mode: initialPaymentMode,
-        transaction_reference: initialPaymentRef,
-        payment_proof_url: collectInitialPayment ? initialPaymentProofUrl : undefined,
+        transaction_reference: initialPaymentMode === 'Cash' ? null : initialPaymentRef,
+        payment_proof_url: collectInitialPayment && initialPaymentMode !== 'Cash' ? initialPaymentProofUrl || undefined : undefined,
+        payment_date: collectInitialPayment ? initialPaymentDate : undefined,
         initial_payment_notes: initialPaymentNotes,
       },
       user.id
@@ -310,6 +324,7 @@ export default function AdmissionsPage() {
       setInitialPaymentAmount(0);
       setInitialPaymentRef('');
       setInitialPaymentProofUrl('');
+      setInitialPaymentDate(actualPaymentDate());
       setInitialPaymentNotes('');
       refreshList();
     } catch (err: any) {
@@ -899,7 +914,8 @@ export default function AdmissionsPage() {
                       </label>
                       <Input
                         type="number"
-                        min="0"
+                        min="0.01"
+                        step="0.01"
                         max={netPayable}
                         value={initialPaymentAmount}
                         onChange={(e) =>
@@ -915,7 +931,7 @@ export default function AdmissionsPage() {
                       </label>
                       <select
                         value={initialPaymentMode}
-                        onChange={(e) => setInitialPaymentMode(e.target.value as PaymentMethod)}
+                        onChange={(e) => changeInitialPaymentMode(e.target.value as PaymentMethod)}
                         className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
                       >
                         <option value="UPI">UPI (GPay / PhonePe / QR)</option>
@@ -928,22 +944,25 @@ export default function AdmissionsPage() {
                       </select>
                     </div>
 
-                    <Input
+                    <Input label="Actual Payment Date *" type="date" value={initialPaymentDate} onChange={(e) => setInitialPaymentDate(e.target.value)} required={collectInitialPayment} />
+                    {initialPaymentMode !== 'Cash' && <Input
+                      required={collectInitialPayment}
                       label="Transaction / Cheque / UTR Ref #"
                       placeholder="e.g. UTR-9823419082 or Cheque #123456"
                       value={initialPaymentRef}
                       onChange={(e) => setInitialPaymentRef(e.target.value)}
-                    />
+                    />}
                   </div>
 
-                  <FileUpload
+                  {initialPaymentMode !== 'Cash' && <FileUpload
+                    key={initialPaymentMode}
                     bucket="payment-proofs"
                     label="Payment Proof / Transaction Image (Optional)"
                     description="Attach a payment screenshot, bank transfer confirmation, or cheque image."
                     value={initialPaymentProofUrl}
-                    onChange={setInitialPaymentProofUrl}
-                    onUploadingChange={setIsPaymentProofUploading}
-                  />
+                    onChange={(url) => { if (paymentProofVersion === paymentProofGeneration.current) setInitialPaymentProofUrl(url); }}
+                    onUploadingChange={(uploading) => { if (paymentProofVersion === paymentProofGeneration.current) setIsPaymentProofUploading(uploading); }}
+                  />}
 
                   <Input
                     label="Payment Remarks / Notes"

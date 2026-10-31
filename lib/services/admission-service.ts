@@ -1,3 +1,4 @@
+import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
 import { store } from './data-store';
 import {
   Admission,
@@ -96,8 +97,9 @@ export interface CreateAdmissionInput {
   counsellor_id?: string;
   lead_id?: string; // Optional: if converted from CRM
   initial_payment_amount?: number;
+  collect_initial_payment?: boolean;
   payment_mode?: PaymentMethod;
-  transaction_reference?: string;
+  transaction_reference?: string | null;
   bank_upi_reference?: string;
   initial_payment_notes?: string;
   payment_proof_url?: string;
@@ -202,6 +204,7 @@ export async function createAdmissionWorkflow(
 
   const net_payable = Math.max(0, input.course_fee - discount);
 
+  if (input.collect_initial_payment && (!input.initial_payment_amount || input.initial_payment_amount <= 0)) throw new Error('Amount to Collect must be greater than zero.');
   // B08: Shared Strict Payment Validation for Initial Payments
   if (input.initial_payment_amount !== undefined && input.initial_payment_amount > 0) {
     if (input.initial_payment_amount > net_payable) {
@@ -213,15 +216,18 @@ export async function createAdmissionWorkflow(
     if (mode !== 'Cash' && !input.transaction_reference?.trim()) {
       throw new Error('Transaction reference is required for non-cash initial payments.');
     }
-    if (!input.payment_proof_url) {
-      throw new Error('Attach payment proof before submitting the initial payment.');
-    }
     if (input.payment_date) {
       const parsedPaymentDate = new Date(`${input.payment_date}T00:00:00.000Z`);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(input.payment_date) || !Number.isFinite(parsedPaymentDate.getTime())) {
         throw new Error('Please enter a valid initial payment date.');
       }
     }
+  }
+
+  if (input.initial_payment_amount !== undefined && input.initial_payment_amount !== 0) {
+    if (!Number.isFinite(input.initial_payment_amount) || input.initial_payment_amount <= 0) throw new Error('Amount to Collect must be greater than zero.');
+    input = normalizePaymentFields({ ...input, payment_mode: input.payment_mode || 'UPI', payment_date: input.payment_date || actualPaymentDate() });
+    validatePaymentEntry(input);
   }
 
   const normalizedBatchId = input.batch_id ? input.batch_id.replace(/^(btc|bch)-/, 'batch-') : undefined;
@@ -488,7 +494,7 @@ export async function createAdmissionWorkflow(
     initialPayment = feeWorkflowService.recordPayment({
       fee_id: newStudentFee.id, student_id: newStudent.id, enrollment_id: newAdmission.id,
       amount_paid: input.initial_payment_amount, payment_mode: input.payment_mode || 'UPI',
-      payment_date: input.payment_date || input.admission_date, transaction_reference: input.transaction_reference,
+      payment_date: input.payment_date || actualPaymentDate(), transaction_reference: input.transaction_reference,
       payment_proof_url: input.payment_proof_url, notes: input.initial_payment_notes,
     }, performedByUserId, performingUser.role);
   }
