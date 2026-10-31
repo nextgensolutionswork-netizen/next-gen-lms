@@ -76,6 +76,8 @@ function getStoragePaths() {
       if (p) {
         const storageDir = (process.env.VITEST || process.env.NEXT_PUBLIC_APP_ENV === 'staging') && process.env.LMS_TEST_STORAGE_DIR
           ? process.env.LMS_TEST_STORAGE_DIR
+          : (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+          ? p.join(eval('require')('os').tmpdir(), 'data')
           : p.join(process.cwd(), 'data');
         return {
           STORAGE_DIR: storageDir,

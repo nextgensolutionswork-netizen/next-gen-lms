@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash, randomUUID } from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
 import { tenantId } from '@/lib/auth/tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -11,7 +12,9 @@ import { validateFile } from '@/lib/services/storage-service';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
-const root = path.resolve(process.cwd(), 'data', 'payment-proofs');
+const root = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+  ? path.join(os.tmpdir(), 'data', 'payment-proofs')
+  : path.resolve(process.cwd(), 'data', 'payment-proofs');
 const mime: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', pdf: 'application/pdf' };
 function fail(error: unknown) {
   const message = error instanceof Error ? error.message : 'Payment proof operation failed.';

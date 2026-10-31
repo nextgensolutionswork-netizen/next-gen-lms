@@ -37,6 +37,31 @@ export function Header({ currentRole, currentUserName, avatar, onOpenNavigation,
     return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, [user?.id]);
   const [showNotifications, setShowNotifications] = React.useState(false);
+  const notificationRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!showNotifications) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showNotifications]);
 
   return (
     <header className="min-h-16 gap-2 border-b border-slate-200 bg-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between sticky top-0 z-40 print:hidden">
@@ -76,7 +101,7 @@ export function Header({ currentRole, currentUserName, avatar, onOpenNavigation,
         </Link>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notificationRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors relative"
