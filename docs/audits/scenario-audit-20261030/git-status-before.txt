@@ -1,0 +1,17 @@
+ M TEST-REPORT.md
+ M app/api/database/health/route.ts
+ M qa-checkpoints/execute-live-leads-test.cjs
+ M qa-checkpoints/live-browser-test.cjs
+ M qa-checkpoints/run-e2e-live-test.cjs
+ M qa-checkpoints/test-complete-admission.cjs
+ M qa-checkpoints/test-confirm-admission.cjs
+ M qa-checkpoints/test-full-admissions-flow.cjs
+ M tests/setup-storage.ts
+?? docs/audits/scenario-audit-20261030/
+?? lib/security/cleanup-dry-run.ts
+?? lib/security/database-preflight.ts
+?? qa-checkpoints/verify-fresh-session.cjs
+?? scripts/database-preflight.cjs
+?? tests/cleanup-dry-run.test.ts
+?? tests/crm-simultaneous-lead-and-proxy.test.ts
+?? tests/database-preflight-guard.test.ts

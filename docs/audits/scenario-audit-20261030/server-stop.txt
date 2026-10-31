@@ -1,0 +1,1 @@
+Audit server stopped; browser-generated synthetic data preserved outside data directory.

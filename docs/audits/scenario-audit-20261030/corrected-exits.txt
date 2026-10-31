@@ -1,0 +1,2 @@
+admissions=1
+typecheck=0

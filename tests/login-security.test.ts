@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { POST as loginPostHandler } from '@/app/api/auth/login/route';
 import { POST as logoutPostHandler, GET as logoutGetHandler } from '@/app/api/auth/logout/route';
 import { middleware } from '@/middleware';
-import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME, AUTH_COOKIE_SECRET } from '@/lib/security/auth-cookie';
+import { generateAuthCookieSignature, verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME, AUTH_COOKIE_SECRET } from '@/lib/security/auth-cookie';
 import { store } from '@/lib/services/data-store';
 import { verifyUserCredentials } from '@/lib/auth/credentials';
 
@@ -387,6 +387,133 @@ describe('Login Security & Credential Protection Tests', () => {
       const res = await logoutGetHandler(req);
       expect(res.status).toBe(303);
       expect(res.headers.get('location')).toBe('http://localhost:3000/login?notice=logged_out');
+    });
+  });
+
+  // =========================================================================
+  // 7. OPERATIONS ADMIN & ALL-ROLE ISOLATION VALIDATION
+  // =========================================================================
+  describe('Operations Admin & Role-Specific Access Isolation', () => {
+    it('resolves Operations Admin with canonical UUID and active status upon valid credentials', async () => {
+      const res = await verifyUserCredentials('admin@next-generpsolutions.com', 'AdminPass#2026');
+      expect(res.success).toBe(true);
+      expect(res.user).toBeDefined();
+      expect(res.user?.role).toBe('admin');
+      expect(res.user?.is_active).toBe(true);
+      expect(res.user?.email).toBe('admin@next-generpsolutions.com');
+      // Must have canonical UUID
+      expect(res.user?.id).toBe('22222222-2222-2222-2222-222222222222');
+    });
+
+    it('preserves backward-compatible legacy usr-admin alias in store', () => {
+      const canonical = store.users.find((u) => u.id === '22222222-2222-2222-2222-222222222222');
+      const alias = store.users.find((u) => u.id === 'usr-admin');
+      expect(canonical).toBeDefined();
+      expect(alias).toBeDefined();
+      expect(canonical?.email).toBe('admin@next-generpsolutions.com');
+      expect(alias?.email).toBe('admin@next-generpsolutions.com');
+    });
+
+    it('enforces role-specific redirects and access restrictions across all 8 supported roles', async () => {
+      const rolePerms = [
+        {
+          role: 'super_admin',
+          email: 'superadmin@next-generpsolutions.com',
+          id: '11111111-1111-1111-1111-111111111111',
+          allowed: ['/dashboard', '/settings', '/todos', '/accounts/approvals'],
+          denied: [],
+        },
+        {
+          role: 'admin',
+          email: 'admin@next-generpsolutions.com',
+          id: '22222222-2222-2222-2222-222222222222',
+          allowed: ['/dashboard', '/settings', '/users', '/onboarding'],
+          denied: [{ path: '/todos', fallback: '/dashboard' }],
+        },
+        {
+          role: 'accountant',
+          email: 'accounts@next-generpsolutions.com',
+          id: '33333333-3333-3333-3333-333333333333',
+          allowed: ['/accounts/fees', '/accounts/approvals'],
+          denied: [{ path: '/settings', fallback: '/accounts/fees' }],
+        },
+        {
+          role: 'counsellor',
+          email: 'counsellor@next-generpsolutions.com',
+          id: '44444444-4444-4444-4444-444444444444',
+          allowed: ['/crm/leads', '/accounts/payments'],
+          denied: [{ path: '/accounts/approvals', fallback: '/crm/leads' }, { path: '/settings', fallback: '/crm/leads' }],
+        },
+        {
+          role: 'trainer',
+          email: 'vikram.fico@next-generpsolutions.com',
+          id: '55555555-5555-5555-5555-555555555551',
+          allowed: ['/academics/courses'],
+          denied: [{ path: '/settings', fallback: '/academics/courses' }, { path: '/accounts/fees', fallback: '/academics/courses' }],
+        },
+        {
+          role: 'placement_coordinator',
+          email: 'placement@next-generpsolutions.com',
+          id: '66666666-6666-6666-6666-666666666666',
+          allowed: ['/placement'],
+          denied: [{ path: '/settings', fallback: '/placement' }],
+        },
+        {
+          role: 'support',
+          email: 'support@next-generpsolutions.com',
+          id: '88888888-8888-8888-8888-888888888888',
+          allowed: ['/support'],
+          denied: [{ path: '/settings', fallback: '/support' }],
+        },
+        {
+          role: 'onboarding_team',
+          email: 'onboarding@next-generpsolutions.com',
+          id: '99999999-9999-9999-9999-999999999999',
+          allowed: ['/onboarding'],
+          denied: [{ path: '/dashboard', fallback: '/onboarding' }, { path: '/settings', fallback: '/onboarding' }],
+        },
+      ];
+
+      for (const item of rolePerms) {
+        const cookiePayload = encodeURIComponent(
+          JSON.stringify({
+            id: item.id,
+            email: item.email,
+            role: item.role,
+            is_active: true,
+          })
+        );
+        const sig = await generateAuthCookieSignature(cookiePayload, AUTH_COOKIE_SECRET);
+
+        // Verify allowed paths
+        for (const allowedPath of item.allowed) {
+          const req = new NextRequest(`http://localhost:3000${allowedPath}`, {
+            headers: {
+              host: 'localhost:3000',
+              cookie: `${AUTH_COOKIE_NAME}=${cookiePayload}; ${AUTH_SIG_COOKIE_NAME}=${sig}`,
+            },
+          });
+          const res = await middleware(req);
+          // Should not redirect away from allowed path
+          if (res.status === 303 || res.status === 307 || res.status === 308) {
+            const loc = res.headers.get('location');
+            expect(loc).toBeNull();
+          }
+        }
+
+        // Verify denied paths redirect to fallback
+        for (const deniedItem of item.denied) {
+          const req = new NextRequest(`http://localhost:3000${deniedItem.path}`, {
+            headers: {
+              host: 'localhost:3000',
+              cookie: `${AUTH_COOKIE_NAME}=${cookiePayload}; ${AUTH_SIG_COOKIE_NAME}=${sig}`,
+            },
+          });
+          const res = await middleware(req);
+          expect([303, 307]).toContain(res.status);
+          expect(res.headers.get('location')).toBe(`http://localhost:3000${deniedItem.fallback}`);
+        }
+      }
     });
   });
 });

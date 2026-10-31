@@ -1,0 +1,4 @@
+regressions=1
+typecheck-with-regressions=0
+browser-crm=0
+browser-auth=1

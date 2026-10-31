@@ -1,3 +1,5 @@
+import { resolveCourseId } from '@/lib/utils/course-resolver';
+import { validateAdmissionCourse } from './admission-course';
 import { store } from './data-store';
 import {
   Admission,
@@ -207,21 +209,9 @@ export async function createAdmissionWorkflow(
   }
   if (feeDueDate < input.admission_date) throw new Error('Fee due date cannot be before the admission date.');
 
-  // Validate Course
-  let course = store.courses.find((c) => c.id === input.course_id);
-  if (!course && isLiveSupabaseEnabled()) {
-    try {
-      const { createAdminClient } = await import('@/lib/supabase/admin');
-      const { data: dbCourse } = await createAdminClient().from('courses').select('*').eq('id', input.course_id).maybeSingle();
-      if (dbCourse) {
-        store.courses.push(dbCourse as any);
-        course = dbCourse as any;
-      }
-    } catch {}
-  }
-  if (!course) {
-    throw new Error(`Invalid Course: Selected course "${input.course_id}" does not exist.`);
-  }
+  // Live admissions must use an authoritative canonical catalog ID, even if a seed matches.
+  const course = await validateAdmissionCourse(input.course_id, tenantId(performingUser));
+  input = { ...input, course_id: course.id };
 
   // B02: Validate Base Course Fee & Discount Authorization
   if (input.course_fee <= 0) {
@@ -289,12 +279,8 @@ export async function createAdmissionWorkflow(
     throw new Error(`Invalid Batch: Selected batch "${input.batch_id}" does not exist.`);
   }
   if (batch) {
-    const isCourseMatch =
-      batch.course_id === input.course_id ||
-      (batch.course_id === 'crs-fico-01' && input.course_id === 'c1000000-0000-0000-0000-000000000001') ||
-      (batch.course_id === 'c1000000-0000-0000-0000-000000000001' && input.course_id === 'crs-fico-01') ||
-      (batch.course_id === 'crs-mm-01' && input.course_id === 'c1000000-0000-0000-0000-000000000002') ||
-      (batch.course_id === 'c1000000-0000-0000-0000-000000000002' && input.course_id === 'crs-mm-01');
+    const courseIds = new Set([course.id, batch.course_id]);
+    const isCourseMatch = resolveCourseId(batch.course_id, courseIds, tenantId(performingUser)) === resolveCourseId(course.id, courseIds, tenantId(performingUser));
     if (input.course_id && batch.course_id && !isCourseMatch) {
       throw new Error(`Course-Batch Mismatch: Selected batch "${batch.batch_name}" belongs to course "${batch.course_id}", not "${input.course_id}".`);
     }

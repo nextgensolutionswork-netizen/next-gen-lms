@@ -1,0 +1,126 @@
+{
+  "project": "tgohtdzwehhjfahtgovq",
+  "tenant": "default",
+  "snapshot_revision": 75,
+  "read_date": "2026-10-31",
+  "method": "SELECT only; candidate IDs are evidence, not approved assignments",
+  "records": [
+    {
+      "student_id": "stu-1793263130233",
+      "student_course_id": "crs-abap-01",
+      "admission_id": "adm-1793263130233",
+      "admission_course_id": "crs-abap-01",
+      "admission_course_name": "SAP ABAP on HANA & RESTful Application Programming (RAP)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000004"
+    },
+    {
+      "student_id": "stu-1791869262274",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1791869262273",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1791869816802",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1791869816802",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792216537724",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792216537724",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792217515501",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792217515501",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792217665451",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792217665450",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792217777349",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792217777349",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792218054839",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792218054839",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792218197782",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792218197781",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792218309514",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792218309513",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1792241311599",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1792241311599",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1793256626974",
+      "student_course_id": "crs-fico-01",
+      "admission_id": "adm-1793256626973",
+      "admission_course_id": "crs-fico-01",
+      "admission_course_name": "SAP S/4HANA Finance (FICO)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000001"
+    },
+    {
+      "student_id": "stu-1791887621133",
+      "student_course_id": "crs-mm-01",
+      "admission_id": "adm-1791887621132",
+      "admission_course_id": "crs-mm-01",
+      "admission_course_name": "SAP S/4HANA Materials Management (MM)",
+      "exact_name_candidates": 1,
+      "candidate_course_id": "c1000000-0000-0000-0000-000000000002"
+    }
+  ]
+}

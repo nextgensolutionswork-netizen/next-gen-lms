@@ -1,3 +1,4 @@
+import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
@@ -146,7 +147,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
     );
 
     expect(() => {
-      feeWorkflowService.verifyPayment(payment.id, counsellorId);
+      feeWorkflowService.verifyPayment(payment.id, counsellorId, undefined, enteredPaymentVerification(payment.id));
     }).toThrow(/Separation of duties violation: Payment recorder cannot verify their own payment entry/i);
   });
 
@@ -163,12 +164,12 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
 
     // Another counsellor cannot verify
     expect(() => {
-      feeWorkflowService.verifyPayment(payment.id, anotherCounsellorId);
+      feeWorkflowService.verifyPayment(payment.id, anotherCounsellorId, undefined, enteredPaymentVerification(payment.id));
     }).toThrow(/Unauthorized: Only an Accountant can verify student payments/i);
 
     // Trainer cannot verify
     expect(() => {
-      feeWorkflowService.verifyPayment(payment.id, trainerId);
+      feeWorkflowService.verifyPayment(payment.id, trainerId, undefined, enteredPaymentVerification(payment.id));
     }).toThrow(/Unauthorized: Only an Accountant can verify student payments/i);
   });
 
@@ -199,7 +200,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
     const verified = feeWorkflowService.verifyPayment(
       payment.id,
       accountantId,
-      'Verified in Axis Bank statement'
+      'Verified in Axis Bank statement', enteredPaymentVerification(payment.id)
     );
 
     expect(verified.verification_status).toBe('Verified');
@@ -237,7 +238,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
     );
 
     // Accountant verifies it
-    feeWorkflowService.verifyPayment(payment.id, accountantId, 'Cash verified at counter');
+    feeWorkflowService.verifyPayment(payment.id, accountantId, 'Cash verified at counter', enteredPaymentVerification(payment.id));
 
     // Attempting to update the verified payment throws error
     expect(() => {

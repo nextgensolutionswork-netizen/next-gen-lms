@@ -25,3 +25,30 @@ The compatibility snapshot follows the repository's existing document-style data
 GST and scheduled installments are retired. New admissions, proposals, corrections, and revisions calculate the payable amount from the fee minus discounts plus any explicit additional charges. Partial payments are allowed against one outstanding balance, with the balance rechecked when Accounts approves each payment. New receipts contain payment details and the remaining balance, with no GST or generated e-invoice identifiers.
 
 The installments navigation and reports are removed; old `/accounts/installments` links redirect to `/accounts/fees`. Historical approved balances, payment records, and schedule rows remain stored for compatibility and are not rewritten or deleted. Deprecated database tax fields are zero/empty on new receipts; legacy payment-plan fields use the existing `Full Payment` value but do not require paying the full balance at once.
+# Manual payment verification
+
+The Verify & Clear Student Payment modal requires Accounts to type the reference,
+amount received, and actual payment date before explicitly confirming approval.
+The inputs start blank each time the modal opens. Admission downpayments are
+stored by `createAdmissionWorkflow` as individual `studentPayments` records with
+their fee, student, and admission association; those records are the comparison
+source, not the student's total fees or balance.
+
+The approval API accepts `verification: { reference, amount, payment_date }`.
+Amount is a decimal string with at most two fractional digits; comparison uses
+integer minor units without rounding. Reference comparison ignores whitespace
+and case. Date comparison uses the stored calendar day without timezone conversion.
+Non-cash payments missing their stored reference, and payments missing their actual
+date, must be returned for correction before approval.
+
+Cash uses its stored transaction/cash reference (or bank reference) when present.
+Otherwise Accounts must explicitly type `CASH:<payment ID>` to acknowledge that
+specific cash collection. This is a verification reference, not an official receipt;
+the normal sequential receipt is generated only after successful approval.
+
+All three checks run inside the existing authenticated approval transaction before
+financial mutations. Mismatches return `fieldErrors` and commit no changes.
+The `PAYMENT_APPROVED` audit snapshot includes `manual_verification` with the exact
+entered strings, plus the existing verifier and timestamp. Existing receipt/ledger
+duplicate guards, transaction serialization, and database revision checks remain in
+force. No migration or historical-record rewrite is required.

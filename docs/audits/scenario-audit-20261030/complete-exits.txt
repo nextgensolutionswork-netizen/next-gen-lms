@@ -1,0 +1,3 @@
+tests=1
+typecheck=2
+lint=0

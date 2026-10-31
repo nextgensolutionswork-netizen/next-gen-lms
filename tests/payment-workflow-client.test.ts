@@ -7,6 +7,15 @@ import { mergeWorkflowSnapshot } from '@/lib/services/payment-workflow-state';
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('payment refresh requests', () => {
+  it('sends explicitly entered verification values and preserves field errors', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ success: false, error: 'Mismatch', fieldErrors: { amount: 'Amount Received does not match this payment record.' } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const verification = { reference: 'MANUAL-REF', amount: '1250.50', payment_date: '2026-10-31' };
+    await expect(paymentWorkflowClient.verifyPayment('payment-1', 'accountant', 'Checked', verification)).rejects.toMatchObject({ fieldErrors: { amount: expect.stringContaining('does not match') } });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ action: 'approve', paymentId: 'payment-1', notes: 'Checked', verification });
+    expect(mergeWorkflowSnapshot).not.toHaveBeenCalled();
+  });
+
   it('shares overlapping reads and fetches fresh data after completion', async () => {
     let resolve!: (value: unknown) => void;
     const fetchMock = vi.fn().mockImplementation(() => new Promise((done) => { resolve = done; }));

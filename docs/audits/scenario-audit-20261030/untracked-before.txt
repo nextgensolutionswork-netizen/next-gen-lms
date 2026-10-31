@@ -1,0 +1,10 @@
+docs/audits/scenario-audit-20261030/branch.txt
+docs/audits/scenario-audit-20261030/head.txt
+docs/audits/scenario-audit-20261030/working-tree-before.patch
+lib/security/cleanup-dry-run.ts
+lib/security/database-preflight.ts
+qa-checkpoints/verify-fresh-session.cjs
+scripts/database-preflight.cjs
+tests/cleanup-dry-run.test.ts
+tests/crm-simultaneous-lead-and-proxy.test.ts
+tests/database-preflight-guard.test.ts

@@ -1,0 +1,459 @@
+{
+  "status": "NO-GO / ownership gate unresolved",
+  "project_ref": "tgohtdzwehhjfahtgovq",
+  "date": "2026-10-31",
+  "database_access": "SELECT only; no migration, writes, or RLS changes",
+  "ownership": {
+    "counts": {
+      "expenses": 0,
+      "with_vendor": 0,
+      "with_recorder": 0,
+      "with_invoice_link": 0,
+      "with_payload_tenant": 0,
+      "with_snapshot_audit": 0,
+      "with_relational_audit": 0,
+      "with_snapshot_expense": 0
+    },
+    "read_at": "2026-10-31T06:49:22.344624+00:00",
+    "project_context": "tgohtdzwehhjfahtgovq",
+    "snapshot_expense_array_counts": [
+      {
+        "tenant": "staging-isolated-tenant",
+        "expense_count": 0
+      },
+      {
+        "tenant": "default",
+        "expense_count": 0
+      }
+    ],
+    "current_recorder_tenant_candidates": null
+  },
+  "schema": {
+    "columns": [
+      {
+        "type": "uuid",
+        "table": "audit_logs",
+        "column": "id",
+        "default": "uuid_generate_v4()",
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "audit_logs",
+        "column": "user_id",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "audit_logs",
+        "column": "user_email",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "audit_logs",
+        "column": "module",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "audit_logs",
+        "column": "action",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "audit_logs",
+        "column": "record_id",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "jsonb",
+        "table": "audit_logs",
+        "column": "payload",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "audit_logs",
+        "column": "ip_address",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamp with time zone",
+        "table": "audit_logs",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "uuid",
+        "table": "expenses",
+        "column": "id",
+        "default": "uuid_generate_v4()",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "voucher_number",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "expenses",
+        "column": "vendor_id",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "category",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "numeric",
+        "table": "expenses",
+        "column": "amount",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "date",
+        "table": "expenses",
+        "column": "expense_date",
+        "default": "CURRENT_DATE",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "payment_mode",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "reference_number",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "invoice_url",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "uuid",
+        "table": "expenses",
+        "column": "recorded_by",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "status",
+        "default": "'Approved'::text",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "expenses",
+        "column": "notes",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamp with time zone",
+        "table": "expenses",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "uuid",
+        "table": "profiles",
+        "column": "id",
+        "default": "uuid_generate_v4()",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "profiles",
+        "column": "role",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "boolean",
+        "table": "profiles",
+        "column": "is_active",
+        "default": "true",
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamp with time zone",
+        "table": "profiles",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamp with time zone",
+        "table": "profiles",
+        "column": "updated_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "profiles",
+        "column": "tenant_id",
+        "default": "'default'::text",
+        "nullable": "NO"
+      },
+      {
+        "type": "uuid",
+        "table": "vendors",
+        "column": "id",
+        "default": "uuid_generate_v4()",
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "vendor_name",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "contact_person",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "phone",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "email",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "category",
+        "default": null,
+        "nullable": "NO"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "gst_number",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "bank_account",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "text",
+        "table": "vendors",
+        "column": "ifsc_code",
+        "default": null,
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamp with time zone",
+        "table": "vendors",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": "YES"
+      },
+      {
+        "type": "timestamp with time zone",
+        "table": "vendors",
+        "column": "updated_at",
+        "default": "now()",
+        "nullable": "YES"
+      }
+    ],
+    "policies": [
+      {
+        "mode": "PERMISSIVE",
+        "name": "Anyone can insert audit logs",
+        "check": "true",
+        "roles": [
+          "public"
+        ],
+        "table": "audit_logs",
+        "using": null,
+        "command": "INSERT"
+      },
+      {
+        "mode": "PERMISSIVE",
+        "name": "Super Admin can view audit logs",
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "table": "audit_logs",
+        "using": "(get_current_user_role() = 'super_admin'::text)",
+        "command": "SELECT"
+      },
+      {
+        "mode": "PERMISSIVE",
+        "name": "Accounts manage expenses",
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "table": "expenses",
+        "using": "(get_current_user_role() = ANY (ARRAY['super_admin'::text, 'admin'::text, 'accountant'::text]))",
+        "command": "ALL"
+      },
+      {
+        "mode": "PERMISSIVE",
+        "name": "Staff can view staff profiles",
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "table": "profiles",
+        "using": "(get_current_user_role() = ANY (ARRAY['admin'::text, 'counsellor'::text, 'trainer'::text, 'placement_coordinator'::text, 'accountant'::text, 'support'::text]))",
+        "command": "SELECT"
+      },
+      {
+        "mode": "PERMISSIVE",
+        "name": "Super Admins can manage all profiles",
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "table": "profiles",
+        "using": "(get_current_user_role() = 'super_admin'::text)",
+        "command": "ALL"
+      },
+      {
+        "mode": "PERMISSIVE",
+        "name": "Users can view their own profile",
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "table": "profiles",
+        "using": "(auth.uid() = id)",
+        "command": "SELECT"
+      },
+      {
+        "mode": "PERMISSIVE",
+        "name": "Accounts manage vendors",
+        "check": null,
+        "roles": [
+          "public"
+        ],
+        "table": "vendors",
+        "using": "(get_current_user_role() = ANY (ARRAY['super_admin'::text, 'admin'::text, 'accountant'::text]))",
+        "command": "ALL"
+      }
+    ],
+    "constraints": [
+      {
+        "type": "c",
+        "table": "vendors",
+        "definition": "CHECK ((category = ANY (ARRAY['Hardware / Server'::text, 'Marketing'::text, 'Facility'::text, 'Software / Cloud'::text, 'Honorarium'::text, 'Other'::text])))"
+      },
+      {
+        "type": "p",
+        "table": "vendors",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "type": "c",
+        "table": "expenses",
+        "definition": "CHECK ((amount > (0)::numeric))"
+      },
+      {
+        "type": "c",
+        "table": "expenses",
+        "definition": "CHECK ((category = ANY (ARRAY['Trainer Honorarium'::text, 'Facility Rent'::text, 'Electricity & Utilities'::text, 'Cloud & Servers'::text, 'Marketing & Ads'::text, 'Software Licenses'::text, 'Office Supplies'::text, 'Miscellaneous'::text])))"
+      },
+      {
+        "type": "c",
+        "table": "expenses",
+        "definition": "CHECK ((payment_mode = ANY (ARRAY['UPI'::text, 'Bank Transfer'::text, 'Credit Card'::text, 'Cash'::text, 'Cheque'::text])))"
+      },
+      {
+        "type": "p",
+        "table": "expenses",
+        "definition": "PRIMARY KEY (id)"
+      },
+      {
+        "type": "f",
+        "table": "expenses",
+        "definition": "FOREIGN KEY (recorded_by) REFERENCES profiles(id)"
+      },
+      {
+        "type": "c",
+        "table": "expenses",
+        "definition": "CHECK ((status = ANY (ARRAY['Pending'::text, 'Approved'::text, 'Rejected'::text])))"
+      },
+      {
+        "type": "f",
+        "table": "expenses",
+        "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE SET NULL"
+      },
+      {
+        "type": "u",
+        "table": "expenses",
+        "definition": "UNIQUE (voucher_number)"
+      }
+    ],
+    "relevant_tables": [
+      "onboarding_audit_logs",
+      "batch_transfer_audits",
+      "expenses",
+      "audit_logs"
+    ]
+  },
+  "local_store": {
+    "count": 3,
+    "paid_total": 111500,
+    "untagged": 3,
+    "ids": [
+      "exp-01",
+      "exp-02",
+      "exp-03"
+    ],
+    "recorded_by_present": 0,
+    "paid_by_present": 3,
+    "expense_audit_count": 1,
+    "ownership_verified": false
+  }
+}

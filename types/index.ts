@@ -1333,6 +1333,7 @@ export interface StudentPaymentRecord {
   verified_by_name?: string;
   verified_at?: string;
   verification_notes?: string;
+  manual_verification?: { reference: string; amount: string; payment_date: string };
 
   updated_at?: string;
   updated_by?: string;

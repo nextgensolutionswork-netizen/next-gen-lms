@@ -1,3 +1,4 @@
+import { validateManualPaymentVerification, type ManualPaymentVerification } from './manual-payment-verification';
 import { store } from './data-store';
 import { assertSameTenant, isAccountsUser, tenantId } from '@/lib/auth/tenant';
 import { paymentAudit, paymentNotification } from './payment-events';
@@ -1132,7 +1133,8 @@ export class FeeWorkflowService {
   public verifyPayment(
     paymentId: string,
     accountantUserId: string,
-    verificationNotes?: string
+    verificationNotes?: string,
+    verification?: ManualPaymentVerification
   ): StudentPaymentRecord {
     const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
@@ -1160,6 +1162,10 @@ export class FeeWorkflowService {
     assertSameTenant(accountantUser, fee);
     this.validatePaymentDetails(fee, payment.amount_paid, payment.transaction_reference || payment.bank_upi_reference, payment.id);
     if (store.receipts.some((r) => r.payment_id === payment.id) || store.studentFinancialLedgers.some((l) => l.reference_id === payment.id && l.entry_type === 'Payment Verified')) throw new Error('Payment already has financial entries.');
+    const student = store.students.find((s) => s.id === fee.student_id);
+    const enrollmentId = fee.enrollment_id || student?.admission_id || student?.admission_number || student?.id;
+    if (payment.student_id !== fee.student_id || (payment.enrollment_id && payment.enrollment_id !== enrollmentId)) throw new Error('Payment does not match its student admission and fee record.');
+    const enteredVerification = validateManualPaymentVerification(payment, verification);
     const before = structuredClone(payment);
 
     const accountantName = accountantUser?.full_name || 'Accountant';
@@ -1171,6 +1177,7 @@ export class FeeWorkflowService {
     payment.verified_by_name = accountantName;
     payment.verified_at = now;
     payment.verification_notes = verificationNotes;
+    payment.manual_verification = enteredVerification;
 
     this.finalizeVerifiedPayment(payment, fee, accountantUserId, accountantName);
     paymentAudit('PAYMENT_APPROVED', payment, accountantUser, before);
