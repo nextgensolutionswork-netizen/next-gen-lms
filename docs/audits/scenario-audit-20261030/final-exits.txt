@@ -1,4 +1,0 @@
-tests=1
-typecheck=0
-lint=0
-browser-auth=0

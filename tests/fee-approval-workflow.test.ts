@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
@@ -330,12 +329,12 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
 
       // Counsellor who recorded the payment cannot verify their own payment
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, counsellorId, undefined, enteredPaymentVerification(payment.id));
+        feeWorkflowService.verifyPayment(payment.id, counsellorId);
       }).toThrow(/Separation of duties violation: Payment recorder cannot verify their own payment entry/i);
 
       // Other non-accountant staff (e.g. trainer) cannot verify payments
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, 'usr-trainer-fico', undefined, enteredPaymentVerification(payment.id));
+        feeWorkflowService.verifyPayment(payment.id, 'usr-trainer-fico');
       }).toThrow(/Unauthorized: Only an Accountant can verify student payments/i);
     });
 
@@ -354,7 +353,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       const verified = feeWorkflowService.verifyPayment(
         payment.id,
         accountantId,
-        'Verified in HDFC bank statement', enteredPaymentVerification(payment.id)
+        'Verified in HDFC bank statement'
       );
 
       expect(verified.verification_status).toBe('Verified');
@@ -477,7 +476,6 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approved.id,
           amount_paid: approved.final_payable,
           payment_mode: 'Bank Transfer',
-          transaction_reference: 'BANK-CLEARANCE-001',
         },
         accountantId,
         'accountant'
@@ -485,7 +483,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
 
       const secondAccountant = { ...store.users.find((u) => u.id === accountantId)!, id: 'accounts-second-reviewer' };
       store.users.push(secondAccountant);
-      feeWorkflowService.verifyPayment(payment.id, secondAccountant.id, undefined, enteredPaymentVerification(payment.id));
+      feeWorkflowService.verifyPayment(payment.id, secondAccountant.id);
 
       const summary = feeWorkflowService.getStudentFinancialSummary(testStudentId);
       expect(summary.outstanding_balance).toBe(0);

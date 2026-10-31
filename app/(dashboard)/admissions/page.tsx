@@ -33,20 +33,12 @@ import { createAdmissionWorkflow, getAdmissions } from '@/lib/services/admission
 import { getCourses } from '@/lib/services/academics-service';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
-import { resolveCourseId, visibleCourses } from '@/lib/utils/course-resolver';
-import { tenantId } from '@/lib/auth/tenant';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
   const { user, role, hasPermission } = useAuth();
   const [admissions, setAdmissions] = React.useState<Admission[]>([]);
   const [loadError, setLoadError] = React.useState('');
-  const [catalogError, setCatalogError] = React.useState('');
-  const [catalogReady, setCatalogReady] = React.useState(false);
-  const tenant = user ? tenantId(user) : '__unauthenticated__';
-  const courses = visibleCourses(store.courses, tenant);
-  const catalogSignature = JSON.stringify(courses.map((course) => course.id));
-  const catalogIds = React.useMemo<Set<string>>(() => new Set(JSON.parse(catalogSignature)), [catalogSignature]);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('All');
   const [isNewModalOpen, setIsNewModalOpen] = React.useState(false);
@@ -99,14 +91,13 @@ export default function AdmissionsPage() {
   const [education, setEducation] = React.useState('B.Tech / MBA / B.Com');
   const [experienceYears, setExperienceYears] = React.useState(1);
   const [employmentStatus, setEmploymentStatus] = React.useState<'Employed' | 'Unemployed' | 'Student' | 'Career Gap'>('Employed');
-  const defaultCourseId = courses[0]?.id || '';
+  const defaultCourseId = store.courses[0]?.id || '';
   const defaultBatches = (store.batches || []).filter((b) => b.course_id === defaultCourseId);
   const defaultBatch = defaultBatches.find(
     (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
   );
 
   const [courseId, setCourseId] = React.useState(defaultCourseId);
-  const matchesSelectedCourse = React.useCallback((id: string) => !!courseId && resolveCourseId(id, catalogIds, tenant) === courseId, [courseId, catalogIds, tenant]);
   const [trainingMode, setTrainingMode] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Hybrid');
   const [batchId, setBatchId] = React.useState(defaultBatch?.id || '');
   const [batchError, setBatchError] = React.useState('');
@@ -133,12 +124,12 @@ export default function AdmissionsPage() {
     }
   }, [user, availableCounsellors, counsellorId]);
 
-  const courseBatches = (store.batches || []).filter((b) => matchesSelectedCourse(b.course_id));
+  const courseBatches = (store.batches || []).filter((b) => b.course_id === courseId);
 
   // Synchronize batch selection reactively when course changes
   React.useEffect(() => {
     if (courseId) {
-      const validBatches = (store.batches || []).filter((b) => matchesSelectedCourse(b.course_id));
+      const validBatches = (store.batches || []).filter((b) => b.course_id === courseId);
       const isCurrentValid = validBatches.some((b) => b.id === batchId && (b.current_enrolled || 0) < (b.maximum_capacity ?? 25));
       if (!isCurrentValid) {
         const openBatch = validBatches.find(
@@ -149,7 +140,7 @@ export default function AdmissionsPage() {
     } else {
       setBatchId('');
     }
-  }, [courseId, batchId, matchesSelectedCourse]);
+  }, [courseId, batchId]);
 
   // Initial Downpayment / Admission Fee Collection state
   const [collectInitialPayment, setCollectInitialPayment] = React.useState(false);
@@ -168,20 +159,12 @@ export default function AdmissionsPage() {
   } | null>(null);
 
   React.useEffect(() => {
-    if (!user) return;
     let isMounted = true;
-    setCatalogReady(false);
     const initAdmissions = async () => {
       try {
-        const loaded = visibleCourses(await getCourses(), tenant);
-        if (isMounted) {
-          setCourseId((previous) => resolveCourseId(previous, new Set(loaded.map((course) => course.id)), tenant) || loaded[0]?.id || '');
-          setCatalogReady(true);
-          setCatalogError('');
-        }
+        await getCourses();
       } catch (e) {
-        if (isMounted) { setCatalogReady(false); setCatalogError(e instanceof Error ? e.message : 'Unable to load course catalog.'); }
-        return;
+        console.warn('Failed to prefetch courses in admissions page:', e);
       }
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
@@ -201,8 +184,8 @@ export default function AdmissionsPage() {
             setPhone(lead.phone || '');
             setEmail(lead.email || '');
             if (lead.interested_course_id) {
-              setCourseId(resolveCourseId(lead.interested_course_id, new Set(store.courses.map((course) => course.id)), tenant) || '');
-              const matchingBatches = (store.batches || []).filter((b) => resolveCourseId(b.course_id, new Set(store.courses.map((course) => course.id)), tenant) === resolveCourseId(lead.interested_course_id, new Set(store.courses.map((course) => course.id)), tenant));
+              setCourseId(lead.interested_course_id);
+              const matchingBatches = (store.batches || []).filter((b) => b.course_id === lead.interested_course_id);
               const availableBatch = matchingBatches.find(
                 (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
               );
@@ -227,10 +210,10 @@ export default function AdmissionsPage() {
     };
     initAdmissions();
     return () => { isMounted = false; };
-  }, [tenant, user]);
+  }, []);
 
-  const selectedCourse = courses.find((c) => c.id === courseId);
-  const courseFee = selectedCourse?.price || 0;
+  const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];
+  const courseFee = selectedCourse?.price || 45000;
   const netPayable = Math.max(0, courseFee - discount);
 
   const refreshList = React.useCallback(async () => {
@@ -263,7 +246,6 @@ export default function AdmissionsPage() {
 
   const handleCreateAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!catalogReady || catalogError || !selectedCourse) { setCatalogError('Select a course from a successfully loaded catalog before submitting.'); return; }
     if (isPaymentProofUploading) return;
     if (!name || !phone || !email || !address) return;
     if (!user) {
@@ -279,7 +261,7 @@ export default function AdmissionsPage() {
     if (batchId) {
       const selectedBatch = (store.batches || []).find((b) => b.id === batchId);
       if (selectedBatch) {
-        if (!matchesSelectedCourse(selectedBatch.course_id)) {
+        if (selectedBatch.course_id !== courseId) {
           alert(`Invalid batch selection: Batch "${selectedBatch.batch_name}" belongs to another course. Please select a batch for the enrolled course.`);
           return;
         }
@@ -376,7 +358,6 @@ export default function AdmissionsPage() {
 
   return (
     <div className="space-y-6">
-      {catalogError && <p role="alert" className="text-rose-700">{catalogError} Reload the page to retry course retrieval.</p>}
       {loadError && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
           <p>{loadError}</p>
@@ -745,7 +726,7 @@ export default function AdmissionsPage() {
                   onChange={(e) => {
                     const newCourseId = e.target.value;
                     setCourseId(newCourseId);
-                    const matchingBatches = (store.batches || []).filter((b) => resolveCourseId(b.course_id, catalogIds, tenant) === newCourseId);
+                    const matchingBatches = (store.batches || []).filter((b) => b.course_id === newCourseId);
                     const availableBatch = matchingBatches.find(
                       (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
                     );
@@ -754,7 +735,7 @@ export default function AdmissionsPage() {
                   }}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
                 >
-                  {courses.map((c) => (
+                  {(store.courses || []).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.course_name} (₹{c.price.toLocaleString('en-IN')})
                     </option>
@@ -1020,7 +1001,7 @@ export default function AdmissionsPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setIsNewModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="sap" size="sm" disabled={!catalogReady || !!catalogError || !selectedCourse || isPaymentProofUploading || (courseBatches.length > 0 && !batchId)}>
+            <Button type="submit" variant="sap" size="sm" disabled={isPaymentProofUploading || (courseBatches.length > 0 && !batchId)}>
               Confirm Admission & Submit Payment
             </Button>
           </div>

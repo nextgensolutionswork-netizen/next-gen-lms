@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
@@ -301,7 +300,7 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
       expect(admissionResult.payment?.status).toBe('Pending Approval');
       expect(admissionResult.student.paid_amount).toBe(0);
       store.users.push({ id: 'accounts-approval-test', full_name: 'Accounts', email: 'accounts@approval.test', role: 'accountant', is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-      feeWorkflowService.verifyPayment(admissionResult.payment!.id, 'accounts-approval-test', undefined, enteredPaymentVerification(admissionResult.payment!.id));
+      feeWorkflowService.verifyPayment(admissionResult.payment!.id, 'accounts-approval-test');
 
       const student = admissionResult.student;
       expect(student.total_fee).toBe(netPayable);

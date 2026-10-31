@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
@@ -150,7 +149,7 @@ describe('24. Student Onboarding Team & Lifecycle Management Tests', () => {
 
       expect(store.onboardingCases.find((c) => c.admission_id === result.admission.id)).toBeUndefined();
       const submitted = feeWorkflowService.recordPayment({ fee_id: result.studentFee!.id, amount_paid: 1000, payment_mode: 'Cash' }, adminUser.id);
-      feeWorkflowService.verifyPayment(submitted.id, store.users.find((u) => u.role === 'accountant')!.id, undefined, enteredPaymentVerification(submitted.id));
+      feeWorkflowService.verifyPayment(submitted.id, store.users.find((u) => u.role === 'accountant')!.id);
       // Verify onboarding case was automatically created
       const onbCase = store.onboardingCases.find((c) => c.admission_id === result.admission.id);
       expect(onbCase).toBeDefined();
@@ -468,7 +467,7 @@ describe('24. Student Onboarding Team & Lifecycle Management Tests', () => {
 
       // 2. Fetch the created onboarding case
       const initialPayment = feeWorkflowService.recordPayment({ fee_id: admResult.studentFee!.id, amount_paid: 1000, payment_mode: 'Cash' }, adminUser.id);
-      feeWorkflowService.verifyPayment(initialPayment.id, store.users.find((u) => u.role === 'accountant')!.id, undefined, enteredPaymentVerification(initialPayment.id));
+      feeWorkflowService.verifyPayment(initialPayment.id, store.users.find((u) => u.role === 'accountant')!.id);
       const unprovCase = store.onboardingCases.find((c) => c.admission_id === admResult.admission.id)!;
       expect(unprovCase).toBeDefined();
       expect(unprovCase.lms_account_created).toBe(false);

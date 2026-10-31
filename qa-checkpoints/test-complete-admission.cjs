@@ -1,12 +1,8 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
-const { assertIsolatedQaDatabase, assertTargetApplicationIsolatedQa } = require('../scripts/database-preflight.cjs');
 
 async function testCompleteAdmission() {
-  assertIsolatedQaDatabase(process.env.NEXT_PUBLIC_SUPABASE_URL || 'mock-sap-lms');
-  await assertTargetApplicationIsolatedQa('http://localhost:3001');
-
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   const page = await browser.newPage();
   

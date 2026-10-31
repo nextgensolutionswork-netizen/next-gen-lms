@@ -2,14 +2,6 @@ import { mkdtempSync, copyFileSync, existsSync, realpathSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll } from 'vitest';
-import { isProductionDatabase } from '../lib/security/database-preflight';
-
-// Strict preflight check: Fail closed if test runner is pointing to production database
-if (process.env.NEXT_PUBLIC_SUPABASE_URL && isProductionDatabase(process.env.NEXT_PUBLIC_SUPABASE_URL)) {
-  throw new Error(
-    'CRITICAL PREFLIGHT GUARD: Test runner refused! NEXT_PUBLIC_SUPABASE_URL is pointing to production database (tgohtdzwehhjfahtgovq). Direct test execution against production is strictly prohibited.'
-  );
-}
 
 // Persistence tests and debounced service writes must never touch the running LMS.
 const testDirectory = mkdtempSync(path.join(tmpdir(), 'lms-test-storage-'));

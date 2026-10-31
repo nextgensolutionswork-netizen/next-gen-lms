@@ -1,4 +1,3 @@
-import { PaymentVerificationError } from '@/lib/services/manual-payment-verification';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
@@ -23,7 +22,7 @@ const details = z.object({
 const command = z.discriminatedUnion('action', [
   z.object({ action: z.literal('record'), input: details.extend({ fee_id: z.string().min(1), student_id: z.string().optional(), enrollment_id: z.string().optional(), idempotency_key: z.string().min(1).max(200) }) }),
   z.object({ action: z.literal('update'), paymentId: z.string(), input: details }),
-  z.object({ action: z.literal('approve'), paymentId: z.string(), notes: z.string().max(2000).optional(), verification: z.object({ reference: z.string().max(200), amount: z.string().max(100), payment_date: z.string().max(40) }).optional() }),
+  z.object({ action: z.literal('approve'), paymentId: z.string(), notes: z.string().max(2000).optional() }),
   z.object({ action: z.literal('reject'), paymentId: z.string(), reason: z.string().trim().min(1).max(2000) }),
   z.object({ action: z.literal('void_receipt'), receiptId: z.string().min(1), reason: z.string().trim().min(1).max(2000) }),
 ]);
@@ -31,7 +30,7 @@ const command = z.discriminatedUnion('action', [
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : 'Payment operation failed.';
   const status = message.startsWith('Unauthorized') ? 401 : /Forbidden|Access denied|Separation of duties/.test(message) ? 403 : message.startsWith('Conflict') ? 409 : 400;
-  return NextResponse.json({ success: false, error: message, ...(error instanceof PaymentVerificationError ? { fieldErrors: error.fieldErrors } : {}) }, { status });
+  return NextResponse.json({ success: false, error: message }, { status });
 }
 
 export async function GET(request: NextRequest) {
@@ -71,7 +70,7 @@ export async function POST(request: NextRequest) {
       if ('input' in body && body.input.payment_mode !== 'Cash' && !body.input.transaction_reference?.trim() && !body.input.bank_upi_reference?.trim()) throw new Error('Transaction reference is required for non-cash payments.');
       const payment = body.action === 'record' ? feeWorkflowService.recordPayment(body.input, actor.id, actor.role)
         : body.action === 'update' ? feeWorkflowService.updatePayment(body.paymentId, body.input, actor.id, actor.role)
-        : body.action === 'approve' ? feeWorkflowService.verifyPayment(body.paymentId, actor.id, body.notes, body.verification)
+        : body.action === 'approve' ? feeWorkflowService.verifyPayment(body.paymentId, actor.id, body.notes)
         : feeWorkflowService.rejectPayment(body.paymentId, actor.id, body.reason);
       return { payment, snapshot: visibleWorkflowSnapshot(actor) };
     });

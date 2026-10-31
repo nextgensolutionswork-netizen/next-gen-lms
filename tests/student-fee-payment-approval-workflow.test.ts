@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -220,12 +219,12 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
 
       // Invariant: Counsellor cannot approve their own payment
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, counsellor.id, undefined, enteredPaymentVerification(payment.id));
+        feeWorkflowService.verifyPayment(payment.id, counsellor.id);
       }).toThrow(/Separation of duties violation: Payment recorder cannot verify their own payment/i);
 
       // Invariant: Non-accounts user (e.g. Trainer) cannot approve payment
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, trainer.id, undefined, enteredPaymentVerification(payment.id));
+        feeWorkflowService.verifyPayment(payment.id, trainer.id);
       }).toThrow(/Unauthorized: Only an Accountant can verify student payments/i);
     });
 
@@ -314,7 +313,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
       const approved = feeWorkflowService.verifyPayment(
         payment.id,
         accountant.id,
-        'Verified in HDFC current account', enteredPaymentVerification(payment.id)
+        'Verified in HDFC current account'
       );
 
       // Status updated to Approved / Verified
@@ -369,7 +368,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
 
       // Duplicate approval prevention
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, secondAccountant.id, undefined, enteredPaymentVerification(payment.id));
+        feeWorkflowService.verifyPayment(payment.id, secondAccountant.id);
       }).toThrow(/Only a payment pending approval can be approved/i);
     });
 
@@ -386,7 +385,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
         },
         counsellor.id
       );
-      feeWorkflowService.verifyPayment(p1.id, accountant.id, undefined, enteredPaymentVerification(p1.id));
+      feeWorkflowService.verifyPayment(p1.id, accountant.id);
 
       expect(testFee.paid_amount).toBe(15000);
       expect(testFee.outstanding_amount).toBe(30000);
@@ -403,7 +402,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
         },
         counsellor.id
       );
-      feeWorkflowService.verifyPayment(p2.id, accountant.id, undefined, enteredPaymentVerification(p2.id));
+      feeWorkflowService.verifyPayment(p2.id, accountant.id);
 
       expect(testFee.paid_amount).toBe(30000);
       expect(testFee.outstanding_amount).toBe(15000);
@@ -420,7 +419,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
         },
         counsellor.id
       );
-      feeWorkflowService.verifyPayment(p3.id, accountant.id, undefined, enteredPaymentVerification(p3.id));
+      feeWorkflowService.verifyPayment(p3.id, accountant.id);
 
       expect(testFee.paid_amount).toBe(45000);
       expect(testFee.outstanding_amount).toBe(0);
@@ -469,7 +468,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
       );
 
       // Approve payment
-      feeWorkflowService.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+      feeWorkflowService.verifyPayment(payment.id, accountant.id);
 
       // Check onboarding case created
       const onboardingCases = store.onboardingCases.filter(
@@ -512,7 +511,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
       );
 
       // Approve payment
-      feeWorkflowService.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+      feeWorkflowService.verifyPayment(payment.id, accountant.id);
 
       const onboardingCase = store.onboardingCases.find(
         (c) => c.student_id === testStudent.id
@@ -553,7 +552,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
       );
 
       // Approve payment
-      feeWorkflowService.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+      feeWorkflowService.verifyPayment(payment.id, accountant.id);
 
       // Invariant: Because admission is pending/unapproved, student is NOT forwarded to onboarding!
       const onboardingCases = store.onboardingCases.filter(

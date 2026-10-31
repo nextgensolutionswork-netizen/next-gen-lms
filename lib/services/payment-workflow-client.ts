@@ -1,4 +1,3 @@
-import type { ManualPaymentVerification } from './manual-payment-verification';
 import { mergeWorkflowSnapshot } from './payment-workflow-state';
 import type { CreateAdmissionInput } from './admission-service';
 import type { feeWorkflowService } from './fee-workflow-service';
@@ -10,7 +9,7 @@ let refreshTask: Promise<any> | undefined;
 async function request(body?: unknown, endpoint = '/api/fees/payments') {
   const res = await fetch(endpoint, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'same-origin' });
   const data = await res.json();
-  if (!res.ok || !data.success) throw Object.assign(new Error(data.error || 'Payment request failed.'), { fieldErrors: data.fieldErrors });
+  if (!res.ok || !data.success) throw new Error(data.error || 'Payment request failed.');
   if (data.snapshot) mergeWorkflowSnapshot(data.snapshot);
   return data;
 }
@@ -38,8 +37,8 @@ export const paymentWorkflowClient = {
   async updatePayment(paymentId: string, input: Parameters<typeof feeWorkflowService.updatePayment>[1], _userId?: string, _role?: string) {
     return (await request({ action: 'update', paymentId, input })).payment as StudentPaymentRecord;
   },
-  async verifyPayment(paymentId: string, _userId?: string, notes?: string, verification?: ManualPaymentVerification) {
-    return (await request({ action: 'approve', paymentId, notes, verification })).payment as StudentPaymentRecord;
+  async verifyPayment(paymentId: string, _userId?: string, notes?: string) {
+    return (await request({ action: 'approve', paymentId, notes })).payment as StudentPaymentRecord;
   },
   async rejectPayment(paymentId: string, _userId: string, reason: string) {
     return (await request({ action: 'reject', paymentId, reason })).payment as StudentPaymentRecord;

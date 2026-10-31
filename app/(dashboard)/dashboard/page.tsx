@@ -28,10 +28,6 @@ import { Button } from '@/components/ui/button';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
-import { getCourses } from '@/lib/services/academics-service';
-import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
-import { tenantId } from '@/lib/auth/tenant';
-import { tenantRecords, visibleCourses } from '@/lib/utils/course-resolver';
 import { Payment } from '@/types';
 import { courseBucket, paymentCourseBucket, UNASSIGNED_COURSE, formatDashboardPercentage } from '@/lib/utils/dashboard-metrics';
 
@@ -56,68 +52,31 @@ function parseDateNormalized(dateStr?: string): Date | null {
 }
 
 export default function DashboardPage() {
-  const { role, user } = useAuth();
-  const tenant = user ? tenantId(user) : '__unauthenticated__';
-  const [loadState, setLoadState] = React.useState({ tenant: '', error: '', revision: 0 });
-  const [retry, setRetry] = React.useState(0);
-  React.useEffect(() => {
-    if (!user || role === 'student') return;
-    let cancelled = false;
-    setLoadState((previous) => ({ ...previous, tenant: '', error: '' }));
-    (async () => {
-      try {
-        await getCourses();
-        if (['admin', 'super_admin', 'accountant', 'counsellor', 'onboarding_team'].includes(role)) await paymentWorkflowClient.refresh();
-        if (!cancelled) setLoadState((previous) => ({ tenant, error: '', revision: previous.revision + 1 }));
-      } catch (error) {
-        if (!cancelled) setLoadState((previous) => ({ ...previous, tenant, error: error instanceof Error ? error.message : 'Unable to load dashboard.' }));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user, role, tenant, retry]);
-  const view = React.useMemo(() => {
-    const visibleTenant = loadState.tenant === tenant && !loadState.error ? tenant : '__loading__';
-    return ({
-    courses: visibleCourses(store.courses || [], visibleTenant),
-    payments: tenantRecords(store.payments || [], visibleTenant),
-    studentPayments: tenantRecords(store.studentPayments || [], visibleTenant),
-    students: tenantRecords(store.students || [], visibleTenant),
-    studentFees: tenantRecords(store.studentFees || [], visibleTenant),
-    feeAccounts: tenantRecords(store.feeAccounts || [], visibleTenant),
-    expenses: tenantRecords(store.expenses || [], visibleTenant),
-    admissions: tenantRecords(store.admissions || [], visibleTenant),
-    batches: tenantRecords(store.batches || [], visibleTenant),
-    leads: tenantRecords(store.leads || [], visibleTenant),
-    placementProfiles: tenantRecords(store.placementProfiles || [], visibleTenant),
-    jobOpenings: tenantRecords(store.jobOpenings || [], visibleTenant),
-    });
-  }, [tenant, loadState]);
-
   const [filterPeriod, setFilterPeriod] = React.useState<'month' | 'today' | 'week' | 'all'>('month');
   const [filterCourse, setFilterCourse] = React.useState<string>('All');
-  const courseIdSignature = JSON.stringify((view.courses || []).map((c) => c.id));
+  const courseIdSignature = JSON.stringify((store.courses || []).map((c) => c.id));
   const courseIds = React.useMemo<Set<string>>(() => new Set(JSON.parse(courseIdSignature)), [courseIdSignature]);
-  const matchesCourse = React.useCallback((courseId?: string) => filterCourse === 'All' || courseBucket(courseId, courseIds, tenant) === filterCourse, [filterCourse, courseIds, tenant]);
+  const matchesCourse = React.useCallback((courseId?: string) => filterCourse === 'All' || courseBucket(courseId, courseIds) === filterCourse, [filterCourse, courseIds]);
 
-  // Unified dual-ledger payments (reconciles view.payments & view.studentPayments)
+  // Unified dual-ledger payments (reconciles store.payments & store.studentPayments)
   const allUnifiedPayments = React.useMemo(() => {
+    store.reconcileDualLedgers();
     const map = new Map<string, Payment>();
 
-    for (const p of view.payments || []) {
+    for (const p of store.payments || []) {
       const key = p.receipt_number || p.id;
       map.set(key, p);
     }
 
-    for (const sp of view.studentPayments || []) {
+    for (const sp of store.studentPayments || []) {
       if (sp.verification_status === 'Rejected') continue;
       const key = sp.receipt_number || sp.id;
       if (!map.has(key)) {
-        const student = (view.students || []).find((s) => s.id === sp.student_id);
-        const fee = (view.studentFees || []).find((f) => f.id === sp.fee_id);
+        const student = (store.students || []).find((s) => s.id === sp.student_id);
+        const fee = (store.studentFees || []).find((f) => f.id === sp.fee_id);
         const courseId = fee?.course_id || student?.course_id;
-        const course = (view.courses || []).find((c) => c.id === courseId);
+        const course = (store.courses || []).find((c) => c.id === courseId);
         map.set(key, {
-          tenant_id: sp.tenant_id,
           id: sp.id.startsWith('pay-') ? sp.id : `pay-${sp.id}`,
           receipt_number: sp.receipt_number || `REC-${sp.id.slice(-6)}`,
           student_id: sp.student_id,
@@ -141,7 +100,7 @@ export default function DashboardPage() {
     }
 
     return Array.from(map.values());
-  }, [view]);
+  }, []);
 
   // Timezone-safe Period filtering calculation
   const isDateInSelectedPeriod = React.useCallback(
@@ -180,38 +139,38 @@ export default function DashboardPage() {
       const inPeriod = isDateInSelectedPeriod(p.payment_date || p.created_at);
       if (!inPeriod) return false;
       if (filterCourse === 'All') return true;
-      return paymentCourseBucket(p, courseIds, view.feeAccounts || [], view.students || [], tenant) === filterCourse;
+      return paymentCourseBucket(p, courseIds, store.feeAccounts || [], store.students || []) === filterCourse;
     });
-  }, [allUnifiedPayments, isDateInSelectedPeriod, filterCourse, courseIds, view, tenant]);
+  }, [allUnifiedPayments, isDateInSelectedPeriod, filterCourse, courseIds]);
 
   // Expenses list dynamically driven by filterPeriod
   const periodExpensesList = React.useMemo(() => {
-    return (view.expenses || []).filter((e) =>
+    return (store.expenses || []).filter((e) =>
       isDateInSelectedPeriod(e.expense_date || e.created_at)
     );
-  }, [isDateInSelectedPeriod, view]);
+  }, [isDateInSelectedPeriod]);
 
   // Admissions dynamically driven by filterPeriod & filterCourse
   const periodAdmissions = React.useMemo(() => {
-    return (view.admissions || []).filter((a) => {
+    return (store.admissions || []).filter((a) => {
       const inPeriod = isDateInSelectedPeriod(a.admission_date || a.created_at);
       if (!inPeriod) return false;
       return matchesCourse(a.course_id);
     });
-  }, [isDateInSelectedPeriod, matchesCourse, view]);
+  }, [isDateInSelectedPeriod, matchesCourse]);
 
   const periodCollections = React.useMemo(() => {
     return periodPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
   }, [periodPayments]);
 
-  const courseBreakdown = [...(view.courses || []).map((c) => ({ id: c.id, name: c.course_name })),
+  const courseBreakdown = [...(store.courses || []).map((c) => ({ id: c.id, name: c.course_name })),
     { id: UNASSIGNED_COURSE, name: 'Unassigned / unknown course' }].map((course) => {
     const payments = allUnifiedPayments.filter((p) =>
       isDateInSelectedPeriod(p.payment_date || p.created_at) &&
-      paymentCourseBucket(p, courseIds, view.feeAccounts || [], view.students || [], tenant) === course.id);
+      paymentCourseBucket(p, courseIds, store.feeAccounts || [], store.students || []) === course.id);
     return { ...course, transactions: payments.length,
       amount: payments.reduce((sum, p) => sum + safeAmount(p.amount), 0),
-      students: (view.students || []).filter((s) => courseBucket(s.course_id, courseIds, tenant) === course.id).length };
+      students: (store.students || []).filter((s) => courseBucket(s.course_id, courseIds) === course.id).length };
   });
 
   const periodExpenses = React.useMemo(() => {
@@ -224,34 +183,34 @@ export default function DashboardPage() {
 
   // Outstanding fee accounts filtered by course
   const totalOutstanding = React.useMemo(() => {
-    return (view.feeAccounts || [])
+    return (store.feeAccounts || [])
       .filter((f) => matchesCourse(f.course_id))
       .reduce((sum, f) => sum + safeAmount(f.outstanding_amount), 0);
-  }, [matchesCourse, view]);
+  }, [matchesCourse]);
 
   // Outstanding balances are tracked per fee account, without schedules.
-  const pendingAccounts = (view.feeAccounts || []).filter((f) =>
+  const pendingAccounts = (store.feeAccounts || []).filter((f) =>
     f.outstanding_amount > 0 && (matchesCourse(f.course_id)));
   const pendingAmountInPeriod = pendingAccounts.reduce((sum, f) => sum + safeAmount(f.outstanding_amount), 0);
 
   // Student roster & active counts filtered by course
   const totalStudents = React.useMemo(() => {
-    return (view.students || []).filter((s) => matchesCourse(s.course_id)).length;
-  }, [matchesCourse, view]);
+    return (store.students || []).filter((s) => matchesCourse(s.course_id)).length;
+  }, [matchesCourse]);
 
   const activeStudents = React.useMemo(() => {
-    return (view.students || []).filter(
+    return (store.students || []).filter(
       (s) => s.status === 'Active' && (matchesCourse(s.course_id))
     ).length;
-  }, [matchesCourse, view]);
+  }, [matchesCourse]);
 
-  const totalCourses = filterCourse === 'All' ? (view.courses || []).length : filterCourse === UNASSIGNED_COURSE ? 0 : 1;
+  const totalCourses = filterCourse === 'All' ? (store.courses || []).length : filterCourse === UNASSIGNED_COURSE ? 0 : 1;
 
   const activeBatches = React.useMemo(() => {
-    return (view.batches || []).filter(
+    return (store.batches || []).filter(
       (b) => b.status === 'Active' && (matchesCourse(b.course_id))
     ).length;
-  }, [matchesCourse, view]);
+  }, [matchesCourse]);
 
   const collectionsPeriodTitle = {
     today: "Today's Collections",
@@ -276,16 +235,16 @@ export default function DashboardPage() {
 
   // CRM & Admission aggregates filtered by period
   const periodLeads = React.useMemo(() => {
-    return (view.leads || []).filter((l) => isDateInSelectedPeriod(l.created_at) && matchesCourse(l.interested_course_id));
-  }, [isDateInSelectedPeriod, matchesCourse, view]);
+    return (store.leads || []).filter((l) => isDateInSelectedPeriod(l.created_at) && matchesCourse(l.interested_course_id));
+  }, [isDateInSelectedPeriod, matchesCourse]);
   const displayLeads = periodLeads;
   const totalLeads = displayLeads.length;
   const convertedLeads = displayLeads.filter((l) => l.stage === 'Converted').length;
   const conversionRate = formatDashboardPercentage(convertedLeads, totalLeads);
-  const upcomingDemos = (view.leads || []).filter((l) => l.stage === 'Demo Scheduled').length;
+  const upcomingDemos = (store.leads || []).filter((l) => l.stage === 'Demo Scheduled').length;
 
   // Placement aggregates calculated dynamically
-  const placementProfiles = (view.placementProfiles || []).filter((p) => matchesCourse((view.students || []).find((s) => s.id === p.student_id)?.course_id));
+  const placementProfiles = (store.placementProfiles || []).filter((p) => matchesCourse((store.students || []).find((s) => s.id === p.student_id)?.course_id));
   const totalPlacementProfiles = placementProfiles.length;
   const approvedResumes = placementProfiles.filter(
     (p) => p.resume_status === 'Reviewed & Approved'
@@ -303,9 +262,9 @@ export default function DashboardPage() {
     : 'N/A';
 
   const totalPlaced = placementProfiles.filter((p) => p.placement_status === 'Placed').length;
-  const activeJobOpenings = (view.jobOpenings || []).filter((j) => j.status === 'Open').length;
+  const activeJobOpenings = (store.jobOpenings || []).filter((j) => j.status === 'Open').length;
 
-
+  const { role } = useAuth();
 
   if (role === 'student') {
     return (
@@ -325,9 +284,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  if (loadState.tenant !== tenant) return <p role="status">Loading dashboard?</p>;
-  if (loadState.error) return <div role="alert"><p>{loadState.error}</p><Button onClick={() => setRetry((value) => value + 1)}>Retry</Button></div>;
 
   return (
     <div className="space-y-6">
@@ -374,9 +330,9 @@ export default function DashboardPage() {
               onChange={(e) => setFilterCourse(e.target.value)}
               className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
             >
-              <option value="All">All Courses ({(view.courses || []).length})</option>
+              <option value="All">All Courses ({(store.courses || []).length})</option>
               <option value={UNASSIGNED_COURSE}>Unassigned / unknown course</option>
-              {(view.courses || []).map((c) => (
+              {(store.courses || []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.course_name}
                 </option>

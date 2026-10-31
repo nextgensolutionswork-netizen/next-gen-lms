@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -159,13 +158,13 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
   it('B03: nominal ₹1 partial payment does NOT grant financial clearance; payment meeting policy grants clearance', () => {
     // ₹1 on ₹30,000 (0.003% < 25%)
     const payment = fees.recordPayment({ ...input(), amount_paid: 1, transaction_reference: 'UTR-B03-1' }, counsellor.id);
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     expect(fee.outstanding_amount).toBe(29999);
     expect(store.onboardingCases[0].checklist.fee_clearance_verification.completed).toBe(false);
 
     // Additional ₹9,999 payment -> total verified = ₹10,000 on ₹30,000 (33.3% >= 25%)
     const p2 = fees.recordPayment({ ...input(), amount_paid: 9999, transaction_reference: 'UTR-B03-2' }, counsellor.id);
-    fees.verifyPayment(p2.id, accountant.id, undefined, enteredPaymentVerification(p2.id));
+    fees.verifyPayment(p2.id, accountant.id);
     expect(fee.outstanding_amount).toBe(20000);
     expect(store.onboardingCases[0].checklist.fee_clearance_verification.completed).toBe(true);
   });
@@ -173,7 +172,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
   // B05: Document and Batch Evidence Verification
   it('B05: rejects document and batch checklist completion when evidence is missing', async () => {
     const payment = fees.recordPayment(input(), counsellor.id);
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     const c = store.onboardingCases[0];
     expect(c.documents).toHaveLength(0);
     expect(c.batch_id).toBeFalsy();
@@ -209,7 +208,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
     const p2 = fees.recordPayment({ ...input(), transaction_reference: 'UTR-INST-REAL', installment_id: 'inst-test-01' }, counsellor.id);
     expect(p2.installment_id).toBe('inst-test-01');
 
-    fees.verifyPayment(p2.id, accountant.id, undefined, enteredPaymentVerification(p2.id));
+    fees.verifyPayment(p2.id, accountant.id);
     const updatedInst = store.installments.find((i) => i.id === 'inst-test-01');
     expect(updatedInst?.paid_amount).toBe(5000);
     expect(updatedInst?.status).toBe('Paid');
@@ -218,7 +217,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
   // B07: Transactional Void & Credit Note Reversal
   it('B07: voiding receipt sets canonical Voided/Rejected status and generates Credit Note', () => {
     const p = fees.recordPayment(input(), counsellor.id);
-    fees.verifyPayment(p.id, accountant.id, undefined, enteredPaymentVerification(p.id));
+    fees.verifyPayment(p.id, accountant.id);
     const receipt = store.receipts[0];
     expect(receipt).toBeDefined();
 
@@ -275,7 +274,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
     } as any);
 
     const p = fees.recordPayment(input(), counsellor.id);
-    fees.verifyPayment(p.id, accountant.id, undefined, enteredPaymentVerification(p.id));
+    fees.verifyPayment(p.id, accountant.id);
 
     const newlyGenerated = store.receipts.find((r) => r.payment_id === p.id);
     expect(newlyGenerated?.receipt_number).toBe(`REC-${year}-000003`);
@@ -285,7 +284,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
   // B12: Tenant-Scoped Handover Recipients
   it('B12: academic handover strictly scopes recipient notifications to the case tenant', async () => {
     const payment = fees.recordPayment({ ...input(), amount_paid: 10000 }, counsellor.id);
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     const c = store.onboardingCases[0];
 
     // Allocate batch in tenant default and complete prerequisite checklist items

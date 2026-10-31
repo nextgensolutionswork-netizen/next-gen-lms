@@ -64,22 +64,14 @@ class InstituteDataStore {
       if (snapshot) {
         if (snapshot.settings) this.settings = snapshot.settings;
         if (snapshot.users?.length) {
-          const mappedUsers = snapshot.users.map((u: any) => {
-            if (u.id === 'usr-counsellor' || (u.role === 'counsellor' && u.email?.toLowerCase() === 'counsellor@next-generpsolutions.com')) {
-              return { ...u, id: '44444444-4444-4444-4444-444444444444' };
-            }
-            if (u.id === 'usr-admin' || (u.role === 'admin' && u.email?.toLowerCase() === 'admin@next-generpsolutions.com')) {
-              return { ...u, id: '22222222-2222-2222-2222-222222222222' };
-            }
-            return u;
-          });
+          const mappedUsers = snapshot.users.map((u: any) =>
+            u.id === 'usr-counsellor' || (u.role === 'counsellor' && u.email?.toLowerCase() === 'counsellor@next-generpsolutions.com')
+              ? { ...u, id: '44444444-4444-4444-4444-444444444444' }
+              : u
+          );
           const ananya = mappedUsers.find((u: any) => u.id === '44444444-4444-4444-4444-444444444444');
           if (ananya && !mappedUsers.some((u: any) => u.id === 'usr-counsellor')) {
             mappedUsers.push({ ...ananya, id: 'usr-counsellor' });
-          }
-          const priya = mappedUsers.find((u: any) => u.id === '22222222-2222-2222-2222-222222222222');
-          if (priya && !mappedUsers.some((u: any) => u.id === 'usr-admin')) {
-            mappedUsers.push({ ...priya, id: 'usr-admin' });
           }
           const existingEmails = new Set(mappedUsers.map((u: any) => u.email?.toLowerCase()));
           const existingIds = new Set(mappedUsers.map((u: any) => u.id));
@@ -479,16 +471,6 @@ class InstituteDataStore {
       full_name: 'Rajesh Sharma (Director)',
       role: 'super_admin',
       phone: '+91 98000 00001',
-      is_active: true,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    },
-    {
-      id: '22222222-2222-2222-2222-222222222222',
-      email: 'admin@next-generpsolutions.com',
-      full_name: 'Priya Nair (Operations Head)',
-      role: 'admin',
-      phone: '+91 98000 00002',
       is_active: true,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',

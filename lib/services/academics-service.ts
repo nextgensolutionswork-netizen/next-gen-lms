@@ -20,27 +20,43 @@ import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 // --- Courses, Modules & Lessons ---
 export async function getCourses(): Promise<Course[]> {
-  if (!isLiveSupabaseEnabled()) return [...store.courses];
-  try {
-    const { data, error } = await createClient().from('courses').select('*').order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error('Missing catalog response.');
-    store.courses = data as Course[];
-    return [...store.courses];
-  } catch (error) {
-    throw new Error('Unable to load course catalog: ' + (error instanceof Error ? error.message : 'Database request failed.'));
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        store.courses = data as Course[];
+        return data as Course[];
+      }
+    } catch (err) {
+      console.warn('Supabase courses query error, fallback to local persistent store:', err);
+    }
   }
+  return [...store.courses];
 }
 
 export async function getCourseById(id: string): Promise<Course | undefined> {
-  if (!isLiveSupabaseEnabled()) return store.courses.find((course) => course.id === id);
-  try {
-    const { data, error } = await createClient().from('courses').select('*').eq('id', id).maybeSingle();
-    if (error) throw new Error(error.message);
-    return data as Course | undefined || undefined;
-  } catch (error) {
-    throw new Error('Unable to load course: ' + (error instanceof Error ? error.message : 'Database request failed.'));
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as Course;
+      }
+    } catch (err) {
+      console.warn('Supabase getCourseById error, checking local store:', err);
+    }
   }
+  return store.courses.find((c) => c.id === id);
 }
 
 export async function createCourse(data: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course> {

@@ -63,44 +63,17 @@ export async function verifyUserCredentials(
   if (isLiveSupabaseEnabled()) {
     try {
       const db = authClient || getDb();
-      let authEmail = cleanEmail;
-      let authPassword = cleanPassword;
-
-      if (cleanEmail.toLowerCase() === 'admin@next-generpsolutions.com' && cleanPassword === 'AdminPass#2026') {
-        authEmail = 'admin.login@next-generpsolutions.com';
-        authPassword = 'xHaDQmuDnNo7RpcAV3bIg8Zn!9aA';
-      } else if (cleanEmail.toLowerCase() === 'support@next-generpsolutions.com' && cleanPassword === 'SupportPass#2026') {
-        authEmail = 'support.login@next-generpsolutions.com';
-        authPassword = 'bLv1pUip4OX4O1q431ONd3Bg!9aA';
-      }
-
       const { data, error } = await db.auth.signInWithPassword({
-        email: authEmail,
-        password: authPassword,
+        email: cleanEmail,
+        password: cleanPassword,
       });
 
       if (!error && data?.user) {
-        let profileTargetId = data.user.id;
-        if (cleanEmail.toLowerCase() === 'admin@next-generpsolutions.com') {
-          profileTargetId = '22222222-2222-2222-2222-222222222222';
-        } else if (cleanEmail.toLowerCase() === 'support@next-generpsolutions.com') {
-          profileTargetId = '88888888-8888-8888-8888-888888888888';
-        }
-
-        let { data: profile } = await db
+        const { data: profile } = await db
           .from('profiles')
           .select('*')
-          .eq('id', profileTargetId)
+          .eq('id', data.user.id)
           .maybeSingle();
-
-        if (!profile && profileTargetId !== data.user.id) {
-          const { data: fallbackProfile } = await db
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .maybeSingle();
-          profile = fallbackProfile;
-        }
 
         if (profile) {
           try {

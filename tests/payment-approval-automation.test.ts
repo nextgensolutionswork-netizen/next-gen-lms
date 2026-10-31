@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { store } from '@/lib/services/data-store';
@@ -38,7 +37,7 @@ describe('Automated payment approval', () => {
     store.installments = [{ id: 'historical', student_id: studentId, fee_account_id: fee.fee_account_id!, installment_number: 1, amount: 1000, paid_amount: 200, status: 'Partial', due_date: '2025-01-01' }];
     const original = structuredClone(store.installments);
     const payment = fees.recordPayment(input(), counsellor.id);
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     store.reconcileDualLedgers();
     expect(store.installments).toEqual(original);
     expect(fee.outstanding_amount).toBe(25000);
@@ -69,7 +68,7 @@ describe('Automated payment approval', () => {
   it('approves once, updates the balance, creates one receipt and assigns onboarding without activation', () => {
     const payment = fees.recordPayment(input(), counsellor.id);
     store.reconcileDualLedgers();
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     expect(payment.status).toBe('Approved');
     expect(payment.verified_by).toBe(accountant.id);
     expect(payment.verified_at).toBeTruthy();
@@ -83,7 +82,7 @@ describe('Automated payment approval', () => {
     expect(store.studentFinancialLedgers.filter((l) => l.reference_id === payment.id)).toHaveLength(1);
     expect(store.onboardingCases[0].assigned_staff_id).toBe(onboarding.id);
     expect(store.onboardingCases[0].lms_account_created).toBe(false);
-    expect(() => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id))).toThrow();
+    expect(() => fees.verifyPayment(payment.id, accountant.id)).toThrow();
     forwardApprovedPaymentToOnboarding(payment, accountant);
     store.reconcileDualLedgers();
     expect(store.receipts).toHaveLength(1);
@@ -94,13 +93,13 @@ describe('Automated payment approval', () => {
 
   it('enforces roles, separation of duties, inactive accounts, and tenant boundaries', () => {
     const payment = fees.recordPayment(input(), counsellor.id);
-    expect(() => fees.verifyPayment(payment.id, counsellor.id, undefined, enteredPaymentVerification(payment.id))).toThrow(/Separation/);
-    expect(() => fees.verifyPayment(payment.id, 'other-counsellor', undefined, enteredPaymentVerification(payment.id))).toThrow(/Unauthorized/);
-    expect(() => fees.verifyPayment(payment.id, 'other-tenant', undefined, enteredPaymentVerification(payment.id))).toThrow(/tenant/);
+    expect(() => fees.verifyPayment(payment.id, counsellor.id)).toThrow(/Separation/);
+    expect(() => fees.verifyPayment(payment.id, 'other-counsellor')).toThrow(/Unauthorized/);
+    expect(() => fees.verifyPayment(payment.id, 'other-tenant')).toThrow(/tenant/);
     expect(() => fees.recordPayment(input(), 'other-tenant')).toThrow(/tenant/);
     expect(() => fees.updatePayment(payment.id, { amount_paid: 1000 }, 'other-counsellor')).toThrow(/Unauthorized/);
     store.users.find((u) => u.id === accountant.id)!.is_active = false;
-    expect(() => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id))).toThrow(/Unauthorized/);
+    expect(() => fees.verifyPayment(payment.id, accountant.id)).toThrow(/Unauthorized/);
     expect(payment.status).toBe('Pending Approval');
   });
 
@@ -108,11 +107,11 @@ describe('Automated payment approval', () => {
     const payment = fees.recordPayment(input(), counsellor.id);
     expect(() => fees.rejectPayment(payment.id, accountant.id, ' ')).toThrow(/reason/);
     fees.rejectPayment(payment.id, accountant.id, 'Reference does not match proof');
-    expect(() => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id))).toThrow();
+    expect(() => fees.verifyPayment(payment.id, accountant.id)).toThrow();
     expect(store.notifications.some((n) => n.user_id === counsellor.id && n.message.includes('does not match'))).toBe(true);
     fees.updatePayment(payment.id, { transaction_reference: 'CORRECTED' }, counsellor.id);
     expect(payment.status).toBe('Pending Approval');
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     const audit = store.auditLogs.filter((a) => a.record_id === payment.id);
     expect(audit.map((a) => a.action)).toEqual(['PAYMENT_APPROVED', 'PAYMENT_RESUBMITTED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED']);
     expect(audit.find((a) => a.action === 'PAYMENT_REJECTED')?.new_value?.rejection_reason).toBe('Reference does not match proof');
@@ -121,11 +120,11 @@ describe('Automated payment approval', () => {
   it('supports partial payments against one balance and rechecks it at approval', () => {
     const one = fees.recordPayment({ ...input(), amount_paid: 20000 }, counsellor.id);
     const two = fees.recordPayment({ ...input(), amount_paid: 20000, transaction_reference: 'UTR-SECOND' }, counsellor.id);
-    fees.verifyPayment(one.id, accountant.id, undefined, enteredPaymentVerification(one.id));
-    expect(() => fees.verifyPayment(two.id, accountant.id, undefined, enteredPaymentVerification(two.id))).toThrow(/outstanding/);
+    fees.verifyPayment(one.id, accountant.id);
+    expect(() => fees.verifyPayment(two.id, accountant.id)).toThrow(/outstanding/);
     expect(two.status).toBe('Pending Approval');
     const final = fees.recordPayment({ ...input(), amount_paid: 10000, transaction_reference: 'FINAL' }, counsellor.id);
-    fees.verifyPayment(final.id, accountant.id, undefined, enteredPaymentVerification(final.id));
+    fees.verifyPayment(final.id, accountant.id);
     expect(fee.outstanding_amount).toBe(0);
     expect(store.installments).toHaveLength(0);
   });
@@ -144,7 +143,7 @@ describe('Automated payment approval', () => {
     fee.outstanding_amount = 0.30;
     for (const [index, amount_paid] of [0.10, 0.20].entries()) {
       const payment = fees.recordPayment({ ...input(), amount_paid, transaction_reference: `decimal-${index}` }, counsellor.id);
-      fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+      fees.verifyPayment(payment.id, accountant.id);
     }
     expect(fee.outstanding_amount).toBe(0);
     expect(fee.paid_amount).toBe(0.30);
@@ -153,7 +152,7 @@ describe('Automated payment approval', () => {
   it('does not forward an unapproved admission and gates LMS provisioning', async () => {
     const payment = fees.recordPayment(input(), counsellor.id);
     store.admissions[0].status = 'Pending';
-    fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
+    fees.verifyPayment(payment.id, accountant.id);
     expect(store.onboardingCases).toHaveLength(0);
     store.admissions[0].status = 'Confirmed';
     forwardApprovedPaymentToOnboarding(payment, accountant);
@@ -165,7 +164,7 @@ describe('Automated payment approval', () => {
   it('rolls back balances, receipt, history and onboarding on a failed durable commit', async () => {
     const payment = fees.recordPayment(input(), counsellor.id);
     vi.mocked(store.persistSync).mockReturnValue(false);
-    await expect(paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id)))).rejects.toThrow(/storage failed/);
+    await expect(paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id))).rejects.toThrow(/storage failed/);
     expect(store.studentPayments[0].status).toBe('Pending Approval');
     expect(store.studentFees[0].paid_amount).toBe(0);
     expect(store.receipts).toHaveLength(0);
@@ -175,7 +174,7 @@ describe('Automated payment approval', () => {
 
   it('serializes simultaneous approvals without duplicate financial entries', async () => {
     const payment = fees.recordPayment(input(), counsellor.id);
-    const results = await Promise.allSettled([paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id))), paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id)))]);
+    const results = await Promise.allSettled([paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id)), paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id))]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(store.receipts).toHaveLength(1);
     expect(store.studentFees[0].paid_amount).toBe(5000);
@@ -187,106 +186,6 @@ async function req(actor: UserProfile, body?: unknown) {
   const signature = await generateAuthCookieSignature(value);
   return new NextRequest('http://localhost/api/fees/payments', { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', cookie: `${AUTH_COOKIE_NAME}=${value}; ${AUTH_SIG_COOKIE_NAME}=${signature}` }, body: body ? JSON.stringify(body) : undefined });
 }
-
-describe('Manual payment verification inside the approval transaction', () => {
-  const entered = { reference: ' utr- 123 ', amount: '5000.00', payment_date: '2026-10-12' };
-  const financialState = () => structuredClone({ payments: store.studentPayments, fees: store.studentFees,
-    legacy: store.payments, balances: store.feeAccounts, students: store.students, receipts: store.receipts,
-    ledger: store.studentFinancialLedgers, audits: store.auditLogs, onboarding: store.onboardingCases });
-
-  it('accepts manually entered normalized values via the API and audits the exact input', async () => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: payment.id, verification: entered }));
-    expect(response.status).toBe(200);
-    const audit = store.auditLogs.find((a) => a.action === 'PAYMENT_APPROVED')!;
-    expect(audit.user_id).toBe(accountant.id);
-    expect(audit.new_value?.manual_verification).toEqual(entered);
-    expect(audit.new_value?.verified_at).toBeTruthy();
-    expect(store.receipts).toHaveLength(1);
-    expect(store.studentFees[0].paid_amount).toBe(5000);
-    expect(store.studentFinancialLedgers.filter((l) => l.reference_id === payment.id && l.entry_type === 'Payment Verified')).toHaveLength(1);
-  });
-
-  it.each([
-    ['reference', 'WRONG'], ['amount', '30000'], ['amount', '5000.001'],
-    ['amount', '5000.01'], ['payment_date', '2026-10-13'], ['payment_date', '2026-02-30'],
-    ['reference', ''], ['amount', ''], ['payment_date', ''],
-  ])('blocks %s=%s with a field error and no financial changes', async (field, value) => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    const before = financialState();
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: payment.id, verification: { ...entered, [field]: value } }));
-    expect(response.status).toBe(400);
-    expect((await response.json()).fieldErrors[field]).toBeTruthy();
-    expect(financialState()).toEqual(before);
-  });
-
-  it('rejects the old approval payload without manual inputs', async () => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: payment.id }));
-    expect(response.status).toBe(400);
-    expect(Object.keys((await response.json()).fieldErrors)).toHaveLength(3);
-    expect(store.receipts).toHaveLength(0);
-  });
-
-  it.each(['reference', 'payment_date'])('fails closed when the stored %s is missing', async (field) => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    if (field === 'reference') payment.transaction_reference = undefined;
-    else payment.payment_date = '';
-    const before = financialState();
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: payment.id, verification: entered }));
-    expect((await response.json()).fieldErrors[field]).toMatch(/missing/);
-    expect(financialState()).toEqual(before);
-  });
-
-  it.each([undefined, 'CASH-RECEIPT-17'])('verifies cash using its recorded reference or explicit payment ID rule (%s)', async (reference) => {
-    const payment = fees.recordPayment({ ...input(), payment_mode: 'Cash', transaction_reference: reference }, counsellor.id);
-    const wrong = await POST(await req(accountant, { action: 'approve', paymentId: payment.id, verification: { ...entered, reference: 'CASH' } }));
-    expect(wrong.status).toBe(400);
-    expect(store.receipts).toHaveLength(0);
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: payment.id, verification: { ...entered, reference: reference || `CASH:${payment.id}` } }));
-    expect(response.status).toBe(200);
-    expect(store.receipts).toHaveLength(1);
-  });
-
-  it('uses the actual calendar day without timezone conversion', async () => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    payment.payment_date = '2026-10-12T23:30:00-07:00';
-    await expect(paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id, undefined, entered))).resolves.toMatchObject({ status: 'Approved' });
-  });
-
-  it('compares the selected payment, not another payment or the total fees', async () => {
-    const first = fees.recordPayment(input(), counsellor.id);
-    const second = fees.recordPayment({ ...input(), amount_paid: 1000, transaction_reference: 'SECOND', payment_date: '2026-10-14' }, counsellor.id);
-    const before = financialState();
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: second.id, verification: enteredPaymentVerification(first.id) }));
-    expect(Object.keys((await response.json()).fieldErrors)).toHaveLength(3);
-    expect(financialState()).toEqual(before);
-  });
-
-  it('rejects unauthorized manual approval and a repeated approval through the API', async () => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    const body = { action: 'approve', paymentId: payment.id, verification: entered };
-    expect((await POST(await req(counsellor, body))).status).toBe(403);
-    expect(store.receipts).toHaveLength(0);
-    expect((await POST(await req(accountant, body))).status).toBe(200);
-    const before = financialState();
-    expect((await POST(await req(accountant, body))).status).toBe(400);
-    expect(financialState()).toEqual(before);
-  });
-
-  it('rolls back an exception after receipt and ledger generation, then permits a clean retry', async () => {
-    const payment = fees.recordPayment(input(), counsellor.id);
-    const before = financialState();
-    const original = (fees as any).finalizeVerifiedPayment.bind(fees);
-    const failure = vi.spyOn(fees as any, 'finalizeVerifiedPayment').mockImplementation((...args) => { original(...args); throw new Error('Injected ledger failure'); });
-    await expect(paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id, undefined, entered))).rejects.toThrow('Injected ledger failure');
-    expect(financialState()).toEqual(before);
-    failure.mockRestore();
-    await paymentTransaction(accountant, () => fees.verifyPayment(payment.id, accountant.id, undefined, entered));
-    expect(store.receipts).toHaveLength(1);
-    expect(store.receipts[0].receipt_number).toMatch(/000001$/);
-  });
-});
 
 describe('Payment API trust boundary', () => {
   it('denies proof downloads across tenants and path traversal', async () => {

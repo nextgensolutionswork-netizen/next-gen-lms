@@ -1,4 +1,0 @@
-test=1
-typecheck=1
-lint=1
-build=1

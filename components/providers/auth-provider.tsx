@@ -58,28 +58,11 @@ async function loadApplicationProfile(
   }
 ): Promise<UserProfile | null> {
   try {
-    let profileTargetId = authUser.id;
-    if (authUser.email === 'admin.login@next-generpsolutions.com') {
-      profileTargetId = '22222222-2222-2222-2222-222222222222';
-    } else if (authUser.email === 'support.login@next-generpsolutions.com') {
-      profileTargetId = '88888888-8888-8888-8888-888888888888';
-    }
-
-    let { data, error } = await db
+    const { data, error } = await db
       .from('profiles')
       .select('*')
-      .eq('id', profileTargetId)
+      .eq('id', authUser.id)
       .maybeSingle();
-
-    if (!data && profileTargetId !== authUser.id) {
-      const fallback = await db
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .maybeSingle();
-      data = fallback.data;
-      error = fallback.error;
-    }
 
     if (error) {
       console.warn(`[AuthProvider] profiles query warning: ${error.message}`);
@@ -372,18 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isLiveSupabaseEnabled() && password) {
         try {
           const db = getDb();
-          let authEmail = email.trim();
-          let authPassword = password;
-
-          if (authEmail.toLowerCase() === 'admin@next-generpsolutions.com' && authPassword === 'AdminPass#2026') {
-            authEmail = 'admin.login@next-generpsolutions.com';
-            authPassword = 'xHaDQmuDnNo7RpcAV3bIg8Zn!9aA';
-          } else if (authEmail.toLowerCase() === 'support@next-generpsolutions.com' && authPassword === 'SupportPass#2026') {
-            authEmail = 'support.login@next-generpsolutions.com';
-            authPassword = 'bLv1pUip4OX4O1q431ONd3Bg!9aA';
-          }
-
-          const { data, error } = await db.auth.signInWithPassword({ email: authEmail, password: authPassword });
+          const { data, error } = await db.auth.signInWithPassword({ email: email.trim(), password });
           if (!error && data?.user) {
             const authUser = data.user;
             const profile = await loadApplicationProfile(db, authUser);
@@ -415,12 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw new Error('Unable to sign in. Check your credentials and try again.');
           }
         } catch (supaErr: any) {
-          if (
-            supaErr?.message?.includes('pending onboarding') ||
-            supaErr?.message?.includes('deactivated') ||
-            supaErr?.message?.includes('Check your credentials') ||
-            supaErr?.message?.includes('credentials')
-          ) {
+          if (supaErr?.message?.includes('pending onboarding') || supaErr?.message?.includes('deactivated')) {
             throw supaErr;
           }
           throw new Error('Unable to sign in. Authentication is unavailable or the session was rejected.');

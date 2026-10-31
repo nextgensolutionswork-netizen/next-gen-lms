@@ -1,4 +1,3 @@
-import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -130,7 +129,7 @@ describe('Dual-Ledger Bi-Directional Financial Synchronization Suite', () => {
       );
 
       // 3. Verify payment by Accountant
-      const verified = feeWorkflowService.verifyPayment(paymentRec.id, accountantId, 'Verified in Bank Statement', enteredPaymentVerification(paymentRec.id));
+      const verified = feeWorkflowService.verifyPayment(paymentRec.id, accountantId, 'Verified in Bank Statement');
       expect(verified.verification_status).toBe('Verified');
 
       // Check Advanced balances

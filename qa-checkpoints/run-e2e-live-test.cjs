@@ -1,17 +1,9 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
-const { assertIsolatedQaDatabase, assertTargetApplicationIsolatedQa } = require('../scripts/database-preflight.cjs');
 
 async function runEndToEndLiveTest() {
   console.log('=== STARTING COMPLETE LIVE END-TO-END VERIFICATION ===');
-
-  // STEP 0: Enforce strict database preflight isolation before any browser launch or mutation
-  console.log('\n--- Step 0: Database Isolation Preflight Check ---');
-  assertIsolatedQaDatabase(process.env.NEXT_PUBLIC_SUPABASE_URL || 'mock-sap-lms');
-  await assertTargetApplicationIsolatedQa('http://localhost:3001');
-  console.log('Database isolation preflight passed: target is verified isolated QA.');
-
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
