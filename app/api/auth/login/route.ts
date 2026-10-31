@@ -8,8 +8,6 @@ import {
   generateAuthCookieSignature,
 } from '@/lib/security/auth-cookie';
 import { validateCsrfOrigin } from '@/lib/security/rate-limiter';
-import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
-import { createClient as createServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -67,8 +65,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 3. Verify Credentials Safely
-  // Persist Supabase's real session cookies for middleware and database RLS.
-  const verification = await verifyUserCredentials(email, password, isLiveSupabaseEnabled() ? createServerClient() : undefined);
+  const verification = await verifyUserCredentials(email, password);
 
   if (!verification.success || !verification.user) {
     const errorCode = verification.errorCode || 'invalid_credentials';

@@ -1,6 +1,0 @@
-{
-    "differences":  [
-                        "lib/services/crm-service.ts"
-                    ],
-    "scope":  "Existing source/test/config files shared by original and isolated validation copy; build-generated types excluded by absence"
-}

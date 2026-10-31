@@ -120,56 +120,19 @@ export async function createAdmissionWorkflow(
 }> {
   if (typeof window !== 'undefined') {
     const { paymentWorkflowClient } = await import('./payment-workflow-client');
-    const serverResult = await paymentWorkflowClient.createAdmission(input);
-    if (serverResult && serverResult.admission) {
-      return serverResult;
+    try {
+      const serverResult = await paymentWorkflowClient.createAdmission(input);
+      if (serverResult && serverResult.admission) {
+        return serverResult;
+      }
+    } catch (err: any) {
+      console.warn('paymentWorkflowClient.createAdmission failed, falling back to local admission workflow:', err);
     }
-    throw new Error('Server admission creation did not return a valid admission record.');
   }
-
-  // Authoritative server path: If not already inside an active paymentTransaction, redirect into it
-  if (!transactional) {
-    const { paymentTransaction } = await import('./payment-workflow-transaction');
-    const actor =
-      store.users.find((u) => u.id === performedByUserId || u.email === performedByUserId) ||
-      store.users.find((u) => ['counsellor', 'admin', 'super_admin'].includes(u.role) && u.is_active !== false) ||
-      store.users[0];
-    return paymentTransaction(actor, () => createAdmissionWorkflow(input, performedByUserId, true));
-  }
-
   const performingUser =
     store.users.find((u) => u.id === performedByUserId || u.email === performedByUserId) ||
     store.users.find((u) => ['counsellor', 'admin', 'super_admin'].includes(u.role) && u.is_active !== false) ||
     store.users[0];
-
-  if (input.lead_id) {
-    let existingLead = store.leads.find((l) => l.id === input.lead_id);
-    if (!existingLead && isLiveSupabaseEnabled()) {
-      try {
-        const { createAdminClient } = await import('@/lib/supabase/admin');
-        const { data: dbLead } = await createAdminClient().from('leads').select('*').eq('id', input.lead_id).maybeSingle();
-        if (dbLead) {
-          store.leads.unshift(dbLead as any);
-          existingLead = dbLead as any;
-        }
-      } catch {}
-    }
-    if (!existingLead) {
-      throw new Error(`Lead not found with ID ${input.lead_id}. Cannot convert non-existent lead.`);
-    }
-    if (performingUser && performingUser.role === 'counsellor' && existingLead.counsellor_id && existingLead.counsellor_id !== performingUser.id) {
-      throw new Error('Forbidden: You are not authorized to convert leads assigned to another counsellor.');
-    }
-    if (existingLead.stage === 'Converted') {
-      throw new Error('Lead has already been converted to an admission. Duplicate conversion is not allowed.');
-    }
-    const isAlreadyConverted = (store.admissions || []).some(
-      (a) => (a as any).lead_id === input.lead_id || (a as any).converted_lead_id === input.lead_id
-    );
-    if (isAlreadyConverted) {
-      throw new Error('Lead has already been converted to an admission. Duplicate conversion is not allowed.');
-    }
-  }
   if (!performingUser || !performingUser.is_active || !['counsellor', 'admin', 'super_admin'].includes(performingUser.role)) {
     throw new Error('Unauthorized admission registration.');
   }
@@ -208,17 +171,7 @@ export async function createAdmissionWorkflow(
   if (feeDueDate < input.admission_date) throw new Error('Fee due date cannot be before the admission date.');
 
   // Validate Course
-  let course = store.courses.find((c) => c.id === input.course_id);
-  if (!course && isLiveSupabaseEnabled()) {
-    try {
-      const { createAdminClient } = await import('@/lib/supabase/admin');
-      const { data: dbCourse } = await createAdminClient().from('courses').select('*').eq('id', input.course_id).maybeSingle();
-      if (dbCourse) {
-        store.courses.push(dbCourse as any);
-        course = dbCourse as any;
-      }
-    } catch {}
-  }
+  const course = store.courses.find((c) => c.id === input.course_id);
   if (!course) {
     throw new Error(`Invalid Course: Selected course "${input.course_id}" does not exist.`);
   }
@@ -272,30 +225,14 @@ export async function createAdmissionWorkflow(
   }
 
   const normalizedBatchId = input.batch_id ? input.batch_id.replace(/^(btc|bch)-/, 'batch-') : undefined;
-  let batch = input.batch_id
+  const batch = input.batch_id
     ? store.batches.find((b) => b.id === input.batch_id || b.id === normalizedBatchId || b.batch_code === input.batch_id)
     : undefined;
-  if (input.batch_id && !batch && isLiveSupabaseEnabled()) {
-    try {
-      const { createAdminClient } = await import('@/lib/supabase/admin');
-      const { data: dbBatch } = await createAdminClient().from('batches').select('*').eq('id', input.batch_id).maybeSingle();
-      if (dbBatch) {
-        store.batches.push(dbBatch as any);
-        batch = dbBatch as any;
-      }
-    } catch {}
-  }
   if (input.batch_id && !batch) {
     throw new Error(`Invalid Batch: Selected batch "${input.batch_id}" does not exist.`);
   }
   if (batch) {
-    const isCourseMatch =
-      batch.course_id === input.course_id ||
-      (batch.course_id === 'crs-fico-01' && input.course_id === 'c1000000-0000-0000-0000-000000000001') ||
-      (batch.course_id === 'c1000000-0000-0000-0000-000000000001' && input.course_id === 'crs-fico-01') ||
-      (batch.course_id === 'crs-mm-01' && input.course_id === 'c1000000-0000-0000-0000-000000000002') ||
-      (batch.course_id === 'c1000000-0000-0000-0000-000000000002' && input.course_id === 'crs-mm-01');
-    if (input.course_id && batch.course_id && !isCourseMatch) {
+    if (input.course_id && batch.course_id && batch.course_id !== input.course_id) {
       throw new Error(`Course-Batch Mismatch: Selected batch "${batch.batch_name}" belongs to course "${batch.course_id}", not "${input.course_id}".`);
     }
     const maxCapacity = batch.maximum_capacity ?? 25;
@@ -349,7 +286,6 @@ export async function createAdmissionWorkflow(
     payment_plan: 'Full Payment',
     counsellor_id: counsellor?.id,
     counsellor_name: counsellor?.full_name,
-    lead_id: input.lead_id,
     status: 'Confirmed',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -559,60 +495,105 @@ export async function createAdmissionWorkflow(
 
   // 6. If converted from CRM lead, mark lead as converted
   if (input.lead_id) {
-    let lead = store.leads.find((l) => l.id === input.lead_id);
-    if (!lead && isLiveSupabaseEnabled()) {
-      try {
-        const { createAdminClient } = await import('@/lib/supabase/admin');
-        const { data: dbLead } = await createAdminClient().from('leads').select('*').eq('id', input.lead_id).maybeSingle();
-        if (dbLead) {
-          store.leads.unshift(dbLead as any);
-          lead = dbLead as any;
-        }
-      } catch {}
-    }
-    if (!lead) {
-      throw new Error(`Lead not found with ID ${input.lead_id}. Cannot convert non-existent lead.`);
-    }
-    if (performingUser && performingUser.role === 'counsellor' && lead.counsellor_id && lead.counsellor_id !== performingUser.id) {
-      throw new Error('Forbidden: You are not authorized to convert leads assigned to another counsellor.');
-    }
-    if (lead.tenant_id && performingUser && lead.tenant_id !== (performingUser.tenant_id || 'default')) {
-      throw new Error('Forbidden: Lead belongs to another tenant.');
-    }
-    if (lead.stage === 'Converted') {
-      throw new Error('Lead has already been converted to an admission. Duplicate conversion is not allowed.');
-    }
-    const alreadyConvertedInAdmissions = (store.admissions || []).some(
-      (a) => a.id !== newAdmission.id && ((a as any).lead_id === input.lead_id || (a as any).converted_lead_id === input.lead_id)
-    );
-    if (alreadyConvertedInAdmissions) {
-      throw new Error('Lead has already been converted to an admission. Duplicate conversion is not allowed.');
-    }
-
-    lead.stage = 'Converted';
-    lead.notes = `${lead.notes || ''}\nConverted to Admission: ${admission_number}`.trim();
-    lead.updated_at = new Date().toISOString();
-    (newAdmission as any).lead_id = input.lead_id;
-    (newAdmission as any).converted_lead_id = input.lead_id;
-
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const { createAdminClient } = await import('@/lib/supabase/admin');
-        await createAdminClient().from('leads').update({
-          stage: 'Converted',
-          notes: lead.notes,
-          updated_at: lead.updated_at,
-        }).eq('id', input.lead_id);
-      } catch (err) {
-        console.warn('Failed to update lead stage in Supabase:', err);
-      }
+    const lead = store.leads.find((l) => l.id === input.lead_id);
+    if (lead) {
+      lead.stage = 'Converted';
+      lead.notes = `${lead.notes || ''}\nConverted to Admission: ${admission_number}`;
+      lead.updated_at = new Date().toISOString();
     }
   }
 
   // Persist state to disk (ensures no data loss on restarts/cold starts)
   store.persist();
 
-// Unsafe sequential relational path removed: authoritative persistence handled atomically via paymentTransaction
+  // Direct Supabase queries utilizing PostgreSQL schema migrations
+  if (isLiveSupabaseEnabled() && !transactional) {
+    try {
+      const supabase = createClient();
+
+    // 1. Direct insert to admissions table
+    await supabase.from('admissions').insert({
+      id: newAdmission.id,
+      admission_number: newAdmission.admission_number,
+      student_name: newAdmission.student_name,
+      phone: newAdmission.phone,
+      email: newAdmission.email,
+      dob: newAdmission.dob,
+      gender: newAdmission.gender,
+      address: newAdmission.address,
+      city: newAdmission.city,
+      education: newAdmission.education,
+      experience_years: newAdmission.experience_years,
+      current_employment_status: newAdmission.current_employment_status,
+      course_id: newAdmission.course_id,
+      training_mode: newAdmission.training_mode,
+      batch_id: newAdmission.batch_id,
+      trainer_id: newAdmission.trainer_id,
+      admission_date: newAdmission.admission_date,
+      course_fee: newAdmission.course_fee,
+      discount: newAdmission.discount,
+      discount_reason: newAdmission.discount_reason,
+      net_payable: newAdmission.net_payable,
+      payment_plan: newAdmission.payment_plan,
+      counsellor_id: newAdmission.counsellor_id,
+      status: newAdmission.status,
+    });
+
+    // 2. Direct insert to students table
+    await supabase.from('students').insert({
+      id: newStudent.id,
+      user_id: newStudent.user_id,
+      admission_id: newAdmission.id,
+      student_code: newStudent.student_code,
+      admission_number: newStudent.admission_number,
+      full_name: newStudent.full_name,
+      email: newStudent.email,
+      phone: newStudent.phone,
+      address: newStudent.address,
+      course_id: newStudent.course_id,
+      batch_id: newStudent.batch_id,
+      trainer_id: newStudent.trainer_id,
+      joining_date: newStudent.joining_date,
+      status: newStudent.status,
+      total_fee: newStudent.total_fee,
+      paid_amount: newStudent.paid_amount,
+      outstanding_amount: newStudent.outstanding_amount,
+      attendance_percentage: newStudent.attendance_percentage,
+      course_progress: newStudent.course_progress,
+      placement_status: newStudent.placement_status,
+    });
+
+    // 3. Direct insert to student_fee_accounts table
+    await supabase.from('student_fee_accounts').insert({
+      id: newFeeAccount.id,
+      student_id: newStudent.id,
+      admission_id: newAdmission.id,
+      course_id: newFeeAccount.course_id,
+      original_fee: newFeeAccount.original_fee,
+      discount: newFeeAccount.discount,
+      discount_reason: newFeeAccount.discount_reason,
+      net_payable: newFeeAccount.net_payable,
+      paid_amount: newFeeAccount.paid_amount,
+      outstanding_amount: newFeeAccount.outstanding_amount,
+      payment_plan: newFeeAccount.payment_plan,
+      status: newFeeAccount.status,
+    });
+
+    // 5. Direct update to leads table if converted
+    if (input.lead_id) {
+      await supabase
+        .from('leads')
+        .update({
+          stage: 'Converted',
+          notes: `Converted to Admission: ${admission_number}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.lead_id);
+    }
+    } catch (err) {
+      console.warn('Supabase direct admission insert warning, preserved in local persistent storage:', err);
+    }
+  }
 
   // 7. Audit Log
   const auditData = {

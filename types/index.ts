@@ -103,7 +103,6 @@ export type LeadStage =
 
 export interface Lead {
   id: string;
-  tenant_id?: string;
   lead_code: string;
   full_name: string;
   phone: string;
@@ -150,7 +149,6 @@ export type AdmissionStatus =
 export interface Admission {
   tenant_id?: string;
   id: string;
-  lead_id?: string;
   admission_number: string;
   student_id?: string;
   student_name: string;

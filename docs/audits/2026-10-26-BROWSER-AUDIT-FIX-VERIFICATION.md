@@ -1,17 +1,14 @@
 # 26 October 2026 browser audit fix verification
 
-**Final Staging Verification Status: ALL 4 RELEASE GATES PASSED (26 October 2026).** The dedicated staging environment was linked to independent Supabase staging project `neiccpnxftfmmwnvtgdy` (Mumbai, org `wpkbffmzvxheoobmwxhg`), verified completely distinct from production (`tgohtdzwehhjfahtgovq`, unlinked and blocklisted). Staging runtime was built and executed on port 3001 with 100 synthetic accounts. Live student authentication, session persistence, profile lookup, receipt financial privacy, and a full 35-route / 140-viewport responsive sweep all passed with zero regressions. Production data remained strictly untouched.
+**Recommendation: do not promote these changes to production yet.** Local fixes and regression evidence are available, but the required independently verified Supabase staging environment is not connected. Live student login, profile relationships, RLS, tenant boundaries and database timing remain release gates. No deployment was performed.
 
 ## Scope and evidence integrity
 
 Original evidence was located in [page-browser-2026-10-26](page-browser-2026-10-26/): [results.json](page-browser-2026-10-26/results.json), [followup.json](page-browser-2026-10-26/followup.json), [student-login.json](page-browser-2026-10-26/student-login.json), desktop/mobile PNGs, and the repository scripts `scripts/page-by-page-audit.mjs` and `scripts/page-audit-followup.mjs`.
 
-Initial regression evidence was established in [browser-fix-2026-10-26](browser-fix-2026-10-26/). 
+New evidence is in [browser-fix-2026-10-26](browser-fix-2026-10-26/). The local application on port 3000 is configured for production Supabase and was not used for state-changing verification. The test server on port 3001 uses the local synthetic adapter, mock Supabase configuration, a separate build directory and separate persistence under `staging-runtime/browser-fix-synthetic`. Browser runners block external origins. This fixture is **not** a substitute for Supabase staging.
 
-Final live staging release gate evidence is stored in [docs/audits/staging-verification-2026-10-26](docs/audits/staging-verification-2026-10-26/):
-- Gate 3 Evidence: [gate3-auth-navigation-evidence.json](docs/audits/staging-verification-2026-10-26/gate3-auth-navigation-evidence.json) and associated screenshots.
-- Gate 4 Evidence: [gate4-route-sweep-evidence.json](docs/audits/staging-verification-2026-10-26/gate4/gate4-route-sweep-evidence.json) and 140 full-route screenshots in `gate4/screenshots/`.
-- The local server on port 3000 connects to production and remained strictly isolated and untouched. The staging daemon on port 3001 executed against `neiccpnxftfmmwnvtgdy.supabase.co` with `PROD_SUPABASE_HOST_BLOCKLIST=tgohtdzwehhjfahtgovq.supabase.co`.
+Connected-project discovery returned production `tgohtdzwehhjfahtgovq` and inactive `yutulwbkkvmryaxqjbfp`. The user explicitly confirmed that the inactive project is **not** staging and will connect the correct project. Neither was restored or modified. The project referenced in `.env.staging` could not be independently verified through the connections. No production financial/student records or Supabase schema were changed by this fix verification.
 
 Before screenshots contain the original audit data; after screenshots contain local synthetic fixtures. They establish layout differences, not equivalence of production and synthetic database content. Original PASS_SMOKE labels do not establish full responsive correctness or live authentication security.
 
@@ -96,42 +93,23 @@ Before screenshots contain the original audit data; after screenshots contain lo
 - Certificate stress/print checks: PASS at all four widths; [certificate-layout.json](browser-fix-2026-10-26/certificate-layout.json). A4 output contains one page: [certificate-print.pdf](browser-fix-2026-10-26/certificate-print.pdf).
 - Isolated component browser regressions: record loading/cancellation and quiz timer both PASS, exit 0; [component-browser-checks.json](browser-fix-2026-10-26/component-browser-checks.json), `record-loading-browser.log`, `quiz-timer-browser.log`.
 
-| Issue | Local verification | Live Staging Verification (`neiccpnxftfmmwnvtgdy`) |
+| Issue | Local verification | Required live verification |
 | --- | --- | --- |
-| Mobile dashboard | PASS: all routes/four widths, drawer and desktop sidebar | **PASS**: 35/35 routes across 4 viewports (140/140 checks). Mobile drawer functional, zero overflow. |
-| Student profiles | PASS: loading, errors, cancellation, invalid IDs and navigation | **PASS**: Live Supabase lookup by UUID/code, session persistence, no intermittent 404, invalid IDs show clean empty state. |
-| Receipt details | PASS: navigation, retry, invalid IDs and synthetic ownership denial | **PASS**: Live RLS enforcement; students denied other students' receipts; invalid IDs show 404 without fallback. |
-| Student login | PASS: local login/portal and mocked fail-closed access gate pass | **PASS**: Real Supabase password auth, JWT creation, session cookie decoding, portal access & reload persistence. |
-| Certificate layout | PASS: four widths, long text and one-page A4 output | **PASS**: Verified at 375, 768, 1366, 1440px with responsive wrapping and public access. |
+| Mobile dashboard | PASS: all routes/four widths, drawer and desktop sidebar | Repeat with staging datasets and role combinations |
+| Student profiles | PASS: loading, errors, cancellation, invalid IDs and navigation | Authenticated Supabase lookup and related-data completeness pending |
+| Receipt details | PASS: navigation, retry, invalid IDs and synthetic ownership denial | Staging RLS/cross-tenant enforcement pending |
+| Student login | PARTIAL: local login/portal and mocked fail-closed access gate pass | Genuine staging login and relationships blocked |
+| Certificate layout | PASS: four widths, long text and one-page A4 output | Live certificate data smoke check pending |
 
 Some concurrent build/test/browser attempts timed out under resource contention. Their incomplete navigation output is retained in `detail-navigation-resource-contention.json`; only completed reruns count toward final verification. The route runner waits for the intentional `/accounts/installments` → `/accounts/fees` redirect and reports it separately from content failures.
 
 Supporting isolation/configuration changes: `package.json` typecheck command; `next.config.mjs` configurable build directory; `tsconfig.json`, `vitest.config.ts`, `.gitignore` generated-directory exclusions; staging-only isolated persistence support in `lib/services/persistent-storage-adapter.ts`; local verification scripts under `scripts/`. Existing unrelated worktree changes were preserved.
 
-## Release gates results
+## Release gates
 
-1. **Gate 1: Supabase Project Identification & CLI Linking — PASSED**
-   - Linked to `neiccpnxftfmmwnvtgdy` (Mumbai, org `wpkbffmzvxheoobmwxhg`, `nextgen-lms-staging`).
-   - Confirmed distinct from production `tgohtdzwehhjfahtgovq` (Sydney, org `noqjcbejucqwtjaikmya`).
-   - Production project remains unlinked and explicitly blocklisted via `PROD_SUPABASE_HOST_BLOCKLIST`.
-2. **Gate 2: Isolated Staging Runtime & Synthetic Account Verification — PASSED**
-   - `staging-runtime/` configured with staging `.env.local` pointing to `neiccpnxftfmmwnvtgdy`.
-   - Verified 100 active synthetic users in Supabase Auth (`staging.*@next-gen-staging.local`) across all 7 roles.
-   - Clean production build generated; staging daemon active on `http://localhost:3001`.
-   - Live health probe (`/api/database/health`) verified: `status: "connected"`, `isLive: true`.
-3. **Gate 3: Genuine Live Auth, Session Refresh, Profile/Receipt Navigation & Negative Access — PASSED (6/6 Checks)**
-   - Test 3.1: Live student password auth, session cookie issuance (`next_gen_auth_user`, `next_gen_auth_user_sig`), and reload persistence passed.
-   - Test 3.2: Student LMS boundary isolation passed; attempted navigation to `/dashboard`, `/students`, `/accounts/fees`, `/crm/leads` redirects cleanly to `/portal`.
-   - Test 3.3: Student financial privacy & receipt negative isolation passed; student is denied access to other candidates' receipts (`REC-2026-000001` -> Access Restricted); invalid receipts show "Receipt Not Found" without fallback.
-   - Test 3.4: Live admin auth, directory & student profile navigation passed; `/students` renders staging records; profile lookup by UUID (`52000000-0000-0000-0000-000000000001`) loads instantly and survives reload; nonexistent student shows clean not-found state.
-   - Test 3.5: Admin receipt navigation & negative state passed; authorized admin views `REC-2026-000001`; invalid receipt displays "Receipt Not Found".
-   - Test 3.6: Anonymous access denied to protected routes (redirects to `/login?redirectTo=...`); public certificate verification route `/certificate/verify/CERT-2026-FICO-0091` accessible without credentials.
-   - Evidence: `docs/audits/staging-verification-2026-10-26/gate3-auth-navigation-evidence.json` and screenshots.
-4. **Gate 4: 4-Width Responsive Route Sweep Across Staging Data — PASSED (140/140 Checks)**
-   - All 35 application routes verified at 375px, 768px, 1366px, and 1440px.
-   - Zero horizontal overflow (`scrollWidth <= innerWidth + 1` across all viewports).
-   - Mobile navigation drawer opens and closes on Escape across all mobile and tablet viewports.
-   - Desktop sidebar layout (256px) preserved across large viewports.
-   - Evidence: `docs/audits/staging-verification-2026-10-26/gate4/gate4-route-sweep-evidence.json` and 140 route screenshots.
+1. Connect and independently identify the intended staging Supabase project; confirm it is distinct from production before any database-dependent test.
+2. Configure the isolated app with staging-only keys without logging secrets; create/use authorized synthetic accounts and records there.
+3. Repeat genuine Auth, session refresh, profile/receipt navigation and negative access tests against staging, including cross-tenant receipts and student financial privacy.
+4. Repeat the four-width route sweep against staging data and review remaining warnings/advisories.
 
-**Conclusion:** All 4 release gates have completed successfully with verified evidence. The browser audit fixes are fully validated against the live staging database and are **cleared for production deployment**.
+Until those gates pass, the evidence supports local regression confidence, **not an unconditional production-readiness PASS**.

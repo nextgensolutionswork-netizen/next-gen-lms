@@ -56,40 +56,21 @@ function initStorage(): IAsyncLocalStorage<RlsAuthContext> {
 export const rlsContextStorage: IAsyncLocalStorage<RlsAuthContext> = initStorage();
 
 function toBase64Url(str: string): string {
-  try {
-    if (typeof Buffer !== 'undefined') {
-      return Buffer.from(str)
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-    }
-  } catch {}
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str).toString('base64url');
+  }
   if (typeof btoa !== 'undefined') {
-    try {
-      return btoa(unescape(encodeURIComponent(str)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-    } catch {}
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
   return '';
 }
 
 function fromBase64Url(str: string): string {
-  try {
-    if (typeof Buffer !== 'undefined') {
-      let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-      while (base64.length % 4) base64 += '=';
-      return Buffer.from(base64, 'base64').toString('utf-8');
-    }
-  } catch {}
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str, 'base64url').toString('utf-8');
+  }
   if (typeof atob !== 'undefined') {
-    try {
-      let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-      while (base64.length % 4) base64 += '=';
-      return decodeURIComponent(escape(atob(base64)));
-    } catch {}
+    return atob(str.replace(/-/g, '+').replace(/_/g, '/'));
   }
   return '';
 }
@@ -126,16 +107,6 @@ export function resolveUserProfile(
   if (!auth) {
     const ambient = rlsContextStorage.getStore();
     if (ambient) return resolveUserProfile(ambient);
-    if (typeof document !== 'undefined') {
-      try {
-        const match = document.cookie.match(/(?:^|;\s*)next_gen_auth_user=([^;]*)/);
-        if (match && match[1]) {
-          const parsed = JSON.parse(decodeURIComponent(match[1]));
-          const payload = parsed.payload || parsed;
-          return resolveUserProfile(payload);
-        }
-      } catch {}
-    }
     return null;
   }
 

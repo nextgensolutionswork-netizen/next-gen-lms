@@ -1,9 +1,0 @@
-[
-  {
-    "name": "suite-confirm",
-    "command": "npm.cmd test -- --exclude tests/audit-*.test.ts --silent --maxWorkers=2 --minWorkers=2",
-    "exitCode": 0,
-    "started": "2026-10-29T11:21:09.144Z",
-    "finished": "2026-10-29T11:22:18.261Z"
-  }
-]
