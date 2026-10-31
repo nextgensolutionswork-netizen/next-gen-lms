@@ -64,12 +64,21 @@ class InstituteDataStore {
       if (snapshot) {
         if (snapshot.settings) this.settings = snapshot.settings;
         if (snapshot.users?.length) {
-          const existingEmails = new Set(snapshot.users.map((u: any) => u.email?.toLowerCase()));
-          const existingIds = new Set(snapshot.users.map((u: any) => u.id));
+          const mappedUsers = snapshot.users.map((u: any) =>
+            u.id === 'usr-counsellor' || (u.role === 'counsellor' && u.email?.toLowerCase() === 'counsellor@next-generpsolutions.com')
+              ? { ...u, id: '44444444-4444-4444-4444-444444444444' }
+              : u
+          );
+          const ananya = mappedUsers.find((u: any) => u.id === '44444444-4444-4444-4444-444444444444');
+          if (ananya && !mappedUsers.some((u: any) => u.id === 'usr-counsellor')) {
+            mappedUsers.push({ ...ananya, id: 'usr-counsellor' });
+          }
+          const existingEmails = new Set(mappedUsers.map((u: any) => u.email?.toLowerCase()));
+          const existingIds = new Set(mappedUsers.map((u: any) => u.id));
           const missingSeedUsers = this.users
             .filter((u) => !existingEmails.has(u.email.toLowerCase()))
             .map((u) => (existingIds.has(u.id) ? { ...u, id: `${u.id}-seed` } : u));
-          this.users = [...snapshot.users, ...missingSeedUsers];
+          this.users = [...mappedUsers, ...missingSeedUsers];
         }
         if (snapshot.admissions?.length) this.admissions = snapshot.admissions;
         if (snapshot.students?.length) this.students = snapshot.students;
