@@ -3,6 +3,7 @@ import { Lead, LeadFollowup, LeadStage } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { CreateAdmissionInput } from './admission-service';
+import { createClient as createSessionClient } from '@/lib/supabase/client';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
@@ -78,14 +79,14 @@ export async function getLeadById(id: string): Promise<Lead | undefined> {
 
 export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_at' | 'updated_at'>): Promise<Lead> {
   store.leads = store.leads || [];
-  const count = store.leads.length + 1;
-  const lead_code = `LD-2026-${String(count).padStart(3, '0')}`;
+  const id = globalThis.crypto.randomUUID();
+  const lead_code = `LD-${new Date().getFullYear()}-${id}`;
   const course = (store.courses || []).find((c) => c.id === data.interested_course_id);
   const counsellor = (store.users || []).find((u) => u.id === data.counsellor_id);
 
   const newLead: Lead = {
     ...data,
-    id: `lead-${Date.now()}`,
+    id,
     lead_code,
     interested_course_name: course?.course_name,
     counsellor_name: counsellor?.full_name,
@@ -93,42 +94,47 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
     updated_at: new Date().toISOString(),
   };
 
-  store.leads.unshift(newLead);
-  store.persist();
-
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('leads').insert({
-        id: newLead.id,
-        lead_code: newLead.lead_code,
-        full_name: newLead.full_name,
-        phone: newLead.phone,
-        email: newLead.email,
-        interested_course_id: newLead.interested_course_id,
-        current_status: newLead.current_status,
-        experience_years: newLead.experience_years,
-        training_preference: newLead.training_preference,
-        lead_source: newLead.lead_source,
-        campaign: newLead.campaign,
-        counsellor_id: newLead.counsellor_id,
-        demo_preference: newLead.demo_preference,
-        demo_date: newLead.demo_date,
-        follow_up_date: newLead.follow_up_date,
-        notes: newLead.notes,
-        stage: newLead.stage,
-        created_at: newLead.created_at,
-        updated_at: newLead.updated_at,
-      });
-      if (error) {
+      // Use the authenticated client directly: a rejected database write must
+      // never be reported as a successful local fallback.
+      const supabase = createSessionClient();
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error } = await supabase.from('leads').insert({
+          id: newLead.id,
+          lead_code: newLead.lead_code,
+          full_name: newLead.full_name,
+          phone: newLead.phone,
+          email: newLead.email,
+          interested_course_id: newLead.interested_course_id,
+          current_status: newLead.current_status,
+          experience_years: newLead.experience_years,
+          training_preference: newLead.training_preference,
+          lead_source: newLead.lead_source,
+          campaign: newLead.campaign,
+          counsellor_id: newLead.counsellor_id,
+          demo_preference: newLead.demo_preference,
+          demo_date: newLead.demo_date,
+          follow_up_date: newLead.follow_up_date,
+          notes: newLead.notes,
+          stage: newLead.stage,
+          created_at: newLead.created_at,
+          updated_at: newLead.updated_at,
+        });
+        if (!error) break;
+        if (error.code === '23505' && error.message.includes('leads_lead_code_key') && attempt < 2) {
+          newLead.lead_code = `LD-${new Date().getFullYear()}-${globalThis.crypto.randomUUID()}`;
+          continue;
+        }
         throw new Error(`Database error creating lead: ${error.message}`);
       }
     } catch (err: any) {
-      store.leads = store.leads.filter((l) => l.id !== newLead.id);
-      store.persistSync();
       throw new Error(`Failed to create lead in database: ${err.message}`);
     }
   }
+
+  store.leads.unshift(newLead);
+  store.persist();
 
   await recordAuditLog({
     user_id: data.counsellor_id || 'system',

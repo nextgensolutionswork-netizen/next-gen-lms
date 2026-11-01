@@ -74,7 +74,7 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
       });
 
       expect(lead.id).toBeDefined();
-      expect(lead.lead_code).toMatch(/^LD-\d{4}-\d+/);
+      expect(lead.lead_code).toMatch(/^LD-\d{4}-[0-9a-f-]{36}$/);
       expect(lead.stage).toBe('New');
       expect(lead.counsellor_id).toBe(counsellorId);
 
