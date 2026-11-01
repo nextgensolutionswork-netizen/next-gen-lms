@@ -2,8 +2,8 @@ import { store } from './data-store';
 import { Lead, LeadFollowup, LeadStage } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { CreateAdmissionInput } from './admission-service';
-import { createClient as createSessionClient } from '@/lib/supabase/client';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
@@ -11,9 +11,27 @@ export async function getLeads(filters?: {
   course_id?: string;
   search?: string;
 }): Promise<Lead[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.stage && filters.stage !== 'All') params.set('stage', filters.stage);
+      if (filters?.search) params.set('search', filters.search);
+      const res = await fetch(`/api/crm/leads?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.leads) && json.leads.length > 0) {
+          store.leads = json.leads;
+          return json.leads;
+        }
+      }
+    } catch (err) {
+      console.warn('GET /api/crm/leads fetch error, using local fallback:', err);
+    }
+  }
+
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
+      const supabase = typeof window === 'undefined' ? createAdminClient() : createClient();
       let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
 
       if (filters?.stage && filters.stage !== 'All') {
@@ -78,11 +96,32 @@ export async function getLeadById(id: string): Promise<Lead | undefined> {
 }
 
 export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_at' | 'updated_at'>): Promise<Lead> {
+  if (typeof window !== 'undefined') {
+    const response = await fetch('/api/crm/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Failed to create lead');
+    }
+    const createdLead: Lead = result.lead;
+    store.leads = store.leads || [];
+    if (!store.leads.some((l) => l.id === createdLead.id)) {
+      store.leads.unshift(createdLead);
+    }
+    return createdLead;
+  }
+
   store.leads = store.leads || [];
   const id = globalThis.crypto.randomUUID();
   const lead_code = `LD-${new Date().getFullYear()}-${id}`;
   const course = (store.courses || []).find((c) => c.id === data.interested_course_id);
   const counsellor = (store.users || []).find((u) => u.id === data.counsellor_id);
+
+  const isUUID = (str?: string | null) =>
+    Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
   const newLead: Lead = {
     ...data,
@@ -96,9 +135,8 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
 
   if (isLiveSupabaseEnabled()) {
     try {
-      // Use the authenticated client directly: a rejected database write must
-      // never be reported as a successful local fallback.
-      const supabase = createSessionClient();
+      // The authenticated API calls this server path. Do not fall back to local writes.
+      const supabase = createAdminClient();
       for (let attempt = 0; attempt < 3; attempt++) {
         const { error } = await supabase.from('leads').insert({
           id: newLead.id,
@@ -106,13 +144,13 @@ export async function createLead(data: Omit<Lead, 'id' | 'lead_code' | 'created_
           full_name: newLead.full_name,
           phone: newLead.phone,
           email: newLead.email,
-          interested_course_id: newLead.interested_course_id,
+          interested_course_id: isUUID(newLead.interested_course_id) ? newLead.interested_course_id : null,
           current_status: newLead.current_status,
           experience_years: newLead.experience_years,
           training_preference: newLead.training_preference,
           lead_source: newLead.lead_source,
           campaign: newLead.campaign,
-          counsellor_id: newLead.counsellor_id,
+          counsellor_id: isUUID(newLead.counsellor_id) ? newLead.counsellor_id : null,
           demo_preference: newLead.demo_preference,
           demo_date: newLead.demo_date,
           follow_up_date: newLead.follow_up_date,

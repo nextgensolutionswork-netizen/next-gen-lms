@@ -30,7 +30,7 @@ import { BulkImportModal } from '@/components/bulk-import-modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { Lead, LeadStage } from '@/types';
-import { createLead, updateLeadStage, bulkAssignLeads, bulkUpdateLeadStage } from '@/lib/services/crm-service';
+import { getLeads, createLead, updateLeadStage, bulkAssignLeads, bulkUpdateLeadStage } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 
@@ -136,7 +136,18 @@ export default function LeadsPage() {
     }
   }, [user?.id, counsellorId]);
 
-  const refreshLeads = React.useCallback(() => {
+  const refreshLeads = React.useCallback(async () => {
+    try {
+      const fetched = await getLeads({
+        stage: selectedStage as any,
+        search: search.trim() || undefined,
+      });
+      if (Array.isArray(fetched)) {
+        setLeads(fetched);
+        return;
+      }
+    } catch {}
+
     let list = [...(store.leads || [])];
     if (selectedStage !== 'All') {
       list = list.filter((l) => l.stage === selectedStage);
@@ -190,26 +201,30 @@ export default function LeadsPage() {
       return;
     }
 
-    await createLead({
-      full_name: fullName,
-      phone,
-      email,
-      interested_course_id: courseId,
-      current_status: status,
-      experience_years: 1,
-      training_preference: trainingPref,
-      lead_source: source,
-      counsellor_id: assignedCounsellorId,
-      notes,
-      stage: 'New',
-    });
+    try {
+      await createLead({
+        full_name: fullName,
+        phone,
+        email,
+        interested_course_id: courseId,
+        current_status: status,
+        experience_years: 1,
+        training_preference: trainingPref,
+        lead_source: source,
+        counsellor_id: assignedCounsellorId,
+        notes,
+        stage: 'New',
+      });
 
-    setIsAddModalOpen(false);
-    setFullName('');
-    setPhone('');
-    setEmail('');
-    setNotes('');
-    refreshLeads();
+      setIsAddModalOpen(false);
+      setFullName('');
+      setPhone('');
+      setEmail('');
+      setNotes('');
+      void refreshLeads();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to create lead');
+    }
   };
 
   const handleUpdateStage = async () => {

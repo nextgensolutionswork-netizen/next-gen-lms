@@ -4,7 +4,7 @@ import { createLead } from '@/lib/services/crm-service';
 
 const mocks = vi.hoisted(() => ({ insert: vi.fn(), audit: vi.fn() }));
 vi.mock('@/lib/supabase/db', () => ({ isLiveSupabaseEnabled: () => true, createClient: vi.fn(() => { throw new Error('Fallback client must not be used'); }) }));
-vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: () => ({ insert: mocks.insert }) }) }));
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ from: () => ({ insert: mocks.insert }) }) }));
 vi.mock('@/lib/services/audit-service', () => ({ recordAuditLog: mocks.audit }));
 
 describe('lead creation with stale or concurrent browser state', () => {
@@ -16,7 +16,18 @@ describe('lead creation with stale or concurrent browser state', () => {
     vi.spyOn(store, 'persist').mockImplementation(() => {});
     mocks.insert.mockResolvedValue({ error: null });
   });
-  afterEach(() => { store.leads = original; vi.restoreAllMocks(); vi.useRealTimers(); });
+  afterEach(() => { store.leads = original; vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it('uses the server API in the browser and caches only its accepted record', async () => {
+    vi.stubGlobal('window', {});
+    const saved = { ...input, id: 'server-id', lead_code: 'LD-server' };
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, lead: saved }) });
+    vi.stubGlobal('fetch', fetch);
+    expect(await createLead(input)).toEqual(saved);
+    expect(fetch).toHaveBeenCalledWith('/api/crm/leads', expect.objectContaining({ method: 'POST' }));
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(store.leads).toEqual([saved]);
+  });
 
   it('creates distinct UUID IDs and codes for simultaneous submissions with an empty cache', async () => {
     vi.useFakeTimers();
