@@ -83,6 +83,8 @@ export default function PaymentsPage() {
   const [verifyModalOpen, setVerifyModalOpen] = React.useState(false);
   const [rejectModalOpen, setRejectModalOpen] = React.useState(false);
   const [verificationNotes, setVerificationNotes] = React.useState('');
+  const [manualVerification, setManualVerification] = React.useState({ reference: '', amount: '', payment_date: '' });
+  const [verificationBusy, setVerificationBusy] = React.useState(false);
   const [rejectReason, setRejectReason] = React.useState('');
 
   // Update payment modal state (Counsellor / Staff)
@@ -310,6 +312,7 @@ export default function PaymentsPage() {
 
   // Handle Accountant Payment Verification
   const handleVerifyPayment = async () => {
+    if (verificationBusy) return;
     if (!selectedPayment || !canVerifyPayments || !user) {
       setErrorMessage('Unauthorized: Only accountants can verify student payments.');
       return;
@@ -317,7 +320,8 @@ export default function PaymentsPage() {
     setErrorMessage(null);
 
     try {
-      await paymentWorkflowClient.verifyPayment(selectedPayment.id, user.id, verificationNotes);
+      setVerificationBusy(true);
+      await paymentWorkflowClient.verifyPayment(selectedPayment.id, user.id, verificationNotes, { ...manualVerification, reference: selectedPayment.payment_mode === 'Cash' ? undefined : manualVerification.reference });
       store.reconcileDualLedgers();
       store.persist();
       setVerifyModalOpen(false);
@@ -325,7 +329,7 @@ export default function PaymentsPage() {
       loadData();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to verify payment.');
-    }
+    } finally { setVerificationBusy(false); }
   };
 
   const handleRejectPayment = async () => {
@@ -670,7 +674,7 @@ export default function PaymentsPage() {
                           </td>
 
                           <td className="px-4 py-3 font-mono text-slate-600">
-                            <span className="block truncate max-w-[130px]" title={p.transaction_reference}>
+                            <span className="block truncate max-w-[130px]" title={p.transaction_reference || undefined}>
                               {p.transaction_reference || p.bank_upi_reference || '—'}
                             </span>
                           </td>
@@ -744,6 +748,9 @@ export default function PaymentsPage() {
                                       size="sm"
                                       onClick={() => {
                                         setSelectedPayment(p);
+                                        setManualVerification({ reference: '', amount: '', payment_date: '' });
+                                        setVerificationNotes('');
+                                        setErrorMessage(null);
                                         setVerifyModalOpen(true);
                                       }}
                                       className="text-xs px-2 py-1 h-7 bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 font-semibold"
@@ -1063,11 +1070,11 @@ export default function PaymentsPage() {
                 <span className="text-slate-500">Payment Mode:</span>
                 <span className="font-semibold text-slate-800">{selectedPayment.payment_mode}</span>
               </div>
-              <div className="flex justify-between">
+              {selectedPayment.payment_mode !== 'Cash' && <div className="flex justify-between">
                 <span className="text-slate-500">Reference:</span>
                 <span className="font-mono text-slate-800">{selectedPayment.transaction_reference || 'N/A'}</span>
-              </div>
-              {selectedPayment.payment_proof_url && (
+              </div>}
+              {selectedPayment.payment_mode !== 'Cash' && selectedPayment.payment_proof_url && (
                 <div className="flex justify-between">
                   <span className="text-slate-500">Payment Proof:</span>
                   <a href={selectedPayment.payment_proof_url} target="_blank" rel="noreferrer" className="font-medium text-blue-600 hover:underline">
@@ -1081,6 +1088,10 @@ export default function PaymentsPage() {
               </div>
             </div>
 
+            {errorMessage && <p role="alert" className="text-red-600">{errorMessage}</p>}
+            {(['reference', 'amount', 'payment_date'] as const).filter((field) => field !== 'reference' || selectedPayment.payment_mode !== 'Cash').map((field) => (
+              <Input key={field} label={field === 'reference' ? 'UTR / Transaction Reference' : field === 'amount' ? 'Amount Received' : 'Actual Payment Date'} type={field === 'amount' ? 'number' : field === 'payment_date' ? 'date' : 'text'} required step={field === 'amount' ? '0.01' : undefined} value={manualVerification[field]} onChange={(e) => setManualVerification((v) => ({ ...v, [field]: e.target.value }))} />
+            ))}
             <div>
               <label className="block text-slate-700 font-medium mb-1">
                 Accountant Verification Notes:
@@ -1102,6 +1113,7 @@ export default function PaymentsPage() {
                 variant="sap"
                 size="sm"
                 onClick={handleVerifyPayment}
+                disabled={verificationBusy}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 Confirm Verification & Issue Receipt

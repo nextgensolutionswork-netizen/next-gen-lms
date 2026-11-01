@@ -386,7 +386,7 @@ class InstituteDataStore {
         legacyP.amount = sp.amount_paid;
         legacyP.payment_date = sp.payment_date;
         legacyP.payment_mode = sp.payment_mode;
-        legacyP.transaction_reference = sp.transaction_reference || sp.bank_upi_reference || legacyP.transaction_reference;
+        legacyP.transaction_reference = sp.payment_mode === 'Cash' ? null : sp.transaction_reference || sp.bank_upi_reference || legacyP.transaction_reference;
       } else {
         const matchingFa = this.feeAccounts.find((fa) => fa.student_id === sp.student_id);
         const matchingFee = this.studentFees.find((f) => f.id === sp.fee_id);
@@ -404,7 +404,7 @@ class InstituteDataStore {
           amount: sp.amount_paid,
           payment_date: sp.payment_date,
           payment_mode: sp.payment_mode,
-          transaction_reference: sp.transaction_reference || sp.bank_upi_reference,
+          transaction_reference: sp.payment_mode === 'Cash' ? null : sp.transaction_reference || sp.bank_upi_reference,
           status: paymentStatus,
           collected_by: sp.recorded_by,
           collected_by_name: sp.recorded_by_name,

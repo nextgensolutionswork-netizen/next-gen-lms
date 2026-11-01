@@ -105,6 +105,9 @@ export default function FeeApprovalsPage() {
   const [paymentVerifyModalOpen, setPaymentVerifyModalOpen] = React.useState(false);
   const [paymentRejectModalOpen, setPaymentRejectModalOpen] = React.useState(false);
   const [paymentVerificationNotes, setPaymentVerificationNotes] = React.useState('');
+  const [manualVerification, setManualVerification] = React.useState({ reference: '', amount: '', payment_date: '' });
+  const [verificationErrors, setVerificationErrors] = React.useState<Record<string, string>>({});
+  const [verificationBusy, setVerificationBusy] = React.useState(false);
   const [paymentRejectionReason, setPaymentRejectionReason] = React.useState('');
 
   // Counsellor Payment Update Modal state
@@ -310,7 +313,7 @@ export default function FeeApprovalsPage() {
 
   // Payment Actions
   const handleVerifyPayment = async () => {
-    if (!selectedPayment) return;
+    if (!selectedPayment || verificationBusy) return;
     if (!user) {
       setActionError('You must be logged in to verify payments.');
       return;
@@ -320,8 +323,10 @@ export default function FeeApprovalsPage() {
       return;
     }
     setActionError(null);
+    setVerificationBusy(true);
+    setVerificationErrors({});
     try {
-      await paymentWorkflowClient.verifyPayment(selectedPayment.id, user.id, paymentVerificationNotes);
+      await paymentWorkflowClient.verifyPayment(selectedPayment.id, user.id, paymentVerificationNotes, { ...manualVerification, reference: selectedPayment.payment_mode === 'Cash' ? undefined : manualVerification.reference });
       store.reconcileDualLedgers();
       store.persist();
       setActionSuccess(`Payment of ${formatINR(selectedPayment.amount_paid)} for ${selectedPayment.student_name} verified & credited! Official payment receipt generated.`);
@@ -330,7 +335,10 @@ export default function FeeApprovalsPage() {
       setPaymentVerificationNotes('');
       loadData();
     } catch (err: any) {
+      setVerificationErrors(err.fieldErrors || { general: err.message || 'Failed to verify payment.' });
       setActionError(err.message || 'Failed to verify payment.');
+    } finally {
+      setVerificationBusy(false);
     }
   };
 
@@ -1569,6 +1577,8 @@ export default function FeeApprovalsPage() {
                                         setSelectedPayment(p);
                                         setPaymentVerificationNotes('');
                                         setActionError(null);
+                                        setManualVerification({ reference: '', amount: '', payment_date: '' });
+                                        setVerificationErrors({});
                                         setPaymentVerifyModalOpen(true);
                                       }}
                                       className={`text-xs px-2.5 py-1 h-7 ${
@@ -2334,11 +2344,11 @@ export default function FeeApprovalsPage() {
                 <span className="text-slate-500">Mode & Date:</span>
                 <span className="text-slate-800">{selectedPayment.payment_mode} ({selectedPayment.payment_date || selectedPayment.created_at?.split('T')[0]})</span>
               </div>
-              <div className="flex justify-between">
+              {selectedPayment.payment_mode !== 'Cash' && <div className="flex justify-between">
                 <span className="text-slate-500">Reference / UTR:</span>
                 <span className="font-mono font-semibold text-slate-800">{selectedPayment.transaction_reference || selectedPayment.bank_upi_reference || 'N/A'}</span>
-              </div>
-              {selectedPayment.payment_proof_url && (
+              </div>}
+              {selectedPayment.payment_mode !== 'Cash' && selectedPayment.payment_proof_url && (
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">Deposit Proof:</span>
                   <a
@@ -2364,6 +2374,27 @@ export default function FeeApprovalsPage() {
               )}
             </div>
 
+            <div className="space-y-3">
+              <p>Manually enter the received payment details for this payment record.</p>
+              {([
+                ['reference', 'UTR / Transaction Reference', 'text'],
+                ['amount', 'Amount Received', 'number'],
+                ['payment_date', 'Actual Payment Date', 'date'],
+              ] as const).filter(([field]) => field !== 'reference' || selectedPayment.payment_mode !== 'Cash').map(([field, label, type]) => (
+                <div key={field}>
+                  <label htmlFor={'verify-' + field} className="block text-slate-700 font-medium mb-1">{label} *</label>
+                  <input id={'verify-' + field} type={type} required autoComplete="off"
+                    step={field === 'amount' ? '0.01' : undefined} min={field === 'amount' ? '0.01' : undefined}
+                    value={manualVerification[field]} disabled={verificationBusy}
+                    aria-invalid={!!verificationErrors[field]} aria-describedby={verificationErrors[field] ? 'verify-' + field + '-error' : undefined}
+                    onChange={(e) => setManualVerification((previous) => ({ ...previous, [field]: e.target.value }))}
+                    className="w-full text-xs p-2 border border-slate-300 rounded-lg" />
+                  {verificationErrors[field] && <p id={'verify-' + field + '-error'} role="alert" className="text-rose-700 mt-1">{verificationErrors[field]}</p>}
+                </div>
+              ))}
+              {verificationErrors.general && <p role="alert" className="text-rose-700">{verificationErrors.general}</p>}
+            </div>
+
             <div>
               <label className="block text-slate-700 font-medium mb-1">
                 Accountant Verification Notes / Bank Statement Ref (Optional)
@@ -2384,7 +2415,7 @@ export default function FeeApprovalsPage() {
               <Button
                 variant="sap"
                 size="sm"
-                disabled={isOwnRecordedPayment(selectedPayment)}
+                disabled={verificationBusy || isOwnRecordedPayment(selectedPayment)}
                 onClick={handleVerifyPayment}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >

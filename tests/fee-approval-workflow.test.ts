@@ -1,3 +1,4 @@
+import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
@@ -288,6 +289,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
             fee_id: unapprovedFee.id,
             amount_paid: 3500,
             payment_mode: 'UPI',
+            transaction_reference: 'TEST-1',
           },
           counsellorId,
           'counsellor'
@@ -322,6 +324,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approvedFee.id,
           amount_paid: 20000,
           payment_mode: 'Bank Transfer',
+          transaction_reference: 'TEST-2',
         },
         counsellorId,
         'counsellor'
@@ -329,12 +332,12 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
 
       // Counsellor who recorded the payment cannot verify their own payment
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, counsellorId);
+        feeWorkflowService.verifyPayment(payment.id, counsellorId, undefined, enteredPaymentVerification(payment.id));
       }).toThrow(/Separation of duties violation: Payment recorder cannot verify their own payment entry/i);
 
       // Other non-accountant staff (e.g. trainer) cannot verify payments
       expect(() => {
-        feeWorkflowService.verifyPayment(payment.id, 'usr-trainer-fico');
+        feeWorkflowService.verifyPayment(payment.id, 'usr-trainer-fico', undefined, enteredPaymentVerification(payment.id));
       }).toThrow(/Unauthorized: Only an Accountant can verify student payments/i);
     });
 
@@ -353,7 +356,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
       const verified = feeWorkflowService.verifyPayment(
         payment.id,
         accountantId,
-        'Verified in HDFC bank statement'
+        'Verified in HDFC bank statement', enteredPaymentVerification(payment.id)
       );
 
       expect(verified.verification_status).toBe('Verified');
@@ -476,6 +479,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approved.id,
           amount_paid: approved.final_payable,
           payment_mode: 'Bank Transfer',
+          transaction_reference: 'TEST-3',
         },
         accountantId,
         'accountant'
@@ -483,7 +487,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
 
       const secondAccountant = { ...store.users.find((u) => u.id === accountantId)!, id: 'accounts-second-reviewer' };
       store.users.push(secondAccountant);
-      feeWorkflowService.verifyPayment(payment.id, secondAccountant.id);
+      feeWorkflowService.verifyPayment(payment.id, secondAccountant.id, undefined, enteredPaymentVerification(payment.id));
 
       const summary = feeWorkflowService.getStudentFinancialSummary(testStudentId);
       expect(summary.outstanding_balance).toBe(0);

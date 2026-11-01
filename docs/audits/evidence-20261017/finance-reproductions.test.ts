@@ -1,3 +1,4 @@
+import { enteredPaymentVerification } from '@/tests/payment-verification-fixture';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -132,7 +133,7 @@ it('F05: editing payment notes preserves valid installment association (FIXED)',
 it('F06: voiding an installment payment restores installment paid balance and status to Pending (FIXED)', () => {
   store.installments = [{id:'own-installment',tenant_id:'default',fee_account_id:fee.fee_account_id,student_id:studentId,amount:5000,paid_amount:0,status:'Pending'} as any];
   const payment=fees.recordPayment({...input(),installment_id:'own-installment'},counsellor.id);
-  fees.verifyPayment(payment.id,accountant.id);
+  fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
   const receipt=store.receipts.find(r=>r.payment_id===payment.id)!;
   fees.voidReceipt(receipt.id,accountant.id,'Audit reversal');
   expect(fee.paid_amount).toBe(0);
@@ -141,7 +142,7 @@ it('F06: voiding an installment payment restores installment paid balance and st
 });
 it('R01: reversal to zero paid correctly revokes onboarding financial clearance', () => {
   const payment=fees.recordPayment({...input(),amount_paid:10000},counsellor.id);
-  fees.verifyPayment(payment.id,accountant.id);
+  fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
   const c=store.onboardingCases[0];
   expect(c.checklist.fee_clearance_verification.completed).toBe(true);
   fees.voidReceipt(store.receipts.find(r=>r.payment_id===payment.id)!.id,accountant.id,'Audit reversal');

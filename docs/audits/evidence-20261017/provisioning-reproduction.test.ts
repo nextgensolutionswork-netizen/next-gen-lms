@@ -1,3 +1,4 @@
+import { enteredPaymentVerification } from '@/tests/payment-verification-fixture';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -123,7 +124,7 @@ vi.mock('@/lib/supabase/admin',()=>({createAdminClient:()=>({auth:{admin:{listUs
 vi.mock('@/lib/services/notification-service',async(importOriginal)=>({...await importOriginal<any>(),sendResendEmail:async()=>({success:true,simulated:true}),sendMultiChannelNotification:async()=>({success:true})}));
 it('F07: Auth provisioning rejection fails closed and prevents unauthorized LMS activation', async () => {
   const payment = fees.recordPayment({ ...input(), amount_paid: 10000 }, counsellor.id);
-  fees.verifyPayment(payment.id, accountant.id);
+  fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
   const c = store.onboardingCases[0];
   for (const key of ['admission_confirmation', 'student_details_verification', 'document_verification', 'course_confirmation', 'batch_allocation', 'fee_clearance_verification']) (c.checklist as any)[key].completed = true;
   c.documents = [{ id: 'synthetic-document', status: 'verified' } as any];

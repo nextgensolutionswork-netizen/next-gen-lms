@@ -1,3 +1,4 @@
+import { normalizePaymentFields } from '@/lib/services/payment-entry-rules';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
@@ -14,10 +15,11 @@ const schema = z.object({
   course_id: z.string().min(1),
   course_fee: z.number().finite().positive(),
   discount: z.number().finite().nonnegative(),
+  collect_initial_payment: z.boolean().optional(),
   initial_payment_amount: z.number().finite().nonnegative().optional(),
   payment_mode: z.enum(['Cash', 'UPI', 'Card', 'Other', 'Payment Gateway', 'Credit Card', 'Debit Card', 'Net Banking', 'Bank Transfer', 'Cheque']).optional(),
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v, 'Invalid payment date').optional(),
-  transaction_reference: z.string().trim().max(200).optional(),
+  transaction_reference: z.string().trim().max(200).nullable().optional(),
   bank_upi_reference: z.string().trim().max(200).optional(),
   payment_proof_url: z.string().max(4096).refine((v) => !v || v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach valid payment proof').optional(),
   idempotency_key: z.string().trim().max(200).optional(),
@@ -36,9 +38,8 @@ export async function POST(request: NextRequest) {
   try {
     const actor = await authenticatePaymentRequest(request);
     if (!['counsellor', 'admin', 'super_admin'].includes(actor.role)) throw new Error('Forbidden: Admission registration requires counsellor access.');
-    const input = schema.parse(await request.json()) as unknown as CreateAdmissionInput;
+    const input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
     if (input.initial_payment_amount && input.initial_payment_amount > 0) {
-      if (!input.payment_proof_url) throw new Error('Attach payment proof before submitting the initial payment.');
       const mode = input.payment_mode || 'UPI';
       if (mode !== 'Cash' && !input.transaction_reference?.trim() && !input.bank_upi_reference?.trim()) {
         throw new Error('Transaction reference is required for non-cash initial payments.');
