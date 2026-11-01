@@ -47,3 +47,6 @@ supabase/.temp/
 
 # Local staging isolated runtime
 staging-runtime/
+
+.vercel
+.env*
