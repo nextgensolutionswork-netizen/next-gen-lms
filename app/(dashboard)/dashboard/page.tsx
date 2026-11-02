@@ -29,7 +29,7 @@ import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Payment } from '@/types';
-import { courseBucket, paymentCourseBucket, UNASSIGNED_COURSE, formatDashboardPercentage } from '@/lib/utils/dashboard-metrics';
+import { courseBucket, paymentCourseBucket, UNASSIGNED_COURSE, formatDashboardPercentage, calculatePaymentApprovalMetrics, calculateEnrollmentMetrics, isPaymentApproved } from '@/lib/utils/dashboard-metrics';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -61,11 +61,14 @@ export default function DashboardPage() {
   // Unified dual-ledger payments (reconciles store.payments & store.studentPayments)
   const allUnifiedPayments = React.useMemo(() => {
     store.reconcileDualLedgers();
-    const map = new Map<string, Payment>();
+    const map = new Map<string, Payment & { verification_status?: string }>();
 
     for (const p of store.payments || []) {
       const key = p.receipt_number || p.id;
-      map.set(key, p);
+      map.set(key, {
+        ...p,
+        verification_status: (p as any).verification_status || (p.status === 'Success' ? 'Verified' : p.status === 'Failed' ? 'Rejected' : 'Pending Verification'),
+      });
     }
 
     for (const sp of store.studentPayments || []) {
@@ -91,6 +94,7 @@ export default function DashboardPage() {
           payment_mode: sp.payment_mode,
           transaction_reference: sp.transaction_reference || sp.bank_upi_reference,
           status: sp.verification_status === 'Verified' ? 'Success' : 'Pending',
+          verification_status: sp.verification_status,
           collected_by: sp.recorded_by,
           collected_by_name: sp.recorded_by_name,
           notes: sp.notes,
@@ -159,9 +163,25 @@ export default function DashboardPage() {
     });
   }, [isDateInSelectedPeriod, matchesCourse]);
 
-  const periodCollections = React.useMemo(() => {
-    return periodPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
+  const periodApprovedPayments = React.useMemo(() => {
+    return periodPayments.filter((p) => isPaymentApproved(p));
   }, [periodPayments]);
+
+  const periodCollections = React.useMemo(() => {
+    return periodApprovedPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
+  }, [periodApprovedPayments]);
+
+  const paymentApprovalMetrics = React.useMemo(() => {
+    return calculatePaymentApprovalMetrics(periodPayments);
+  }, [periodPayments]);
+
+  const enrollmentMetrics = React.useMemo(() => {
+    return calculateEnrollmentMetrics(
+      (store.admissions || []).filter((a) => isDateInSelectedPeriod(a.admission_date || a.created_at)),
+      store.students || [],
+      matchesCourse
+    );
+  }, [isDateInSelectedPeriod, matchesCourse]);
 
   const courseBreakdown = [...(store.courses || []).map((c) => ({ id: c.id, name: c.course_name })),
     { id: UNASSIGNED_COURSE, name: 'Unassigned / unknown course' }].map((course) => {
@@ -342,40 +362,40 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Collections */}
-        <Card className="border-l-4 border-l-[#0A6ED1]">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+      {/* KPI Metric Cards (6 Cards: 3x2 Desktop, 2x3 Tablet, 1x6 Mobile) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Card 1: This Month's Collections */}
+        <Card className="border-l-4 border-l-[#0A6ED1] h-full shadow-xs">
+          <CardContent className="p-4 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{collectionsPeriodTitle}</p>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">{formatINR(periodCollections)}</h3>
                 <div className="flex items-center space-x-1 mt-1 text-emerald-600 text-xs font-semibold">
                   <ArrowUpRight className="h-3.5 w-3.5" />
                   <span>
                     {filterPeriod === 'today'
-                      ? `${periodPayments.length} transactions today`
+                      ? `${periodApprovedPayments.length} successful transactions today`
                       : filterPeriod === 'week'
-                      ? `${periodPayments.length} transactions this week`
+                      ? `${periodApprovedPayments.length} successful transactions this week`
                       : filterPeriod === 'month'
-                      ? `${periodPayments.length} transactions this month`
-                      : `${periodPayments.length} total transactions`}
+                      ? `${periodApprovedPayments.length} successful transactions this month`
+                      : `${periodApprovedPayments.length} total successful transactions`}
                   </span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-blue-50 text-[#0A6ED1] flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-blue-50 text-[#0A6ED1] flex items-center justify-center shrink-0">
                 <IndianRupee className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Metric 2: Outstanding Fees */}
-        <Card className="border-l-4 border-l-amber-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+        {/* Card 2: Total Outstanding Fees */}
+        <Card className="border-l-4 border-l-amber-500 h-full shadow-xs">
+          <CardContent className="p-4 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Total Outstanding Fees
                 </p>
@@ -383,21 +403,21 @@ export default function DashboardPage() {
                   {formatINR(filterPeriod === 'all' ? totalOutstanding : pendingAmountInPeriod)}
                 </h3>
                 <p className="text-xs text-amber-600 font-medium mt-1">
-                  {pendingAccounts.length} accounts with an outstanding balance
+                  {pendingAccounts.length} {pendingAccounts.length === 1 ? 'account' : 'accounts'} with an outstanding balance
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                 <CreditCard className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Metric 3: Expenses & Net Balance */}
-        <Card className="border-l-4 border-l-emerald-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+        {/* Card 3: Net Operating Balance */}
+        <Card className="border-l-4 border-l-emerald-500 h-full shadow-xs">
+          <CardContent className="p-4 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   {filterCourse !== 'All' ? 'Collections before shared expenses' : filterPeriod === 'all' ? 'Lifetime Net Balance' : `Net Operating Balance (${periodLabel})`}
                 </p>
@@ -405,32 +425,104 @@ export default function DashboardPage() {
                   {formatINR(filterCourse === 'All' ? netOperatingBalance : periodCollections)}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">{expensesPeriodTitle} (institute-wide): {formatINR(periodExpenses)}</p>
-                {filterCourse !== 'All' && <p className="text-xs text-slate-500 mt-1">Shared expenses are not allocated to courses; course net balance is unavailable.</p>}
+                {filterCourse !== 'All' && <p className="text-xs text-slate-500 mt-0.5">Shared expenses are not allocated to courses; course net balance is unavailable.</p>}
               </div>
-              <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <TrendingUp className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Metric 4: Enrolled Students & Lead Conversion */}
-        <Card className="border-l-4 border-l-indigo-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+        {/* Card 4: Admissions & Batches */}
+        <Card className="border-l-4 border-l-indigo-500 h-full shadow-xs">
+          <CardContent className="p-4 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   {filterPeriod === 'all' ? 'Students & Batches' : `Admissions & Batches (${periodLabel})`}
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                  {filterPeriod === 'all' ? `${totalStudents} Enrolled Students` : `${periodAdmissions.length} New Admissions`}
+                  {filterPeriod === 'all' ? `${totalStudents} Enrolled Students` : `${enrollmentMetrics.newEnrollmentsCount} New Admissions`}
                 </h3>
                 <p className="text-xs text-indigo-600 font-semibold mt-1">
                   {activeBatches} Active {activeBatches === 1 ? 'Batch' : 'Batches'} | {conversionRate} Conv. ({convertedLeads}/{totalLeads} leads)
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                 <GraduationCap className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 5: Payment Approval Status (NEW) */}
+        <Card className="border-l-4 border-l-teal-500 h-full shadow-xs">
+          <CardContent className="p-4 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Payment Approval Status
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Approved</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-emerald-700 truncate">
+                      {formatINR(paymentApprovalMetrics.approvedAmount)}
+                    </h3>
+                    <p className="text-[11px] text-emerald-600 font-medium">
+                      {paymentApprovalMetrics.approvedCount} verified
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Pending</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-amber-600 truncate">
+                      {formatINR(paymentApprovalMetrics.pendingAmount)}
+                    </h3>
+                    <p className="text-[11px] text-amber-600 font-medium">
+                      {paymentApprovalMetrics.pendingCount} awaiting
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 ml-2">
+                <CheckCircle className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 6: Student Enrollment (NEW) */}
+        <Card className="border-l-4 border-l-violet-500 h-full shadow-xs">
+          <CardContent className="p-4 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Student Enrollment
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">New Enrolled</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                      {enrollmentMetrics.newEnrollmentsCount}
+                    </h3>
+                    <p className="text-[11px] text-violet-600 font-medium truncate">
+                      {filterPeriod === 'all' ? 'All time' : periodLabel}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active Students</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                      {enrollmentMetrics.activeStudentsCount}
+                    </h3>
+                    <p className="text-[11px] text-emerald-600 font-medium truncate">
+                      Current roster
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0 ml-2">
+                <Users className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
