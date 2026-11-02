@@ -1,6 +1,6 @@
 import { createClient as createBrowserClient, SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from './admin';
-import { createClient as createSessionClient } from './client';
+import { createClient as createSessionClient, resolveSupabaseKey } from './client';
 import { store } from '@/lib/services/data-store';
 import {
   RlsAuthContext,
@@ -21,7 +21,11 @@ export function isLiveSupabaseEnabled(): boolean {
     return false;
   }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = resolveSupabaseKey(
+    url,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
 
   if (!url || !anonKey) return false;
   if (url.includes('mock-sap-lms') || anonKey.includes('mockAnonKey')) return false;
@@ -31,6 +35,16 @@ export function isLiveSupabaseEnabled(): boolean {
   if (isStaging && url.includes('tgohtdzwehhjfahtgovq')) {
     throw new Error(
       'CRITICAL ISOLATION BLOCKER: Staging environment attempted to connect to production database (tgohtdzwehhjfahtgovq). Staging must connect exclusively to nextgen-lms-staging.'
+    );
+  }
+
+  // Cross-Environment Key Guardrail: Warn if production database URL is paired with staging project key
+  if (
+    url.includes('tgohtdzwehhjfahtgovq') &&
+    (anonKey.includes('ta86fl6G2CbwIzrnJMTLsQ_W0U3QjYe') || anonKey.includes('neiccpnxftfmmwnvtgdy'))
+  ) {
+    console.error(
+      '[Supabase Guardrail] Production database URL (tgohtdzwehhjfahtgovq) is paired with staging API key. Supabase will reject requests with HTTP 401 Unauthorized.'
     );
   }
 
@@ -521,10 +535,11 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
  */
 export function getDb(auth?: RlsAuthContext | string | UserProfile): any {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock-sap-lms.supabase.co';
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    'mock-key';
+  const anonKey = resolveSupabaseKey(
+    url,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
 
   const user = resolveUserProfile(auth);
   const isBypass = typeof auth === 'object' && auth !== null && 'bypassRls' in auth ? Boolean(auth.bypassRls) : false;

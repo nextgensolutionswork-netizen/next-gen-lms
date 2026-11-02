@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createLead, getLeads } from '@/lib/services/crm-service';
+import { createLead, getLeads, updateLeadDetails } from '@/lib/services/crm-service';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
 import { tenantId } from '@/lib/auth/tenant';
 
@@ -42,6 +42,21 @@ export async function POST(request: NextRequest) {
     const actor = await authorize(request);
     const body = await request.json();
     const lead = await createLead({ ...body, ...(actor.role === 'counsellor' ? { counsellor_id: actor.id } : {}) });
+    return NextResponse.json({ success: true, lead });
+  } catch (err: any) {
+    return failure(err);
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const actor = await authorize(request);
+    const body = await request.json();
+    const { leadId, updates } = body;
+    if (!leadId) {
+      return NextResponse.json({ success: false, error: 'leadId is required' }, { status: 400 });
+    }
+    const lead = await updateLeadDetails(leadId, updates, actor.id);
     return NextResponse.json({ success: true, lead });
   } catch (err: any) {
     return failure(err);

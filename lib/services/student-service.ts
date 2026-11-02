@@ -15,7 +15,10 @@ export async function getStudents(filters?: {
     const supabase = typeof window !== 'undefined' ? createSessionClient() : createClient();
     const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
     if (signal?.aborted) throw new Error('Student lookup cancelled.');
-    if (error) throw new Error('Unable to load students. Please retry or contact your administrator.');
+    if (error) {
+      console.error('[student-service] Supabase query failed:', error.message || error);
+      throw new Error('Unable to load students. Please retry or contact your administrator.');
+    }
     store.students = (data || []) as Student[];
   }
 
@@ -50,7 +53,10 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
     const reference = String(id).trim();
     const column = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference) ? 'id' : 'student_code';
     const { data, error } = await supabase.from('students').select('*').eq(column, reference).maybeSingle();
-    if (error) throw new Error('Unable to verify the student profile. Please retry or contact your administrator.');
+    if (error) {
+      console.error('[student-service] Supabase student lookup failed:', error.message || error);
+      throw new Error('Unable to verify the student profile. Please retry or contact your administrator.');
+    }
     return data ? data as Student : undefined;
   }
 

@@ -101,19 +101,31 @@ export type LeadStage =
   | 'Enrolled'
   | 'Lost';
 
+export type LeadTrainingPreference = 'Online' | 'Offline' | 'Classroom' | 'Hybrid';
+export type LeadSource = 'Website' | 'Google Ads' | 'Meta Ads' | 'YouTube' | 'Referral' | 'Walk-in' | 'Other';
+export type LeadCurrentStatus =
+  | 'Fresher'
+  | 'Career Gap'
+  | 'Working Professional'
+  | 'Experienced + Career Gap';
+
 export interface Lead {
   id: string;
+  tenant_id?: string;
   lead_code: string;
   full_name: string;
+  country_code?: string;
   phone: string;
+  whatsapp_country_code?: string;
+  whatsapp_number?: string;
   email: string;
   interested_course_id?: string;
   interested_course_name?: string;
-  current_status?: string;
+  current_status?: LeadCurrentStatus | string;
   education?: string;
   experience_years?: number;
-  training_preference?: 'Online' | 'Classroom' | 'Hybrid';
-  lead_source?: 'Website' | 'Google Ads' | 'Meta Ads' | 'Referral' | 'Walk-in' | 'Other';
+  training_preference?: LeadTrainingPreference;
+  lead_source?: LeadSource;
   campaign?: string;
   counsellor_id?: string;
   counsellor_name?: string;
@@ -166,7 +178,7 @@ export interface Admission {
   current_employment_status: 'Employed' | 'Unemployed' | 'Student' | 'Career Gap';
   course_id: string;
   course_name?: string;
-  training_mode: 'Online' | 'Classroom' | 'Hybrid';
+  training_mode: 'Online' | 'Offline' | 'Classroom' | 'Hybrid';
   batch_id?: string;
   batch_name?: string;
   trainer_id?: string;
@@ -179,6 +191,7 @@ export interface Admission {
   payment_plan: 'Full Payment' | '2 Installments' | '3 Installments' | 'Custom';
   counsellor_id?: string;
   counsellor_name?: string;
+  lead_id?: string;
   status: AdmissionStatus;
   created_at: string;
   updated_at: string;

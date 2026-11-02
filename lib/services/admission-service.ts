@@ -1,3 +1,5 @@
+import { onTransactionCommit } from './payment-workflow-transaction';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
 import { store } from './data-store';
 import {
@@ -11,6 +13,7 @@ import {
   Payment,
   Receipt,
   PaymentMethod,
+  Lead,
 } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { generateAdmissionNumber } from '@/lib/utils/formatters';
@@ -70,6 +73,57 @@ export async function getAdmissionById(id: string): Promise<Admission | undefine
   return store.admissions.find((a) => a.id === id);
 }
 
+export interface FeeDueDateValidationResult {
+  isValid: boolean;
+  isRequired: boolean;
+  error?: string;
+}
+
+export function validateFeeDueDate(params: {
+  feeDueDate?: string;
+  admissionDate: string;
+  netPayable: number;
+  collectInitialPayment?: boolean;
+  initialPaymentAmount?: number;
+}): FeeDueDateValidationResult {
+  const initialAmount = params.collectInitialPayment ? (params.initialPaymentAmount || 0) : 0;
+  const isFullPayment = initialAmount >= params.netPayable || params.netPayable === 0;
+  const rawDueDate = params.feeDueDate?.trim();
+
+  if (isFullPayment) {
+    if (!rawDueDate) {
+      return { isValid: true, isRequired: false };
+    }
+  } else {
+    if (!rawDueDate) {
+      return {
+        isValid: false,
+        isRequired: true,
+        error: 'Fee due date is required for partial payment or pay later.',
+      };
+    }
+  }
+
+  const parsedDueDate = new Date(`${rawDueDate}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDueDate) || !Number.isFinite(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== rawDueDate) {
+    return {
+      isValid: false,
+      isRequired: !isFullPayment,
+      error: 'Please enter a valid fee due date.',
+    };
+  }
+
+  if (rawDueDate < params.admissionDate) {
+    return {
+      isValid: false,
+      isRequired: !isFullPayment,
+      error: 'Fee due date cannot be before the admission date.',
+    };
+  }
+
+  return { isValid: true, isRequired: !isFullPayment };
+}
+
 export interface CreateAdmissionInput {
   student_name: string;
   phone: string;
@@ -85,7 +139,7 @@ export interface CreateAdmissionInput {
   experience_years: number;
   current_employment_status: 'Employed' | 'Unemployed' | 'Student' | 'Career Gap';
   course_id: string;
-  training_mode?: 'Online' | 'Classroom' | 'Hybrid';
+  training_mode?: 'Online' | 'Offline' | 'Classroom' | 'Hybrid';
   batch_id?: string;
   trainer_id?: string;
   admission_date: string;
@@ -119,6 +173,7 @@ export async function createAdmissionWorkflow(
   installments?: Installment[];
   payment?: StudentPaymentRecord;
   receipt?: Receipt;
+  lead?: Lead;
 }> {
   if (typeof window !== 'undefined') {
     const { paymentWorkflowClient } = await import('./payment-workflow-client');
@@ -139,6 +194,53 @@ export async function createAdmissionWorkflow(
     throw new Error('Unauthorized admission registration.');
   }
   const admissionTenant = tenantId(performingUser);
+
+  // Cross-Tenant Conversion Guard
+  if (input.lead_id) {
+    const lead = store.leads.find((l) => l.id === input.lead_id);
+    if (lead && tenantId(lead) !== admissionTenant) {
+      throw new Error(
+        `Unauthorized cross-tenant conversion: Lead belongs to tenant "${tenantId(lead)}", but actor belongs to tenant "${admissionTenant}".`
+      );
+    }
+  }
+
+  // B09b: Lead Conversion Idempotency Check
+  if (input.lead_id) {
+    const existingAdmissionForLead = store.admissions.find(
+      (a) =>
+        tenantId(a) === admissionTenant &&
+        (a.lead_id === input.lead_id ||
+          (a as any).lead_id === input.lead_id ||
+          (store.leads.find((l) => l.id === input.lead_id)?.notes?.includes(a.admission_number)))
+    );
+    if (existingAdmissionForLead) {
+      const existingStudent = store.students.find((s) => s.id === existingAdmissionForLead.student_id);
+      const existingFeeAccount = store.feeAccounts.find((fa) => fa.admission_id === existingAdmissionForLead.id);
+      const existingStudentFee = store.studentFees?.find((sf) => sf.enrollment_id === existingAdmissionForLead.id);
+      const existingPayment = store.studentPayments?.find((p) => p.enrollment_id === existingAdmissionForLead.id);
+      const existingReceipt = store.receipts?.find(
+        (r) => (r as any).enrollment_id === existingAdmissionForLead.id || (existingPayment && r.payment_id === existingPayment.id)
+      );
+
+      const lead = store.leads.find((l) => l.id === input.lead_id);
+      if (lead && lead.stage !== 'Converted') {
+        lead.stage = 'Converted';
+        lead.updated_at = new Date().toISOString();
+        store.persist();
+      }
+
+      return {
+        admission: existingAdmissionForLead,
+        student: existingStudent!,
+        feeAccount: existingFeeAccount!,
+        studentFee: existingStudentFee,
+        payment: existingPayment,
+        receipt: existingReceipt,
+        lead,
+      };
+    }
+  }
 
   // B09: Admission Idempotency Check
   const idempotencyKey = input.idempotency_key;
@@ -165,12 +267,20 @@ export async function createAdmissionWorkflow(
     }
   }
 
-  const feeDueDate = input.fee_due_date || input.admission_date;
-  const parsedDueDate = new Date(`${feeDueDate}T00:00:00.000Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(feeDueDate) || !Number.isFinite(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== feeDueDate) {
-    throw new Error('Please enter a valid fee due date.');
+  const rawDueDate = input.fee_due_date?.trim();
+  let feeDueDate: string;
+  if (!rawDueDate) {
+    feeDueDate = input.payment_date || input.admission_date;
+  } else {
+    const parsedDueDate = new Date(`${rawDueDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDueDate) || !Number.isFinite(parsedDueDate.getTime()) || parsedDueDate.toISOString().slice(0, 10) !== rawDueDate) {
+      throw new Error('Please enter a valid fee due date.');
+    }
+    if (rawDueDate < input.admission_date) {
+      throw new Error('Fee due date cannot be before the admission date.');
+    }
+    feeDueDate = rawDueDate;
   }
-  if (feeDueDate < input.admission_date) throw new Error('Fee due date cannot be before the admission date.');
 
   // Validate Course
   const course = store.courses.find((c) => c.id === input.course_id);
@@ -264,6 +374,7 @@ export async function createAdmissionWorkflow(
     tenant_id: admissionTenant,
     id: `adm-${Date.now()}`,
     admission_number,
+    lead_id: input.lead_id,
     student_name: input.student_name,
     phone: input.phone,
     email: input.email,
@@ -500,12 +611,34 @@ export async function createAdmissionWorkflow(
   }
 
   // 6. If converted from CRM lead, mark lead as converted
+  let convertedLead: Lead | undefined;
   if (input.lead_id) {
     const lead = store.leads.find((l) => l.id === input.lead_id);
     if (lead) {
       lead.stage = 'Converted';
-      lead.notes = `${lead.notes || ''}\nConverted to Admission: ${admission_number}`;
+      lead.notes = `${lead.notes || ''}\nConverted to Admission: ${admission_number}`.trim();
       lead.updated_at = new Date().toISOString();
+      convertedLead = lead;
+    }
+
+    if (isLiveSupabaseEnabled() && transactional) {
+      const targetLeadId = input.lead_id;
+      const targetAdmNumber = admission_number;
+      onTransactionCommit(async () => {
+        try {
+          const supabase = createAdminClient();
+          await supabase
+            .from('leads')
+            .update({
+              stage: 'Converted',
+              notes: `Converted to Admission: ${targetAdmNumber}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', targetLeadId);
+        } catch (err) {
+          console.warn('[admission-service] Failed to update lead stage in Supabase on commit:', err);
+        }
+      });
     }
   }
 
@@ -628,5 +761,6 @@ export async function createAdmissionWorkflow(
     installments: newInstallments,
     payment: initialPayment,
     receipt: undefined,
+    lead: convertedLead,
   };
 }

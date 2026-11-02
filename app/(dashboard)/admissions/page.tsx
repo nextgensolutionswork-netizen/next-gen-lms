@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   UserCheck,
   Search,
@@ -29,14 +30,17 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
-import { createAdmissionWorkflow, getAdmissions } from '@/lib/services/admission-service';
+import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
+import { isLeadConverted } from '@/lib/services/crm-service';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
 import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
+  const router = useRouter();
   const { user, role, hasPermission } = useAuth();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [admissions, setAdmissions] = React.useState<Admission[]>([]);
   const [loadError, setLoadError] = React.useState('');
   const [search, setSearch] = React.useState('');
@@ -98,12 +102,13 @@ export default function AdmissionsPage() {
   );
 
   const [courseId, setCourseId] = React.useState(defaultCourseId);
-  const [trainingMode, setTrainingMode] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Hybrid');
+  const [trainingMode, setTrainingMode] = React.useState<'Online' | 'Offline' | 'Classroom' | 'Hybrid'>('Hybrid');
   const [batchId, setBatchId] = React.useState(defaultBatch?.id || '');
   const [batchError, setBatchError] = React.useState('');
   const [counsellorId, setCounsellorId] = React.useState('');
   const [discount, setDiscount] = React.useState(0);
   const [feeDueDate, setFeeDueDate] = React.useState('');
+  const [feeDueDateError, setFeeDueDateError] = React.useState('');
   const [discountReason, setDiscountReason] = React.useState('');
   const [convertedLeadId, setConvertedLeadId] = React.useState<string | undefined>(undefined);
 
@@ -172,9 +177,14 @@ export default function AdmissionsPage() {
       const params = new URLSearchParams(window.location.search);
       const leadId = params.get('convertLeadId');
       if (leadId) {
-        setConvertedLeadId(leadId);
         const lead = store.leads.find((l) => l.id === leadId);
         if (lead) {
+          if (isLeadConverted(lead, store.admissions)) {
+            alert(`Lead ${lead.lead_code || lead.full_name} has already been converted to an admission.`);
+            router.replace('/admissions');
+            return;
+          }
+          setConvertedLeadId(leadId);
           setName(lead.full_name || '');
           setPhone(lead.phone || '');
           setEmail(lead.email || '');
@@ -202,11 +212,19 @@ export default function AdmissionsPage() {
         }
       }
     }
-  }, []);
+  }, [router]);
 
   const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];
   const courseFee = selectedCourse?.price || 45000;
   const netPayable = Math.max(0, courseFee - discount);
+  const isFullPayment = (collectInitialPayment && initialPaymentAmount >= netPayable) || netPayable === 0;
+  const isFeeDueDateRequired = !isFullPayment;
+
+  React.useEffect(() => {
+    if (isFullPayment && feeDueDateError) {
+      setFeeDueDateError('');
+    }
+  }, [isFullPayment, feeDueDateError]);
 
   const refreshList = React.useCallback(async () => {
     try {
@@ -238,6 +256,7 @@ export default function AdmissionsPage() {
 
   const handleCreateAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (initialPaymentMode !== 'Cash' && isPaymentProofUploading) return;
     if (collectInitialPayment && (!Number.isFinite(initialPaymentAmount) || initialPaymentAmount <= 0)) { alert('Amount to Collect must be greater than zero.'); return; }
     if (collectInitialPayment && initialPaymentMode !== 'Cash' && !initialPaymentRef.trim()) { alert('Transaction reference is required for non-cash payments.'); return; }
@@ -246,6 +265,31 @@ export default function AdmissionsPage() {
       alert('Authentication required: Please sign in to register admissions.');
       return;
     }
+
+    const admissionDateStr = new Date().toISOString().slice(0, 10);
+    const dueDateValidation = validateFeeDueDate({
+      feeDueDate: feeDueDate.trim() ? feeDueDate : undefined,
+      admissionDate: admissionDateStr,
+      netPayable,
+      collectInitialPayment,
+      initialPaymentAmount: collectInitialPayment ? initialPaymentAmount : 0,
+    });
+
+    if (!dueDateValidation.isValid) {
+      setFeeDueDateError(dueDateValidation.error || 'Please enter a valid fee due date.');
+      return;
+    }
+    setFeeDueDateError('');
+    if (convertedLeadId) {
+      const lead = store.leads.find((l) => l.id === convertedLeadId);
+      if (lead && isLeadConverted(lead, store.admissions)) {
+        alert(`Lead ${lead.lead_code || lead.full_name} has already been converted to an admission.`);
+        setIsNewModalOpen(false);
+        setConvertedLeadId(undefined);
+        return;
+      }
+    }
+    setIsSubmitting(true);
 
     if (!batchId && courseBatches.length > 0) {
       setBatchError('Please select a batch with available seats. All full batches are disabled.');
@@ -286,7 +330,7 @@ export default function AdmissionsPage() {
         training_mode: trainingMode,
         batch_id: batchId,
         admission_date: new Date().toISOString().slice(0, 10),
-        fee_due_date: feeDueDate,
+        fee_due_date: feeDueDate.trim() ? feeDueDate : undefined,
         course_fee: courseFee,
         discount,
         discount_reason: discountReason,
@@ -319,6 +363,7 @@ export default function AdmissionsPage() {
       setAddress('');
       setDiscount(0);
       setFeeDueDate('');
+      setFeeDueDateError('');
       setDiscountReason('');
       setCollectInitialPayment(false);
       setInitialPaymentAmount(0);
@@ -326,9 +371,17 @@ export default function AdmissionsPage() {
       setInitialPaymentProofUrl('');
       setInitialPaymentDate(actualPaymentDate());
       setInitialPaymentNotes('');
+      if (convertedLeadId) {
+        const lead = store.leads.find((l) => l.id === convertedLeadId);
+        if (lead) {
+          lead.stage = 'Converted';
+        }
+      }
       refreshList();
     } catch (err: any) {
       alert('Error registering admission: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -750,6 +803,7 @@ export default function AdmissionsPage() {
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                 >
                   <option value="Hybrid">Hybrid</option>
+                  <option value="Offline">Offline</option>
                   <option value="Online">Online Live</option>
                   <option value="Classroom">Classroom Lab</option>
                 </select>
@@ -819,14 +873,29 @@ export default function AdmissionsPage() {
                 value={`₹${courseFee.toLocaleString('en-IN')}`}
                 disabled
               />
-              <Input
-                label="Fee Due Date *"
-                type="date"
-                value={feeDueDate}
-                min={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setFeeDueDate(e.target.value)}
-                required
-              />
+              <div className="space-y-1">
+                <Input
+                  label={isFeeDueDateRequired ? "Fee Due Date *" : "Fee Due Date (Optional)"}
+                  type="date"
+                  value={feeDueDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => {
+                    setFeeDueDate(e.target.value);
+                    if (feeDueDateError) setFeeDueDateError('');
+                  }}
+                  required={isFeeDueDateRequired}
+                  error={feeDueDateError}
+                />
+                {isFullPayment ? (
+                  <p className="text-[11px] text-emerald-600 font-medium">
+                    Full payment collected upfront; fee due date is optional.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    Required for remaining balance of {formatINR(netPayable - (collectInitialPayment ? initialPaymentAmount : 0))}.
+                  </p>
+                )}
+              </div>
               <Input
                 label="Approved Discount (₹)"
                 type="number"
@@ -1002,8 +1071,8 @@ export default function AdmissionsPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setIsNewModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="sap" size="sm" disabled={isPaymentProofUploading || (courseBatches.length > 0 && !batchId)}>
-              Confirm Admission & Submit Payment
+            <Button type="submit" variant="sap" size="sm" disabled={isSubmitting || isPaymentProofUploading || (courseBatches.length > 0 && !batchId)}>
+              {isSubmitting ? 'Registering Admission...' : 'Confirm Admission & Submit Payment'}
             </Button>
           </div>
         </form>
