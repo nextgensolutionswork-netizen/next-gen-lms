@@ -15,11 +15,11 @@ import {
   COUNTRY_CODES,
   DEFAULT_COUNTRY,
 } from '@/lib/utils/phone-validation';
-import { Lead, User } from '@/types';
+import { Lead, UserProfile } from '@/types';
 
 describe('CRM Lead Creation Form Enhancements Suite', () => {
   let initialLeads: Lead[];
-  let initialUsers: User[];
+  let initialUsers: UserProfile[];
   const counsellorId = 'usr-counsellor-enhancement-test';
 
   beforeEach(() => {
@@ -35,6 +35,7 @@ describe('CRM Lead Creation Form Enhancements Suite', () => {
         role: 'counsellor',
         is_active: true,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
     }
   });
