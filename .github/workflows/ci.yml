@@ -46,7 +46,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Node Dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Verify TypeScript Types (npx tsc --noEmit)
         run: npx tsc --noEmit
@@ -65,7 +65,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Node Dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Run Vitest Test Suite (npm test)
         run: npm test
@@ -85,7 +85,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Node Dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Build Next.js Production Application (npm run build)
         run: npm run build
