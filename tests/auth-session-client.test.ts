@@ -1,7 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const sharedClient = vi.hoisted(() => ({ auth: { getSession: vi.fn() } }));
-vi.mock('@/lib/supabase/client', () => ({ createClient: () => sharedClient }));
+vi.mock('@/lib/supabase/client', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/lib/supabase/client')
+  >();
+
+  return {
+    ...actual,
+    createClient: () => sharedClient,
+  };
+});
 
 import { getDb } from '@/lib/supabase/db';
 
