@@ -47,6 +47,12 @@ export const COUNTRY_CODES: CountryCodeItem[] = [
 
 export const DEFAULT_COUNTRY = COUNTRY_CODES[0]; // India (+91)
 
+export function isSupportedCountryCode(dialCode?: string): boolean {
+  if (!dialCode) return false;
+  const clean = dialCode.startsWith('+') ? dialCode : `+${dialCode}`;
+  return COUNTRY_CODES.some((c) => c.dialCode === clean || c.dialCode === dialCode);
+}
+
 export interface PhoneValidationResult {
   isValid: boolean;
   error?: string;
@@ -58,7 +64,7 @@ export interface PhoneValidationResult {
  * Validates a phone number based on selected country dial code.
  * - Mandatory: cannot be empty
  * - India (+91): exactly 10 digits, must start with 6, 7, 8, or 9
- * - International: 7 to 15 digits
+ * - International: 7 to 15 digits (total E.164 length including dial code)
  * - Rejects letters and malformed inputs
  */
 export function validatePhoneNumber(
@@ -85,11 +91,23 @@ export function validatePhoneNumber(
 
   // Extract pure digits of national number
   let digits = trimmed.replace(/\D/g, '');
-
-  // If user pasted a number with the dial code already prefixed, remove it
   const cleanDial = dialCode.replace(/\D/g, '');
-  if (digits.startsWith(cleanDial) && digits.length > cleanDial.length + 6) {
-    digits = digits.slice(cleanDial.length);
+  const isIndia = dialCode === '+91' || dialCode === '91' || cleanDial === '91';
+
+  // Handle dial code stripping carefully to avoid prefix collision (e.g., 9123456789 in India)
+  if (isIndia) {
+    // If 12 digits starting with 91, the user pasted country code + 10-digit number
+    if (digits.length === 12 && digits.startsWith('91')) {
+      digits = digits.slice(2);
+    } else if (digits.length === 11 && digits.startsWith('0')) {
+      // Handle leading zero for Indian trunk numbers (e.g. 09876543210 -> 9876543210)
+      digits = digits.slice(1);
+    }
+  } else {
+    // For non-India: if user explicitly included country dial code with leading +
+    if (trimmed.startsWith('+') && digits.startsWith(cleanDial) && digits.length > cleanDial.length + 3) {
+      digits = digits.slice(cleanDial.length);
+    }
   }
 
   if (!digits) {
@@ -98,8 +116,6 @@ export function validatePhoneNumber(
       error: `${fieldLabel} is mandatory.`,
     };
   }
-
-  const isIndia = dialCode === '+91' || dialCode === '91';
 
   if (isIndia) {
     if (digits.length !== 10) {
@@ -125,8 +141,9 @@ export function validatePhoneNumber(
     };
   }
 
-  // International phone validation (E.164: 7 to 15 digits)
-  if (digits.length < 7 || digits.length > 15) {
+  // International phone validation (E.164: national digits 7-15, total digits with dial code <= 15)
+  const totalDigits = cleanDial.length + digits.length;
+  if (digits.length < 7 || digits.length > 15 || totalDigits > 15) {
     return {
       isValid: false,
       error: `International phone number must be between 7 and 15 digits (currently ${digits.length} digits).`,
@@ -159,12 +176,35 @@ export function normalizePhoneForStorage(dialCode: string, nationalNumber: strin
  */
 export function getCanonicalPhoneDigits(countryCode?: string, phone?: string): string {
   if (!phone) return '';
-  const cleanPhone = phone.replace(/\D/g, '');
+  let cleanPhone = phone.replace(/\D/g, '');
   if (!cleanPhone) return '';
 
   const cleanCountry = countryCode ? countryCode.replace(/\D/g, '') : '';
+  const isIndia = cleanCountry === '91' || (!cleanCountry && cleanPhone.length === 10);
+
+  // If cleanPhone has 11 digits starting with 0 and cleanCountry is 91 or empty
+  if (cleanPhone.length === 11 && cleanPhone.startsWith('0') && isIndia) {
+    cleanPhone = cleanPhone.slice(1);
+  }
+
+  if (cleanCountry === '91') {
+    if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) {
+      return cleanPhone;
+    }
+    if (cleanPhone.length === 10) {
+      return `91${cleanPhone}`;
+    }
+    if (phone.trim().startsWith('+91') && cleanPhone.startsWith('91')) {
+      return cleanPhone;
+    }
+    return `91${cleanPhone}`;
+  }
+
   if (cleanCountry) {
-    if (cleanPhone.startsWith(cleanCountry)) {
+    if (phone.trim().startsWith('+') && cleanPhone.startsWith(cleanCountry)) {
+      return cleanPhone;
+    }
+    if (cleanPhone.startsWith(cleanCountry) && cleanPhone.length > cleanCountry.length + 4) {
       return cleanPhone;
     }
     return `${cleanCountry}${cleanPhone}`;
@@ -232,6 +272,89 @@ export function findDuplicateLeadByPhone<T extends { id?: string; phone?: string
     const lDigits = getCanonicalPhoneDigits(l.country_code, l.phone);
     return lDigits === targetDigits;
   });
+}
+
+export interface DuplicateLeadMatch<T = any> {
+  isDuplicate: boolean;
+  matchType?: 'phone' | 'email' | 'both';
+  existingLead?: T;
+  isConverted?: boolean;
+  admissionNumber?: string;
+  message?: string;
+}
+
+/**
+ * Comprehensive duplicate check comparing canonical phone digits and email address.
+ * Cross-references admissions to detect if candidate was already converted.
+ */
+export function checkDuplicateLead<T extends {
+  id?: string;
+  lead_code?: string;
+  full_name?: string;
+  phone?: string;
+  country_code?: string;
+  email?: string;
+  stage?: string;
+  counsellor_name?: string;
+  tenant_id?: string;
+  notes?: string;
+}>(
+  leads: T[],
+  input: {
+    phone?: string;
+    country_code?: string;
+    email?: string;
+    tenant_id?: string;
+    excludeLeadId?: string;
+  },
+  admissions?: { id?: string; lead_id?: string; admission_number?: string; email?: string }[]
+): DuplicateLeadMatch<T> {
+  if (!leads || leads.length === 0) {
+    return { isDuplicate: false };
+  }
+
+  const targetDigits = input.phone ? getCanonicalPhoneDigits(input.country_code || '+91', input.phone) : '';
+  const targetEmail = input.email?.trim().toLowerCase();
+
+  for (const lead of leads) {
+    if (input.excludeLeadId && lead.id === input.excludeLeadId) continue;
+    if (input.tenant_id && lead.tenant_id && lead.tenant_id !== input.tenant_id) continue;
+
+    const leadDigits = getCanonicalPhoneDigits(lead.country_code, lead.phone);
+    const phoneMatch = Boolean(targetDigits && leadDigits && targetDigits === leadDigits);
+    const emailMatch = Boolean(targetEmail && lead.email && lead.email.trim().toLowerCase() === targetEmail);
+
+    if (phoneMatch || emailMatch) {
+      const matchType: 'phone' | 'email' | 'both' = phoneMatch && emailMatch ? 'both' : phoneMatch ? 'phone' : 'email';
+
+      const isConverted =
+        lead.stage === 'Converted' ||
+        lead.stage === 'Enrolled' ||
+        Boolean(admissions?.some((a) => a.lead_id === lead.id || (lead.notes && a.admission_number && lead.notes.includes(a.admission_number))));
+
+      const matchingAdmission = admissions?.find(
+        (a) => a.lead_id === lead.id || (lead.notes && a.admission_number && lead.notes.includes(a.admission_number))
+      );
+      const admNum = matchingAdmission?.admission_number;
+
+      const identifier = matchType === 'both' ? 'mobile number and email' : matchType === 'phone' ? 'mobile number' : 'email address';
+      let msg = `A lead with this ${identifier} already exists: ${lead.lead_code || lead.id} (${lead.full_name}) in stage "${lead.stage || 'New'}". Assigned to: ${lead.counsellor_name || 'Unassigned'}.`;
+      if (isConverted) {
+        msg += ` Candidate has already been converted to admission${admNum ? ` (${admNum})` : ''}.`;
+      }
+
+      return {
+        isDuplicate: true,
+        matchType,
+        existingLead: lead,
+        isConverted,
+        admissionNumber: admNum,
+        message: msg,
+      };
+    }
+  }
+
+  return { isDuplicate: false };
 }
 
 /**

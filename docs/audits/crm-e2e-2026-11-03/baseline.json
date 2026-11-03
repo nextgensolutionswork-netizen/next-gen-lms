@@ -1,0 +1,37 @@
+{
+  "head": "dc6ed80067d60aa79e7e74186322f9959535f417",
+  "files": [
+    {
+      "path": "app/api/bulk-import/execute/route.ts",
+      "sha256": "e86f6a57b70157e5a983795dcfb989915005778f91ae19dc84efaf3f4528c326"
+    },
+    {
+      "path": "app/api/crm/leads/route.ts",
+      "sha256": "ca30e83f60c43699e9632f7e52dfef4e2e93de2c5e5e7498c84322bd1ab33560"
+    },
+    {
+      "path": "lib/services/bulk-import-service.ts",
+      "sha256": "f430e87c282f7420b1751f0c3044631706961f3e294cce427e128bfacfdc82e9"
+    },
+    {
+      "path": "lib/services/crm-service.ts",
+      "sha256": "5bdc6a9a4fa836a9c379d8c3d5c5bf03a5371bd598275d574d96e749e3d22e21"
+    },
+    {
+      "path": "lib/utils/phone-validation.ts",
+      "sha256": "e97847a57dec71a92d28bc3498f38d0d26a09937c9ecfeec8f0a3940c12ecc5c"
+    },
+    {
+      "path": "types/index.ts",
+      "sha256": "6862ed50047bc5fd0ce8a0d773f2db25082c2e8359cc391bb56fffda026ced6e"
+    },
+    {
+      "path": "supabase/migrations/20261103_prevent_duplicate_leads.sql",
+      "sha256": "eeb6a4f34df033231c4d6fef693a35c522f33914c7ad11f70eb6bb7e258b65e4"
+    },
+    {
+      "path": "tests/crm-duplicate-lead-prevention.test.ts",
+      "sha256": "6f05b8b6f6a1e48ae285f1f8498ead59eceb65ebda790782d54673f35439890c"
+    }
+  ]
+}

@@ -1,0 +1,1701 @@
+[
+  {
+    "id": 1,
+    "scenario": "Valid 10-digit Indian number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-001 accepts all valid Indian prefixes including national numbers beginning 91: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-001 accepts all valid Indian prefixes including national numbers beginning 91"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Accept every valid 10-digit Indian mobile, including a national number beginning 91."
+  },
+  {
+    "id": 2,
+    "scenario": "Fewer than 10 digits.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-2 rejects invalid mobile 987654321: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-2 rejects invalid mobile 987654321"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject numbers shorter than 10 Indian national digits."
+  },
+  {
+    "id": 3,
+    "scenario": "More than 10 digits.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-3 rejects invalid mobile 98765432101: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-3 rejects invalid mobile 98765432101"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject overlength Indian national numbers after valid formatting normalization."
+  },
+  {
+    "id": 4,
+    "scenario": "Number beginning with 0–5.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-4 rejects invalid mobile 5123456789: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-4 rejects invalid mobile 5123456789"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject 10-digit Indian numbers beginning 0–5."
+  },
+  {
+    "id": 5,
+    "scenario": "Alphabetic characters.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-5 rejects invalid mobile 98765abcde: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-5 rejects invalid mobile 98765abcde"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject alphabetic phone characters."
+  },
+  {
+    "id": 6,
+    "scenario": "Special characters.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-6 rejects invalid mobile 98765@3210: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-6 rejects invalid mobile 98765@3210"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject unsupported special characters."
+  },
+  {
+    "id": 7,
+    "scenario": "Empty number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-7 rejects invalid mobile : passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-7 rejects invalid mobile "
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject empty mandatory mobile."
+  },
+  {
+    "id": 8,
+    "scenario": "Spaces and formatting.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-008 normalizes formatting: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-008 normalizes formatting"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Normalize spaces, parentheses and permitted formatting consistently."
+  },
+  {
+    "id": 9,
+    "scenario": "Duplicate number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-009-060 rejects duplicate without relying on a client flag: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-009-060 rejects duplicate without relying on a client flag"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject a duplicate normalized mobile without requiring a client flag."
+  },
+  {
+    "id": 10,
+    "scenario": "International numbers.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-010 supports international numbers without exceeding E164 total length: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-010 supports international numbers without exceeding E164 total length"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Accept international numbers and enforce the total international digit limit."
+  },
+  {
+    "id": 11,
+    "scenario": "Country code change after entering a number.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "country change revalidates existing number: PASS",
+    "evidence": [
+      "browser-results.json :: country change revalidates existing number"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Revalidate an entered number after changing its country code."
+  },
+  {
+    "id": 12,
+    "scenario": "Number normalization and persistence.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-012-017-042-052-057-065 creates and persists normalized lead fields: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-012-017-042-052-057-065 creates and persists normalized lead fields"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Persist normalized phone values."
+  },
+  {
+    "id": 13,
+    "scenario": "Default +91.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "default India country code: PASS",
+    "evidence": [
+      "browser-results.json :: default India country code"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Default the country selector to India +91."
+  },
+  {
+    "id": 14,
+    "scenario": "Searchable dropdown.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "search and choose UAE: PASS",
+    "evidence": [
+      "browser-results.json :: search and choose UAE"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Search country names and codes in the dropdown."
+  },
+  {
+    "id": 15,
+    "scenario": "Country selection.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "search and choose UAE: PASS",
+    "evidence": [
+      "browser-results.json :: search and choose UAE"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Apply the selected country code."
+  },
+  {
+    "id": 16,
+    "scenario": "International dialing codes.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "search and choose UAE: PASS",
+    "evidence": [
+      "browser-results.json :: search and choose UAE"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Expose and use supported international dialing codes."
+  },
+  {
+    "id": 17,
+    "scenario": "Saved country code.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-012-017-042-052-057-065 creates and persists normalized lead fields: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-012-017-042-052-057-065 creates and persists normalized lead fields"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Persist the selected country code."
+  },
+  {
+    "id": 18,
+    "scenario": "Edit existing lead.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "edit saved country and YouTube via Candidate Information: PASS",
+    "evidence": [
+      "browser-followup.json :: edit saved country and YouTube via Candidate Information"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Restore the saved country code when editing."
+  },
+  {
+    "id": 19,
+    "scenario": "Invalid country code.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-019 rejects invalid country codes on server: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-019 rejects invalid country codes on server"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject invalid country codes at the backend."
+  },
+  {
+    "id": 20,
+    "scenario": "Existing legacy phone numbers.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-020 parses historical formatted and national phones: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-020 parses historical formatted and national phones"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Read supported legacy stored phone formats."
+  },
+  {
+    "id": 21,
+    "scenario": "Online selection.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "training mode offers only Online and Offline: PASS",
+    "evidence": [
+      "browser-results.json :: training mode offers only Online and Offline"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Allow Online selection."
+  },
+  {
+    "id": 22,
+    "scenario": "Offline selection.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "training mode offers only Online and Offline: PASS",
+    "evidence": [
+      "browser-results.json :: training mode offers only Online and Offline"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Allow Offline selection."
+  },
+  {
+    "id": 23,
+    "scenario": "Hybrid unavailable for new leads.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "training mode offers only Online and Offline: PASS",
+    "evidence": [
+      "browser-results.json :: training mode offers only Online and Offline"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Do not offer Hybrid for new leads."
+  },
+  {
+    "id": 24,
+    "scenario": "Invalid mode rejected by backend.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-024 rejects new training mode Hybrid on backend: passed; CRM-024 rejects new training mode INVALID on backend: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-024 rejects new training mode Hybrid on backend",
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-024 rejects new training mode INVALID on backend"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject unsupported training mode on the backend, including new Hybrid."
+  },
+  {
+    "id": 25,
+    "scenario": "Mode saved correctly.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-025 stores training mode Online: passed; CRM-025 stores training mode Offline: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-025 stores training mode Online",
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-025 stores training mode Offline"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Persist the selected training mode."
+  },
+  {
+    "id": 26,
+    "scenario": "Mode updated correctly.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-026 updates Online to Offline: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-026 updates Online to Offline"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Update training mode correctly."
+  },
+  {
+    "id": 27,
+    "scenario": "Legacy Hybrid records remain readable.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-027 reads historical Hybrid unchanged: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-027 reads historical Hybrid unchanged"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Keep historical Hybrid records readable."
+  },
+  {
+    "id": 28,
+    "scenario": "CRM-to-admission mapping compatibility.",
+    "status": "PASS",
+    "layer": "Application mapping verified",
+    "actual": "Offline mode mapped to Classroom before insert into admissions table, conforming to admissions_training_mode_check constraint.",
+    "evidence": [
+      "lib/services/admission-service.ts:718; tests/crm-e2e-audit.test.ts :: CRM-028"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Map lead modes to values accepted by the admission backend/database."
+  },
+  {
+    "id": 29,
+    "scenario": "YouTube option available.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "YouTube source option: PASS",
+    "evidence": [
+      "browser-results.json :: YouTube source option"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Offer YouTube as a lead source."
+  },
+  {
+    "id": 30,
+    "scenario": "YouTube selection saved.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-030 saves YouTube source: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-030 saves YouTube source"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Persist YouTube source."
+  },
+  {
+    "id": 31,
+    "scenario": "Existing lead sources retained.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-031 retains every existing source: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-031 retains every existing source"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Retain all existing source options."
+  },
+  {
+    "id": 32,
+    "scenario": "YouTube available in Edit Lead.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "edit saved country and YouTube via Candidate Information: PASS",
+    "evidence": [
+      "browser-followup.json :: edit saved country and YouTube via Candidate Information"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Offer and restore YouTube in Edit Lead."
+  },
+  {
+    "id": 33,
+    "scenario": "YouTube appears correctly in reports.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "CSV report retains YouTube source: PASS",
+    "evidence": [
+      "browser-results.json :: CSV report retains YouTube source"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Include YouTube correctly in the CRM report/export."
+  },
+  {
+    "id": 34,
+    "scenario": "YouTube filter works.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "YouTube filter includes saved lead: PASS",
+    "evidence": [
+      "browser-results.json :: YouTube filter includes saved lead"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Filter YouTube leads correctly."
+  },
+  {
+    "id": 35,
+    "scenario": "Invalid source rejected.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-035 rejects invalid source at API: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-035 rejects invalid source at API"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject invalid lead source on the backend."
+  },
+  {
+    "id": 36,
+    "scenario": "Source retained after admission conversion.",
+    "status": "BLOCKED",
+    "layer": "Partial local coverage",
+    "actual": "Lead source survives local lead storage, but source attribution after a fresh committed admission reload was not specifically asserted. Live admissions has no lead_id column.",
+    "evidence": [
+      "live-schema.json; vitest.json :: crm-conversion-button.test.ts"
+    ],
+    "root": "End-to-end attribution coverage and durable relation incomplete.",
+    "fix": "Verify source linkage after conversion/reload in isolated staging.",
+    "expected": "Retain source attribution through a committed admission conversion."
+  },
+  {
+    "id": 37,
+    "scenario": "Fresher.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "four current status selections: PASS",
+    "evidence": [
+      "browser-results.json :: four current status selections"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Accept and persist Fresher."
+  },
+  {
+    "id": 38,
+    "scenario": "Career Gap.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "four current status selections: PASS",
+    "evidence": [
+      "browser-results.json :: four current status selections"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Accept and persist Career Gap."
+  },
+  {
+    "id": 39,
+    "scenario": "Working Professional.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "four current status selections: PASS",
+    "evidence": [
+      "browser-results.json :: four current status selections"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Accept and persist Working Professional."
+  },
+  {
+    "id": 40,
+    "scenario": "Experienced + Career Gap.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "four current status selections: PASS",
+    "evidence": [
+      "browser-results.json :: four current status selections"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Accept and persist Experienced + Career Gap."
+  },
+  {
+    "id": 41,
+    "scenario": "Required-field validation according to approved business rules.",
+    "status": "BLOCKED",
+    "layer": "Business rule prerequisite",
+    "actual": "UI preselects a current status; no approved rule for whether an omitted status should be rejected was supplied. Backend invalid-status rejection fails separately in CRM-044.",
+    "evidence": [
+      "app/(dashboard)/crm/leads/page.tsx:1452"
+    ],
+    "root": "Required/default policy is not independently confirmed.",
+    "fix": "Confirm required/default behavior and add its server/UI contract test.",
+    "expected": "Enforce the approved required-field policy for current status."
+  },
+  {
+    "id": 42,
+    "scenario": "Save and reload.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-012-017-042-052-057-065 creates and persists normalized lead fields: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-012-017-042-052-057-065 creates and persists normalized lead fields"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Persist and reload current status."
+  },
+  {
+    "id": 43,
+    "scenario": "Edit and update.",
+    "status": "PASS",
+    "layer": "Unit / isolated service",
+    "actual": "Current status edited to Career Gap while pipeline remained Interested.",
+    "evidence": [
+      "audit-tests.json :: CRM-045 editing current status leaves pipeline stage intact"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Edit and save current status."
+  },
+  {
+    "id": 44,
+    "scenario": "Invalid status.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-044 rejects invalid current status at API: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-044 rejects invalid current status at API"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject invalid current status."
+  },
+  {
+    "id": 45,
+    "scenario": "Current Status does not overwrite CRM pipeline stage.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-045 editing current status leaves pipeline stage intact: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-045 editing current status leaves pipeline stage intact"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Keep current status distinct from pipeline stage."
+  },
+  {
+    "id": 46,
+    "scenario": "Legacy status compatibility.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-046 legacy current status stays readable: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-046 legacy current status stays readable"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Read legacy current status values."
+  },
+  {
+    "id": 47,
+    "scenario": "Same as mobile checkbox.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "same WhatsApp follows mobile: PASS",
+    "evidence": [
+      "browser-results.json :: same WhatsApp follows mobile"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Use mobile for WhatsApp when the checkbox is selected."
+  },
+  {
+    "id": 48,
+    "scenario": "Different WhatsApp number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-048-049 saves independent WhatsApp country and number: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-048-049 saves independent WhatsApp country and number"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Allow a different WhatsApp number."
+  },
+  {
+    "id": 49,
+    "scenario": "Independent country code.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-048-049 saves independent WhatsApp country and number: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-048-049 saves independent WhatsApp country and number"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Validate and save an independent WhatsApp country code."
+  },
+  {
+    "id": 50,
+    "scenario": "Invalid WhatsApp number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-050 rejects invalid WhatsApp: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-050 rejects invalid WhatsApp"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject invalid WhatsApp number."
+  },
+  {
+    "id": 51,
+    "scenario": "Empty optional WhatsApp number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-051 permits optional empty WhatsApp and uses mobile: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-051 permits optional empty WhatsApp and uses mobile"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Allow empty optional WhatsApp input."
+  },
+  {
+    "id": 52,
+    "scenario": "WhatsApp number saved.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-012-017-042-052-057-065 creates and persists normalized lead fields: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-012-017-042-052-057-065 creates and persists normalized lead fields"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Persist WhatsApp number."
+  },
+  {
+    "id": 53,
+    "scenario": "WhatsApp number updated.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-053 updates WhatsApp independently: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-053 updates WhatsApp independently"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Update WhatsApp independently."
+  },
+  {
+    "id": 54,
+    "scenario": "Correct WhatsApp contact action.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-054 computes intended WhatsApp contact digits: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-054 computes intended WhatsApp contact digits"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Generate the correct WhatsApp destination."
+  },
+  {
+    "id": 55,
+    "scenario": "Mobile number change when same-number checkbox is enabled.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "same WhatsApp follows mobile: PASS",
+    "evidence": [
+      "browser-results.json :: same WhatsApp follows mobile"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Keep same-number WhatsApp synchronized after mobile changes."
+  },
+  {
+    "id": 56,
+    "scenario": "Checkbox toggle without losing entered data.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "WhatsApp toggle preserves distinct entered number: PASS",
+    "evidence": [
+      "browser-results.json :: WhatsApp toggle preserves distinct entered number"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Preserve a distinct typed WhatsApp number across checkbox toggles."
+  },
+  {
+    "id": 57,
+    "scenario": "Create lead with valid data.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "create lead double click only submits once: PASS",
+    "evidence": [
+      "browser-results.json :: create lead double click only submits once"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Create a valid lead successfully."
+  },
+  {
+    "id": 58,
+    "scenario": "Required fields missing.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-058 rejects missing required full_name: passed; CRM-058 rejects missing required phone: passed; CRM-058 rejects missing required email: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-058 rejects missing required full_name",
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-058 rejects missing required phone",
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-058 rejects missing required email"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject missing mandatory fields on the backend."
+  },
+  {
+    "id": 59,
+    "scenario": "Invalid email.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-059 rejects invalid email at API: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-059 rejects invalid email at API"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject invalid email on the backend."
+  },
+  {
+    "id": 60,
+    "scenario": "Duplicate lead.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-009-060 rejects duplicate without relying on a client flag: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-009-060 rejects duplicate without relying on a client flag"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject duplicate lead submission without trusting client flags."
+  },
+  {
+    "id": 61,
+    "scenario": "Double-click Save.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "create lead double click only submits once: PASS",
+    "evidence": [
+      "browser-results.json :: create lead double click only submits once"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Prevent duplicate records from double-click/retry."
+  },
+  {
+    "id": 62,
+    "scenario": "Network timeout.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "network failure retains create form: PASS",
+    "evidence": [
+      "browser-results.json :: network failure retains create form"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Fail safely on network timeout."
+  },
+  {
+    "id": 63,
+    "scenario": "Database error.",
+    "status": "PASS",
+    "layer": "Mocked Supabase integration",
+    "actual": "CRM-063 creation database failure fails without local lead: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-database-failure-audit.test.ts :: CRM-063 creation database failure fails without local lead"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Fail safely on database creation error."
+  },
+  {
+    "id": 64,
+    "scenario": "Unauthorized submission.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-064 rejects unauthenticated creation: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-064 rejects unauthenticated creation"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject unauthenticated creation."
+  },
+  {
+    "id": 65,
+    "scenario": "Successful lead ID generation.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "create lead double click only submits once: PASS",
+    "evidence": [
+      "browser-results.json :: create lead double click only submits once"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Generate a unique valid lead ID/code."
+  },
+  {
+    "id": 66,
+    "scenario": "Form reset after successful creation.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "successful creation resets all create fields to defaults: PASS",
+    "evidence": [
+      "browser-results.json :: successful creation resets all create fields to defaults"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Reset creation fields to defaults after successful creation."
+  },
+  {
+    "id": 67,
+    "scenario": "Form retains data after failed submission.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "network failure retains create form: PASS",
+    "evidence": [
+      "browser-results.json :: network failure retains create form"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Preserve user input and previous saved values after failure."
+  },
+  {
+    "id": 68,
+    "scenario": "No false success messages.",
+    "status": "PASS",
+    "layer": "Mocked Supabase integration",
+    "actual": "CRM-068 missing-column errors must not silently drop enhanced fields and report success: passed; CRM-067-068 failed edit preserves original data and reports failure: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-database-failure-audit.test.ts :: CRM-068 missing-column errors must not silently drop enhanced fields and report success",
+      "audit-tests.json :: crm-e2e-database-failure-audit.test.ts :: CRM-067-068 failed edit preserves original data and reports failure"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Do not report success when persistence fails or enhanced fields are dropped."
+  },
+  {
+    "id": 69,
+    "scenario": "Edit lead.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "edit saved country and YouTube via Candidate Information: PASS",
+    "evidence": [
+      "browser-followup.json :: edit saved country and YouTube via Candidate Information"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Open and edit an existing lead."
+  },
+  {
+    "id": 70,
+    "scenario": "Save updates.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-069-070-072 edits and persists details: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-069-070-072 edits and persists details"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Save lead updates."
+  },
+  {
+    "id": 71,
+    "scenario": "Cancel editing.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "cancel editing preserves original name: PASS",
+    "evidence": [
+      "browser-followup.json :: cancel editing preserves original name"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Cancel editing without changing saved values."
+  },
+  {
+    "id": 72,
+    "scenario": "Refresh and verify persistence.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "refresh and name search preserve saved lead: PASS",
+    "evidence": [
+      "browser-results.json :: refresh and name search preserve saved lead"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Reload and observe persisted changes."
+  },
+  {
+    "id": 73,
+    "scenario": "Search by name.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "refresh and name search preserve saved lead: PASS",
+    "evidence": [
+      "browser-results.json :: refresh and name search preserve saved lead"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Search by name."
+  },
+  {
+    "id": 74,
+    "scenario": "Search by mobile number.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-074 mobile search accepts unformatted national number: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-074 mobile search accepts unformatted national number"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Search by unformatted national mobile number."
+  },
+  {
+    "id": 75,
+    "scenario": "Filter by source.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "YouTube filter includes saved lead: PASS",
+    "evidence": [
+      "browser-results.json :: YouTube filter includes saved lead"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Filter by source."
+  },
+  {
+    "id": 76,
+    "scenario": "Filter by pipeline stage.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-076 filters stage: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-076 filters stage"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Filter by pipeline stage."
+  },
+  {
+    "id": 77,
+    "scenario": "Update lead stage.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-077-078-079 updates stage and completes followup: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-077-078-079 updates stage and completes followup"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Update pipeline stage."
+  },
+  {
+    "id": 78,
+    "scenario": "Create follow-up.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-077-078-079 updates stage and completes followup: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-077-078-079 updates stage and completes followup"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Create a follow-up with date and notes."
+  },
+  {
+    "id": 79,
+    "scenario": "Update follow-up.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-077-078-079 updates stage and completes followup: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-077-078-079 updates stage and completes followup"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Update or complete a follow-up."
+  },
+  {
+    "id": 80,
+    "scenario": "Verify counsellor ownership and permissions.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-080-102 counsellor cannot edit another owner lead: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-080-102 counsellor cannot edit another owner lead"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Enforce counsellor ownership and role authorization."
+  },
+  {
+    "id": 81,
+    "scenario": "Convert valid lead.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Admission created with lead_id; lead stage and admission note updated after successful local workflow.",
+    "evidence": [
+      "vitest.json :: crm-conversion-button.test.ts :: CRM Conversion Button & Authoritative Admission Verification 2. Successful conversion creates admission with lead_id, marks lead Converted, and records note"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Convert a valid lead through the admission workflow."
+  },
+  {
+    "id": 82,
+    "scenario": "Prefill student name.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "primary admission conversion prefills identity, country prefix, mode and course: PASS",
+    "evidence": [
+      "browser-followup.json :: primary admission conversion prefills identity, country prefix, mode and course"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Prefill student name."
+  },
+  {
+    "id": 83,
+    "scenario": "Prefill mobile and email.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "primary admission conversion prefills identity, country prefix, mode and course: PASS",
+    "evidence": [
+      "browser-followup.json :: primary admission conversion prefills identity, country prefix, mode and course"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Prefill phone and email."
+  },
+  {
+    "id": 84,
+    "scenario": "Preserve country code.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "primary admission conversion prefills identity, country prefix, mode and course: PASS",
+    "evidence": [
+      "browser-followup.json :: primary admission conversion prefills identity, country prefix, mode and course"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Preserve the country prefix through conversion."
+  },
+  {
+    "id": 85,
+    "scenario": "Preserve WhatsApp number where supported.",
+    "status": "BLOCKED",
+    "layer": "Unsupported admission field",
+    "actual": "Lead supports a separate WhatsApp contact; current admission input/schema has no separate WhatsApp field. No preservation claim made.",
+    "evidence": [
+      "lib/services/admission-service.ts:180; live-schema.json"
+    ],
+    "root": "Destination storage does not support the separate contact.",
+    "fix": "Define intended contact propagation and schema before asserting this scenario.",
+    "expected": "Preserve a distinct WhatsApp contact where admission storage supports it."
+  },
+  {
+    "id": 86,
+    "scenario": "Preserve training mode.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "primary admission conversion prefills identity, country prefix, mode and course: PASS",
+    "evidence": [
+      "browser-followup.json :: primary admission conversion prefills identity, country prefix, mode and course"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Preserve selected training mode in admission prefill."
+  },
+  {
+    "id": 87,
+    "scenario": "Preserve selected course.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "primary admission conversion prefills identity, country prefix, mode and course: PASS",
+    "evidence": [
+      "browser-followup.json :: primary admission conversion prefills identity, country prefix, mode and course"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Preserve selected course in admission prefill."
+  },
+  {
+    "id": 88,
+    "scenario": "Validate fee and discount.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "45000 course fee less 5000 discount produces 40000 net payable and matching initial payment.",
+    "evidence": [
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 10. Discount and net payable calculations remain correct with optional due date"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Validate fee/discount and calculate net payable correctly."
+  },
+  {
+    "id": 89,
+    "scenario": "Validate due-date rules.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "11 due-date and payment-plan cases passed, including missing/invalid/pre-admission dates.",
+    "evidence": [
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 1. Full payment collected upfront: fee due date is optional when omitted",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 2. Full payment collected upfront with an optional valid due date: accepts and preserves due date",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 3. Partial payment collected: fee due date is required and succeeds when valid",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 4. Partial payment with missing due date: validation fails with clear field error",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 5. Pay Later (uncollected upfront) with valid due date: succeeds",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 6. Pay Later with missing due date: validation fails with clear error",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 7. Pay Later preset (collectInitialPayment === true but amount === 0): requires due date",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 8. Due date before admission date: validation fails and service rejects",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 9. Malformed date string: validation fails and service rejects",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 10. Discount and net payable calculations remain correct with optional due date",
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 11. CRM lead conversion with full payment upfront and omitted due date updates lead correctly"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Enforce full/partial/pay-later due-date rules."
+  },
+  {
+    "id": 90,
+    "scenario": "Full payment.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Full upfront payment accepts omitted due date.",
+    "evidence": [
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 1. Full payment collected upfront: fee due date is optional when omitted"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Support full upfront payment."
+  },
+  {
+    "id": 91,
+    "scenario": "Partial payment.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Partial upfront payment succeeds with valid required due date.",
+    "evidence": [
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 3. Partial payment collected: fee due date is required and succeeds when valid"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Support partial upfront payment."
+  },
+  {
+    "id": 92,
+    "scenario": "Pay Later.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "No upfront collection succeeds with valid required due date.",
+    "evidence": [
+      "vitest.json :: admission-fee-due-date.test.ts :: Admission Fee Due Date Validation & Institute Business Rules 5. Pay Later (uncollected upfront) with valid due date: succeeds"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Support Pay Later with valid due date."
+  },
+  {
+    "id": 93,
+    "scenario": "Payment approval workflow.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "45 payment cases passed, including explicit manual approval, authorization, duplicate protection and failure rollback.",
+    "evidence": [
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval preserves historical schedule records while new payments use the account balance",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval keeps registration inactive and submitted payments out of verified balances and receipts",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval reconciles pending legacy records repeatedly without approval or duplicates",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval approves once, updates the balance, creates one receipt and assigns onboarding without activation",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval enforces roles, separation of duties, inactive accounts, and tenant boundaries",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval requires a rejection reason and preserves history across correction and approval",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval supports partial payments against one balance and rechecks it at approval",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval rejects invalid amounts, duplicate references, and mismatched enrollments",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval settles decimal partial payments without floating-point overpayment errors",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval does not forward an unapproved admission and gates LMS provisioning",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval rolls back balances, receipt, history and onboarding on a failed durable commit",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval serializes simultaneous approvals without duplicate financial entries",
+      "vitest.json :: payment-approval-automation.test.ts :: Payment API trust boundary denies proof downloads across tenants and path traversal",
+      "vitest.json :: payment-approval-automation.test.ts :: Payment API trust boundary rejects forged bearer identities and unsigned cookies",
+      "vitest.json :: payment-approval-automation.test.ts :: Payment API trust boundary validates optional proof, retains a submission across duplicate requests, and exposes it to Accounts",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves UPI without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Credit Card without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Debit Card without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Net Banking without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Cash without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Bank Transfer without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Cheque without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects UPI admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Credit Card admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Debit Card admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Net Banking admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Bank Transfer admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Cheque admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification strips stale reference and proof from cash on the server and defaults the actual date",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification requires a positive collection amount (undefined)",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification requires a positive collection amount (0)",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification requires a positive collection amount (-1)",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears UPI fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Credit Card fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Debit Card fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Net Banking fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Bank Transfer fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Cheque fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification blocks mismatched amount/date and missing verification for Cash",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification blocks mismatched amount/date and missing verification for UPI",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects a wrong noncash UTR before financial changes",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification uses the institute calendar date across UTC midnight boundaries",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification never carries reference or proof through cash when switching among all seven modes",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification normalizes reference whitespace and case for manual approval",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification blocks legacy noncash payments with a missing original reference"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Require Accounts verification before financial clearance."
+  },
+  {
+    "id": 94,
+    "scenario": "Lead marked Converted only after successful admission creation.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-094 conversion preparation must not mark lead Converted before admission commits: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-094 conversion preparation must not mark lead Converted before admission commits"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Mark Converted only after successful admission creation."
+  },
+  {
+    "id": 95,
+    "scenario": "Prevent duplicate admission.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Repeated admission creation using the same lead ID does not duplicate records.",
+    "evidence": [
+      "vitest.json :: crm-conversion-button.test.ts :: CRM Conversion Button & Authoritative Admission Verification 6. Double-click / retry idempotency: creating admission twice with same lead_id returns existing admission without duplicates"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Prevent duplicate admissions for the same lead/retry."
+  },
+  {
+    "id": 96,
+    "scenario": "Hide conversion actions for converted leads.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "converted lead hides conversion actions: PASS",
+    "evidence": [
+      "browser-followup.json :: converted lead hides conversion actions"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Hide conversion actions for converted leads."
+  },
+  {
+    "id": 97,
+    "scenario": "Handle conversion failure without partial or duplicate records.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Failed local conversion validation does not falsely mark the lead converted. Live DB rollback remains unverified.",
+    "evidence": [
+      "vitest.json :: crm-conversion-button.test.ts :: CRM Conversion Button & Authoritative Admission Verification 5. Failed conversion validation does not falsely mark lead as converted"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Fail conversion safely without partial/duplicate local records."
+  },
+  {
+    "id": 98,
+    "scenario": "Schema compatibility.",
+    "status": "FAIL",
+    "layer": "Live database metadata SELECT",
+    "actual": "Live leads lacks canonical_phone, idempotency_key, is_repeat_inquiry, repeat_inquiry_reason, original_lead_id and tenant_id. Admissions lacks lead_id and separate WhatsApp/country fields.",
+    "evidence": [
+      "live-schema.json"
+    ],
+    "root": "F12/F13: deployed schema does not support all enhancement payload/relationship fields.",
+    "fix": "Prepare reviewed compatible migrations and verify in isolated staging.",
+    "expected": "Live schema must support every field written by the enhancements."
+  },
+  {
+    "id": 99,
+    "scenario": "Database constraints.",
+    "status": "FAIL",
+    "layer": "Live database metadata SELECT",
+    "actual": "No canonical-phone or idempotency index exists; current_status has no CHECK. New Hybrid remains DB-allowed for legacy compatibility.",
+    "evidence": [
+      "live-schema.json :: constraints/indexes"
+    ],
+    "root": "F03/F12: database guarantees are missing; application must distinguish new vs legacy records.",
+    "fix": "Review and correct pending uniqueness/idempotency migration before staging validation.",
+    "expected": "Live constraints/indexes must support validation and duplicate/idempotency guarantees."
+  },
+  {
+    "id": 100,
+    "scenario": "RLS read permissions.",
+    "status": "BLOCKED",
+    "layer": "Live authenticated integration unavailable",
+    "actual": "Configured staging project neiccpnxftfmmwnvtgdy is absent from accessible project lists; get_project returned permission denied. Production RLS metadata read only; no role/tenant write probes were run.",
+    "evidence": [
+      "staging-access.json; live-schema.json"
+    ],
+    "root": "No verified accessible isolated database with tenant test identities.",
+    "fix": "Provide access to verified isolated staging and run native authenticated RLS tests.",
+    "expected": "Verify authenticated RLS read restrictions using isolated tenant identities."
+  },
+  {
+    "id": 101,
+    "scenario": "RLS write permissions.",
+    "status": "BLOCKED",
+    "layer": "Live authenticated integration unavailable",
+    "actual": "Configured staging project neiccpnxftfmmwnvtgdy is absent from accessible project lists; get_project returned permission denied. Production RLS metadata read only; no role/tenant write probes were run.",
+    "evidence": [
+      "staging-access.json; live-schema.json"
+    ],
+    "root": "No verified accessible isolated database with tenant test identities.",
+    "fix": "Provide access to verified isolated staging and run native authenticated RLS tests.",
+    "expected": "Verify authenticated RLS write restrictions using isolated tenant identities."
+  },
+  {
+    "id": 102,
+    "scenario": "Counsellor role restrictions.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-080-102 counsellor cannot edit another owner lead: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-080-102 counsellor cannot edit another owner lead"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Restrict counsellors to authorized records and operations."
+  },
+  {
+    "id": 103,
+    "scenario": "Admin role permissions.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-103 admin may create lead: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-103 admin may create lead"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Permit authorized admin operations."
+  },
+  {
+    "id": 104,
+    "scenario": "Cross-tenant access rejection.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-104 rejects cross-tenant lead edit even by default tenant staff: passed; CRM-104 list excludes another tenant records: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-104 rejects cross-tenant lead edit even by default tenant staff",
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-104 list excludes another tenant records"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject cross-tenant reads and edits."
+  },
+  {
+    "id": 105,
+    "scenario": "Invalid UUID handling.",
+    "status": "PASS",
+    "layer": "Unit / isolated API-service",
+    "actual": "CRM-105 rejects malformed course UUID without silently losing assignment: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-audit.test.ts :: CRM-105 rejects malformed course UUID without silently losing assignment"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Reject malformed identifiers rather than losing an assignment."
+  },
+  {
+    "id": 106,
+    "scenario": "Legacy course ID handling.",
+    "status": "PASS",
+    "layer": "Mocked Supabase integration",
+    "actual": "CRM-106 legacy course assignments must not be silently stored as NULL: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-database-failure-audit.test.ts :: CRM-106 legacy course assignments must not be silently stored as NULL"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Resolve verified legacy course assignments without storing NULL."
+  },
+  {
+    "id": 107,
+    "scenario": "Transaction rollback on failure.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Injected durable commit failure rolls back balances, receipt, history and onboarding. This is local transaction evidence, not live PostgreSQL rollback.",
+    "evidence": [
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval rolls back balances, receipt, history and onboarding on a failed durable commit"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Roll back transactional financial changes after commit failure."
+  },
+  {
+    "id": 108,
+    "scenario": "Sensitive error information not exposed.",
+    "status": "PASS",
+    "layer": "Mocked Supabase integration",
+    "actual": "CRM-108 database errors must not expose internal schema details: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-database-failure-audit.test.ts :: CRM-108 database errors must not expose internal schema details"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Return safe errors without internal database details."
+  },
+  {
+    "id": 109,
+    "scenario": "Existing CRM leads.",
+    "status": "PASS",
+    "layer": "Mocked Supabase integration",
+    "actual": "CRM-109 database read failures must not return cached leads as authoritative: passed",
+    "evidence": [
+      "audit-tests.json :: crm-e2e-database-failure-audit.test.ts :: CRM-109 database read failures must not return cached leads as authoritative"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "Read existing leads without masking database errors using cached data."
+  },
+  {
+    "id": 110,
+    "scenario": "Existing admissions.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "Admission created with lead_id; lead stage and admission note updated after successful local workflow.",
+    "evidence": [
+      "vitest.json :: crm-conversion-button.test.ts :: CRM Conversion Button & Authoritative Admission Verification 2. Successful conversion creates admission with lead_id, marks lead Converted, and records note"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Preserve existing admission workflow regressions."
+  },
+  {
+    "id": 111,
+    "scenario": "Student fee ledger.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "All four local dual-ledger regression cases passed.",
+    "evidence": [
+      "vitest.json :: dual-ledger-sync.test.ts :: Dual-Ledger Bi-Directional Financial Synchronization Suite 1. Admissions Creation Bridges Both Ledgers automatically generates both legacy feeAccount/installments and approved StudentFee/ledger on admission",
+      "vitest.json :: dual-ledger-sync.test.ts :: Dual-Ledger Bi-Directional Financial Synchronization Suite 2. Advanced Workflow Payment Finalization Updates Legacy Store updates legacy feeAccount, installments, payments, and student profile when payment verified",
+      "vitest.json :: dual-ledger-sync.test.ts :: Dual-Ledger Bi-Directional Financial Synchronization Suite 3. Legacy recordPaymentAtomic Updates Advanced Store updates StudentFee balances, pushes verified StudentPaymentRecord, and posts to studentFinancialLedgers",
+      "vitest.json :: dual-ledger-sync.test.ts :: Dual-Ledger Bi-Directional Financial Synchronization Suite 4. Self-Healing Dual-Ledger Reconciliation on Store Hydration reconciles any orphaned legacy fee account or payment into advanced store"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Preserve student fee ledger regressions."
+  },
+  {
+    "id": 112,
+    "scenario": "Payment approvals.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "45 payment cases passed, including explicit manual approval, authorization, duplicate protection and failure rollback.",
+    "evidence": [
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval preserves historical schedule records while new payments use the account balance",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval keeps registration inactive and submitted payments out of verified balances and receipts",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval reconciles pending legacy records repeatedly without approval or duplicates",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval approves once, updates the balance, creates one receipt and assigns onboarding without activation",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval enforces roles, separation of duties, inactive accounts, and tenant boundaries",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval requires a rejection reason and preserves history across correction and approval",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval supports partial payments against one balance and rechecks it at approval",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval rejects invalid amounts, duplicate references, and mismatched enrollments",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval settles decimal partial payments without floating-point overpayment errors",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval does not forward an unapproved admission and gates LMS provisioning",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval rolls back balances, receipt, history and onboarding on a failed durable commit",
+      "vitest.json :: payment-approval-automation.test.ts :: Automated payment approval serializes simultaneous approvals without duplicate financial entries",
+      "vitest.json :: payment-approval-automation.test.ts :: Payment API trust boundary denies proof downloads across tenants and path traversal",
+      "vitest.json :: payment-approval-automation.test.ts :: Payment API trust boundary rejects forged bearer identities and unsigned cookies",
+      "vitest.json :: payment-approval-automation.test.ts :: Payment API trust boundary validates optional proof, retains a submission across duplicate requests, and exposes it to Accounts",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves UPI without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Credit Card without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Debit Card without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Net Banking without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Cash without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Bank Transfer without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification admits and explicitly approves Cheque without proof, once only",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects UPI admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Credit Card admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Debit Card admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Net Banking admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Bank Transfer admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects Cheque admission with a missing reference",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification strips stale reference and proof from cash on the server and defaults the actual date",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification requires a positive collection amount (undefined)",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification requires a positive collection amount (0)",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification requires a positive collection amount (-1)",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears UPI fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Credit Card fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Debit Card fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Net Banking fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Bank Transfer fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification clears Cheque fields when updating to cash and requires a reference when switching back",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification blocks mismatched amount/date and missing verification for Cash",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification blocks mismatched amount/date and missing verification for UPI",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification rejects a wrong noncash UTR before financial changes",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification uses the institute calendar date across UTC midnight boundaries",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification never carries reference or proof through cash when switching among all seven modes",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification normalizes reference whitespace and case for manual approval",
+      "vitest.json :: payment-approval-automation.test.ts :: Conditional admission payments and manual Accounts verification blocks legacy noncash payments with a missing original reference"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Preserve payment approval regressions."
+  },
+  {
+    "id": 113,
+    "scenario": "Dashboard statistics.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "All 11 local KPI cases passed; no claim of live dashboard totals.",
+    "evidence": [
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 1 & Card 5: Payment Approval Status & Collections accurately calculates approved payment totals and count",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 1 & Card 5: Payment Approval Status & Collections accurately calculates pending payment totals and count awaiting approval",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 1 & Card 5: Payment Approval Status & Collections strictly excludes rejected, failed, voided, and refunded payments",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 1 & Card 5: Payment Approval Status & Collections correctly identifies approved vs pending statuses with helpers",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 1 & Card 5: Payment Approval Status & Collections prevents negative amounts and non-finite values from corrupting financial totals",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 6: Student Enrollment Metrics counts new student enrollments in period and deduplicates duplicate admissions for the same student",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 6: Student Enrollment Metrics excludes cancelled, draft, and on-hold admissions from new enrollments count",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 6: Student Enrollment Metrics excludes inactive, dropped, and suspended students from active students count",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Card 6: Student Enrollment Metrics applies course filtering cleanly to both new enrollments and active students",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Course Attribution and Reconciliation correctly maps known courses and isolates unassigned ones",
+      "vitest.json :: dashboard-kpi-cards.test.ts :: Executive Dashboard 6 KPI Cards Metric Calculations Course Attribution and Reconciliation resolves payment course bucket prioritizing payment course, then fee account, then student"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Preserve dashboard statistic regressions."
+  },
+  {
+    "id": 114,
+    "scenario": "Course reconciliation.",
+    "status": "BLOCKED",
+    "layer": "Partial local regression",
+    "actual": "Five canonical/unknown-course metric tests passed. No verified legacy-to-canonical resolver exists in this checkout; full legacy reconciliation was not verified.",
+    "evidence": [
+      "vitest.json :: dashboard-metrics.test.ts; lib/utils/dashboard-metrics.ts:3"
+    ],
+    "root": "Verified legacy reconciliation coverage/mapping missing.",
+    "fix": "Restore/implement the verified shared resolver in a separately approved fix and test all legacy mappings.",
+    "expected": "Reconcile canonical, unknown and verified legacy course assignments."
+  },
+  {
+    "id": 115,
+    "scenario": "CRM reports.",
+    "status": "PASS",
+    "layer": "Isolated Chromium / real authenticated API",
+    "actual": "CSV report retains YouTube source: PASS",
+    "evidence": [
+      "browser-results.json :: CSV report retains YouTube source"
+    ],
+    "root": "",
+    "fix": "None for the executed browser scope.",
+    "expected": "Preserve CRM report/source export behavior."
+  },
+  {
+    "id": 116,
+    "scenario": "Student onboarding.",
+    "status": "PASS",
+    "layer": "Existing isolated regression",
+    "actual": "All 22 local onboarding cases passed.",
+    "evidence": [
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 1. Role Management & Default-Deny RBAC Permissions grants onboarding staff operational onboarding permissions",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 1. Role Management & Default-Deny RBAC Permissions strictly denies onboarding staff financial and administrative mutations",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 1. Role Management & Default-Deny RBAC Permissions allows Admin to assign staff, but prohibits Onboarding staff from self-assigning",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 2. Admission Handoff & CRM Eligibility Rules creates an onboarding case after admission confirmation and Accounts approval",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 2. Admission Handoff & CRM Eligibility Rules rejects onboarding initialization for unconfirmed or draft admissions",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 2. Admission Handoff & CRM Eligibility Rules CRM stage change (Closed Won) does NOT automatically create onboarding case",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 2. Admission Handoff & CRM Eligibility Rules prevents duplicate onboarding cases for the same admission (Idempotency)",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 3. Assignment & Staff Scoping Isolation allows Admin to assign a case to an onboarding specialist",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 3. Assignment & Staff Scoping Isolation prohibits unauthorized non-admin from reassigning staff",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 3. Assignment & Staff Scoping Isolation onboarding specialist can view only their own assigned cases",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 3. Assignment & Staff Scoping Isolation onboarding specialist cannot access or update an unassigned case or another specialist case",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion allows assigned specialist to upload and verify documents",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion provisions LMS account idempotently without exposing credentials",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion requires a mandatory reason when placing a case on hold/blocked",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion prohibits completing onboarding if mandatory checklist items are incomplete",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion successfully completes onboarding and logs academic handover when all mandatory items are done",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion defends against unprovisioned student login with clear onboarding guidance",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion computes accurate staff performance and SLA turnaround metrics for administrators",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion strictly denies non-admin users from viewing staff performance analytics",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion accurately identifies and backfills unhandled legacy admissions idempotently for admins",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion strictly denies non-admin users from executing legacy admission backfill",
+      "vitest.json :: onboarding.test.ts :: 24. Student Onboarding Team & Lifecycle Management Tests 4. Checklist Rules, Document Verification & Completion dispatches multi-channel welcome notification and orientation kit via email & whatsapp"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Preserve student onboarding regressions."
+  },
+  {
+    "id": 117,
+    "scenario": "TypeScript compilation.",
+    "status": "PASS",
+    "layer": "Isolated source-copy tool run",
+    "actual": "typecheck: exit 0; 20.082s",
+    "evidence": [
+      "typecheck.log; typecheck-exit.json"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "TypeScript compilation succeeds."
+  },
+  {
+    "id": 118,
+    "scenario": "ESLint.",
+    "status": "PASS",
+    "layer": "Isolated source-copy tool run",
+    "actual": "lint: exit 0; 5.569s; four next/image warnings, zero errors.",
+    "evidence": [
+      "lint.log; lint-exit.json"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "ESLint succeeds with warnings reported."
+  },
+  {
+    "id": 119,
+    "scenario": "Full Vitest suite.",
+    "status": "PASS",
+    "layer": "Vitest: baseline plus added audit coverage",
+    "actual": "Existing full suite: 910 passed / 0 failed across 68 files. Added audit suite: 60 passed / 0 failed. Combined: 970 tests.",
+    "evidence": [
+      "vitest.json",
+      "audit-tests.json"
+    ],
+    "root": "",
+    "fix": "None for the executed local scope.",
+    "expected": "All existing and newly added applicable Vitest tests pass."
+  },
+  {
+    "id": 120,
+    "scenario": "Production build.",
+    "status": "PASS",
+    "layer": "Isolated source-copy tool run",
+    "actual": "build: exit 0; 63.931s",
+    "evidence": [
+      "build.log; build-exit.json"
+    ],
+    "root": "",
+    "fix": "None for the executed scope.",
+    "expected": "Production build succeeds in an isolated copy."
+  }
+]

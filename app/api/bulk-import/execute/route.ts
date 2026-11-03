@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
     let entityType: BulkImportEntityType = 'students';
     let csvContent = '';
     let skipInvalidRows = false;
+    let skipDuplicates = true;
     let userId = auth.user.id;
     let userName = auth.user.full_name;
 
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
       const formData = await req.formData();
       entityType = (formData.get('entityType') as BulkImportEntityType) || 'students';
       skipInvalidRows = formData.get('skipInvalidRows') === 'true';
+      skipDuplicates = formData.get('skipDuplicates') !== 'false';
 
       const file = formData.get('file') as File | null;
       if (!file) {
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
       entityType = body.entityType || 'students';
       csvContent = body.csvContent || '';
       skipInvalidRows = Boolean(body.skipInvalidRows);
+      skipDuplicates = body.skipDuplicates !== undefined ? Boolean(body.skipDuplicates) : true;
     }
 
     if (!csvContent || csvContent.trim().length === 0) {
@@ -47,6 +50,7 @@ export async function POST(req: NextRequest) {
 
     const result = await executeBulkImport(entityType, csvContent, userId, userName, {
       skipInvalidRows,
+      skipDuplicates,
     });
 
     if (!result.success) {

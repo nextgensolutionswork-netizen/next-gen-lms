@@ -46,6 +46,8 @@ import {
   getCanonicalPhoneDigits,
   formatDisplayPhone,
   DEFAULT_COUNTRY,
+  checkDuplicateLead,
+  DuplicateLeadMatch,
 } from '@/lib/utils/phone-validation';
 
 const CURRENT_STATUS_OPTIONS: LeadCurrentStatus[] = [
@@ -140,11 +142,21 @@ export default function LeadsPage() {
   const [phoneError, setPhoneError] = React.useState('');
   const [phoneDuplicateWarning, setPhoneDuplicateWarning] = React.useState('');
 
+  // Duplicate warning & Repeat Inquiry state
+  const [duplicateLeadMatch, setDuplicateLeadMatch] = React.useState<DuplicateLeadMatch | null>(null);
+  const [isRepeatInquiry, setIsRepeatInquiry] = React.useState(false);
+  const [repeatInquiryReason, setRepeatInquiryReason] = React.useState('');
+  const [idempotencyKey, setIdempotencyKey] = React.useState('');
+  const [isSubmittingLead, setIsSubmittingLead] = React.useState(false);
+  const submittingLeadRef = React.useRef(false);
+
   // WhatsApp form state
   const [isWhatsAppSame, setIsWhatsAppSame] = React.useState(true);
   const [whatsappCountryCode, setWhatsappCountryCode] = React.useState('+91');
   const [whatsappNumber, setWhatsappNumber] = React.useState('');
   const [whatsappError, setWhatsappError] = React.useState('');
+  const [separateWhatsappDraft, setSeparateWhatsappDraft] = React.useState('');
+  const [separateWhatsappCountryDraft, setSeparateWhatsappCountryDraft] = React.useState('+91');
 
   const [email, setEmail] = React.useState('');
   const [courseId, setCourseId] = React.useState(store.courses?.[0]?.id || '');
@@ -269,27 +281,79 @@ export default function LeadsPage() {
     refreshLeads();
   }, [refreshLeads]);
 
+  React.useEffect(() => {
+    if (isAddModalOpen) {
+      setIdempotencyKey(
+        typeof window !== 'undefined' && globalThis.crypto?.randomUUID
+          ? globalThis.crypto.randomUUID()
+          : `idemp-lead-${Date.now()}`
+      );
+      setDuplicateLeadMatch(null);
+      setIsRepeatInquiry(false);
+      setRepeatInquiryReason('');
+      setIsSubmittingLead(false);
+      submittingLeadRef.current = false;
+      setFullName('');
+      setPhone('');
+      setCountryCode('+91');
+      setPhoneError('');
+      setPhoneDuplicateWarning('');
+      setIsWhatsAppSame(true);
+      setWhatsappCountryCode('+91');
+      setWhatsappNumber('');
+      setWhatsappError('');
+      setSeparateWhatsappDraft('');
+      setSeparateWhatsappCountryDraft('+91');
+      setEmail('');
+      setTrainingPref('Online');
+      setSource('Website');
+      setCurrentStatus('Fresher');
+      setNotes('');
+    }
+  }, [isAddModalOpen]);
+
+  const triggerDuplicateCheck = React.useCallback(
+    (targetPhone: string, targetCountry: string, targetEmail: string) => {
+      if (!targetPhone.trim() && !targetEmail.trim()) {
+        setDuplicateLeadMatch(null);
+        setPhoneDuplicateWarning('');
+        return;
+      }
+      const match = checkDuplicateLead(
+        leads,
+        {
+          phone: targetPhone.trim(),
+          country_code: targetCountry,
+          email: targetEmail.trim(),
+        },
+        store.admissions
+      );
+      if (match.isDuplicate && match.existingLead) {
+        setDuplicateLeadMatch(match);
+        setPhoneDuplicateWarning(match.message || `Lead already exists: ${match.existingLead.lead_code}`);
+      } else {
+        setDuplicateLeadMatch(null);
+        setPhoneDuplicateWarning('');
+      }
+    },
+    [leads]
+  );
+
   // Phone input handler for Create Lead
   const handlePhoneChange = (val: string) => {
     setPhone(val);
     if (!val.trim()) {
       setPhoneError('');
-      setPhoneDuplicateWarning('');
+      triggerDuplicateCheck('', countryCode, email);
       return;
     }
     const res = validatePhoneNumber(countryCode, val, 'Mobile number');
     if (!res.isValid) {
       setPhoneError(res.error || 'Invalid mobile number');
-      setPhoneDuplicateWarning('');
     } else {
       setPhoneError('');
-      const dup = findDuplicateLeadByPhone(leads, val, countryCode);
-      if (dup) {
-        setPhoneDuplicateWarning(`Existing lead found with this number: ${dup.lead_code} - ${dup.full_name} (${dup.stage})`);
-      } else {
-        setPhoneDuplicateWarning('');
-      }
     }
+    triggerDuplicateCheck(val, countryCode, email);
   };
 
   const handleCountryCodeChange = (code: string) => {
@@ -297,16 +361,14 @@ export default function LeadsPage() {
     if (phone.trim()) {
       const res = validatePhoneNumber(code, phone, 'Mobile number');
       setPhoneError(res.isValid ? '' : (res.error || ''));
-      if (res.isValid) {
-        const dup = findDuplicateLeadByPhone(leads, phone, code);
-        setPhoneDuplicateWarning(dup ? `Existing lead found: ${dup.lead_code} - ${dup.full_name} (${dup.stage})` : '');
-      }
+      triggerDuplicateCheck(phone, code, email);
     }
   };
 
   // WhatsApp input handler for Create Lead
   const handleWhatsappChange = (val: string) => {
     setWhatsappNumber(val);
+    setSeparateWhatsappDraft(val);
     if (!val.trim()) {
       setWhatsappError('');
       return;
@@ -317,6 +379,7 @@ export default function LeadsPage() {
 
   const handleWhatsappCountryCodeChange = (code: string) => {
     setWhatsappCountryCode(code);
+    setSeparateWhatsappCountryDraft(code);
     if (whatsappNumber.trim()) {
       const res = validatePhoneNumber(code, whatsappNumber, 'WhatsApp number');
       setWhatsappError(res.isValid ? '' : (res.error || ''));
@@ -326,6 +389,8 @@ export default function LeadsPage() {
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !phone || !email) return;
+    if (submittingLeadRef.current || isSubmittingLead) return;
+
     if (!user) {
       alert('Authentication required: Please sign in to create leads.');
       return;
@@ -334,6 +399,19 @@ export default function LeadsPage() {
     const pCheck = validatePhoneNumber(countryCode, phone, 'Mobile number');
     if (!pCheck.isValid) {
       setPhoneError(pCheck.error || 'Invalid mobile number');
+      return;
+    }
+
+    if (duplicateLeadMatch && !isRepeatInquiry) {
+      alert(
+        duplicateLeadMatch.message ||
+          'Duplicate lead detected. To proceed, please confirm this as an authorized Repeat Inquiry with remarks.'
+      );
+      return;
+    }
+
+    if (isRepeatInquiry && !repeatInquiryReason.trim()) {
+      alert('Please provide a mandatory reason for the repeat inquiry.');
       return;
     }
 
@@ -354,6 +432,9 @@ export default function LeadsPage() {
       return;
     }
 
+    submittingLeadRef.current = true;
+    setIsSubmittingLead(true);
+
     try {
       await createLead({
         full_name: fullName.trim(),
@@ -370,22 +451,48 @@ export default function LeadsPage() {
         counsellor_id: assignedCounsellorId,
         notes: notes.trim(),
         stage: 'New',
+        rejectOnDuplicate: !isRepeatInquiry,
+        is_repeat_inquiry: isRepeatInquiry,
+        repeat_inquiry_reason: isRepeatInquiry ? repeatInquiryReason.trim() : undefined,
+        idempotency_key: idempotencyKey || (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `idemp-${Date.now()}`),
       });
 
       setIsAddModalOpen(false);
       setFullName('');
       setPhone('');
+      setCountryCode('+91');
       setPhoneError('');
       setPhoneDuplicateWarning('');
+      setDuplicateLeadMatch(null);
+      setIsRepeatInquiry(false);
+      setRepeatInquiryReason('');
       setIsWhatsAppSame(true);
       setWhatsappCountryCode('+91');
       setWhatsappNumber('');
       setWhatsappError('');
+      setSeparateWhatsappDraft('');
+      setSeparateWhatsappCountryDraft('+91');
       setEmail('');
+      setTrainingPref('Online');
+      setSource('Website');
+      setCurrentStatus('Fresher');
       setNotes('');
       void refreshLeads();
     } catch (err: any) {
-      alert(err?.message || 'Failed to create lead');
+      if (err?.name === 'DuplicateLeadError' || err?.code === 'DUPLICATE_LEAD') {
+        setDuplicateLeadMatch({
+          isDuplicate: true,
+          existingLead: err.existingLead,
+          isConverted: err.isConverted,
+          admissionNumber: err.admissionNumber,
+          message: err.message,
+        });
+      } else {
+        alert(err?.message || 'Failed to create lead');
+      }
+    } finally {
+      submittingLeadRef.current = false;
+      setIsSubmittingLead(false);
     }
   };
 
@@ -1157,6 +1264,16 @@ export default function LeadsPage() {
                       setWhatsappCountryCode(countryCode);
                       setWhatsappNumber(phone);
                       setWhatsappError('');
+                    } else {
+                      const restoredCode = separateWhatsappCountryDraft || countryCode || '+91';
+                      setWhatsappCountryCode(restoredCode);
+                      setWhatsappNumber(separateWhatsappDraft);
+                      if (separateWhatsappDraft.trim()) {
+                        const res = validatePhoneNumber(restoredCode, separateWhatsappDraft, 'WhatsApp number');
+                        setWhatsappError(res.isValid ? '' : (res.error || ''));
+                      } else {
+                        setWhatsappError('');
+                      }
                     }
                   }}
                   className="rounded border-slate-300 text-[#0A6ED1] focus:ring-[#0A6ED1] h-3.5 w-3.5"
@@ -1187,9 +1304,106 @@ export default function LeadsPage() {
             type="email"
             placeholder="ramesh@example.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setEmail(val);
+              triggerDuplicateCheck(phone, countryCode, val);
+            }}
             required
           />
+
+          {/* Duplicate Lead Detection Alert Banner */}
+          {duplicateLeadMatch && duplicateLeadMatch.existingLead && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 space-y-2">
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold text-xs text-amber-800">
+                    Existing Candidate Record Detected
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    A lead record matching this contact already exists in the system.
+                  </p>
+                  <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-[11px] bg-white/70 p-2 rounded border border-amber-200">
+                    <div>
+                      <span className="font-semibold text-slate-700">Lead ID:</span>{' '}
+                      <span className="font-mono text-amber-900">{duplicateLeadMatch.existingLead.lead_code}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Candidate:</span>{' '}
+                      <span className="text-slate-900">{duplicateLeadMatch.existingLead.full_name}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Current Stage:</span>{' '}
+                      <Badge variant="outline" className="text-[10px] ml-1 bg-amber-100 text-amber-800 border-amber-300">
+                        {duplicateLeadMatch.existingLead.stage}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Sales:</span>{' '}
+                      <span className="text-slate-900">{duplicateLeadMatch.existingLead.counsellor_name || 'Unassigned'}</span>
+                    </div>
+                  </div>
+
+                  {duplicateLeadMatch.isConverted && (
+                    <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Candidate already converted to Admission {duplicateLeadMatch.admissionNumber ? `(${duplicateLeadMatch.admissionNumber})` : ''}
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddModalOpen(false);
+                        setSearch(duplicateLeadMatch.existingLead!.lead_code);
+                      }}
+                      className="text-xs text-[#0A6ED1] hover:underline font-semibold"
+                    >
+                      View Existing Lead ({duplicateLeadMatch.existingLead.lead_code}) →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Authorized Repeat Inquiry Option */}
+              <div className="pt-2 border-t border-amber-200 mt-2 space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isRepeatInquiry}
+                    onChange={(e) => setIsRepeatInquiry(e.target.checked)}
+                    className="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                  />
+                  <div>
+                    <span className="font-semibold text-xs text-amber-900">
+                      Confirm as Legitimate Repeat Inquiry
+                    </span>
+                    <p className="text-[11px] text-amber-700">
+                      Authorized staff may record a repeat inquiry (e.g. candidate returning for a second course or next academic term).
+                    </p>
+                  </div>
+                </label>
+
+                {isRepeatInquiry && (
+                  <div className="space-y-1 pl-5">
+                    <label className="block text-[11px] font-semibold text-amber-900">
+                      Repeat Inquiry Reason / Remarks *
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={repeatInquiryReason}
+                      onChange={(e) => setRepeatInquiryReason(e.target.value)}
+                      placeholder="e.g. Candidate inquired for SAP MM after completing SAP FICO, requested weekend batch."
+                      required={isRepeatInquiry}
+                      className="w-full text-xs bg-white border border-amber-300 rounded p-2 text-slate-800 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -1306,8 +1520,17 @@ export default function LeadsPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="sap" size="sm" disabled={Boolean(phoneError || whatsappError)}>
-              Create Lead
+            <Button
+              type="submit"
+              variant="sap"
+              size="sm"
+              disabled={
+                isSubmittingLead ||
+                Boolean(phoneError || whatsappError) ||
+                (Boolean(duplicateLeadMatch) && (!isRepeatInquiry || !repeatInquiryReason.trim()))
+              }
+            >
+              {isSubmittingLead ? 'Creating Lead...' : 'Create Lead'}
             </Button>
           </div>
         </form>

@@ -116,6 +116,7 @@ export interface Lead {
   full_name: string;
   country_code?: string;
   phone: string;
+  canonical_phone?: string;
   whatsapp_country_code?: string;
   whatsapp_number?: string;
   email: string;
@@ -134,6 +135,10 @@ export interface Lead {
   follow_up_date?: string;
   notes?: string;
   stage: LeadStage;
+  idempotency_key?: string;
+  is_repeat_inquiry?: boolean;
+  repeat_inquiry_reason?: string;
+  original_lead_id?: string;
   created_at: string;
   updated_at: string;
 }

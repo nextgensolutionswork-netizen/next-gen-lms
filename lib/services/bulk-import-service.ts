@@ -13,6 +13,7 @@ import { recordAuditLog } from './audit-service';
 import { publishRealtimeEvent } from './realtime-service';
 import { recalculateStudentAttendancePercentage } from './meeting-attendance-service';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
+import { findDuplicateLeadByPhone, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
 
 export type BulkImportEntityType = 'students' | 'leads' | 'attendance';
 
@@ -476,12 +477,21 @@ export function validateLeadRows(
         const msg = `Invalid phone number: "${phone}"`;
         rowErrors.push(msg);
         errors.push({ rowNumber, field: 'phone', message: msg, value: phone, severity: 'error' });
-      } else if (seenPhones.has(phone)) {
-        const msg = `Duplicate phone "${phone}" in import file`;
-        rowWarnings.push(msg);
-        errors.push({ rowNumber, field: 'phone', message: msg, value: phone, severity: 'warning' });
       } else {
-        seenPhones.add(phone);
+        const canonical = getCanonicalPhoneDigits('+91', phone);
+        if (canonical && seenPhones.has(canonical)) {
+          const msg = `Duplicate phone "${phone}" in import file`;
+          rowWarnings.push(msg);
+          errors.push({ rowNumber, field: 'phone', message: msg, value: phone, severity: 'warning' });
+        } else {
+          if (canonical) seenPhones.add(canonical);
+          const existingLead = findDuplicateLeadByPhone(store.leads || [], phone, '+91');
+          if (existingLead) {
+            const msg = `Lead with phone "${phone}" already exists (Code: ${existingLead.lead_code}, Name: ${existingLead.full_name}, Stage: ${existingLead.stage})`;
+            rowWarnings.push(msg);
+            errors.push({ rowNumber, field: 'phone', message: msg, value: phone, severity: 'warning' });
+          }
+        }
       }
     }
 
@@ -701,7 +711,7 @@ export async function executeBulkImport(
   csvContent: string,
   userId: string = 'usr-admin',
   userName: string = 'Operations Head',
-  options: { skipInvalidRows?: boolean } = {}
+  options: { skipInvalidRows?: boolean; skipDuplicates?: boolean } = {}
 ): Promise<BulkImportExecutionResult> {
   const preview = previewBulkImport(entityType, csvContent);
 
@@ -839,8 +849,31 @@ export async function executeBulkImport(
       createdIds.push(newStudent.id);
     }
   } else if (entityType === 'leads') {
+    const seenImportedPhones = new Set<string>();
     for (const row of rowsToImport) {
       const d = row.data;
+      const rawPhone = (d.phone || '').trim();
+      const canonical = getCanonicalPhoneDigits('+91', rawPhone);
+
+      const shouldSkipDuplicates = Boolean(options.skipDuplicates);
+      const duplicateInDb = shouldSkipDuplicates ? findDuplicateLeadByPhone(store.leads || [], rawPhone, '+91') : undefined;
+      const duplicateInBatch = shouldSkipDuplicates && canonical ? seenImportedPhones.has(canonical) : false;
+
+      if (duplicateInDb || duplicateInBatch) {
+        const dupRef = duplicateInDb ? `${duplicateInDb.lead_code} (${duplicateInDb.full_name})` : 'duplicate row in CSV';
+        errors.push({
+          rowNumber: row.rowNumber,
+          field: 'phone',
+          message: `Skipped duplicate lead for phone "${rawPhone}" (matches ${dupRef})`,
+          severity: 'warning',
+        });
+        continue;
+      }
+
+      if (canonical) {
+        seenImportedPhones.add(canonical);
+      }
+
       const count = store.leads.length + 1;
       const leadCode = `LD-2026-${String(count).padStart(3, '0')}`;
 
@@ -848,7 +881,9 @@ export async function executeBulkImport(
         id: `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         lead_code: leadCode,
         full_name: d.full_name,
-        phone: d.phone,
+        country_code: '+91',
+        phone: rawPhone,
+        canonical_phone: canonical,
         email: d.email,
         interested_course_id: d.interested_course_id,
         interested_course_name: d.interested_course_name,

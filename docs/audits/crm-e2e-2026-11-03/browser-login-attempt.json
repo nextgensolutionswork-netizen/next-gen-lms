@@ -1,0 +1,13 @@
+[
+  {
+    "ids": [],
+    "name": "browser harness prerequisite",
+    "status": "BLOCKED",
+    "evidence": "page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n  navigated to \"http://localhost:3017/login?redirectTo=%2Fdashboard\"\n============================================================",
+    "path": "/login",
+    "alerts": [
+      ""
+    ],
+    "bodyExcerpt": "te your future.\n\nComplete enterprise training management for students, trainers, accountants, sales staff, support mentors, and administrators.\n\n8 Dedicated Role Workspaces & Portals\n\nNext-Gen ERP Solutions · SAP Training Institute\n\nACCESS PORTAL\n\nSign in to your account\n\nSelect any of the 8 accounts below or enter credentials manually.\n\nActive Session Detected\n\nSigned in as Rajesh Sharma (Director) (Super Admin)\n\nTarget: /dashboard\n\nContinue to Page →\n8 PRESET ROLE ACCOUNTS:\nClick to fill\nSuper Admin\n/dashboard\n\nsuperadmin@next-generpsolutions.com\n\nSales Lead\n/dashboard\n\nadmin@next-generpsolutions.com\n\nAccountant\n/accounts/fees\n\naccounts@next-generpsolutions.com\n\nSales\n/crm/leads\n\ncounsellor@next-generpsolutions.com\n\nTrainer / Faculty\n/academics/courses\n\nvikram.fico@next-generpsolutions.com\n\nPlacement Head\n/placement\n\nplacement@next-generpsolutions.com\n\nAcademic Support\n/support\n\nsupport@next-generpsolutions.com\n\nOnboarding Team\n/onboarding\n\nonboarding@next-generpsolutions.com\n\nEnrolled Student\n/portal\n\namit.gupta@student.next-gen.com\n\nEmail address\nPassword\nForgot password?\nSign in\n\nNeed assistance or access issue?\nContact institute administrator at admin@next-generpsolutions.com"
+  }
+]

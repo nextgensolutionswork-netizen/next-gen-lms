@@ -1,0 +1,40 @@
+[
+  {
+    "ids": [
+      18,
+      32,
+      69
+    ],
+    "name": "edit saved country and YouTube via Candidate Information",
+    "status": "PASS",
+    "evidence": "Executed isolated Playwright assertion"
+  },
+  {
+    "ids": [
+      71
+    ],
+    "name": "cancel editing preserves original name",
+    "status": "PASS",
+    "evidence": "Executed isolated Playwright assertion"
+  },
+  {
+    "ids": [
+      82,
+      83,
+      84,
+      86,
+      87
+    ],
+    "name": "primary admission conversion prefills identity, country prefix, mode and course",
+    "status": "PASS",
+    "evidence": "Executed isolated Playwright assertion"
+  },
+  {
+    "ids": [
+      96
+    ],
+    "name": "converted lead hides conversion actions",
+    "status": "PASS",
+    "evidence": "Executed isolated Playwright assertion"
+  }
+]

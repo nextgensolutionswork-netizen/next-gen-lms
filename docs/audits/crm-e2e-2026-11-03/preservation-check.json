@@ -1,0 +1,39 @@
+[
+  {
+    "path": "app/api/bulk-import/execute/route.ts",
+    "unchanged": true
+  },
+  {
+    "path": "app/api/crm/leads/route.ts",
+    "unchanged": true
+  },
+  {
+    "path": "lib/services/bulk-import-service.ts",
+    "unchanged": true
+  },
+  {
+    "path": "lib/services/crm-service.ts",
+    "unchanged": true
+  },
+  {
+    "path": "lib/utils/phone-validation.ts",
+    "unchanged": true
+  },
+  {
+    "path": "types/index.ts",
+    "unchanged": true
+  },
+  {
+    "path": "supabase/migrations/20261103_prevent_duplicate_leads.sql",
+    "unchanged": true
+  },
+  {
+    "path": "tests/crm-duplicate-lead-prevention.test.ts",
+    "unchanged": true
+  },
+  {
+    "path": "app/(dashboard)/crm/leads/page.tsx",
+    "unchanged": true,
+    "comparison": "isolated source copy made before browser testing"
+  }
+]

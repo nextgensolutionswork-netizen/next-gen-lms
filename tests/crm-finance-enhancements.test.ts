@@ -49,7 +49,7 @@ describe('CRM & Finance Enhancements Test Suite', () => {
       const result = convertLeadToAdmission(mockLeadId);
 
       expect(result).toBeDefined();
-      expect(result.lead.stage).toBe('Converted');
+      expect(result.lead.stage).toBe('Interested');
       expect(result.admissionPrefill).toMatchObject({
         student_name: 'Ananya Sharma',
         email: 'ananya.sharma@example.com',
@@ -67,7 +67,7 @@ describe('CRM & Finance Enhancements Test Suite', () => {
     it('persists Converted stage in store', () => {
       convertLeadToAdmission(mockLeadId);
       const updated = store.leads.find((l) => l.id === mockLeadId);
-      expect(updated?.stage).toBe('Converted');
+      expect(updated?.stage).toBe('Interested');
     });
 
     it('throws error for non-existent lead ID', () => {

@@ -49,13 +49,21 @@ import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { CreateAdmissionInput } from './admission-service';
-import { validatePhoneNumber, findDuplicateLeadByPhone, normalizePhoneForStorage, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
+import {
+  validatePhoneNumber,
+  findDuplicateLeadByPhone,
+  normalizePhoneForStorage,
+  getCanonicalPhoneDigits,
+  checkDuplicateLead,
+  DuplicateLeadMatch,
+} from '@/lib/utils/phone-validation';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
   counsellor_id?: string;
   course_id?: string;
   search?: string;
+  tenant_id?: string;
 }): Promise<Lead[]> {
   if (typeof window !== 'undefined') {
     try {
@@ -90,20 +98,33 @@ export async function getLeads(filters?: {
       if (filters?.course_id) {
         query = query.eq('interested_course_id', filters.course_id);
       }
+      if (filters?.tenant_id) {
+        query = query.eq('tenant_id', filters.tenant_id);
+      }
 
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (error) {
+        throw new Error(`Database error fetching leads: ${error.message || 'Query failed'}`);
+      }
+      if (data && data.length > 0) {
         const reconciled = reconcileLeadsWithAdmissions(data as Lead[]);
         store.leads = reconciled;
         return reconciled;
       }
+      if (data && data.length === 0) {
+        return [];
+      }
     } catch (err) {
-      console.warn('Supabase leads query error, falling back to local persistent store:', err);
+      console.warn('Supabase leads query error:', err);
+      throw err;
     }
   }
 
   let list = reconcileLeadsWithAdmissions([...store.leads]);
 
+  if (filters?.tenant_id) {
+    list = list.filter((l) => (l.tenant_id || 'default') === filters.tenant_id);
+  }
   if (filters?.stage && filters.stage !== 'All') {
     list = list.filter((l) => l.stage === filters.stage);
   }
@@ -114,14 +135,30 @@ export async function getLeads(filters?: {
     list = list.filter((l) => l.interested_course_id === filters.course_id);
   }
   if (filters?.search) {
-    const s = filters.search.toLowerCase();
-    list = list.filter(
-      (l) =>
-        l.full_name.toLowerCase().includes(s) ||
-        l.email.toLowerCase().includes(s) ||
-        l.phone.includes(s) ||
-        l.lead_code.toLowerCase().includes(s)
-    );
+    const s = filters.search.toLowerCase().trim();
+    const searchDigits = s.replace(/\D/g, '');
+    list = list.filter((l) => {
+      const fullName = (l.full_name || '').toLowerCase();
+      const email = (l.email || '').toLowerCase();
+      const phone = l.phone || '';
+      const leadCode = (l.lead_code || '').toLowerCase();
+      const phoneDigits = phone.replace(/\D/g, '');
+      const waDigits = (l.whatsapp_number || '').replace(/\D/g, '');
+      const canonical = l.canonical_phone || '';
+
+      const matchesText =
+        fullName.includes(s) ||
+        email.includes(s) ||
+        phone.includes(s) ||
+        leadCode.includes(s);
+      const matchesDigits =
+        searchDigits.length >= 4 &&
+        (phoneDigits.includes(searchDigits) ||
+          waDigits.includes(searchDigits) ||
+          canonical.includes(searchDigits));
+
+      return matchesText || matchesDigits;
+    });
   }
 
   return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -143,10 +180,33 @@ export async function getLeadById(id: string): Promise<Lead | undefined> {
   return store.leads.find((l) => l.id === id);
 }
 
+export class DuplicateLeadError extends Error {
+  code = 'DUPLICATE_LEAD';
+  existingLead: Lead;
+  isConverted?: boolean;
+  admissionNumber?: string;
+
+  constructor(message: string, existingLead: Lead, isConverted?: boolean, admissionNumber?: string) {
+    super(message);
+    this.name = 'DuplicateLeadError';
+    this.existingLead = existingLead;
+    this.isConverted = isConverted;
+    this.admissionNumber = admissionNumber;
+  }
+}
+
+// In-flight concurrency lock map to serialize concurrent creations with same idempotency key
+const inFlightLeadSubmissions = new Map<string, Promise<Lead>>();
+
 export async function createLead(
   data: Omit<Lead, 'id' | 'lead_code' | 'created_at' | 'updated_at'> & {
     rejectOnDuplicate?: boolean;
     allowDuplicate?: boolean;
+    allowRepeatInquiry?: boolean;
+    idempotency_key?: string;
+    is_repeat_inquiry?: boolean;
+    repeat_inquiry_reason?: string;
+    original_lead_id?: string;
   }
 ): Promise<Lead> {
   // 1. Mobile number validation based on country code
@@ -156,6 +216,7 @@ export async function createLead(
     throw new Error(phoneValidation.error || 'Invalid mobile number');
   }
   const normalizedPhone = phoneValidation.normalized || data.phone;
+  const canonicalPhone = phoneValidation.canonicalDigits || getCanonicalPhoneDigits(country_code, normalizedPhone);
 
   // 2. WhatsApp number validation (with country code support)
   let whatsapp_country_code = data.whatsapp_country_code || country_code;
@@ -172,36 +233,79 @@ export async function createLead(
     whatsapp_number = normalizedPhone;
   }
 
-  // 3. Duplicate mobile number check
-  const duplicate = findDuplicateLeadByPhone(
-    store.leads || [],
-    normalizedPhone,
-    country_code,
-    undefined,
-    data.tenant_id
-  );
-  if (duplicate && data.rejectOnDuplicate) {
-    throw new Error(
-      `A lead with this mobile number already exists: ${duplicate.lead_code} (${duplicate.full_name}).`
+  // 3. Idempotency Key check: if an identical request was already processed or is currently running
+  const idempotencyKey = data.idempotency_key;
+  if (idempotencyKey) {
+    const existingByIdemp = (store.leads || []).find(
+      (l) => l.idempotency_key === idempotencyKey && (!data.tenant_id || (l.tenant_id || 'default') === (data.tenant_id || 'default'))
     );
+    if (existingByIdemp) {
+      return existingByIdemp;
+    }
+
+    const inFlight = inFlightLeadSubmissions.get(idempotencyKey);
+    if (inFlight) {
+      return await inFlight;
+    }
+  }
+
+  // 4. Duplicate lead check
+  const duplicateMatch = checkDuplicateLead(
+    store.leads || [],
+    {
+      phone: normalizedPhone,
+      country_code,
+      email: data.email,
+      tenant_id: data.tenant_id,
+    },
+    store.admissions
+  );
+
+  const duplicate = duplicateMatch.existingLead;
+  const isRepeatInquiry = Boolean(data.is_repeat_inquiry || data.allowRepeatInquiry);
+
+  if (duplicateMatch.isDuplicate && duplicate) {
+    if (isRepeatInquiry) {
+      // Allowed legitimate repeat inquiry
+    } else if (data.rejectOnDuplicate) {
+      throw new DuplicateLeadError(
+        duplicateMatch.message || `A lead with this mobile number already exists: ${duplicate.lead_code} (${duplicate.full_name}).`,
+        duplicate,
+        duplicateMatch.isConverted,
+        duplicateMatch.admissionNumber
+      );
+    }
   }
 
   const payload: typeof data = {
     ...data,
     country_code,
     phone: normalizedPhone,
+    canonical_phone: canonicalPhone,
     whatsapp_country_code,
     whatsapp_number,
   };
 
   if (typeof window !== 'undefined') {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
     const response = await fetch('/api/crm/leads', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
     const result = await response.json();
     if (!response.ok || !result.success) {
+      if (result.code === 'DUPLICATE_LEAD' && result.existing_lead) {
+        throw new DuplicateLeadError(
+          result.error || 'A lead with this mobile number already exists.',
+          result.existing_lead,
+          result.existing_lead.is_converted,
+          result.existing_lead.admission_number
+        );
+      }
       throw new Error(result.error || 'Failed to create lead');
     }
     const createdLead: Lead = result.lead;
@@ -212,105 +316,137 @@ export async function createLead(
     return createdLead;
   }
 
-  store.leads = store.leads || [];
-  const id = globalThis.crypto.randomUUID();
-  const lead_code = `LD-${new Date().getFullYear()}-${id}`;
-  const course = (store.courses || []).find((c) => c.id === payload.interested_course_id);
-  const counsellor = (store.users || []).find((u) => u.id === payload.counsellor_id);
+  const executeCreation = async (): Promise<Lead> => {
+    store.leads = store.leads || [];
+    const id = globalThis.crypto.randomUUID();
+    const lead_code = `LD-${new Date().getFullYear()}-${id}`;
+    const course = (store.courses || []).find((c) => c.id === payload.interested_course_id);
+    const counsellor = (store.users || []).find((u) => u.id === payload.counsellor_id);
 
-  const isUUID = (str?: string | null) =>
-    Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+    const isUUID = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
-  let finalNotes = payload.notes || '';
-  if (duplicate && !data.rejectOnDuplicate) {
-    const dupNotice = `[Duplicate Inquiry: matches ${duplicate.lead_code} (${duplicate.full_name})]`;
-    finalNotes = finalNotes ? `${dupNotice} ${finalNotes}` : dupNotice;
-  }
+    let finalNotes = payload.notes || '';
+    if (duplicateMatch.isDuplicate && duplicate) {
+      if (isRepeatInquiry) {
+        const repeatNotice = `[Authorized Repeat Inquiry: Ref ${duplicate.lead_code} - ${duplicate.full_name}. Reason: ${data.repeat_inquiry_reason || 'Repeat candidate inquiry'}]`;
+        finalNotes = finalNotes ? `${repeatNotice} ${finalNotes}` : repeatNotice;
 
-  const newLead: Lead = {
-    ...payload,
-    id,
-    lead_code,
-    notes: finalNotes,
-    interested_course_name: course?.course_name,
-    counsellor_name: counsellor?.full_name,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+        // Annotate original lead record without mutating its pipeline stage or history
+        const origLead = store.leads.find((l) => l.id === duplicate.id);
+        if (origLead) {
+          const logMsg = `[Repeat Inquiry Recorded: New inquiry ${lead_code} for course "${course?.course_name || 'N/A'}". Reason: ${data.repeat_inquiry_reason || 'Repeat inquiry'}]`;
+          origLead.notes = (origLead.notes ? origLead.notes + '\n' : '') + logMsg;
+          origLead.updated_at = new Date().toISOString();
+        }
+      } else if (!data.rejectOnDuplicate) {
+        const dupNotice = `[Duplicate Inquiry: matches ${duplicate.lead_code} (${duplicate.full_name})]`;
+        finalNotes = finalNotes ? `${dupNotice} ${finalNotes}` : dupNotice;
+      }
+    }
+
+    const newLead: Lead = {
+      ...payload,
+      id,
+      lead_code,
+      canonical_phone: canonicalPhone,
+      notes: finalNotes,
+      idempotency_key: idempotencyKey,
+      is_repeat_inquiry: isRepeatInquiry,
+      repeat_inquiry_reason: isRepeatInquiry ? (data.repeat_inquiry_reason || 'Authorized Repeat Inquiry') : undefined,
+      original_lead_id: isRepeatInquiry && duplicate ? duplicate.id : undefined,
+      interested_course_name: course?.course_name,
+      counsellor_name: counsellor?.full_name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const supabase = createAdminClient();
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const insertPayload: Record<string, any> = {
+            id: newLead.id,
+            lead_code: newLead.lead_code,
+            full_name: newLead.full_name,
+            phone: newLead.phone,
+            canonical_phone: newLead.canonical_phone,
+            email: newLead.email,
+            country_code: newLead.country_code || '+91',
+            whatsapp_country_code: newLead.whatsapp_country_code || '+91',
+            whatsapp_number: newLead.whatsapp_number,
+            interested_course_id: newLead.interested_course_id || null,
+            current_status: newLead.current_status,
+            experience_years: newLead.experience_years,
+            training_preference: newLead.training_preference,
+            lead_source: newLead.lead_source,
+            campaign: newLead.campaign,
+            counsellor_id: isUUID(newLead.counsellor_id) ? newLead.counsellor_id : null,
+            demo_preference: newLead.demo_preference,
+            demo_date: newLead.demo_date,
+            follow_up_date: newLead.follow_up_date,
+            notes: newLead.notes,
+            stage: newLead.stage,
+            idempotency_key: newLead.idempotency_key,
+            is_repeat_inquiry: newLead.is_repeat_inquiry || false,
+            repeat_inquiry_reason: newLead.repeat_inquiry_reason,
+            original_lead_id: newLead.original_lead_id,
+            created_at: newLead.created_at,
+            updated_at: newLead.updated_at,
+          };
+
+          const { error } = await supabase.from('leads').insert(insertPayload);
+          if (!error) break;
+          if (error.code === '23505' && error.message.includes('leads_lead_code_key') && attempt < 2) {
+            newLead.lead_code = `LD-${new Date().getFullYear()}-${globalThis.crypto.randomUUID()}`;
+            continue;
+          }
+          throw new Error(`Database error creating lead: ${error.message || error.code || 'Insert failed'}`);
+        }
+      } catch (err: any) {
+        throw new Error(`Failed to create lead in database: ${err.message}`);
+      }
+    }
+
+    store.leads.unshift(newLead);
+    store.persist();
+
+    await recordAuditLog({
+      user_id: data.counsellor_id || 'system',
+      user_name: counsellor?.full_name || 'System',
+      user_role: 'counsellor',
+      action: isRepeatInquiry ? 'REPEAT_INQUIRY_CREATED' : 'LEAD_CREATED',
+      module: 'CRM',
+      record_id: newLead.id,
+      new_value: {
+        name: newLead.full_name,
+        phone: newLead.phone,
+        country_code: newLead.country_code,
+        whatsapp_number: newLead.whatsapp_number,
+        stage: newLead.stage,
+        training_preference: newLead.training_preference,
+        lead_source: newLead.lead_source,
+        current_status: newLead.current_status,
+        is_repeat_inquiry: isRepeatInquiry,
+        repeat_inquiry_reason: newLead.repeat_inquiry_reason,
+        original_lead_id: newLead.original_lead_id,
+      },
+    });
+
+    return newLead;
   };
 
-  if (isLiveSupabaseEnabled()) {
+  if (idempotencyKey) {
+    const creationPromise = executeCreation();
+    inFlightLeadSubmissions.set(idempotencyKey, creationPromise);
     try {
-      const supabase = createAdminClient();
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const insertPayload: Record<string, any> = {
-          id: newLead.id,
-          lead_code: newLead.lead_code,
-          full_name: newLead.full_name,
-          phone: newLead.phone,
-          email: newLead.email,
-          country_code: newLead.country_code || '+91',
-          whatsapp_country_code: newLead.whatsapp_country_code || '+91',
-          whatsapp_number: newLead.whatsapp_number,
-          interested_course_id: isUUID(newLead.interested_course_id) ? newLead.interested_course_id : null,
-          current_status: newLead.current_status,
-          experience_years: newLead.experience_years,
-          training_preference: newLead.training_preference,
-          lead_source: newLead.lead_source,
-          campaign: newLead.campaign,
-          counsellor_id: isUUID(newLead.counsellor_id) ? newLead.counsellor_id : null,
-          demo_preference: newLead.demo_preference,
-          demo_date: newLead.demo_date,
-          follow_up_date: newLead.follow_up_date,
-          notes: newLead.notes,
-          stage: newLead.stage,
-          created_at: newLead.created_at,
-          updated_at: newLead.updated_at,
-        };
-
-        const { error } = await supabase.from('leads').insert(insertPayload);
-        if (!error) break;
-        if (error.code === '23505' && error.message.includes('leads_lead_code_key') && attempt < 2) {
-          newLead.lead_code = `LD-${new Date().getFullYear()}-${globalThis.crypto.randomUUID()}`;
-          continue;
-        }
-        // Fallback if country_code / whatsapp columns don't exist yet on remote db
-        if (error.code === '42703' || error.message.includes('column')) {
-          delete insertPayload.country_code;
-          delete insertPayload.whatsapp_country_code;
-          delete insertPayload.whatsapp_number;
-          const { error: retryErr } = await supabase.from('leads').insert(insertPayload);
-          if (!retryErr) break;
-        }
-        throw new Error(`Database error creating lead: ${error.message}`);
-      }
-    } catch (err: any) {
-      throw new Error(`Failed to create lead in database: ${err.message}`);
+      return await creationPromise;
+    } finally {
+      inFlightLeadSubmissions.delete(idempotencyKey);
     }
   }
 
-  store.leads.unshift(newLead);
-  store.persist();
-
-  await recordAuditLog({
-    user_id: data.counsellor_id || 'system',
-    user_name: counsellor?.full_name || 'System',
-    user_role: 'counsellor',
-    action: 'LEAD_CREATED',
-    module: 'CRM',
-    record_id: newLead.id,
-    new_value: {
-      name: newLead.full_name,
-      phone: newLead.phone,
-      country_code: newLead.country_code,
-      whatsapp_number: newLead.whatsapp_number,
-      stage: newLead.stage,
-      training_preference: newLead.training_preference,
-      lead_source: newLead.lead_source,
-      current_status: newLead.current_status,
-    },
-  });
-
-  return newLead;
+  return await executeCreation();
 }
 
 /**
@@ -345,6 +481,8 @@ export async function updateLeadDetails(
 
   const lead = (store.leads || []).find((l) => l.id === leadId);
   if (!lead) throw new Error('Lead not found');
+
+  const snapshot: Lead = { ...lead };
 
   const country_code = updates.country_code || lead.country_code || '+91';
   let phone = updates.phone;
@@ -421,7 +559,7 @@ export async function updateLeadDetails(
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createAdminClient();
-      await supabase.from('leads').update({
+      const { error } = await supabase.from('leads').update({
         full_name: lead.full_name,
         phone: lead.phone,
         country_code: lead.country_code || '+91',
@@ -436,8 +574,15 @@ export async function updateLeadDetails(
         notes: lead.notes,
         updated_at: lead.updated_at,
       }).eq('id', leadId);
+      if (error) {
+        Object.assign(lead, snapshot);
+        store.persist();
+        throw new Error(`Database error updating lead: ${error.message || error.code || 'Update failed'}`);
+      }
     } catch (err) {
-      console.warn('Supabase updateLeadDetails warning:', err);
+      Object.assign(lead, snapshot);
+      store.persist();
+      throw err;
     }
   }
 
@@ -576,10 +721,7 @@ export function convertLeadToAdmission(leadId: string): {
     throw new Error("Lead " + (lead.lead_code || lead.id) + " has already been converted to an admission.");
   }
 
-  lead.stage = 'Converted';
-  lead.updated_at = new Date().toISOString();
-  store.persist();
-
+  // Pure preparation helper: do NOT mutate lead.stage before admission is actually committed
   const course = (store.courses || []).find((c) => c.id === lead.interested_course_id) || store.courses?.[0];
 
   const admissionPrefill: Partial<CreateAdmissionInput> = {

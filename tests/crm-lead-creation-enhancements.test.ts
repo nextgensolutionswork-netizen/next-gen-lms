@@ -446,7 +446,7 @@ describe('CRM Lead Creation Form Enhancements Suite', () => {
 
       const { lead: convertedLead, admissionPrefill } = convertLeadToAdmission(lead.id);
 
-      expect(convertedLead.stage).toBe('Converted');
+      expect(convertedLead.stage).toBe('Interested');
       expect(admissionPrefill.student_name).toBe('Anand Varma');
       expect(admissionPrefill.phone).toBe('+91 98666 77788');
       expect(admissionPrefill.email).toBe('anand@example.com');

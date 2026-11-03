@@ -1,0 +1,7 @@
+{
+  "runtime": "E:\\my erp hub\\next gen lms\\.audit-build-check\\crm-e2e-20261103",
+  "storage": "E:\\my erp hub\\next gen lms\\.audit-build-check\\crm-e2e-20261103\\synthetic-data",
+  "base": "http://localhost:3017",
+  "remoteDatabaseEnabled": false,
+  "source": "current working tree; no env files or production data copied"
+}

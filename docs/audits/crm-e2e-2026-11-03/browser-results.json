@@ -1,0 +1,146 @@
+[
+  {
+    "ids": [
+      13
+    ],
+    "name": "default India country code",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      14,
+      15,
+      16
+    ],
+    "name": "search and choose UAE",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      11
+    ],
+    "name": "country change revalidates existing number",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      21,
+      22,
+      23
+    ],
+    "name": "training mode offers only Online and Offline",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      29
+    ],
+    "name": "YouTube source option",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      37,
+      38,
+      39,
+      40
+    ],
+    "name": "four current status selections",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      47,
+      55
+    ],
+    "name": "same WhatsApp follows mobile",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      56
+    ],
+    "name": "WhatsApp toggle preserves distinct entered number",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      62,
+      67
+    ],
+    "name": "network failure retains create form",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      57,
+      61,
+      65
+    ],
+    "name": "create lead double click only submits once",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      66
+    ],
+    "name": "successful creation resets all create fields to defaults",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      72,
+      73
+    ],
+    "name": "refresh and name search preserve saved lead",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      34,
+      75
+    ],
+    "name": "YouTube filter includes saved lead",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      18,
+      32,
+      69
+    ],
+    "name": "edit saved country code and YouTube source",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      71
+    ],
+    "name": "cancel editing keeps saved lead unchanged",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  },
+  {
+    "ids": [
+      33,
+      115
+    ],
+    "name": "CSV report retains YouTube source",
+    "status": "PASS",
+    "evidence": "Executed Playwright assertion against isolated local server"
+  }
+]

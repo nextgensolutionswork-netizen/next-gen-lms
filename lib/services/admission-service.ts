@@ -715,7 +715,7 @@ export async function createAdmissionWorkflow(
       experience_years: newAdmission.experience_years,
       current_employment_status: newAdmission.current_employment_status,
       course_id: newAdmission.course_id,
-      training_mode: newAdmission.training_mode,
+      training_mode: newAdmission.training_mode === 'Offline' ? 'Classroom' : newAdmission.training_mode,
       batch_id: newAdmission.batch_id,
       trainer_id: newAdmission.trainer_id,
       admission_date: newAdmission.admission_date,
