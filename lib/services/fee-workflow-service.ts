@@ -910,6 +910,10 @@ export class FeeWorkflowService {
       payment_proof_url?: string;
       notes?: string;
       installment_id?: string;
+      our_bank_name?: string;
+      our_bank_account_name?: string;
+      our_bank_account_id?: string;
+      our_upi_details?: string;
     },
     recorderUserId: string,
     recorderRole = 'counsellor'
@@ -1005,6 +1009,10 @@ export class FeeWorkflowService {
       bank_upi_reference: input.bank_upi_reference,
       payment_proof_url: input.payment_proof_url,
       notes: input.notes,
+      our_bank_name: input.our_bank_name,
+      our_bank_account_name: input.our_bank_account_name,
+      our_bank_account_id: input.our_bank_account_id,
+      our_upi_details: input.our_upi_details,
       recorded_by: recorderUserId,
       recorded_by_name: recorderName,
       recorded_by_role: recorderRole,
@@ -1039,6 +1047,10 @@ export class FeeWorkflowService {
       payment_proof_url?: string;
       notes?: string;
       installment_id?: string;
+      our_bank_name?: string;
+      our_bank_account_name?: string;
+      our_bank_account_id?: string;
+      our_upi_details?: string;
     },
     updaterUserId: string,
     updaterRole = 'counsellor'

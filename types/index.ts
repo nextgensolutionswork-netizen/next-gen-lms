@@ -162,10 +162,13 @@ export interface Admission {
   tenant_id?: string;
   id: string;
   admission_number: string;
+  student_unique_id?: string;
   student_id?: string;
   student_name: string;
   phone: string;
+  alternate_phone?: string;
   email: string;
+  photo_url?: string;
   dob: string;
   gender: 'Male' | 'Female' | 'Other';
   address: string;
@@ -184,6 +187,7 @@ export interface Admission {
   trainer_id?: string;
   trainer_name?: string;
   admission_date: string;
+  fee_due_date?: string;
   course_fee: number;
   discount: number;
   discount_reason?: string;
@@ -192,6 +196,10 @@ export interface Admission {
   counsellor_id?: string;
   counsellor_name?: string;
   lead_id?: string;
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
   status: AdmissionStatus;
   created_at: string;
   updated_at: string;
@@ -204,11 +212,14 @@ export interface Student {
   user_id: string;
   admission_id: string;
   student_code: string;
+  student_unique_id?: string;
   admission_number: string;
   full_name: string;
   email: string;
   phone: string;
+  alternate_phone?: string;
   profile_photo?: string;
+  photo_url?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -562,6 +573,10 @@ export interface Payment {
   collected_by: string;
   collected_by_name?: string;
   notes?: string;
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
   created_at: string;
 }
 
@@ -1334,6 +1349,10 @@ export interface StudentPaymentRecord {
   receipt_number?: string;
   payment_proof_url?: string;
   notes?: string;
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
 
   recorded_by: string;
   recorded_by_name: string;

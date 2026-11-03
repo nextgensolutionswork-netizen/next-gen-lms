@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { FileUpload } from '@/components/ui/file-upload';
@@ -34,7 +35,7 @@ import {
   StudentPaymentRecord,
   StudentFee,
 } from '@/types';
-import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
+import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { exportCollectionsToExcel } from '@/lib/utils/excel-export';
 
 function safeAmount(val: unknown): number {
@@ -87,7 +88,7 @@ export default function PaymentsPage() {
   const [verificationBusy, setVerificationBusy] = React.useState(false);
   const [rejectReason, setRejectReason] = React.useState('');
 
-  // Update payment modal state (Counsellor / Staff)
+  // Update payment modal state (Sales / Staff)
   const [isUpdateModalOpen, setIsUpdateModalOpen] = React.useState(false);
   const [updatingPayment, setUpdatingPayment] = React.useState<StudentPaymentRecord | null>(null);
   const [editAmount, setEditAmount] = React.useState<number>(0);
@@ -111,6 +112,18 @@ export default function PaymentsPage() {
   const [notes, setNotes] = React.useState('');
   const [proofUrl, setProofUrl] = React.useState('');
   const [proofUploading, setProofUploading] = React.useState(false);
+
+  // Bank Details (Institute Receiving Account)
+  const defaultBankName = store.settings?.bank_name || 'HDFC Bank Ltd';
+  const defaultAccountName = store.settings?.bank_account_name || 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED';
+  const defaultAccountId = store.settings?.bank_account_number || '50200088991122';
+  const defaultUpi = store.settings?.upi_id || 'nextgenerp@hdfcbank';
+
+  const [ourBankName, setOurBankName] = React.useState(defaultBankName);
+  const [ourBankAccountName, setOurBankAccountName] = React.useState(defaultAccountName);
+  const [ourBankAccountId, setOurBankAccountId] = React.useState(defaultAccountId);
+  const [ourUpiDetails, setOurUpiDetails] = React.useState(defaultUpi);
+  const [bankPreset, setBankPreset] = React.useState<'default' | 'custom'>('default');
 
   const selectedFee = (store.studentFees || []).find((f) => f.id === selectedFeeId);
 
@@ -276,6 +289,10 @@ export default function PaymentsPage() {
           bank_upi_reference: bankUpiRef,
           payment_proof_url: proofUrl,
           notes,
+          our_bank_name: paymentMode !== 'Cash' ? ourBankName : undefined,
+          our_bank_account_name: paymentMode !== 'Cash' ? ourBankAccountName : undefined,
+          our_bank_account_id: paymentMode !== 'Cash' ? ourBankAccountId : undefined,
+          our_upi_details: (paymentMode === 'UPI' || ourUpiDetails) ? ourUpiDetails : undefined,
         },
         user.id,
         (role as any) || (user.role as any) || 'counsellor'
@@ -351,7 +368,7 @@ export default function PaymentsPage() {
     }
   };
 
-  // Open Update Payment Modal (Counsellor / Staff)
+  // Open Update Payment Modal (Sales / Staff)
   const handleOpenUpdateModal = (p: StudentPaymentRecord) => {
     setUpdatingPayment(p);
     setEditAmount(p.amount_paid);
@@ -468,7 +485,7 @@ export default function PaymentsPage() {
             <span className="text-slate-500 font-medium">Session:</span>
             <span className="font-semibold text-slate-800">{user?.full_name || 'Staff'}</span>
             <Badge variant="outline" className="text-[10px] capitalize bg-white text-slate-700">
-              {role?.replace('_', ' ') || 'Staff'}
+              {getRoleLabel(role) || 'Staff'}
             </Badge>
           </div>
 
@@ -735,7 +752,7 @@ export default function PaymentsPage() {
                                     size="sm"
                                     onClick={() => handleOpenUpdateModal(p)}
                                     className="text-xs px-2 py-1 h-7 bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 font-medium"
-                                    title="Counsellor/Staff: Update payment amount, mode, transaction UTR, or notes"
+                                    title="Sales/Staff: Update payment amount, mode, transaction UTR, or notes"
                                   >
                                     Update
                                   </Button>
@@ -1009,6 +1026,93 @@ export default function PaymentsPage() {
             />
           </div>
 
+          {paymentMode !== 'Cash' && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-xs text-slate-800 block">
+                    Bank Details
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Institute receiving account details for reconciliation
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <label className="text-[10px] text-slate-500 font-medium">Account Preset:</label>
+                  <select
+                    value={bankPreset}
+                    onChange={(e) => {
+                      const val = e.target.value as 'default' | 'custom';
+                      setBankPreset(val);
+                      if (val === 'default') {
+                        setOurBankName(defaultBankName);
+                        setOurBankAccountName(defaultAccountName);
+                        setOurBankAccountId(defaultAccountId);
+                        setOurUpiDetails(defaultUpi);
+                      }
+                    }}
+                    className="text-[11px] bg-white border border-slate-200 rounded px-2 py-1 text-slate-700 font-medium"
+                  >
+                    <option value="default">Primary Account ({defaultBankName})</option>
+                    <option value="custom">Custom Bank Account</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Input
+                    label="Our Bank Name *"
+                    placeholder="e.g. HDFC Bank"
+                    value={ourBankName}
+                    onChange={(e) => {
+                      setOurBankName(e.target.value);
+                      setBankPreset('custom');
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Our Bank Account Name *"
+                    placeholder="e.g. Next-Gen ERP Solutions"
+                    value={ourBankAccountName}
+                    onChange={(e) => {
+                      setOurBankAccountName(e.target.value);
+                      setBankPreset('custom');
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Our Bank Account ID *"
+                    type="text"
+                    placeholder="e.g. 50200088991122"
+                    value={ourBankAccountId}
+                    onChange={(e) => {
+                      setOurBankAccountId(e.target.value);
+                      setBankPreset('custom');
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Our UPI Details"
+                    type="text"
+                    placeholder="e.g. nextgenerp@bank"
+                    value={ourUpiDetails}
+                    onChange={(e) => {
+                      setOurUpiDetails(e.target.value);
+                      setBankPreset('custom');
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <FileUpload bucket="payment-proofs" label="Payment Proof *" value={proofUrl} onChange={setProofUrl} onUploadingChange={setProofUploading} />
           <Input
             label="Notes / Comments"
@@ -1080,6 +1184,32 @@ export default function PaymentsPage() {
                   <a href={selectedPayment.payment_proof_url} target="_blank" rel="noreferrer" className="font-medium text-blue-600 hover:underline">
                     View attachment
                   </a>
+                </div>
+              )}
+              {selectedPayment.our_bank_name && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Receiving Bank:</span>
+                  <span className="font-semibold text-slate-800">{selectedPayment.our_bank_name}</span>
+                </div>
+              )}
+              {selectedPayment.our_bank_account_name && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Account Name:</span>
+                  <span className="text-slate-800">{selectedPayment.our_bank_account_name}</span>
+                </div>
+              )}
+              {selectedPayment.our_bank_account_id && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Account ID:</span>
+                  <span className="font-mono text-slate-800">
+                    {maskBankAccountId(selectedPayment.our_bank_account_id)}
+                  </span>
+                </div>
+              )}
+              {selectedPayment.our_upi_details && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Institute UPI:</span>
+                  <span className="font-mono text-slate-800">{selectedPayment.our_upi_details}</span>
                 </div>
               )}
               <div className="flex justify-between">
@@ -1164,7 +1294,7 @@ export default function PaymentsPage() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* MODAL 4: UPDATE PAYMENT MODAL (Counsellor / Staff)                        */}
+      {/* MODAL 4: UPDATE PAYMENT MODAL (Sales / Staff)                        */}
       {/* ========================================================================= */}
       <Modal
         isOpen={isUpdateModalOpen}

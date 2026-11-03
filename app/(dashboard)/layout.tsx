@@ -18,6 +18,30 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const drawer = React.useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_collapsed');
+      if (saved !== null) {
+        setSidebarCollapsed(saved === 'true');
+      }
+    } catch {
+      // Ignore if localStorage is restricted
+    }
+  }, []);
+
+  const handleToggleSidebar = React.useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }, []);
 
   React.useEffect(() => { setNavigationOpen(false); }, [pathname]);
   React.useEffect(() => {
@@ -47,8 +71,19 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <div className="hidden lg:block print:hidden">
-        <Sidebar currentRole={role} currentUserName={userName} />
+      <div
+        className={`hidden lg:block print:hidden transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${
+          sidebarCollapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-64 opacity-100'
+        }`}
+        aria-hidden={sidebarCollapsed}
+      >
+        <Sidebar
+          currentRole={role}
+          currentUserName={userName}
+          onToggleCollapse={handleToggleSidebar}
+          collapsed={sidebarCollapsed}
+          className="w-64"
+        />
       </div>
       <dialog
         ref={drawer}
@@ -67,7 +102,14 @@ export default function DashboardLayout({
         <Sidebar currentRole={role} currentUserName={userName} className="w-full h-dvh" />
       </dialog>
       <div className="flex-1 flex flex-col min-w-0">
-        <Header currentRole={role} currentUserName={userName} onOpenNavigation={() => setNavigationOpen(true)} navigationOpen={navigationOpen} />
+        <Header
+          currentRole={role}
+          currentUserName={userName}
+          onOpenNavigation={() => setNavigationOpen(true)}
+          navigationOpen={navigationOpen}
+          onToggleSidebar={handleToggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
         <main className="dashboard-content flex-1 min-w-0 w-full p-3 sm:p-6 xl:p-8">
           {children}
         </main>

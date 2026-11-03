@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -21,6 +22,7 @@ import {
   Layers,
   Building2,
   ChevronDown,
+  ChevronLeft,
   UserCheck,
   CreditCard,
   Receipt,
@@ -33,9 +35,18 @@ interface SidebarProps {
   currentUserName: string;
   avatar?: string;
   className?: string;
+  onToggleCollapse?: () => void;
+  collapsed?: boolean;
 }
 
-export function Sidebar({ currentRole, currentUserName, avatar, className = '' }: SidebarProps) {
+export function Sidebar({
+  currentRole,
+  currentUserName,
+  avatar,
+  className = '',
+  onToggleCollapse,
+  collapsed = false,
+}: SidebarProps) {
   const pathname = usePathname();
   const [openSection, setOpenSection] = React.useState<string | null>('academics');
 
@@ -69,14 +80,27 @@ export function Sidebar({ currentRole, currentUserName, avatar, className = '' }
   return (
     <aside className={`w-64 flex-shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col h-screen sticky top-0 ${className}`}>
       {/* Brand Header */}
-      <div className="p-4 border-b border-slate-800 flex items-center space-x-3 bg-slate-950/50">
-        <div className="h-10 w-10 rounded-lg bg-[#0A6ED1] flex items-center justify-center font-bold text-white shadow-md text-lg">
-          SAP
+      <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="h-10 w-10 rounded-lg bg-[#0A6ED1] flex items-center justify-center font-bold text-white shadow-md text-lg shrink-0">
+            SAP
+          </div>
+          <div className="overflow-hidden">
+            <h1 className="font-bold text-sm tracking-wide text-white truncate">NEXT-GEN ERP</h1>
+            <p className="text-[10px] text-slate-400 font-medium truncate">LMS & Institute Management</p>
+          </div>
         </div>
-        <div className="overflow-hidden">
-          <h1 className="font-bold text-sm tracking-wide text-white truncate">NEXT-GEN ERP</h1>
-          <p className="text-[10px] text-slate-400 font-medium truncate">LMS & Institute Management</p>
-        </div>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -133,7 +157,7 @@ export function Sidebar({ currentRole, currentUserName, avatar, className = '' }
           </Link>
         )}
 
-        {/* CRM Module (Counsellor, Admin, Super Admin) */}
+        {/* CRM Module (Sales, Admin, Super Admin) */}
         {isCounsellor && (
           <div>
             <button
@@ -169,7 +193,7 @@ export function Sidebar({ currentRole, currentUserName, avatar, className = '' }
           </div>
         )}
 
-        {/* Admissions (Counsellor, Accountant, Admin, Super Admin) */}
+        {/* Admissions (Sales, Accountant, Admin, Super Admin) */}
         {(isCounsellor || isAccountant) && (
           <div>
             <button
@@ -281,7 +305,7 @@ export function Sidebar({ currentRole, currentUserName, avatar, className = '' }
           </div>
         )}
 
-        {/* Accounts & Finance (Accountant, Admin, Super Admin, Counsellor) */}
+        {/* Accounts & Finance (Accountant, Admin, Super Admin, Sales) */}
         {(isAccountant || isCounsellor) && (
           <div>
             <button
@@ -493,7 +517,7 @@ export function Sidebar({ currentRole, currentUserName, avatar, className = '' }
         )}
         <div className="overflow-hidden flex-1">
           <p className="text-xs font-semibold text-white truncate">{currentUserName}</p>
-          <p className="text-[10px] text-slate-400 capitalize truncate">{currentRole.replace('_', ' ')}</p>
+          <p className="text-[10px] text-slate-400 capitalize truncate">{getRoleLabel(currentRole)}</p>
         </div>
       </div>
     </aside>

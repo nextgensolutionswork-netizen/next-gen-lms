@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import Image from 'next/image';
 import {
@@ -445,7 +446,7 @@ export default function SupportDeskPage() {
             <UserCheck className="h-4 w-4 text-[#0A6ED1]" />
             <span className="text-slate-600">Active Staff:</span>
             <strong className="text-slate-900">
-              {activeUser.full_name} ({activeUser.role.replace('_', ' ')})
+              {activeUser.full_name} ({getRoleLabel(activeUser.role)})
             </strong>
           </div>
         </div>

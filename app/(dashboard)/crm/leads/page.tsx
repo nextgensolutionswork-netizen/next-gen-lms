@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -125,7 +126,7 @@ export default function LeadsPage() {
       'Lead Source': l.lead_source || 'Website',
       'Current Status': l.current_status || 'Working Professional',
       'Stage': l.stage,
-      'Counsellor': l.counsellor_name || 'Unassigned',
+      'Sales': l.counsellor_name || 'Unassigned',
       'Follow-up Date': l.follow_up_date ? formatDate(l.follow_up_date) : 'N/A',
       'Created Date': formatDate(l.created_at),
     }));
@@ -680,7 +681,7 @@ export default function LeadsPage() {
           admission_date: new Date().toISOString().slice(0, 10),
           course_fee: Number(convertCourseFee),
           discount: Number(discount) || 0,
-          discount_reason: discountReason || 'Counsellor approved discount',
+          discount_reason: discountReason || 'Sales approved discount',
           payment_plan: 'Full Payment',
           counsellor_id: assignedCounsellorId,
           lead_id: selectedLead.id,
@@ -858,17 +859,17 @@ export default function LeadsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Bulk Assign Counsellor */}
+            {/* Bulk Assign Sales */}
             <div className="flex items-center space-x-1.5">
               <select
                 value={bulkCounsellorId}
                 onChange={(e) => setBulkCounsellorId(e.target.value)}
                 className="text-xs bg-white border border-blue-300 rounded px-2 py-1.5 text-slate-800"
               >
-                <option value="">Assign Counsellor...</option>
+                <option value="">Assign Sales...</option>
                 {availableCounsellors.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.full_name} ({c.role})
+                    {c.full_name} ({getRoleLabel(c.role)})
                   </option>
                 ))}
               </select>
@@ -1213,7 +1214,7 @@ export default function LeadsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                Assigned Counsellor *
+                Assigned Sales *
               </label>
               <select
                 value={counsellorId}
@@ -1225,7 +1226,7 @@ export default function LeadsPage() {
                 ) : (
                   availableCounsellors.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.full_name} ({c.role})
+                      {c.full_name} ({getRoleLabel(c.role)})
                     </option>
                   ))
                 )}
@@ -1290,7 +1291,7 @@ export default function LeadsPage() {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-              Counsellor Notes / Demo Preferences
+              Sales Notes / Demo Preferences
             </label>
             <textarea
               rows={3}
@@ -1606,7 +1607,7 @@ export default function LeadsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                    Assigned Counsellor
+                    Assigned Sales
                   </label>
                   <select
                     value={editCounsellorId}
@@ -1615,7 +1616,7 @@ export default function LeadsPage() {
                   >
                     {availableCounsellors.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.full_name} ({c.role})
+                        {c.full_name} ({getRoleLabel(c.role)})
                       </option>
                     ))}
                   </select>

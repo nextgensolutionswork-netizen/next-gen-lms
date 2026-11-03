@@ -30,6 +30,8 @@ import {
   Plus,
   RefreshCw,
   Check,
+  Camera,
+  X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
+import { validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { transferStudentBatch } from '@/lib/services/academics-service';
@@ -101,6 +104,17 @@ export default function StudentDetailsPage() {
   // Certificate Issuance state
   const [isIssuingCert, setIsIssuingCert] = React.useState(false);
   const [certMsg, setCertMsg] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Edit Personal Details Modal state (Alternate Mobile Number & Photo)
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = React.useState(false);
+  const [editAltPhone, setEditAltPhone] = React.useState('');
+  const [editAltPhoneError, setEditAltPhoneError] = React.useState('');
+  const [editPhotoUrl, setEditPhotoUrl] = React.useState('');
+  const [editPhotoPreview, setEditPhotoPreview] = React.useState('');
+  const [editPhotoError, setEditPhotoError] = React.useState('');
+  const [isEditPhotoUploading, setIsEditPhotoUploading] = React.useState(false);
+  const [editProfileSaving, setEditProfileSaving] = React.useState(false);
+  const [editProfileSuccess, setEditProfileSuccess] = React.useState<string | null>(null);
 
   if (!authLoading && !user) return <p role="alert">Please sign in to view this student profile.</p>;
   if (loadStatus === 'loading') return <p role="status" className="p-8 text-center">Loading student profile…</p>;
@@ -179,6 +193,97 @@ export default function StudentDetailsPage() {
     role === 'admin' ||
     role === 'super_admin' ||
     role === 'trainer';
+  const canEditStudent =
+    role === 'admin' ||
+    role === 'super_admin' ||
+    role === 'counsellor' ||
+    (role as string) === 'operations';
+
+  const openEditProfileModal = () => {
+    setEditAltPhone(student?.alternate_phone || '');
+    setEditAltPhoneError('');
+    setEditPhotoUrl(student?.photo_url || student?.profile_photo || '');
+    setEditPhotoPreview(student?.photo_url || student?.profile_photo || '');
+    setEditPhotoError('');
+    setEditProfileSuccess(null);
+    setIsEditProfileModalOpen(true);
+  };
+
+  const handleEditPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditPhotoError('');
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      setEditPhotoError('Supported photo formats: JPG, JPEG, PNG, WEBP.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setEditPhotoError('Student photograph size must not exceed 2 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setIsEditPhotoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', 'student-photos');
+      const res = await fetch('/api/students/photo', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload photo');
+      }
+      setEditPhotoUrl(data.url);
+    } catch (err: any) {
+      setEditPhotoError(err.message || 'Upload failed');
+    } finally {
+      setIsEditPhotoUploading(false);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student) return;
+    if (editAltPhone.trim()) {
+      const val = validateAlternatePhoneNumber(editAltPhone, 'Alternate mobile number');
+      if (!val.isValid) {
+        setEditAltPhoneError(val.error || 'Invalid alternate mobile number.');
+        return;
+      }
+    }
+    setEditProfileSaving(true);
+    setEditAltPhoneError('');
+    try {
+      student.alternate_phone = editAltPhone.trim() || undefined;
+      student.photo_url = editPhotoUrl.trim() || undefined;
+      if (editPhotoUrl.trim()) {
+        student.profile_photo = editPhotoUrl.trim();
+      }
+      if (admission) {
+        admission.alternate_phone = student.alternate_phone;
+        admission.photo_url = student.photo_url;
+      }
+      store.persist();
+      setEditProfileSuccess('Student personal details updated.');
+      setTimeout(() => {
+        setIsEditProfileModalOpen(false);
+        reloadData();
+      }, 700);
+    } catch (err: any) {
+      setEditAltPhoneError(err.message || 'Failed to save changes.');
+    } finally {
+      setEditProfileSaving(false);
+    }
+  };
 
   const onboardingCase = store.onboardingCases.find(
     (c) =>
@@ -519,15 +624,34 @@ export default function StudentDetailsPage() {
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
-              <div className="h-16 w-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl font-extrabold text-white">
-                {student.full_name?.charAt(0) || 'S'}
-              </div>
+              {student.photo_url || student.profile_photo ? (
+                <img
+                  src={student.photo_url || student.profile_photo}
+                  alt={student.full_name}
+                  className="h-16 w-16 rounded-2xl object-cover border border-white/20 shadow-xs"
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl font-extrabold text-white">
+                  {student.full_name?.charAt(0) || 'S'}
+                </div>
+              )}
               <div>
                 <div className="flex items-center space-x-2">
                   <h1 className="text-xl font-bold">{student.full_name}</h1>
                   <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full font-semibold">
                     {student.status}
                   </span>
+                  {canEditStudent && (
+                    <button
+                      type="button"
+                      onClick={openEditProfileModal}
+                      className="text-xs text-blue-200 hover:text-white bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-md transition-colors flex items-center space-x-1 cursor-pointer"
+                      title="Edit Personal Details & Photo"
+                    >
+                      <Camera className="h-3 w-3" />
+                      <span>Edit Info</span>
+                    </button>
+                  )}
                   {onboardingCase && (
                     <Link href={`/onboarding?search=${encodeURIComponent(student.admission_number || student.full_name)}`}>
                       <span
@@ -547,8 +671,20 @@ export default function StudentDetailsPage() {
                     </Link>
                   )}
                 </div>
-                <p className="text-xs text-blue-200 mt-0.5">
-                  Code: <span className="font-semibold text-white">{student.student_code}</span> | Admission #{' '}
+                <p className="text-xs text-blue-200 mt-1 flex flex-wrap items-center gap-1.5">
+                  {student.student_unique_id && (
+                    <>
+                      <span>Student ID:</span>
+                      <span className="font-mono font-bold text-emerald-300 bg-white/10 px-2 py-0.5 rounded border border-emerald-400/40">
+                        {student.student_unique_id}
+                      </span>
+                      <span className="text-slate-400">|</span>
+                    </>
+                  )}
+                  <span>Code:</span>
+                  <span className="font-semibold text-white">{student.student_code}</span>
+                  <span className="text-slate-400">|</span>
+                  <span>Admission #</span>
                   <span className="font-semibold text-white">{student.admission_number}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 mt-2">
@@ -560,6 +696,12 @@ export default function StudentDetailsPage() {
                     <Phone className="h-3.5 w-3.5 text-blue-300" />
                     <span>{student.phone}</span>
                   </span>
+                  {student.alternate_phone && (
+                    <span className="flex items-center space-x-1" title="Alternate Mobile Number">
+                      <Phone className="h-3.5 w-3.5 text-emerald-300" />
+                      <span>Alt: {student.alternate_phone}</span>
+                    </span>
+                  )}
                   <span className="flex items-center space-x-1">
                     <MapPin className="h-3.5 w-3.5 text-blue-300" />
                     <span>{student.address}</span>
@@ -743,18 +885,26 @@ export default function StudentDetailsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-slate-500 font-semibold text-[11px]">Primary Phone</p>
+                  <p className="text-slate-900 font-bold mt-1 text-xs">{student.phone}</p>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-slate-500 font-semibold text-[11px]">Alternate Phone</p>
+                  <p className="text-slate-900 font-bold mt-1 text-xs">
+                    {student.alternate_phone || (
+                      <span className="text-slate-400 font-normal italic">Not specified</span>
+                    )}
+                  </p>
+                </div>
                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                   <p className="text-blue-600 font-semibold text-[11px]">Training Mode</p>
-                  <p className="text-slate-800 font-bold mt-1">{admission?.training_mode || 'Hybrid'}</p>
+                  <p className="text-slate-800 font-bold mt-1 text-xs">{admission?.training_mode || 'Online'}</p>
                 </div>
                 <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg">
                   <p className="text-purple-600 font-semibold text-[11px]">Education</p>
-                  <p className="text-slate-800 font-bold mt-1">{admission?.education}</p>
-                </div>
-                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
-                  <p className="text-emerald-600 font-semibold text-[11px]">Prior Experience</p>
-                  <p className="text-slate-800 font-bold mt-1">{admission?.experience_years} Years</p>
+                  <p className="text-slate-800 font-bold mt-1 text-xs">{admission?.education || 'Graduate'}</p>
                 </div>
               </div>
             </CardContent>
@@ -1594,7 +1744,7 @@ export default function StudentDetailsPage() {
                     <th className="px-4 py-3 text-right">Final Total</th>
                     <th className="px-4 py-3 text-right">Outstanding</th>
                     
-                    <th className="px-4 py-3">Counsellor</th>
+                    <th className="px-4 py-3">Sales</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
@@ -2187,7 +2337,7 @@ export default function StudentDetailsPage() {
 
           {role === 'counsellor' && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] space-y-1">
-              <p className="font-semibold">⚠️ Counsellor Submission Policy:</p>
+              <p className="font-semibold">⚠️ Sales Submission Policy:</p>
               <p>
                 This payment will be saved with status <strong>Pending Approval</strong> and forwarded to the Accounts Team at <strong>/accounts/approvals</strong>. Official receipt generation, fee ledger clearance, and onboarding progression occur upon Accounts verification.
               </p>
@@ -2212,6 +2362,133 @@ export default function StudentDetailsPage() {
               disabled={payLoading || payProofUploading || (!payProofUrl && payMode !== 'Cash')}
             >
               {payLoading ? 'Submitting...' : role === 'counsellor' ? 'Submit Payment for Approval' : 'Record Payment'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Student Personal Details Modal (Alternate Mobile Number & Photograph) */}
+      <Modal
+        isOpen={isEditProfileModalOpen}
+        onClose={() => setIsEditProfileModalOpen(false)}
+        title="Edit Student Personal Details"
+        description="Update student contact information and official photograph."
+        maxWidth="md"
+      >
+        <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
+          {editAltPhoneError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 flex items-center space-x-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{editAltPhoneError}</span>
+            </div>
+          )}
+          {editProfileSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              <span>{editProfileSuccess}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Student Unique ID</label>
+            <Input
+              value={student.student_unique_id || student.student_code}
+              disabled
+              className="bg-slate-100 font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Primary Mobile Number</label>
+            <Input value={student.phone} disabled className="bg-slate-100" />
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">
+              Alternate Mobile Number (Optional)
+            </label>
+            <Input
+              type="tel"
+              placeholder="e.g. +91 98765 43211 or 9876543211"
+              value={editAltPhone}
+              onChange={(e) => {
+                setEditAltPhone(e.target.value);
+                if (editAltPhoneError) setEditAltPhoneError('');
+              }}
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Valid 10-digit Indian phone number or standard international format.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <label className="font-semibold text-slate-700 block">
+              Student Photograph (Optional)
+            </label>
+            <div className="flex items-center space-x-4">
+              {editPhotoPreview ? (
+                <div className="relative group">
+                  <img
+                    src={editPhotoPreview}
+                    alt="Preview"
+                    className="h-16 w-16 rounded-xl object-cover border border-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditPhotoUrl('');
+                      setEditPhotoPreview('');
+                    }}
+                    className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5 shadow-sm hover:bg-rose-700"
+                    title="Remove Photo"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="h-16 w-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                  <Camera className="h-6 w-6" />
+                </div>
+              )}
+              <div className="flex-1 space-y-1">
+                <label className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer">
+                  <span>{isEditPhotoUploading ? 'Uploading...' : editPhotoPreview ? 'Change Photo' : 'Upload Photo'}</span>
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={isEditPhotoUploading}
+                    onChange={handleEditPhotoSelect}
+                  />
+                </label>
+                <p className="text-[10px] text-slate-400">
+                  JPG, JPEG, PNG, or WEBP (Max 2 MB).
+                </p>
+                {editPhotoError && (
+                  <p className="text-[11px] text-rose-600">{editPhotoError}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setIsEditProfileModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="sap"
+              size="sm"
+              className="text-xs"
+              disabled={editProfileSaving || isEditPhotoUploading}
+            >
+              {editProfileSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </form>

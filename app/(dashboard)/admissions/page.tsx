@@ -21,6 +21,9 @@ import {
   ExternalLink,
   Receipt as ReceiptIcon,
   ArrowRight,
+  UploadCloud,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,9 +35,10 @@ import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
 import { isLeadConverted } from '@/lib/services/crm-service';
-import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
+import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
 import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
+import { validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
@@ -86,7 +90,13 @@ export default function AdmissionsPage() {
   // Form State for New Admission
   const [name, setName] = React.useState('');
   const [phone, setPhone] = React.useState('');
+  const [alternatePhone, setAlternatePhone] = React.useState('');
+  const [alternatePhoneError, setAlternatePhoneError] = React.useState('');
   const [email, setEmail] = React.useState('');
+  const [photoUrl, setPhotoUrl] = React.useState('');
+  const [photoPreview, setPhotoPreview] = React.useState('');
+  const [photoError, setPhotoError] = React.useState('');
+  const [isPhotoUploading, setIsPhotoUploading] = React.useState(false);
   const [dob, setDob] = React.useState('1998-06-15');
   const [gender, setGender] = React.useState<'Male' | 'Female' | 'Other'>('Male');
   const [address, setAddress] = React.useState('');
@@ -106,11 +116,75 @@ export default function AdmissionsPage() {
   const [batchId, setBatchId] = React.useState(defaultBatch?.id || '');
   const [batchError, setBatchError] = React.useState('');
   const [counsellorId, setCounsellorId] = React.useState('');
-  const [discount, setDiscount] = React.useState(0);
+  // Requirement 4: Approved discount numeric input is empty by default when form opens
+  const [discount, setDiscount] = React.useState<number | ''>('');
   const [feeDueDate, setFeeDueDate] = React.useState('');
   const [feeDueDateError, setFeeDueDateError] = React.useState('');
   const [discountReason, setDiscountReason] = React.useState('');
   const [convertedLeadId, setConvertedLeadId] = React.useState<string | undefined>(undefined);
+
+  // Requirement 6: Four Bank Details Fields in Payments in exact order
+  const defaultBankName = store.settings?.bank_name || 'HDFC Bank Ltd';
+  const defaultAccountName = store.settings?.bank_account_name || 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED';
+  const defaultAccountId = store.settings?.bank_account_number || '50200088991122';
+  const defaultUpi = store.settings?.upi_id || 'nextgenerp@hdfcbank';
+
+  const [ourBankName, setOurBankName] = React.useState(defaultBankName);
+  const [ourBankAccountName, setOurBankAccountName] = React.useState(defaultAccountName);
+  const [ourBankAccountId, setOurBankAccountId] = React.useState(defaultAccountId);
+  const [ourUpiDetails, setOurUpiDetails] = React.useState(defaultUpi);
+  const [bankPreset, setBankPreset] = React.useState<'default' | 'custom'>('default');
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoError('');
+
+    // Supported formats: JPG, JPEG, PNG, WEBP (Max 2 MB)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+      setPhotoError('Supported photo formats: JPG, JPEG, PNG, WEBP.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoError('Student photograph size must not exceed 2 MB.');
+      return;
+    }
+
+    // Instant local preview
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setIsPhotoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', 'student-photos');
+      const res = await fetch('/api/students/photo', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.url) {
+        setPhotoUrl(data.url);
+      } else {
+        setPhotoError(data.error || 'Failed to upload photo. Please retry.');
+      }
+    } catch (err: any) {
+      setPhotoError(err.message || 'Photo upload failed.');
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoRemove = () => {
+    setPhotoUrl('');
+    setPhotoPreview('');
+    setPhotoError('');
+  };
 
   const availableCounsellors = React.useMemo(() => {
     return (store.users || []).filter(
@@ -216,15 +290,18 @@ export default function AdmissionsPage() {
 
   const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];
   const courseFee = selectedCourse?.price || 45000;
-  const netPayable = Math.max(0, courseFee - discount);
+  const discountAmount = typeof discount === 'number' ? discount : 0;
+  const netPayable = Math.max(0, courseFee - discountAmount);
   const isFullPayment = (collectInitialPayment && initialPaymentAmount >= netPayable) || netPayable === 0;
   const isFeeDueDateRequired = !isFullPayment;
 
+  // Requirement 5: Clear due date from form state when full payment is collected
   React.useEffect(() => {
-    if (isFullPayment && feeDueDateError) {
-      setFeeDueDateError('');
+    if (isFullPayment) {
+      if (feeDueDate) setFeeDueDate('');
+      if (feeDueDateError) setFeeDueDateError('');
     }
-  }, [isFullPayment, feeDueDateError]);
+  }, [isFullPayment, feeDueDate, feeDueDateError]);
 
   const refreshList = React.useCallback(async () => {
     try {
@@ -238,7 +315,9 @@ export default function AdmissionsPage() {
         (a) =>
           a.student_name?.toLowerCase().includes(q) ||
           a.admission_number?.toLowerCase().includes(q) ||
+          a.student_unique_id?.toLowerCase().includes(q) ||
           a.phone?.includes(q) ||
+          a.alternate_phone?.includes(q) ||
           a.email?.toLowerCase().includes(q)
       );
     }
@@ -266,9 +345,18 @@ export default function AdmissionsPage() {
       return;
     }
 
+    if (alternatePhone.trim()) {
+      const altValidation = validateAlternatePhoneNumber(alternatePhone, 'Alternate mobile number');
+      if (!altValidation.isValid) {
+        setAlternatePhoneError(altValidation.error || 'Please enter a valid alternate mobile number.');
+        return;
+      }
+    }
+    setAlternatePhoneError('');
+
     const admissionDateStr = new Date().toISOString().slice(0, 10);
     const dueDateValidation = validateFeeDueDate({
-      feeDueDate: feeDueDate.trim() ? feeDueDate : undefined,
+      feeDueDate: isFullPayment ? undefined : (feeDueDate.trim() ? feeDueDate : undefined),
       admissionDate: admissionDateStr,
       netPayable,
       collectInitialPayment,
@@ -316,7 +404,9 @@ export default function AdmissionsPage() {
         {
           student_name: name,
         phone,
+        alternate_phone: alternatePhone.trim() || undefined,
         email,
+        photo_url: photoUrl || undefined,
         dob,
         gender,
         address,
@@ -330,9 +420,9 @@ export default function AdmissionsPage() {
         training_mode: trainingMode,
         batch_id: batchId,
         admission_date: new Date().toISOString().slice(0, 10),
-        fee_due_date: feeDueDate.trim() ? feeDueDate : undefined,
+        fee_due_date: isFullPayment ? undefined : (feeDueDate.trim() ? feeDueDate : undefined),
         course_fee: courseFee,
-        discount,
+        discount: discountAmount,
         discount_reason: discountReason,
         payment_plan: 'Full Payment',
         counsellor_id: counsellorId || user.id,
@@ -344,6 +434,10 @@ export default function AdmissionsPage() {
         payment_proof_url: collectInitialPayment && initialPaymentMode !== 'Cash' ? initialPaymentProofUrl || undefined : undefined,
         payment_date: collectInitialPayment ? initialPaymentDate : undefined,
         initial_payment_notes: initialPaymentNotes,
+        our_bank_name: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankName : undefined,
+        our_bank_account_name: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankAccountName : undefined,
+        our_bank_account_id: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankAccountId : undefined,
+        our_upi_details: collectInitialPayment && (initialPaymentMode === 'UPI' || ourUpiDetails) ? ourUpiDetails : undefined,
       },
       user.id
     );
@@ -359,9 +453,14 @@ export default function AdmissionsPage() {
 
       setName('');
       setPhone('');
+      setAlternatePhone('');
+      setAlternatePhoneError('');
+      setPhotoUrl('');
+      setPhotoPreview('');
+      setPhotoError('');
       setEmail('');
       setAddress('');
-      setDiscount(0);
+      setDiscount('');
       setFeeDueDate('');
       setFeeDueDateError('');
       setDiscountReason('');
@@ -393,7 +492,7 @@ export default function AdmissionsPage() {
         </div>
         <h2 className="text-lg font-bold text-slate-900">Access Restricted</h2>
         <p className="text-xs text-slate-500">
-          You do not have authorization to view student admissions and enrollment records. This area is restricted to Admissions Counsellors, Onboarding Team, and Administration.
+          You do not have authorization to view student admissions and enrollment records. This area is restricted to Admissions Sales staff, Onboarding Team, and Administration.
         </p>
         <div className="pt-2">
           <Link href={role === 'student' ? '/portal' : '/dashboard'}>
@@ -537,7 +636,14 @@ export default function AdmissionsPage() {
                       <td className="px-4 py-3 font-semibold text-blue-600">{adm.admission_number}</td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-slate-800">{adm.student_name}</p>
-                        <p className="text-[10px] text-slate-400">{adm.phone}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {adm.student_unique_id && (
+                            <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-medium">
+                              {adm.student_unique_id}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400">{adm.phone}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-800">{adm.course_name}</p>
@@ -638,7 +744,7 @@ export default function AdmissionsPage() {
         maxWidth="2xl"
       >
         <form onSubmit={handleCreateAdmission} className="space-y-4 text-xs">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input
               label="Student Full Name *"
               placeholder="e.g. Ramesh Kumar"
@@ -653,6 +759,75 @@ export default function AdmissionsPage() {
               onChange={(e) => setPhone(e.target.value)}
               required
             />
+            <Input
+              label="Alternate Mobile Number (Optional)"
+              type="tel"
+              placeholder="+91 98765 43211"
+              value={alternatePhone}
+              error={alternatePhoneError}
+              onChange={(e) => {
+                setAlternatePhone(e.target.value);
+                if (alternatePhoneError) setAlternatePhoneError('');
+              }}
+            />
+          </div>
+
+          {/* Student Photo Attachment (Optional) */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="h-14 w-14 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center relative shadow-xs shrink-0">
+                  {photoPreview || photoUrl ? (
+                    <img
+                      src={photoPreview || photoUrl}
+                      alt="Student photo preview"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-slate-400 flex flex-col items-center justify-center p-1 text-center">
+                      <ImageIcon className="h-5 w-5 text-slate-300" />
+                      <span className="text-[9px] text-slate-400">Photo</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Student Photo (Optional)
+                  </label>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Supported: JPG, JPEG, PNG, WEBP (Max 2 MB).
+                  </p>
+                  {photoError && <p role="alert" className="text-xs text-rose-600 font-medium mt-0.5">{photoError}</p>}
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <label className="cursor-pointer">
+                  <span className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 shadow-xs inline-flex items-center space-x-1.5 transition-colors">
+                    <UploadCloud className="h-3.5 w-3.5 text-slate-500" />
+                    <span>{isPhotoUploading ? 'Uploading...' : photoUrl || photoPreview ? 'Change Photo' : 'Upload Photo'}</span>
+                  </span>
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={isPhotoUploading}
+                    onChange={handlePhotoSelect}
+                  />
+                </label>
+                {(photoUrl || photoPreview) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                    onClick={handlePhotoRemove}
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />
+                    <span>Remove</span>
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -843,7 +1018,7 @@ export default function AdmissionsPage() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Admissions Counsellor *
+                  Admissions Sales *
                 </label>
                 <select
                   value={counsellorId}
@@ -854,7 +1029,7 @@ export default function AdmissionsPage() {
                   <option value="" disabled>Select admissions counsellor</option>
                   {availableCounsellors.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.full_name} ({c.role === 'counsellor' ? 'Counsellor' : 'Admin'})
+                      {c.full_name} ({c.role === 'counsellor' ? 'Sales' : 'Admin'})
                     </option>
                   ))}
                 </select>
@@ -873,35 +1048,44 @@ export default function AdmissionsPage() {
                 value={`₹${courseFee.toLocaleString('en-IN')}`}
                 disabled
               />
-              <div className="space-y-1">
-                <Input
-                  label={isFeeDueDateRequired ? "Fee Due Date *" : "Fee Due Date (Optional)"}
-                  type="date"
-                  value={feeDueDate}
-                  min={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => {
-                    setFeeDueDate(e.target.value);
-                    if (feeDueDateError) setFeeDueDateError('');
-                  }}
-                  required={isFeeDueDateRequired}
-                  error={feeDueDateError}
-                />
-                {isFullPayment ? (
-                  <p className="text-[11px] text-emerald-600 font-medium">
-                    Full payment collected upfront; fee due date is optional.
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-slate-500">
-                    Required for remaining balance of {formatINR(netPayable - (collectInitialPayment ? initialPaymentAmount : 0))}.
-                  </p>
-                )}
-              </div>
               <Input
                 label="Approved Discount (₹)"
                 type="number"
+                placeholder="Enter approved discount"
                 value={discount}
-                onChange={(e) => setDiscount(Number(e.target.value))}
+                min="0"
+                max={courseFee}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setDiscount('');
+                  } else {
+                    const num = Number(val);
+                    if (num < 0) setDiscount(0);
+                    else if (num > courseFee) setDiscount(courseFee);
+                    else setDiscount(num);
+                  }
+                }}
               />
+              {!isFullPayment && (
+                <div className="space-y-1 md:col-span-2">
+                  <Input
+                    label="Fee Due Date *"
+                    type="date"
+                    value={feeDueDate}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => {
+                      setFeeDueDate(e.target.value);
+                      if (feeDueDateError) setFeeDueDateError('');
+                    }}
+                    required
+                    error={feeDueDateError}
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Required for remaining balance of {formatINR(netPayable - (collectInitialPayment ? initialPaymentAmount : 0))}.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between mt-3">
@@ -1023,6 +1207,93 @@ export default function AdmissionsPage() {
                     />}
                   </div>
 
+                  {initialPaymentMode !== 'Cash' && (
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-xs text-slate-800 block">
+                            Bank Details
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            Institute receiving account details for fee reconciliation
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <label className="text-[10px] text-slate-500 font-medium">Account Preset:</label>
+                          <select
+                            value={bankPreset}
+                            onChange={(e) => {
+                              const val = e.target.value as 'default' | 'custom';
+                              setBankPreset(val);
+                              if (val === 'default') {
+                                setOurBankName(defaultBankName);
+                                setOurBankAccountName(defaultAccountName);
+                                setOurBankAccountId(defaultAccountId);
+                                setOurUpiDetails(defaultUpi);
+                              }
+                            }}
+                            className="text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-700 font-medium"
+                          >
+                            <option value="default">Primary Account ({defaultBankName})</option>
+                            <option value="custom">Custom Bank Account</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <Input
+                            label="Our Bank Name *"
+                            placeholder="e.g. HDFC Bank"
+                            value={ourBankName}
+                            onChange={(e) => {
+                              setOurBankName(e.target.value);
+                              setBankPreset('custom');
+                            }}
+                            required={collectInitialPayment}
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            label="Our Bank Account Name *"
+                            placeholder="e.g. Next-Gen ERP Solutions"
+                            value={ourBankAccountName}
+                            onChange={(e) => {
+                              setOurBankAccountName(e.target.value);
+                              setBankPreset('custom');
+                            }}
+                            required={collectInitialPayment}
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            label="Our Bank Account ID *"
+                            type="text"
+                            placeholder="e.g. 50200088991122"
+                            value={ourBankAccountId}
+                            onChange={(e) => {
+                              setOurBankAccountId(e.target.value);
+                              setBankPreset('custom');
+                            }}
+                            required={collectInitialPayment}
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            label="Our UPI Details"
+                            type="text"
+                            placeholder="e.g. nextgenerp@bank"
+                            value={ourUpiDetails}
+                            onChange={(e) => {
+                              setOurUpiDetails(e.target.value);
+                              setBankPreset('custom');
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {initialPaymentMode !== 'Cash' && <FileUpload
                     key={initialPaymentMode}
                     bucket="payment-proofs"
@@ -1099,6 +1370,14 @@ export default function AdmissionsPage() {
                 <p className="text-emerald-800">
                   Admission Number: <strong className="font-mono">{admissionSuccessModal.admission.admission_number}</strong>
                 </p>
+                <p className="text-emerald-900 font-medium">
+                  Student Unique ID:{' '}
+                  <strong className="font-mono bg-emerald-100/90 text-emerald-900 px-2 py-0.5 rounded border border-emerald-300">
+                    {admissionSuccessModal.student.student_unique_id ||
+                      admissionSuccessModal.admission.student_unique_id ||
+                      admissionSuccessModal.student.student_code}
+                  </strong>
+                </p>
                 <p className="text-emerald-700 text-[11px]">
                   Course: {admissionSuccessModal.admission.course_name} | Mode: {admissionSuccessModal.admission.training_mode}
                 </p>
@@ -1143,7 +1422,16 @@ export default function AdmissionsPage() {
                   </div>
                 </div>
 
-                
+                {admissionSuccessModal.admission.our_bank_name && (
+                  <div className="pt-2 border-t border-blue-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Credited To:</span>
+                    <span className="font-semibold text-slate-800">
+                      {admissionSuccessModal.admission.our_bank_name}
+                      {admissionSuccessModal.admission.our_bank_account_id &&
+                        ` (${maskBankAccountId(admissionSuccessModal.admission.our_bank_account_id)})`}
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">

@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BookOpen, Eye, EyeOff, GraduationCap, AlertCircle } from 'lucide-react';
@@ -43,7 +44,7 @@ const DEMO_ACCOUNTS = [
   },
   {
     role: 'admin' as const,
-    label: 'Operations Admin',
+    label: getRoleLabel('admin'),
     name: 'Priya Nair (Operations Head)',
     email: 'admin@next-generpsolutions.com',
     password: 'AdminPass#2026',
@@ -61,8 +62,8 @@ const DEMO_ACCOUNTS = [
   },
   {
     role: 'counsellor' as const,
-    label: 'Counsellor',
-    name: 'Ananya Desai (Senior Counsellor)',
+    label: getRoleLabel('counsellor'),
+    name: 'Ananya Desai (Senior Sales)',
     email: 'counsellor@next-generpsolutions.com',
     password: 'CounsellorPass#2026',
     route: '/crm/leads',
@@ -334,7 +335,7 @@ export default function LoginPage() {
         <div className="py-8 lg:py-16">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">Multi-Role Institute ERP & LMS</p>
           <h1 className="max-w-lg text-3xl font-semibold leading-tight lg:text-5xl">Build skills.<br />Create your future.</h1>
-          <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">Complete enterprise training management for students, trainers, accountants, counsellors, support mentors, and administrators.</p>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">Complete enterprise training management for students, trainers, accountants, sales staff, support mentors, and administrators.</p>
           <div className="mt-8 flex items-center gap-3 text-xs text-slate-300"><BookOpen aria-hidden="true" className="text-blue-400" size={18} />8 Dedicated Role Workspaces & Portals</div>
         </div>
         <p className="text-[11px] text-slate-500">Next-Gen ERP Solutions · SAP Training Institute</p>
@@ -479,7 +480,7 @@ export default function LoginPage() {
               <div>
                 <p className="font-semibold text-blue-900 text-xs">Active Session Detected</p>
                 <p className="text-[11px] text-blue-700">
-                  Signed in as <strong>{user.full_name}</strong> ({user.role.replace('_', ' ')})
+                  Signed in as <strong>{user.full_name}</strong> ({getRoleLabel(user.role)})
                 </p>
                 {targetRedirect && (
                   <p className="text-[10px] text-blue-600 mt-0.5 truncate max-w-[220px]">

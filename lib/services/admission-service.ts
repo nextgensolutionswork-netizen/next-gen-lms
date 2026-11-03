@@ -16,12 +16,38 @@ import {
   Lead,
 } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { generateAdmissionNumber } from '@/lib/utils/formatters';
+import { generateAdmissionNumber, generateStudentUniqueId } from '@/lib/utils/formatters';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { ensureOnboardingCaseForAdmission } from './onboarding-service';
 import { feeWorkflowService } from './fee-workflow-service';
 import { tenantId } from '@/lib/auth/tenant';
 import type { StudentPaymentRecord } from '@/types';
+
+export function getNextStudentSequence(year = new Date().getFullYear()): number {
+  const prefix = `NGERP-${year}-`;
+  let maxSeq = 0;
+  for (const s of store.students || []) {
+    const id = s.student_unique_id || s.student_code;
+    if (id && id.startsWith(prefix)) {
+      const num = parseInt(id.slice(prefix.length), 10);
+      if (Number.isFinite(num) && num > maxSeq) maxSeq = num;
+    }
+  }
+  for (const a of store.admissions || []) {
+    const id = a.student_unique_id;
+    if (id && id.startsWith(prefix)) {
+      const num = parseInt(id.slice(prefix.length), 10);
+      if (Number.isFinite(num) && num > maxSeq) maxSeq = num;
+    }
+  }
+  if ((store as any).highestStudentSequence && typeof (store as any).highestStudentSequence[year] === 'number') {
+    maxSeq = Math.max(maxSeq, (store as any).highestStudentSequence[year]);
+  }
+  const nextSeq = maxSeq + 1;
+  if (!(store as any).highestStudentSequence) (store as any).highestStudentSequence = {};
+  (store as any).highestStudentSequence[year] = nextSeq;
+  return nextSeq;
+}
 
 export async function getAdmissions(): Promise<Admission[]> {
   if (typeof window !== 'undefined') {
@@ -127,7 +153,9 @@ export function validateFeeDueDate(params: {
 export interface CreateAdmissionInput {
   student_name: string;
   phone: string;
+  alternate_phone?: string;
   email: string;
+  photo_url?: string;
   dob: string;
   gender: 'Male' | 'Female' | 'Other';
   address: string;
@@ -158,6 +186,10 @@ export interface CreateAdmissionInput {
   initial_payment_notes?: string;
   payment_proof_url?: string;
   payment_date?: string;
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
   idempotency_key?: string;
 }
 
@@ -311,6 +343,8 @@ export async function createAdmissionWorkflow(
 
   const sequence = store.admissions.length + 1;
   const admission_number = generateAdmissionNumber(sequence);
+  const studentSequence = getNextStudentSequence();
+  const studentUniqueId = generateStudentUniqueId(studentSequence);
 
   const net_payable = Math.max(0, input.course_fee - discount);
 
@@ -374,10 +408,13 @@ export async function createAdmissionWorkflow(
     tenant_id: admissionTenant,
     id: `adm-${Date.now()}`,
     admission_number,
+    student_unique_id: studentUniqueId,
     lead_id: input.lead_id,
     student_name: input.student_name,
     phone: input.phone,
+    alternate_phone: input.alternate_phone,
     email: input.email,
+    photo_url: input.photo_url,
     dob: input.dob,
     gender: input.gender,
     address: input.address,
@@ -396,6 +433,7 @@ export async function createAdmissionWorkflow(
     trainer_id: trainer?.id,
     trainer_name: trainer?.full_name,
     admission_date: input.admission_date,
+    fee_due_date: input.fee_due_date ? input.fee_due_date.trim() : undefined,
     course_fee: input.course_fee,
     discount: input.discount || 0,
     discount_reason: input.discount_reason,
@@ -403,6 +441,10 @@ export async function createAdmissionWorkflow(
     payment_plan: 'Full Payment',
     counsellor_id: counsellor?.id,
     counsellor_name: counsellor?.full_name,
+    our_bank_name: input.our_bank_name,
+    our_bank_account_name: input.our_bank_account_name,
+    our_bank_account_id: input.our_bank_account_id,
+    our_upi_details: input.our_upi_details,
     status: 'Confirmed',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -434,10 +476,14 @@ export async function createAdmissionWorkflow(
     user_id: studentUserId,
     admission_id: newAdmission.id,
     student_code: studentCode,
+    student_unique_id: studentUniqueId,
     admission_number,
     full_name: input.student_name,
     email: input.email,
     phone: input.phone,
+    alternate_phone: input.alternate_phone,
+    profile_photo: input.photo_url,
+    photo_url: input.photo_url,
     address: `${input.address}, ${input.city}, ${stateVal}`,
     city: input.city,
     state: stateVal,
@@ -607,6 +653,10 @@ export async function createAdmissionWorkflow(
       amount_paid: input.initial_payment_amount, payment_mode: input.payment_mode || 'UPI',
       payment_date: input.payment_date || actualPaymentDate(), transaction_reference: input.transaction_reference,
       payment_proof_url: input.payment_proof_url, notes: input.initial_payment_notes,
+      our_bank_name: input.our_bank_name,
+      our_bank_account_name: input.our_bank_account_name,
+      our_bank_account_id: input.our_bank_account_id,
+      our_upi_details: input.our_upi_details,
     }, performedByUserId, performingUser.role);
   }
 

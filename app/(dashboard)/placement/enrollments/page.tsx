@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -1481,7 +1482,7 @@ export default function PlacementEnrollmentsPage() {
                 .filter((u) => u.role === 'placement_coordinator' || u.role === 'admin' || u.role === 'super_admin' || u.role === 'counsellor')
                 .map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.full_name} ({u.role.replace('_', ' ')})
+                    {u.full_name} ({getRoleLabel(u.role)})
                   </option>
                 ))}
             </select>

@@ -116,7 +116,7 @@ export default function FollowupsPage() {
     };
   }, [activeFollowups, getUrgency]);
 
-  // Available counsellors for filtering
+  // Available sales staff for filtering
   const availableCounsellors = React.useMemo(() => {
     return (store.users || []).filter(
       (u) => u.role === 'counsellor' || u.role === 'admin' || u.role === 'super_admin'
@@ -136,7 +136,7 @@ export default function FollowupsPage() {
       if (urgencyFilter === 'Upcoming' && urgency !== 'upcoming') return false;
       if (urgencyFilter === 'Unscheduled' && urgency !== 'unscheduled') return false;
 
-      // Counsellor filter
+      // Sales filter
       if (counsellorFilter !== 'All') {
         if (counsellorFilter === 'mine') {
           if (lead.counsellor_id !== user?.id) return false;
@@ -393,7 +393,7 @@ export default function FollowupsPage() {
         </div>
         <h2 className="text-lg font-bold text-slate-900">Access Restricted</h2>
         <p className="text-xs text-slate-500">
-          You do not have authorization to view follow-up and demo schedules. This area is restricted to Counsellors and Admissions Administration.
+          You do not have authorization to view follow-up and demo schedules. This area is restricted to Sales staff and Admissions Administration.
         </p>
         <div className="pt-2">
           <Link href={role === 'student' ? '/portal' : '/dashboard'}>
@@ -549,15 +549,15 @@ export default function FollowupsPage() {
               </select>
             </div>
 
-            {/* Counsellor filter */}
+            {/* Sales filter */}
             <div className="flex items-center space-x-1">
-              <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Counsellor:</span>
+              <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Sales:</span>
               <select
                 value={counsellorFilter}
                 onChange={(e) => setCounsellorFilter(e.target.value)}
                 className="text-xs bg-white border border-slate-200 rounded px-2 py-1 text-slate-700 font-medium"
               >
-                <option value="All">All Counsellors</option>
+                <option value="All">All Sales staff</option>
                 {user && <option value="mine">Assigned to Me</option>}
                 {availableCounsellors.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -776,7 +776,7 @@ export default function FollowupsPage() {
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5 flex items-center space-x-3">
                             <span>
-                              Counsellor: <strong>{lead.counsellor_name || 'Unassigned'}</strong>
+                              Sales: <strong>{lead.counsellor_name || 'Unassigned'}</strong>
                             </span>
                             <span>•</span>
                             <a href={`tel:${lead.phone}`} className="text-blue-600 hover:underline font-medium">
@@ -974,7 +974,7 @@ export default function FollowupsPage() {
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                     <div className="flex items-center space-x-2">
                       <span className="text-[11px] text-slate-400">
-                        Counsellor: <strong className="text-slate-600">{lead.counsellor_name || 'Unassigned'}</strong>
+                        Sales: <strong className="text-slate-600">{lead.counsellor_name || 'Unassigned'}</strong>
                       </span>
                       <button
                         type="button"
@@ -1328,7 +1328,7 @@ export default function FollowupsPage() {
                           <span>•</span>
                           <span>Time: <strong>{timeStr}</strong></span>
                           <span>•</span>
-                          <span>Counsellor: <strong>{lead.counsellor_name || 'Unassigned'}</strong></span>
+                          <span>Sales: <strong>{lead.counsellor_name || 'Unassigned'}</strong></span>
                         </p>
                       </div>
 

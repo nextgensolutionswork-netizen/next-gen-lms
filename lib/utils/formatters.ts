@@ -54,6 +54,18 @@ export function generateAdmissionNumber(sequence: number): string {
   return `ADM-${year}-${String(sequence).padStart(4, '0')}`;
 }
 
+export function generateStudentUniqueId(sequence: number, year: number = new Date().getFullYear()): string {
+  return `NGERP-${year}-${String(sequence).padStart(5, '0')}`;
+}
+
+export function maskBankAccountId(accountId: string): string {
+  if (!accountId) return '';
+  const clean = String(accountId).trim();
+  if (clean.length <= 4) return clean;
+  const visible = clean.slice(-4);
+  return '•'.repeat(Math.max(4, clean.length - 4)) + visible;
+}
+
 export function generateCertificateId(courseCode: string, sequence: number): string {
   const year = new Date().getFullYear();
   const cleanCode = courseCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();

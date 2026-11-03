@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -13,9 +14,19 @@ interface HeaderProps {
   avatar?: string;
   onOpenNavigation?: () => void;
   navigationOpen?: boolean;
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
 }
 
-export function Header({ currentRole, currentUserName, avatar, onOpenNavigation, navigationOpen }: HeaderProps) {
+export function Header({
+  currentRole,
+  currentUserName,
+  avatar,
+  onOpenNavigation,
+  navigationOpen,
+  onToggleSidebar,
+  sidebarCollapsed = false,
+}: HeaderProps) {
   const { logout, user } = useAuth();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   React.useEffect(() => {
@@ -65,10 +76,32 @@ export function Header({ currentRole, currentUserName, avatar, onOpenNavigation,
 
   return (
     <header className="min-h-16 gap-2 border-b border-slate-200 bg-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between sticky top-0 z-40 print:hidden">
-      {onOpenNavigation && <button type="button" aria-label="Open navigation" aria-controls="mobile-navigation" aria-expanded={navigationOpen} onClick={onOpenNavigation} className="lg:hidden rounded-lg border border-slate-200 p-2"><Menu className="h-5 w-5" /></button>}
-      {/* Search Input */}
-      <div className="flex items-center min-w-0 flex-1 max-w-96">
-        <div className="relative w-full">
+      <div className="flex items-center gap-2 min-w-0 flex-1 max-w-md">
+        {onOpenNavigation && (
+          <button
+            type="button"
+            aria-label="Open navigation"
+            aria-controls="mobile-navigation"
+            aria-expanded={navigationOpen}
+            onClick={onOpenNavigation}
+            className="lg:hidden rounded-lg border border-slate-200 p-2 hover:bg-slate-100 text-slate-600 transition-colors"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+        {sidebarCollapsed && onToggleSidebar && (
+          <button
+            type="button"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            onClick={onToggleSidebar}
+            className="hidden lg:flex items-center justify-center rounded-lg border border-slate-200 p-2 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors shrink-0"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+        {/* Search Input */}
+        <div className="relative w-full max-w-96">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
@@ -148,7 +181,7 @@ export function Header({ currentRole, currentUserName, avatar, onOpenNavigation,
           )}
           <div className="hidden sm:block text-left">
             <p className="text-xs font-bold text-slate-800 leading-tight">{currentUserName}</p>
-            <p className="text-[10px] font-medium text-slate-500 capitalize">{currentRole.replace('_', ' ')}</p>
+            <p className="text-[10px] font-medium text-slate-500 capitalize">{getRoleLabel(currentRole)}</p>
           </div>
         </div>
 

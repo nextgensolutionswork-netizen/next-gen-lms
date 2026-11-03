@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { FileUpload } from '@/components/ui/file-upload';
@@ -110,7 +111,7 @@ export default function FeeApprovalsPage() {
   const [verificationBusy, setVerificationBusy] = React.useState(false);
   const [paymentRejectionReason, setPaymentRejectionReason] = React.useState('');
 
-  // Counsellor Payment Update Modal state
+  // Sales Payment Update Modal state
   const [paymentUpdateModalOpen, setPaymentUpdateModalOpen] = React.useState(false);
   const [updatingPayment, setUpdatingPayment] = React.useState<StudentPaymentRecord | null>(null);
   const [editAmount, setEditAmount] = React.useState<number>(0);
@@ -121,7 +122,7 @@ export default function FeeApprovalsPage() {
   const [editProofUrl, setEditProofUrl] = React.useState<string>('');
   const [editNotes, setEditNotes] = React.useState<string>('');
 
-  // Record Payment Modal state (Counsellor / Staff)
+  // Record Payment Modal state (Sales / Staff)
   const [recordPaymentModalOpen, setRecordPaymentModalOpen] = React.useState(false);
   const [recFeeId, setRecFeeId] = React.useState<string>('');
   const [recAmount, setRecAmount] = React.useState<number>(15000);
@@ -760,7 +761,7 @@ export default function FeeApprovalsPage() {
             <span className="text-slate-500 font-medium">Session:</span>
             <span className="font-semibold text-slate-800">{user?.full_name || 'Staff'}</span>
             <Badge variant="outline" className="text-[10px] capitalize bg-white text-slate-700">
-              {role?.replace('_', ' ') || 'Staff'}
+              {getRoleLabel(role) || 'Staff'}
             </Badge>
           </div>
 
@@ -822,7 +823,7 @@ export default function FeeApprovalsPage() {
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3.5 flex items-start space-x-3 text-xs text-blue-900 shadow-xs">
         <ShieldAlert className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
         <div>
-          <span className="font-bold">Separation of Duties Invariant:</span> Counsellor proposes the fee and updates payments, Accountant reviews and approves. The submitter or updater can never verify or financially clear their own submission. Only Accountant-approved fees and payments become finalized and credited to the student ledger.
+          <span className="font-bold">Separation of Duties Invariant:</span> Sales proposes the fee and updates payments, Accountant reviews and approves. The submitter or updater can never verify or financially clear their own submission. Only Accountant-approved fees and payments become finalized and credited to the student ledger.
         </div>
       </div>
 
@@ -1029,7 +1030,7 @@ export default function FeeApprovalsPage() {
                   <th className="px-4 py-3 text-right">Discount</th>
                   <th className="px-4 py-3 text-right">Final Payable</th>
                   
-                  <th className="px-4 py-3">Counsellor</th>
+                  <th className="px-4 py-3">Sales</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
@@ -1125,7 +1126,7 @@ export default function FeeApprovalsPage() {
                         </td>
                         
 
-                        {/* Counsellor */}
+                        {/* Sales */}
                         <td className="px-4 py-3 text-slate-600">
                           <div>
                             <p className="font-medium text-slate-800 truncate max-w-[110px]" title={fee.counsellor_name}>
@@ -1287,7 +1288,7 @@ export default function FeeApprovalsPage() {
   )}
 
       {/* ========================================================================= */}
-      {/* DESK 2: STUDENT PAYMENT APPROVALS & VERIFICATION (Counsellor <-> Accountant) */}
+      {/* DESK 2: STUDENT PAYMENT APPROVALS & VERIFICATION (Sales <-> Accountant) */}
       {/* ========================================================================= */}
       {activeDesk === 'payment_approvals' && (
         <div className="space-y-6">
@@ -1425,7 +1426,7 @@ export default function FeeApprovalsPage() {
                             <CreditCard className="h-8 w-8 text-slate-300" />
                             <p className="font-medium text-slate-500">No payment records found in this category.</p>
                             <p className="text-[11px] text-slate-400">
-                              When counsellors update or record payments, they appear here for accountant approval.
+                              When sales staff update or record payments, they appear here for accountant approval.
                             </p>
                           </div>
                         </td>
@@ -1554,14 +1555,14 @@ export default function FeeApprovalsPage() {
                               <div className="flex items-center justify-center space-x-1.5">
                                 {p.verification_status !== 'Verified' && (
                                   <>
-                                    {/* Counsellor Update Action */}
+                                    {/* Sales Update Action */}
                                     {canCounsellorEdit && (
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleOpenUpdatePaymentModal(p)}
                                         className="text-xs px-2 py-1 h-7 text-blue-700 border-blue-300 hover:bg-blue-50 flex items-center space-x-1"
-                                        title="Counsellor: Update payment amount, UTR reference, proof slip, or notes"
+                                        title="Sales: Update payment amount, UTR reference, proof slip, or notes"
                                       >
                                         <Edit3 className="h-3 w-3" />
                                         <span>Update</span>
@@ -1675,7 +1676,7 @@ export default function FeeApprovalsPage() {
                 <span className="text-slate-800">{courseLabel(selectedFee)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Counsellor:</span>
+                <span className="text-slate-500">Sales:</span>
                 <span className="text-slate-800">{selectedFee.counsellor_name}</span>
               </div>
             </div>
@@ -1766,7 +1767,7 @@ export default function FeeApprovalsPage() {
 
           <div>
             <label className="block text-slate-700 font-medium mb-1">
-              Detailed Instructions for Counsellor:
+              Detailed Instructions for Sales:
             </label>
             <textarea
               rows={3}
@@ -2024,7 +2025,7 @@ export default function FeeApprovalsPage() {
           </div>
 
           <div>
-            <label className="block text-slate-700 font-medium mb-1">Counsellor Notes</label>
+            <label className="block text-slate-700 font-medium mb-1">Sales Notes</label>
             <textarea
               rows={2}
               value={proposedNotes}
@@ -2483,7 +2484,7 @@ export default function FeeApprovalsPage() {
           setPaymentUpdateModalOpen(false);
           setUpdatingPayment(null);
         }}
-        title="Update Student Payment Details (Counsellor Edit)"
+        title="Update Student Payment Details (Sales Edit)"
         description="Correct payment amount, mode, transaction reference (UTR), date, deposit slip link, or remarks while awaiting accountant approval."
         maxWidth="lg"
       >
@@ -2592,7 +2593,7 @@ export default function FeeApprovalsPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-medium mb-1">Counsellor Modification Notes</label>
+              <label className="block text-slate-700 font-medium mb-1">Sales Modification Notes</label>
               <textarea
                 rows={2}
                 value={editNotes}

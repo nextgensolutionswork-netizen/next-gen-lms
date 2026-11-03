@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import {
   Users,
@@ -371,7 +372,7 @@ export default function UsersPage() {
         </div>
         <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
         <p className="text-sm text-slate-500">
-          Faculty & Staff directory and security configuration are strictly restricted to Super Administrators and Operational Administrators.
+          Faculty & Staff directory and security configuration are strictly restricted to Super Administrators and Sales Leads.
         </p>
       </div>
     );
@@ -424,10 +425,10 @@ export default function UsersPage() {
             >
               <option value="All">All Roles ({users.length})</option>
               <option value="super_admin">Super Admin</option>
-              <option value="admin">Admin</option>
+              <option value="admin">{getRoleLabel('admin')}</option>
               <option value="trainer">Trainer</option>
               <option value="accountant">Accountant</option>
-              <option value="counsellor">Counsellor</option>
+              <option value="counsellor">{getRoleLabel('counsellor')}</option>
               <option value="placement_coordinator">Placement Head</option>
               <option value="support">Academic Support</option>
               <option value="onboarding_team">Onboarding Team</option>
@@ -496,7 +497,7 @@ export default function UsersPage() {
                             }
                             className="capitalize"
                           >
-                            {u.role.replace('_', ' ')}
+                            {getRoleLabel(u.role)}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-slate-700">
@@ -642,12 +643,12 @@ export default function UsersPage() {
               className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
             >
               <option value="super_admin">Super Admin / Director</option>
-              <option value="admin">Operations Admin</option>
+              <option value="admin">{getRoleLabel('admin')}</option>
               <option value="onboarding_team">Student Onboarding Specialist</option>
               <option value="trainer">Trainer (Assigned Courses Only)</option>
               <option value="support">Academic Support Mentor</option>
               <option value="accountant">Accountant (Financial Ledgers Only)</option>
-              <option value="counsellor">Counsellor (CRM & Admissions)</option>
+              <option value="counsellor">{getRoleLabel('counsellor')} (CRM & Admissions)</option>
               <option value="placement_coordinator">Placement Coordinator</option>
               <option value="student">Student Account</option>
             </select>
@@ -874,12 +875,12 @@ export default function UsersPage() {
               className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
             >
               <option value="super_admin">Super Admin / Director</option>
-              <option value="admin">Operations Admin</option>
+              <option value="admin">{getRoleLabel('admin')}</option>
               <option value="onboarding_team">Student Onboarding Specialist</option>
               <option value="trainer">Trainer (Assigned Courses Only)</option>
               <option value="support">Academic Support Mentor</option>
               <option value="accountant">Accountant (Financial Ledgers Only)</option>
-              <option value="counsellor">Counsellor (CRM & Admissions)</option>
+              <option value="counsellor">{getRoleLabel('counsellor')} (CRM & Admissions)</option>
               <option value="placement_coordinator">Placement Coordinator</option>
               <option value="student">Student Account</option>
             </select>

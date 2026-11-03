@@ -80,7 +80,14 @@ export function FileUpload({
       formData.append('bucket', bucket);
       if (entityId) formData.append('entityId', entityId);
 
-      const res = await fetch(bucket === 'payment-proofs' ? '/api/fees/proof' : '/api/upload', {
+      const uploadEndpoint =
+        bucket === 'payment-proofs'
+          ? '/api/fees/proof'
+          : bucket === 'student-photos'
+          ? '/api/students/photo'
+          : '/api/upload';
+
+      const res = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
       });
@@ -94,9 +101,9 @@ export function FileUpload({
         }
       }
 
-      if (bucket === 'payment-proofs') {
+      if (bucket === 'payment-proofs' || bucket === 'student-photos') {
         const error = await res.json().catch(() => ({}));
-        throw new Error(error.error || 'Payment proof upload failed. Please retry.');
+        throw new Error(error.error || `${bucket === 'student-photos' ? 'Student photo' : 'Payment proof'} upload failed. Please retry.`);
       }
 
       // 2. Direct client fallback via storage-service

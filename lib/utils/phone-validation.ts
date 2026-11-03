@@ -233,3 +233,79 @@ export function findDuplicateLeadByPhone<T extends { id?: string; phone?: string
     return lDigits === targetDigits;
   });
 }
+
+/**
+ * Validates an optional alternate mobile number.
+ * Returns valid if empty.
+ * If provided, validates that it contains digits only, and validates Indian (10 digits starting with 6,7,8,9)
+ * or international format (7-15 digits).
+ */
+export function validateAlternatePhoneNumber(
+  rawPhone?: string | null,
+  fieldLabel: string = 'Alternate mobile number'
+): PhoneValidationResult {
+  if (!rawPhone || !rawPhone.trim()) {
+    return { isValid: true };
+  }
+
+  const trimmed = rawPhone.trim();
+
+  // Reject disallowed characters
+  if (/[^\d\s\-\(\)\+]/.test(trimmed)) {
+    return {
+      isValid: false,
+      error: `${fieldLabel} must contain numbers only. Letters and special characters are not allowed.`,
+    };
+  }
+
+  // Extract digits
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits) {
+    return { isValid: true };
+  }
+
+  // Handle +91 prefix
+  if (trimmed.startsWith('+91') || (trimmed.startsWith('91') && digits.length === 12)) {
+    if (digits.startsWith('91')) {
+      digits = digits.slice(2);
+    }
+  }
+
+  // If 10 digits or was prefixed with +91, validate as Indian mobile number
+  if (digits.length === 10 || trimmed.startsWith('+91')) {
+    if (digits.length !== 10) {
+      return {
+        isValid: false,
+        error: `Indian mobile number must be exactly 10 digits (currently ${digits.length} digits).`,
+      };
+    }
+    const firstDigit = digits.charAt(0);
+    if (!['6', '7', '8', '9'].includes(firstDigit)) {
+      return {
+        isValid: false,
+        error: `Indian mobile number must begin with 6, 7, 8, or 9 (starts with ${firstDigit}).`,
+      };
+    }
+    const formatted = `${digits.slice(0, 5)} ${digits.slice(5)}`;
+    return {
+      isValid: true,
+      normalized: `+91 ${formatted}`,
+      canonicalDigits: `91${digits}`,
+    };
+  }
+
+  // International phone validation (7 to 15 digits)
+  if (digits.length < 7 || digits.length > 15) {
+    return {
+      isValid: false,
+      error: `${fieldLabel} must be between 7 and 15 digits (currently ${digits.length} digits).`,
+    };
+  }
+
+  const prefix = trimmed.startsWith('+') ? '+' : '+91 ';
+  return {
+    isValid: true,
+    normalized: `${prefix}${digits}`,
+    canonicalDigits: digits,
+  };
+}

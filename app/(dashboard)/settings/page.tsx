@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import Image from 'next/image';
 import {
@@ -282,7 +283,7 @@ export default function SettingsPage() {
         <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center space-x-2.5">
           <ShieldAlert className="h-4 w-4 text-amber-600 flex-shrink-0" />
           <span>
-            <strong>Read-Only Mode:</strong> Your role ({currentRole ? currentRole.replace('_', ' ') : 'viewer'}) does not have administrative permissions to edit global system settings. Only Super Admins and Operations Admins can commit changes.
+            <strong>Read-Only Mode:</strong> Your role ({currentRole ? getRoleLabel(currentRole) : 'viewer'}) does not have administrative permissions to edit global system settings. Only Super Admins and Sales Leads can commit changes.
           </span>
         </div>
       )}

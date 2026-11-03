@@ -87,22 +87,28 @@ export default function StudentsListPage() {
         if (!s) return false;
         const fullName = s.full_name ? String(s.full_name).toLowerCase() : '';
         const studentCode = s.student_code ? String(s.student_code).toLowerCase() : '';
+        const studentUniqueId = s.student_unique_id ? String(s.student_unique_id).toLowerCase() : '';
         const admNumber = s.admission_number ? String(s.admission_number).toLowerCase() : '';
         const email = s.email ? String(s.email).toLowerCase() : '';
         const courseName = s.course_name ? String(s.course_name).toLowerCase() : '';
         const batchName = s.batch_name ? String(s.batch_name).toLowerCase() : '';
         const phoneRaw = s.phone != null ? String(s.phone).toLowerCase() : '';
         const phoneDigits = phoneRaw.replace(/\D/g, '');
+        const altPhoneRaw = s.alternate_phone != null ? String(s.alternate_phone).toLowerCase() : '';
+        const altPhoneDigits = altPhoneRaw.replace(/\D/g, '');
 
         return (
           fullName.includes(q) ||
           studentCode.includes(q) ||
+          studentUniqueId.includes(q) ||
           admNumber.includes(q) ||
           email.includes(q) ||
           courseName.includes(q) ||
           batchName.includes(q) ||
           (phoneRaw.length > 0 && phoneRaw.includes(q)) ||
-          (cleanDigits.length > 0 && phoneDigits.includes(cleanDigits))
+          (cleanDigits.length > 0 && phoneDigits.includes(cleanDigits)) ||
+          (altPhoneRaw.length > 0 && altPhoneRaw.includes(q)) ||
+          (cleanDigits.length > 0 && altPhoneDigits.includes(cleanDigits))
         );
       });
     }
@@ -143,10 +149,12 @@ export default function StudentsListPage() {
     }
 
     const exportData = filteredStudents.map((s) => ({
+      'Student Unique ID': s.student_unique_id || s.student_code || 'N/A',
       'Student Code': s.student_code,
       'Full Name': s.full_name,
       'Email': s.email,
       'Phone': s.phone || 'N/A',
+      'Alternate Phone': s.alternate_phone || 'N/A',
       'Course': s.course_name || 'N/A',
       'Batch': s.batch_name || 'N/A',
       'Joining Date': formatDate(s.joining_date),
@@ -374,10 +382,44 @@ export default function StudentsListPage() {
                 ) : (
                   paginatedStudents.map((stu) => (
                     <tr key={stu.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-blue-600">{stu.student_code}</td>
+                      <td className="px-4 py-3 font-semibold text-blue-600">
+                        {stu.student_unique_id ? (
+                          <div>
+                            <span className="font-mono text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px] font-bold block w-fit">
+                              {stu.student_unique_id}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">{stu.student_code}</span>
+                          </div>
+                        ) : (
+                          stu.student_code
+                        )}
+                      </td>
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-800">{stu.full_name}</p>
-                        <p className="text-[10px] text-slate-400">{stu.email}</p>
+                        <div className="flex items-center space-x-2.5">
+                          {stu.photo_url || stu.profile_photo ? (
+                            <img
+                              src={stu.photo_url || stu.profile_photo}
+                              alt={stu.full_name}
+                              className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-[11px] shrink-0 border border-slate-200">
+                              {stu.full_name?.charAt(0) || 'S'}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-slate-800">{stu.full_name}</p>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                              <span>{stu.email}</span>
+                              {stu.phone && <span>• {stu.phone}</span>}
+                              {stu.alternate_phone && (
+                                <span className="text-emerald-700" title="Alternate Phone">
+                                  • Alt: {stu.alternate_phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-800">{stu.course_name}</p>

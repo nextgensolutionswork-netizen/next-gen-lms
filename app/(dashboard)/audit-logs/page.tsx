@@ -149,7 +149,7 @@ export default function AuditLogsPage() {
         </div>
         <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
         <p className="text-sm text-slate-500">
-          The forensic audit trail is strictly restricted to Super Administrators and Operational Administrators.
+          The forensic audit trail is strictly restricted to Super Administrators and Sales Leads.
         </p>
       </div>
     );

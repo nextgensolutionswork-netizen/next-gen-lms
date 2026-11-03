@@ -22,6 +22,12 @@ const schema = z.object({
   transaction_reference: z.string().trim().max(200).nullable().optional(),
   bank_upi_reference: z.string().trim().max(200).optional(),
   payment_proof_url: z.string().max(4096).refine((v) => !v || v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach valid payment proof').optional(),
+  alternate_phone: z.string().trim().max(50).optional(),
+  photo_url: z.string().max(4096).optional(),
+  our_bank_name: z.string().trim().max(200).optional(),
+  our_bank_account_name: z.string().trim().max(200).optional(),
+  our_bank_account_id: z.string().trim().max(100).optional(),
+  our_upi_details: z.string().trim().max(200).optional(),
   idempotency_key: z.string().trim().max(200).optional(),
   payment_plan: z.string().optional(),
 }).passthrough();

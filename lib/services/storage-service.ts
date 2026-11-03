@@ -3,6 +3,7 @@ import { getDb, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export type StorageBucket =
   | 'payment-proofs'
+  | 'student-photos'
   | 'resumes'
   | 'assignments'
   | 'doubt-attachments'
@@ -26,6 +27,14 @@ export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
     allowedMimes: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
     allowedExtensions: ['.png', '.jpg', '.jpeg', '.webp', '.pdf'],
     description: 'Private payment evidence, accessible only through the tenant-authorized payment API',
+  },
+  'student-photos': {
+    name: 'student-photos',
+    public: false,
+    maxSizeBytes: 2 * 1024 * 1024, // 2MB
+    allowedMimes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
+    description: 'Secured student photograph attachments uploaded during enrollment and profile management',
   },
   resumes: {
     name: 'resumes',

@@ -1,5 +1,6 @@
 'use client';
 
+import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -453,7 +454,7 @@ export default function OnboardingPage() {
               variant="outline"
               className="bg-teal-50 text-teal-800 border-teal-300 text-xs uppercase font-semibold"
             >
-              {currentUserProfile.role.replace('_', ' ')}
+              {getRoleLabel(currentUserProfile.role)}
             </Badge>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -751,7 +752,7 @@ export default function OnboardingPage() {
                       <option value="All">All Onboarding Staff</option>
                       {eligibleStaff.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.full_name} ({s.role})
+                          {s.full_name} ({getRoleLabel(s.role)})
                         </option>
                       ))}
                     </select>
@@ -1595,7 +1596,7 @@ export default function OnboardingPage() {
               >
                 {eligibleStaff.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.full_name} ({s.role.replace('_', ' ')})
+                    {s.full_name} ({getRoleLabel(s.role)})
                   </option>
                 ))}
               </select>
