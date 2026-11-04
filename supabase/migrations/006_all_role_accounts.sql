@@ -58,7 +58,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Rajesh Sharma (Director)","role":"super_admin"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('AdminPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -74,7 +74,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Priya Nair (Operations Head)","role":"admin"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('AdminPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -90,7 +90,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Suresh Kumar (Chief Accountant)","role":"accountant"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('AccountsPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -106,7 +106,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Ananya Desai (Senior Counsellor)","role":"counsellor"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('CounsellorPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -122,7 +122,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Vikram Rao (SAP FICO Lead)","role":"trainer"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('TrainerPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -138,7 +138,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Sunita Reddy (Placement Head)","role":"placement_coordinator"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('PlacementPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -154,7 +154,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Ananya Deshmukh (SAP Support Lead)","role":"support"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('SupportPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 
@@ -170,7 +170,7 @@ BEGIN
       '{"provider":"email","providers":["email"]}',
       '{"full_name":"Amit Gupta (Student)","role":"student"}',
       NOW(), NOW(), 'authenticated', 'authenticated'
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
       encrypted_password = crypt('StudentPass#2026', gen_salt('bf')),
       email_confirmed_at = NOW();
 

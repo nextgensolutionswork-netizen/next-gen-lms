@@ -31,6 +31,11 @@ CREATE TABLE IF NOT EXISTS profiles (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Preserve existing tenant assignments; the default applies only to new profiles.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+ALTER TABLE public.profiles ALTER COLUMN tenant_id SET DEFAULT 'default';
+ALTER TABLE public.profiles ALTER COLUMN tenant_id SET NOT NULL;
+
 -- 2.2 System Settings
 CREATE TABLE IF NOT EXISTS system_settings (
     id UUID PRIMARY KEY DEFAULT '11111111-1111-1111-1111-111111111111',

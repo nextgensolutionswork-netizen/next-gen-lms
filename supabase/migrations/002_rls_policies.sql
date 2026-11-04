@@ -47,12 +47,15 @@ RETURNS TEXT AS $$
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
 -- 1. Profiles
+DROP POLICY IF EXISTS "Super Admins can manage all profiles" ON profiles;
 CREATE POLICY "Super Admins can manage all profiles" ON profiles
   FOR ALL USING (get_current_user_role() = 'super_admin');
 
+DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
 CREATE POLICY "Users can view their own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Staff can view staff profiles" ON profiles;
 CREATE POLICY "Staff can view staff profiles" ON profiles
   FOR SELECT USING (
     get_current_user_role() IN ('admin', 'counsellor', 'trainer', 'placement_coordinator', 'accountant')
@@ -61,6 +64,7 @@ CREATE POLICY "Staff can view staff profiles" ON profiles
 
 -- 2. Courses & Academic Content
 -- Super Admins and Admins can view/edit all courses
+DROP POLICY IF EXISTS "Super Admins and Admins manage courses" ON courses;
 CREATE POLICY "Super Admins and Admins manage courses" ON courses
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin'));
 
@@ -72,10 +76,12 @@ CREATE POLICY "Trainers view assigned courses only" ON courses
   );
 
 -- Counsellors can view courses for admission counseling
+DROP POLICY IF EXISTS "Counsellors view courses" ON courses;
 CREATE POLICY "Counsellors view courses" ON courses
   FOR SELECT USING (get_current_user_role() = 'counsellor');
 
 -- Students can ONLY view published courses they are enrolled in
+DROP POLICY IF EXISTS "Students view enrolled courses" ON courses;
 CREATE POLICY "Students view enrolled courses" ON courses
   FOR SELECT USING (
     get_current_user_role() = 'student' AND
@@ -87,12 +93,14 @@ CREATE POLICY "Students view enrolled courses" ON courses
 CREATE POLICY "Super Admins and Admins manage modules" ON course_modules
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin'));
 
+DROP POLICY IF EXISTS "Trainers view assigned modules" ON course_modules;
 CREATE POLICY "Trainers view assigned modules" ON course_modules
   FOR SELECT USING (
     get_current_user_role() = 'trainer' AND
     course_id IN (SELECT unnest(assigned_course_ids) FROM profiles WHERE id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Students view enrolled modules" ON course_modules;
 CREATE POLICY "Students view enrolled modules" ON course_modules
   FOR SELECT USING (
     get_current_user_role() = 'student' AND
@@ -102,6 +110,7 @@ CREATE POLICY "Students view enrolled modules" ON course_modules
 CREATE POLICY "Super Admins and Admins manage lessons" ON lessons
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin'));
 
+DROP POLICY IF EXISTS "Trainers manage assigned lessons" ON lessons;
 CREATE POLICY "Trainers manage assigned lessons" ON lessons
   FOR ALL USING (
     get_current_user_role() = 'trainer' AND
@@ -120,6 +129,7 @@ CREATE POLICY "Super Admin, Admin, Counsellor manage leads" ON leads
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin', 'counsellor'));
 
 -- 4. Admissions
+DROP POLICY IF EXISTS "Admissions access" ON admissions;
 CREATE POLICY "Admissions access" ON admissions
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin', 'counsellor'));
 
@@ -127,6 +137,7 @@ CREATE POLICY "Admissions access" ON admissions
 CREATE POLICY "Super Admin, Admin, Accountant manage fee accounts" ON student_fee_accounts
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin', 'accountant'));
 
+DROP POLICY IF EXISTS "Students view own fee account" ON student_fee_accounts;
 CREATE POLICY "Students view own fee account" ON student_fee_accounts
   FOR SELECT USING (
     get_current_user_role() = 'student' AND
@@ -136,6 +147,7 @@ CREATE POLICY "Students view own fee account" ON student_fee_accounts
 CREATE POLICY "Super Admin, Admin, Accountant manage payments" ON payments
   FOR ALL USING (get_current_user_role() IN ('super_admin', 'admin', 'accountant'));
 
+DROP POLICY IF EXISTS "Students view own receipts" ON receipts;
 CREATE POLICY "Students view own receipts" ON receipts
   FOR SELECT USING (
     get_current_user_role() = 'student' AND
@@ -159,9 +171,11 @@ CREATE POLICY "Students view own placement profile" ON placement_profiles
   );
 
 -- 7. Audit Logs
+DROP POLICY IF EXISTS "Super Admin can view audit logs" ON audit_logs;
 CREATE POLICY "Super Admin can view audit logs" ON audit_logs
   FOR SELECT USING (get_current_user_role() = 'super_admin');
 
 -- 8. Public Certificate Verification
+DROP POLICY IF EXISTS "Anyone can verify valid certificates" ON certificates;
 CREATE POLICY "Anyone can verify valid certificates" ON certificates
   FOR SELECT USING (is_valid = true);

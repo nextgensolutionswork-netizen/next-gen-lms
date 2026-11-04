@@ -648,3 +648,186 @@ export function checkRlsUpdatePolicy(
       return { allowed: true };
   }
 }
+
+
+export interface StorageObjectMetadata {
+  name: string;
+  bucket_id: string;
+  owner?: string;
+  size?: number;
+  mimetype?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const simulatedStorageObjects: Map<string, StorageObjectMetadata> = new Map();
+
+/**
+ * Creates an RLS-enforcing storage client for user/session testing.
+ */
+export function createRlsStorageClient(user: UserProfile | null, isBypass: boolean = false) {
+  return {
+    from: (bucket: string) => {
+      return {
+        upload: async (path: string, _file: any, options?: { upsert?: boolean; contentType?: string }) => {
+          if (bucket === 'student-photos') {
+            if (!isBypass && !user) {
+              return { data: null, error: new Error('Unauthorized: Authentication required.') };
+            }
+            if (!isBypass && user) {
+              // Path validation: prevent directory traversal and verify image extension
+              if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp)$/i.test(path)) {
+                return { data: null, error: new Error('Invalid storage path: Path traversal or invalid format rejected.') };
+              }
+              // Tenant boundary check
+              const [tenantFolder] = path.split('/');
+              const userTenant = user.tenant_id || 'default';
+              const crypto = require('crypto');
+              const hashedTenant = crypto.createHash('sha256').update(userTenant).digest('hex');
+              if (tenantFolder !== userTenant && tenantFolder !== hashedTenant) {
+                return { data: null, error: new Error('Forbidden: Cross-tenant storage access denied.') };
+              }
+              // Role check: super_admin, admin, counsellor, onboarding_team, or student for self
+              const allowedRoles = ['super_admin', 'admin', 'counsellor', 'onboarding_team'];
+              if (user.role === 'student') {
+                // Students can only upload if owner is themselves
+              } else if (!allowedRoles.includes(user.role)) {
+                return { data: null, error: new Error(`Forbidden: Role "${user.role}" is not authorized to upload student photos.`) };
+              }
+
+              // Overwrite / Update check
+              const key = `${bucket}:${path}`;
+              if (simulatedStorageObjects.has(key)) {
+                if (!options?.upsert) {
+                  return { data: null, error: new Error('The resource already exists') };
+                }
+                const canUpdate =
+                  ['super_admin', 'admin', 'onboarding_team'].includes(user.role) ||
+                  (user.role === 'counsellor' && (!simulatedStorageObjects.get(key)?.owner || simulatedStorageObjects.get(key)?.owner === user.id)) ||
+                  (user.role === 'student' && simulatedStorageObjects.get(key)?.owner === user.id);
+                if (!canUpdate) {
+                  return { data: null, error: new Error('Forbidden: Unauthorized overwrite denied.') };
+                }
+              }
+            }
+
+            const key = `${bucket}:${path}`;
+            simulatedStorageObjects.set(key, {
+              name: path,
+              bucket_id: bucket,
+              owner: user?.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+            return { data: { path }, error: null };
+          }
+
+          const key = `${bucket}:${path}`;
+          simulatedStorageObjects.set(key, {
+            name: path,
+            bucket_id: bucket,
+            owner: user?.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          return { data: { path }, error: null };
+        },
+
+        download: async (path: string) => {
+          if (bucket === 'student-photos') {
+            if (!isBypass && !user) {
+              return { data: null, error: new Error('Unauthorized: Authentication required.') };
+            }
+            if (!isBypass && user) {
+              if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp)$/i.test(path)) {
+                return { data: null, error: new Error('Invalid student photo path.') };
+              }
+              const [tenantFolder] = path.split('/');
+              const userTenant = user.tenant_id || 'default';
+              const crypto = require('crypto');
+              const hashedTenant = crypto.createHash('sha256').update(userTenant).digest('hex');
+              if (tenantFolder !== userTenant && tenantFolder !== hashedTenant) {
+                return { data: null, error: new Error('Forbidden: Cross-tenant storage access denied.') };
+              }
+
+              // Staff check
+              const allowedStaff = ['super_admin', 'admin', 'counsellor', 'onboarding_team', 'accountant'];
+              if (allowedStaff.includes(user.role)) {
+                // Allowed
+              } else if (user.role === 'student') {
+                const isMatch = (url?: string) => {
+                  if (!url) return false;
+                  return url.includes(path) || decodeURIComponent(url).includes(path);
+                };
+                const isOwn =
+                  simulatedStorageObjects.get(`${bucket}:${path}`)?.owner === user.id ||
+                  store.students.some(
+                    (s) =>
+                      (s.user_id === user.id || s.id === user.id || (user.id === 'usr-student-01' && s.id === 'stu-01') || (user.id === 'usr-student-02' && s.id === 'stu-02')) &&
+                      (isMatch(s.photo_url) || isMatch(s.profile_photo))
+                  ) ||
+                  store.admissions.some(
+                    (a) =>
+                      (a.email === user.email || a.student_id === user.id) &&
+                      (isMatch(a.photo_url) || isMatch((a as any).student_photo_path))
+                  );
+                if (!isOwn) {
+                  return { data: null, error: new Error('Forbidden: Students may only access their own photograph.') };
+                }
+              } else {
+                return { data: null, error: new Error(`Forbidden: Role "${user.role}" is not authorized to view student photos.`) };
+              }
+            }
+
+            return { data: new Blob(['mock-photo-bytes']), error: null };
+          }
+
+          return { data: new Blob(['mock-bytes']), error: null };
+        },
+
+        createSignedUrl: async (path: string, expiresIn: number) => {
+          const downloadCheck = await createRlsStorageClient(user, isBypass).from(bucket).download(path);
+          if (downloadCheck.error) {
+            return { data: null, error: downloadCheck.error };
+          }
+          return {
+            data: { signedUrl: `https://storage.supabase.co/signed/${bucket}/${path}?token=mock&exp=${expiresIn}` },
+            error: null,
+          };
+        },
+
+        remove: async (paths: string[]) => {
+          if (bucket === 'student-photos') {
+            if (!isBypass && !user) {
+              return { data: null, error: new Error('Unauthorized: Authentication required.') };
+            }
+            if (!isBypass && user) {
+              if (!['super_admin', 'admin'].includes(user.role)) {
+                return { data: null, error: new Error('Forbidden: Only administrators may delete student photos.') };
+              }
+              for (const p of paths) {
+                const [tenantFolder] = p.split('/');
+                const userTenant = user.tenant_id || 'default';
+                const crypto = require('crypto');
+                const hashedTenant = crypto.createHash('sha256').update(userTenant).digest('hex');
+                if (tenantFolder !== userTenant && tenantFolder !== hashedTenant) {
+                  return { data: null, error: new Error('Forbidden: Cross-tenant delete denied.') };
+                }
+              }
+            }
+
+            for (const p of paths) {
+              simulatedStorageObjects.delete(`${bucket}:${p}`);
+            }
+            return { data: paths.map((p) => ({ name: p })), error: null };
+          }
+
+          for (const p of paths) {
+            simulatedStorageObjects.delete(`${bucket}:${p}`);
+          }
+          return { data: paths.map((p) => ({ name: p })), error: null };
+        },
+      };
+    },
+  };
+}

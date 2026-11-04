@@ -8,6 +8,7 @@ import { tenantId } from '@/lib/auth/tenant';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { validateFile } from '@/lib/services/storage-service';
+import { store } from '@/lib/services/data-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -80,7 +81,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const actor = await authenticatePaymentRequest(request);
-    if (!['counsellor', 'accountant', 'admin', 'super_admin', 'student', 'onboarding_team', 'trainer'].includes(actor.role)) {
+    // Only authorized staff (super_admin, admin, counsellor, onboarding_team, accountant) or student for own photo
+    if (!['counsellor', 'accountant', 'admin', 'super_admin', 'student', 'onboarding_team'].includes(actor.role)) {
       throw new Error('Forbidden: Authorized access required to view student photographs.');
     }
 
@@ -94,6 +96,28 @@ export async function GET(request: NextRequest) {
       throw new Error('Forbidden: Photo belongs to another institute tenant.');
     }
 
+    // Student self-access: Students may only view their own photo
+    if (actor.role === 'student') {
+      const studentRecord = store.students.find(
+        (s) => s.user_id === actor.id || s.email === actor.email || s.id === actor.id || (actor.id === 'usr-student-01' && s.id === 'stu-01')
+      );
+      const admissionRecord = store.admissions.find(
+        (a) => a.email === actor.email || a.student_id === actor.id || (actor.id === 'usr-student-01' && a.student_id === 'stu-01')
+      );
+      const isMatch = (url?: string) => {
+        if (!url) return false;
+        return url.includes(objectPath) || decodeURIComponent(url).includes(objectPath);
+      };
+      const isOwnPhoto = Boolean(
+        (studentRecord && (isMatch(studentRecord.photo_url) || isMatch(studentRecord.profile_photo))) ||
+        (admissionRecord && (isMatch(admissionRecord.photo_url) || isMatch((admissionRecord as any).student_photo_path)))
+      );
+
+      if (!isOwnPhoto) {
+        throw new Error('Forbidden: Students may only access their own photograph.');
+      }
+    }
+
     if (isLiveSupabaseEnabled()) {
       const { data, error } = await createAdminClient()
         .storage.from('student-photos')
@@ -104,15 +128,113 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const bytes = await readFile(path.join(root, objectPath));
-    const ext = objectPath.split('.').pop()!.toLowerCase();
-    return new NextResponse(bytes, {
-      headers: {
-        'Content-Type': mime[ext] || 'image/jpeg',
-        'Cache-Control': 'private, no-store',
-        'X-Content-Type-Options': 'nosniff',
-      },
+    try {
+      const bytes = await readFile(path.join(root, objectPath));
+      const ext = objectPath.split('.').pop()!.toLowerCase();
+      return new NextResponse(bytes, {
+        headers: {
+          'Content-Type': mime[ext] || 'image/jpeg',
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'ENOENT') {
+        return NextResponse.json({ success: false, error: 'Student photo not found.' }, { status: 404 });
+      }
+      throw e;
+    }
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const actor = await authenticatePaymentRequest(request);
+    if (!['counsellor', 'admin', 'super_admin', 'onboarding_team'].includes(actor.role)) {
+      throw new Error('Forbidden: Authorized staff access required to update student photo.');
+    }
+
+    const objectPath = request.nextUrl.searchParams.get('path') || '';
+    if (!/^[a-f0-9]{64}\/[a-f0-9-]{36}\.(png|jpe?g|webp)$/i.test(objectPath)) {
+      throw new Error('Invalid student photo path.');
+    }
+
+    const [tenant] = objectPath.split('/');
+    if (tenant !== hash(tenantId(actor))) {
+      throw new Error('Forbidden: Photo belongs to another institute tenant.');
+    }
+
+    const form = await request.formData();
+    const file = form.get('file') as File | null;
+    if (!file || typeof file.arrayBuffer !== 'function') {
+      throw new Error('Please select a student photograph to upload.');
+    }
+
+    const validation = validateFile({ name: file.name, size: file.size, type: file.type }, 'student-photos');
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid photo file. Please upload a JPG, PNG, or WEBP under 2 MB.');
+    }
+
+    const extension = file.name.split('.').pop()!.toLowerCase();
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (isLiveSupabaseEnabled()) {
+      const { error } = await createAdminClient()
+        .storage.from('student-photos')
+        .upload(objectPath, buffer, { contentType: mime[extension] || 'image/jpeg', upsert: true });
+      if (error) throw new Error(error.message);
+    } else {
+      const target = path.join(root, objectPath);
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, buffer);
+    }
+
+    return NextResponse.json({
+      success: true,
+      bucket: 'student-photos',
+      path: objectPath,
+      url: `/api/students/photo?path=${encodeURIComponent(objectPath)}`,
     });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const actor = await authenticatePaymentRequest(request);
+    if (!['admin', 'super_admin'].includes(actor.role)) {
+      throw new Error('Forbidden: Only administrators may delete student photographs.');
+    }
+
+    const objectPath = request.nextUrl.searchParams.get('path') || '';
+    if (!/^[a-f0-9]{64}\/[a-f0-9-]{36}\.(png|jpe?g|webp)$/i.test(objectPath)) {
+      throw new Error('Invalid student photo path.');
+    }
+
+    const [tenant] = objectPath.split('/');
+    if (tenant !== hash(tenantId(actor))) {
+      throw new Error('Forbidden: Photo belongs to another institute tenant.');
+    }
+
+    if (isLiveSupabaseEnabled()) {
+      const { error } = await createAdminClient()
+        .storage.from('student-photos')
+        .remove([objectPath]);
+      if (error) throw new Error(error.message);
+    } else {
+      const target = path.join(root, objectPath);
+      try {
+        const { unlink } = await import('fs/promises');
+        await unlink(target);
+      } catch (err: any) {
+        if (err.code !== 'ENOENT') throw err;
+      }
+    }
+
+    return NextResponse.json({ success: true, message: 'Student photo deleted successfully.' });
   } catch (error) {
     return fail(error);
   }

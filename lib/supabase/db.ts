@@ -10,6 +10,7 @@ import {
   checkRlsUpdatePolicy,
   createAuthJwt,
   rlsContextStorage,
+  createRlsStorageClient,
 } from './rls';
 import { UserProfile } from '@/types';
 
@@ -576,6 +577,7 @@ export function getDb(auth?: RlsAuthContext | string | UserProfile): any {
   // 3. Return client with RLS-enforcing query builders
   return {
     from: (table: string) => new RlsQueryBuilder(table, user, isBypass, liveClient),
+    storage: liveClient?.storage || createRlsStorageClient(user, isBypass),
     auth: liveClient?.auth || {
       getUser: async () => ({ data: { user: user ? { id: user.id, email: user.email } : null }, error: null }),
       signInWithPassword: async () => ({ data: null, error: null }),
