@@ -68,17 +68,17 @@ export async function POST(req: NextRequest) {
     if (isLiveSupabaseEnabled()) {
       try {
         const adminClient = createAdminClient();
-        const { data: created, error: authError } = await adminClient.auth.admin.createUser({
-          email: email.trim().toLowerCase(),
-          password: password || 'TempPass@2026!',
-          email_confirm: true,
-          user_metadata: {
-            full_name: full_name.trim(),
-            role: role || 'trainer',
-            phone: phone || '',
-            assigned_course_ids: assigned_course_ids || [],
-          },
-        });
+        const { data: created, error: authError } = await adminClient.auth.admin.inviteUserByEmail(
+          email.trim().toLowerCase(),
+          {
+            data: {
+              full_name: full_name.trim(),
+              role: role || 'trainer',
+              phone: phone || '',
+              assigned_course_ids: assigned_course_ids || [],
+            },
+          }
+        );
 
         if (authError) {
           console.warn('[Users API] Supabase createUser error:', authError.message);

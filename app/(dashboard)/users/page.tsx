@@ -36,7 +36,8 @@ import { useAuth } from '@/components/providers/auth-provider';
 
 export default function UsersPage() {
   const { role: currentRole, user: currentUser, hasPermission } = useAuth();
-  const [users, setUsers] = React.useState<UserProfile[]>(store.users || []);
+  const [users, setUsers] = React.useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [isAddModal, setIsAddModal] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState<string>('All');
@@ -77,9 +78,21 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = React.useState('');
   const [resetSuccess, setResetSuccess] = React.useState(false);
 
-  const refreshList = () => {
-    setUsers([...(store.users || [])]);
+  const refreshList = async () => {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        setUsers(data.users);
+      }
+    } catch {
+      setUsers([...(store.users || [])]);
+    }
   };
+
+  React.useEffect(() => {
+    refreshList().finally(() => setIsLoading(false));
+  }, []);
 
   const filteredUsers = React.useMemo(() => {
     return users.filter((u) => {
