@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { UserProfile, UserRole } from '@/types';
-import { createUser, updateUser, setUserActiveStatus } from '@/lib/services/auth-service';
+import { generatePasswordResetLink } from '@/lib/services/auth-service';
 import { dispatchMultiChannelNotification } from '@/lib/services/notification-service';
 import { formatDate } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -104,33 +104,33 @@ export default function UsersPage() {
     e.preventDefault();
     if (!name || !email) return;
 
-    const newUser = await createUser({
-      full_name: name,
-      email,
-      phone,
-      role,
-      assigned_course_ids: role === 'trainer' ? [assignedCourseId] : [],
-    });
-
-    if (!store.auditLogs) store.auditLogs = [];
-    store.auditLogs.unshift({
-      id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      user_id: currentUser?.id || 'usr-admin',
-      user_name: currentUser?.full_name || 'Administrator',
-      user_role: currentRole,
-      action: 'USER_CREATED',
-      module: 'USERS',
-      record_id: newUser.id,
-      new_value: newUser,
-      created_at: new Date().toISOString(),
-    });
-
-    store.persist();
-    setIsAddModal(false);
-    setName('');
-    setEmail('');
-    setPhone('');
-    refreshList();
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: name,
+          email,
+          phone,
+          role,
+          assigned_course_ids: role === 'trainer' ? [assignedCourseId] : [],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create user.');
+      }
+      if (data.user && !store.users.some((u) => u.id === data.user.id)) {
+        store.users.push(data.user);
+      }
+      setIsAddModal(false);
+      setName('');
+      setEmail('');
+      setPhone('');
+      refreshList();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to create user.');
+    }
   };
 
   const openEditModal = (u: UserProfile) => {
@@ -160,29 +160,26 @@ export default function UsersPage() {
     }
 
     try {
-      const updated = await updateUser(editingUser.id, {
-        full_name: editName,
-        email: editEmail,
-        phone: editPhone,
-        role: editRole,
-        assigned_course_ids: editRole === 'trainer' ? [editCourseId] : [],
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingUser.id,
+          full_name: editName,
+          email: editEmail,
+          phone: editPhone,
+          role: editRole,
+          assigned_course_ids: editRole === 'trainer' ? [editCourseId] : [],
+        }),
       });
-
-      if (!store.auditLogs) store.auditLogs = [];
-      store.auditLogs.unshift({
-        id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        user_id: currentUser?.id || 'usr-admin',
-        user_name: currentUser?.full_name || 'Administrator',
-        user_role: currentRole,
-        action: 'USER_UPDATED',
-        module: 'USERS',
-        record_id: editingUser.id,
-        old_value: editingUser,
-        new_value: updated || undefined,
-        created_at: new Date().toISOString(),
-      });
-
-      store.persist();
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update user.');
+      }
+      if (data.user) {
+        const idx = store.users.findIndex((u) => u.id === data.user.id);
+        if (idx !== -1) store.users[idx] = data.user;
+      }
       refreshList();
       setIsEditModal(false);
       setEditingUser(null);
@@ -201,22 +198,19 @@ export default function UsersPage() {
 
     try {
       const willBeActive = !u.is_active;
-      await setUserActiveStatus(u.id, willBeActive, currentUser?.id);
-
-      if (!store.auditLogs) store.auditLogs = [];
-      store.auditLogs.unshift({
-        id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        user_id: currentUser?.id || 'usr-admin',
-        user_name: currentUser?.full_name || 'Administrator',
-        user_role: currentRole,
-        action: willBeActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
-        module: 'USERS',
-        record_id: u.id,
-        new_value: { is_active: willBeActive },
-        created_at: new Date().toISOString(),
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: u.id, is_active: willBeActive }),
       });
-
-      store.persist();
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update user status.');
+      }
+      if (data.user) {
+        const idx = store.users.findIndex((usr) => usr.id === data.user.id);
+        if (idx !== -1) store.users[idx] = data.user;
+      }
       refreshList();
     } catch (err: any) {
       setActionError(err.message || 'Failed to update user status.');
