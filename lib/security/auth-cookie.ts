@@ -6,8 +6,17 @@
 
 export const AUTH_COOKIE_NAME = 'next_gen_auth_user';
 export const AUTH_SIG_COOKIE_NAME = 'next_gen_auth_user_sig';
-export const AUTH_COOKIE_SECRET =
-  process.env.AUTH_COOKIE_SECRET || 'next-gen-lms-secure-auth-secret-2026';
+export const AUTH_COOKIE_SECRET = (() => {
+  const secret = process.env.AUTH_COOKIE_SECRET;
+
+  if (!secret || secret.trim().length < 32) {
+    throw new Error(
+      'AUTH_COOKIE_SECRET must be configured with a strong secret of at least 32 characters.'
+    );
+  }
+
+  return secret;
+})();
 
 /**
  * Computes an HMAC-SHA256 hex signature for an auth cookie value using Web Crypto / Node crypto.
