@@ -25,6 +25,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
@@ -32,6 +33,7 @@ import { UserProfile, UserRole } from '@/types';
 import { generatePasswordResetLink } from '@/lib/services/auth-service';
 import { dispatchMultiChannelNotification } from '@/lib/services/notification-service';
 import { formatDate } from '@/lib/utils/formatters';
+import { getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function UsersPage() {
@@ -87,11 +89,13 @@ export default function UsersPage() {
       }
     } catch {
       setUsers([...(store.users || [])]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   React.useEffect(() => {
-    refreshList().finally(() => setIsLoading(false));
+    refreshList();
   }, []);
 
   const filteredUsers = React.useMemo(() => {
@@ -386,7 +390,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Faculty & Staff RBAC Administration</h1>
@@ -403,14 +407,14 @@ export default function UsersPage() {
       </div>
 
       {actionError && (
-        <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs flex items-center space-x-2 animate-in fade-in">
+        <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-xs flex items-center space-x-2 animate-in fade-in">
           <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
           <span className="font-semibold">{actionError}</span>
         </div>
       )}
 
       {/* Search & Filters Bar */}
-      <Card className="p-3.5">
+      <Card className="p-3">
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -460,21 +464,23 @@ export default function UsersPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+              <thead className="bg-slate-50 text-[11px] text-slate-600 uppercase border-b border-slate-100 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">User Name</th>
-                  <th className="px-4 py-3">Email & Phone</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Assigned Scope / Courses</th>
-                  <th className="px-4 py-3">Account Status</th>
-                  <th className="px-4 py-3">Joined Date</th>
-                  {canManageUsers && <th className="px-4 py-3 text-right">Actions</th>}
+                  <th className="px-3.5 py-2.5">User Name</th>
+                  <th className="px-3.5 py-2.5">Email & Phone</th>
+                  <th className="px-3.5 py-2.5">Role</th>
+                  <th className="px-3.5 py-2.5">Assigned Scope / Courses</th>
+                  <th className="px-3.5 py-2.5">Account Status</th>
+                  <th className="px-3.5 py-2.5">Joined Date</th>
+                  {canManageUsers && <th className="px-3.5 py-2.5 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredUsers.length === 0 ? (
+                {isLoading ? (
+                  <TableSkeleton columns={canManageUsers ? 7 : 6} rows={6} />
+                ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={canManageUsers ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={canManageUsers ? 7 : 6} className="px-3.5 py-8 text-center text-slate-400">
                       No faculty or staff members found matching criteria.
                     </td>
                   </tr>
@@ -486,12 +492,29 @@ export default function UsersPage() {
 
                     return (
                       <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-900">{u.full_name}</td>
-                        <td className="px-4 py-3">
-                          <p className="text-slate-800">{u.email}</p>
-                          <p className="text-[10px] text-slate-400">{u.phone || '—'}</p>
+                        <td className="px-3.5 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{u.full_name}</td>
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                          <p className="text-slate-800 text-xs font-medium">{u.email}</p>
+                          {u.phone ? (
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 whitespace-nowrap">
+                              <span>{u.phone}</span>
+                              <a
+                                href={`https://wa.me/${getCanonicalPhoneDigits('+91', u.phone)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Chat on WhatsApp (${u.phone})`}
+                                className="h-5 w-5 rounded-full bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white flex items-center justify-center transition-all shrink-0 border border-[#25D366]/30 shadow-2xs"
+                              >
+                                <svg className="h-3 w-3 fill-current" viewBox="0 0 24 24">
+                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                                </svg>
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 mt-0.5 block">—</span>
+                          )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <Badge
                             variant={
                               u.role === 'super_admin'
@@ -502,35 +525,35 @@ export default function UsersPage() {
                                 ? 'info'
                                 : 'secondary'
                             }
-                            className="capitalize"
+                            className="capitalize font-medium text-[11px]"
                           >
                             {getRoleLabel(u.role)}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">
+                        <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap">
                           {u.role === 'trainer' ? (
                             assignedCourses.length > 0 ? (
-                              <span className="font-medium text-blue-700">{assignedCourses.join(', ')}</span>
+                              <span className="font-medium text-blue-700 text-xs">{assignedCourses.join(', ')}</span>
                             ) : (
-                              <span className="text-rose-600 italic">No courses assigned (Zero access)</span>
+                              <span className="text-rose-600 italic text-xs">No courses assigned (Zero access)</span>
                             )
                           ) : u.role === 'accountant' ? (
-                            <span className="text-slate-500 italic">Financial ledger & receipts only</span>
+                            <span className="text-slate-500 italic text-xs">Financial ledger & receipts only</span>
                           ) : u.role === 'support' ? (
-                            <span className="text-cyan-700 font-medium">Academic Doubts & Helpdesk Lead</span>
+                            <span className="text-cyan-700 font-medium text-xs">Academic Doubts & Helpdesk Lead</span>
                           ) : u.role === 'onboarding_team' ? (
-                            <span className="text-teal-700 font-medium">Student Onboarding & LMS Activation</span>
+                            <span className="text-teal-700 font-medium text-xs">Student Onboarding & LMS Activation</span>
                           ) : u.role === 'placement_coordinator' ? (
-                            <span className="text-purple-700 font-medium">Job Openings & Placements</span>
+                            <span className="text-purple-700 font-medium text-xs">Job Openings & Placements</span>
                           ) : u.role === 'counsellor' ? (
-                            <span className="text-amber-700 font-medium">CRM Leads & Admissions</span>
+                            <span className="text-amber-700 font-medium text-xs">CRM Leads & Admissions</span>
                           ) : u.role === 'student' ? (
-                            <span className="text-emerald-700 font-medium">Student Learning Portal</span>
+                            <span className="text-emerald-700 font-medium text-xs">Student Learning Portal</span>
                           ) : (
-                            <span className="text-slate-500 italic">Full Enterprise Scope</span>
+                            <span className="text-slate-500 italic text-xs">Full Enterprise Scope</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => canManageUsers && handleToggleActive(u)}
@@ -556,9 +579,9 @@ export default function UsersPage() {
                             {u.is_active ? 'Active' : 'Deactivated'}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-slate-500">{formatDate(u.created_at)}</td>
+                        <td className="px-3.5 py-2.5 text-slate-500 whitespace-nowrap text-xs">{formatDate(u.created_at)}</td>
                         {canManageUsers && (
-                          <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
+                          <td className="px-3.5 py-2.5 text-right space-x-1 whitespace-nowrap">
                             <button
                               onClick={() => openEditModal(u)}
                               className="p-1 rounded text-slate-600 hover:text-blue-600 hover:bg-slate-100"

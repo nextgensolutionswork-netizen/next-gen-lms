@@ -19,6 +19,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { store } from '@/lib/services/data-store';
 import { StudentFeeAccount } from '@/types';
 import { formatINR, exportToCSV } from '@/lib/utils/formatters';
@@ -48,6 +49,7 @@ export default function StudentFeesPage() {
     store.reconcileDualLedgers();
     return store.feeAccounts || [];
   });
+  const [isLoading, setIsLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('All');
 
@@ -70,6 +72,7 @@ export default function StudentFeesPage() {
   }, [search, statusFilter]);
 
   React.useEffect(() => {
+    setIsLoading(true);
     paymentWorkflowClient
       .refresh()
       .then(() => {
@@ -77,6 +80,9 @@ export default function StudentFeesPage() {
       })
       .catch(() => {
         refreshList();
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, [refreshList]);
 
@@ -125,7 +131,7 @@ export default function StudentFeesPage() {
     : '/accounts/payments';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Student Fee Accounts Ledger</h1>
@@ -163,34 +169,34 @@ export default function StudentFeesPage() {
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <Card className="border-l-4 border-l-emerald-500 shadow-xs">
-          <CardContent className="p-4">
+          <CardContent className="p-3.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Collected</p>
             <h3 className="text-2xl font-bold text-emerald-700 mt-1">{formatINR(totalCollected)}</h3>
-            <p className="text-xs text-slate-500 mt-1">Verified bank, UPI, and cash receipts</p>
+            <p className="text-xs text-slate-500 mt-0.5">Verified bank, UPI, and cash receipts</p>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-amber-500 shadow-xs">
-          <CardContent className="p-4">
+          <CardContent className="p-3.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Outstanding Balance</p>
             <h3 className="text-2xl font-bold text-amber-700 mt-1">{formatINR(totalOutstanding)}</h3>
-            <p className="text-xs text-slate-500 mt-1">Remaining student fee balances</p>
+            <p className="text-xs text-slate-500 mt-0.5">Remaining student fee balances</p>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-blue-500 shadow-xs">
-          <CardContent className="p-4">
+          <CardContent className="p-3.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Fee Accounts</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{activeCount} Students</h3>
-            <p className="text-xs text-blue-600 font-semibold mt-1">100% Dual-ledger reconciliation</p>
+            <p className="text-xs text-blue-600 font-semibold mt-0.5">100% Dual-ledger reconciliation</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="p-4 shadow-xs">
+      <Card className="p-3 shadow-xs">
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -227,24 +233,25 @@ export default function StudentFeesPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+              <thead className="bg-slate-50 text-[11px] text-slate-600 uppercase border-b border-slate-100 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Student Name</th>
-                  <th className="px-4 py-3">Course</th>
-                  <th className="px-4 py-3">Original Fee</th>
-                  <th className="px-4 py-3">Discount</th>
-                  <th className="px-4 py-3">Net Payable</th>
-                  <th className="px-4 py-3">Paid Amount</th>
-                  <th className="px-4 py-3">Outstanding</th>
-                  
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-3.5 py-2.5">Student Name</th>
+                  <th className="px-3.5 py-2.5">Course</th>
+                  <th className="px-3.5 py-2.5">Original Fee</th>
+                  <th className="px-3.5 py-2.5">Discount</th>
+                  <th className="px-3.5 py-2.5">Net Payable</th>
+                  <th className="px-3.5 py-2.5">Paid Amount</th>
+                  <th className="px-3.5 py-2.5">Outstanding</th>
+                  <th className="px-3.5 py-2.5">Status</th>
+                  <th className="px-3.5 py-2.5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {feeAccounts.length === 0 ? (
+                {isLoading ? (
+                  <TableSkeleton columns={9} rows={6} />
+                ) : feeAccounts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={9} className="px-3.5 py-8 text-center text-slate-400">
                       <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-40 text-slate-400" />
                       <p className="font-semibold text-slate-600">No student fee accounts found</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">Try adjusting your search query or status filter.</p>
@@ -253,7 +260,7 @@ export default function StudentFeesPage() {
                 ) : (
                   feeAccounts.map((fa) => (
                     <tr key={fa.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <Link
                           href={`/students/${fa.student_id}`}
                           className="font-semibold text-slate-900 hover:text-[#0A6ED1] hover:underline inline-flex items-center space-x-1"
@@ -262,24 +269,23 @@ export default function StudentFeesPage() {
                           <ExternalLink className="h-3 w-3 opacity-40 hover:opacity-100" />
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{fa.course_name}</td>
-                      <td className="px-4 py-3 font-medium text-slate-700">{formatINR(safeAmount(fa.original_fee))}</td>
-                      <td className="px-4 py-3 text-emerald-600 font-medium">
+                      <td className="px-3.5 py-2.5 text-slate-600 whitespace-nowrap">{fa.course_name}</td>
+                      <td className="px-3.5 py-2.5 font-medium text-slate-700 whitespace-nowrap">{formatINR(safeAmount(fa.original_fee))}</td>
+                      <td className="px-3.5 py-2.5 text-emerald-600 font-medium whitespace-nowrap">
                         {safeAmount(fa.discount) > 0 ? `-${formatINR(safeAmount(fa.discount))}` : '—'}
                       </td>
-                      <td className="px-4 py-3 font-bold text-slate-900">{formatINR(safeAmount(fa.net_payable))}</td>
-                      <td className="px-4 py-3 font-bold text-emerald-600">{formatINR(safeAmount(fa.paid_amount))}</td>
-                      <td className="px-4 py-3 font-bold text-amber-600">{formatINR(safeAmount(fa.outstanding_amount))}</td>
-                      
-                      <td className="px-4 py-3">
-                        <Badge variant={fa.status === 'Paid' ? 'success' : 'warning'}>{fa.status}</Badge>
+                      <td className="px-3.5 py-2.5 font-bold text-slate-900 whitespace-nowrap">{formatINR(safeAmount(fa.net_payable))}</td>
+                      <td className="px-3.5 py-2.5 font-bold text-emerald-600 whitespace-nowrap">{formatINR(safeAmount(fa.paid_amount))}</td>
+                      <td className="px-3.5 py-2.5 font-bold text-amber-600 whitespace-nowrap">{formatINR(safeAmount(fa.outstanding_amount))}</td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <Badge variant={fa.status === 'Paid' ? 'success' : 'warning'} className="whitespace-nowrap font-medium text-[11px]">{fa.status}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
                         {safeAmount(fa.outstanding_amount) > 0 ? (
                           <Link
                             href={`/accounts/payments?studentId=${encodeURIComponent(fa.student_id)}&student_id=${encodeURIComponent(fa.student_id)}&student_name=${encodeURIComponent(fa.student_name || '')}&feeAccountId=${encodeURIComponent(fa.id)}&fee_id=${encodeURIComponent(fa.id)}&amount=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&amount_due=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&course_name=${encodeURIComponent(fa.course_name || '')}`}
                           >
-                            <Button variant="sap" size="sm" className="text-xs px-2.5 py-1">
+                            <Button variant="sap" size="sm" className="h-7 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white whitespace-nowrap shadow-xs">
                               Collect
                             </Button>
                           </Link>

@@ -72,7 +72,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans">
       <div
-        className={`hidden lg:block print:hidden transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${
+        className={`hidden lg:block print:hidden transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 sticky top-0 h-screen ${
           sidebarCollapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-64 opacity-100'
         }`}
         aria-hidden={sidebarCollapsed}
@@ -82,7 +82,7 @@ export default function DashboardLayout({
           currentUserName={userName}
           onToggleCollapse={handleToggleSidebar}
           collapsed={sidebarCollapsed}
-          className="w-64"
+          className="w-64 h-full"
         />
       </div>
       <dialog
@@ -110,7 +110,7 @@ export default function DashboardLayout({
           onToggleSidebar={handleToggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <main className="dashboard-content flex-1 min-w-0 w-full p-3 sm:p-6 xl:p-8">
+        <main className="dashboard-content flex-1 min-w-0 w-full p-3 sm:p-5 xl:p-6">
           {children}
         </main>
       </div>

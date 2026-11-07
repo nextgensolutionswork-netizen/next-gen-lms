@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { RouteProgressBar } from '@/components/ui/route-progress-bar';
 
 export const metadata: Metadata = {
   title: 'Next-Gen ERP LMS | Enterprise Training & Institute Management',
@@ -14,8 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans antialiased text-foreground">
+    <html lang="en" suppressHydrationWarning className="bg-slate-50">
+      <body className="min-h-screen bg-slate-50 font-sans antialiased text-foreground">
+        <RouteProgressBar />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

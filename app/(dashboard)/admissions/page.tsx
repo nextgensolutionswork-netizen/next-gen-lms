@@ -23,11 +23,13 @@ import {
   ArrowRight,
   UploadCloud,
   Image as ImageIcon,
+  User,
   X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Modal } from '@/components/ui/modal';
@@ -38,7 +40,7 @@ import { isLeadConverted } from '@/lib/services/crm-service';
 import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
 import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
-import { validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
+import { validateAlternatePhoneNumber, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
@@ -46,6 +48,7 @@ export default function AdmissionsPage() {
   const { user, role, hasPermission } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [admissions, setAdmissions] = React.useState<Admission[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState('');
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('All');
@@ -304,28 +307,31 @@ export default function AdmissionsPage() {
   }, [isFullPayment, feeDueDate, feeDueDateError]);
 
   const refreshList = React.useCallback(async () => {
+    setIsLoading(true);
     try {
-    let list = await getAdmissions();
-    if (statusFilter !== 'All') {
-      list = list.filter((a) => a.status === statusFilter);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.student_name?.toLowerCase().includes(q) ||
-          a.admission_number?.toLowerCase().includes(q) ||
-          a.student_unique_id?.toLowerCase().includes(q) ||
-          a.phone?.includes(q) ||
-          a.alternate_phone?.includes(q) ||
-          a.email?.toLowerCase().includes(q)
-      );
-    }
-    setAdmissions(list);
-    setLoadError('');
+      let list = await getAdmissions();
+      if (statusFilter !== 'All') {
+        list = list.filter((a) => a.status === statusFilter);
+      }
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        list = list.filter(
+          (a) =>
+            a.student_name?.toLowerCase().includes(q) ||
+            a.admission_number?.toLowerCase().includes(q) ||
+            a.student_unique_id?.toLowerCase().includes(q) ||
+            a.phone?.includes(q) ||
+            a.alternate_phone?.includes(q) ||
+            a.email?.toLowerCase().includes(q)
+        );
+      }
+      setAdmissions(list);
+      setLoadError('');
     } catch (error) {
       setAdmissions([]);
       setLoadError(error instanceof Error ? error.message : 'Unable to load admissions. Please retry.');
+    } finally {
+      setIsLoading(false);
     }
   }, [search, statusFilter]);
 
@@ -506,7 +512,7 @@ export default function AdmissionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {loadError && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
           <p>{loadError}</p>
@@ -544,7 +550,7 @@ export default function AdmissionsPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="p-4">
+      <Card className="p-3">
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -581,25 +587,23 @@ export default function AdmissionsPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold">
+              <thead className="bg-slate-50 text-[11px] text-slate-600 uppercase border-b border-slate-100 font-semibold">
                 <tr>
-                  <th className="px-4 py-3">Adm #</th>
-                  <th className="px-4 py-3">Student Name</th>
-                  <th className="px-4 py-3">Course & Mode</th>
-                  <th className="px-4 py-3">State</th>
-                  <th className="px-4 py-3">Batch</th>
-                  <th className="px-4 py-3">Fee Structure</th>
-                  
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Onboarding</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-3.5 py-2.5">Student</th>
+                  <th className="px-3.5 py-2.5">Course</th>
+                  <th className="px-3.5 py-2.5">Batch</th>
+                  <th className="px-3.5 py-2.5">Fee Structure</th>
+                  <th className="px-3.5 py-2.5">Date</th>
+                  <th className="px-3.5 py-2.5">Status</th>
+                  <th className="px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {admissions.length === 0 && (
+                {isLoading ? (
+                  <TableSkeleton columns={7} rows={6} />
+                ) : admissions.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={7} className="px-3.5 py-8 text-center text-slate-500">
                       <UserCheck className="h-8 w-8 mx-auto text-slate-400 mb-2 opacity-50" />
                       <p className="font-semibold text-slate-700">No Admissions Found</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
@@ -609,13 +613,10 @@ export default function AdmissionsPage() {
                       </p>
                     </td>
                   </tr>
-                )}
-                {admissions.map((adm) => {
+                ) : (
+                  admissions.map((adm) => {
                   const resolved = resolveState(adm.state_code || adm.state || adm.city || adm.address);
                   const isIntra = resolved.code === '36';
-                  const onbCase = store.onboardingCases.find(
-                    (c) => c.admission_id === adm.id || c.admission_number === adm.admission_number
-                  );
                   const matchingStudent = (store.students || []).find(
                     (s) =>
                       (adm.student_id && s.id === adm.student_id) ||
@@ -633,102 +634,81 @@ export default function AdmissionsPage() {
 
                   return (
                     <tr key={adm.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-blue-600">{adm.admission_number}</td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-800">{adm.student_name}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {adm.student_unique_id && (
-                            <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-medium">
-                              {adm.student_unique_id}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-slate-400">{adm.phone}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-slate-800">{adm.course_name}</p>
-                        <Badge variant="outline" className="text-[10px] mt-0.5">{adm.training_mode}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-800">{adm.state || resolved.name}</p>
-                        
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{adm.batch_name || 'Assigned Batch'}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-bold text-slate-900">{formatINR(adm.net_payable)}</p>
-                      {adm.discount > 0 && (
-                        <p className="text-[10px] text-emerald-600 font-medium">Disc: -{formatINR(adm.discount)}</p>
-                      )}
-                    </td>
-                    
-                    <td className="px-4 py-3 text-slate-500">{formatDate(adm.admission_date)}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="success">{adm.status}</Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {onbCase ? (
-                        <div className="flex flex-col items-start gap-1">
-                          <Link href={`/onboarding?search=${encodeURIComponent(adm.admission_number)}`}>
-                            <Badge
-                              variant={
-                                onbCase.status === 'completed'
-                                  ? 'success'
-                                  : onbCase.status === 'in_progress'
-                                  ? 'info'
-                                  : onbCase.status === 'blocked'
-                                  ? 'destructive'
-                                  : 'warning'
-                              }
-                              className="text-[10px] cursor-pointer hover:opacity-80 transition-opacity font-semibold"
-                            >
-                              {onbCase.status === 'in_progress' ? 'In Progress' : onbCase.status.replace('_', ' ')}
-                            </Badge>
-                          </Link>
-                          <Link
-                            href={`/onboarding?search=${encodeURIComponent(adm.admission_number)}`}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline flex items-center font-medium"
-                          >
-                            <span>View Onboarding Case &rarr;</span>
-                          </Link>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 italic">Not Generated</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end space-x-1.5">
-                        {onbCase && (
-                          <Link href={`/onboarding?search=${encodeURIComponent(adm.admission_number)}`}>
-                            <Button variant="outline" size="sm" className="text-[10px] px-2 py-1 text-blue-600 border-blue-200 hover:bg-blue-50">
-                              View Onboarding Case
-                            </Button>
-                          </Link>
-                        )}
-                        {matchingStudent && (matchingStudent.outstanding_amount ?? adm.net_payable) > 0 && (
-                          <Link
-                            href={`/accounts/payments?studentId=${matchingStudent.id}&feeAccountId=fa-${adm.id}&amount=${matchingStudent.outstanding_amount ?? adm.net_payable}`}
-                          >
-                            <Button
-                              variant="sap"
-                              size="sm"
-                              className="text-[10px] px-2 py-1 flex items-center space-x-1"
-                              title="Collect / Record Fee Payment"
-                            >
-                              <CreditCard className="h-3 w-3" />
-                              <span>Collect Fee</span>
-                            </Button>
-                          </Link>
-                        )}
-                        <Link href={`/students/${profileId}`}>
-                          <Button variant="outline" size="sm" className="text-[10px] px-2 py-1">
-                            360° Profile
-                          </Button>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <Link
+                          href={`/students/${profileId}`}
+                          className="font-semibold text-slate-900 text-xs hover:text-[#0A6ED1] transition-colors block"
+                        >
+                          {adm.student_name}
                         </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 whitespace-nowrap">
+                          <span className="font-medium text-slate-600">{adm.phone}</span>
+                          {adm.phone && (
+                            <a
+                              href={`https://wa.me/${getCanonicalPhoneDigits('+91', adm.phone)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={`Chat on WhatsApp (${adm.phone})`}
+                              className="h-5 w-5 rounded-full bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white flex items-center justify-center transition-all shrink-0 border border-[#25D366]/30 shadow-2xs"
+                            >
+                              <svg className="h-3 w-3 fill-current" viewBox="0 0 24 24">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                              </svg>
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <p className="font-semibold text-slate-800 text-xs">{adm.course_name}</p>
+                        <span className="text-[10px] text-slate-500 font-medium">{adm.training_mode || 'Online'}</span>
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <span className="text-xs text-slate-700 font-medium">
+                          {adm.batch_name || 'Assigned Batch'}
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <p className="font-bold text-slate-900 text-xs">{formatINR(adm.net_payable)}</p>
+                        {adm.discount > 0 && (
+                          <p className="text-[10px] text-emerald-600 font-medium">Disc: -{formatINR(adm.discount)}</p>
+                        )}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-slate-500 whitespace-nowrap">{formatDate(adm.admission_date)}</td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <Badge variant="success" className="whitespace-nowrap font-medium">{adm.status}</Badge>
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {matchingStudent && (matchingStudent.outstanding_amount ?? adm.net_payable) > 0 && (
+                            <Link
+                              href={`/accounts/payments?studentId=${matchingStudent.id}&feeAccountId=fa-${adm.id}&amount=${matchingStudent.outstanding_amount ?? adm.net_payable}`}
+                            >
+                              <Button
+                                variant="sap"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white whitespace-nowrap shadow-xs"
+                                title="Collect / Record Fee Payment"
+                              >
+                                <CreditCard className="h-3 w-3 mr-1" />
+                                <span>Collect Fee</span>
+                              </Button>
+                            </Link>
+                          )}
+                          <Link href={`/students/${profileId}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
+                              title="View Student Profile"
+                            >
+                              <User className="h-3.5 w-3.5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }))}
               </tbody>
             </table>
           </div>
