@@ -29,7 +29,7 @@ ALTER TABLE admissions
 CREATE INDEX IF NOT EXISTS idx_admissions_student_unique_id ON admissions(student_unique_id);
 
 -- 3. Alter student_payments & payments tables
-ALTER TABLE student_payments
+ALTER TABLE IF EXISTS student_payments
   ADD COLUMN IF NOT EXISTS our_bank_name TEXT,
   ADD COLUMN IF NOT EXISTS our_bank_account_name TEXT,
   ADD COLUMN IF NOT EXISTS our_bank_account_id TEXT,

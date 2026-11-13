@@ -5,6 +5,9 @@
 
 BEGIN;
 
+-- Keep tenant security deployable when historical duplicates defer the unique-phone migration.
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS tenant_id TEXT DEFAULT 'default';
+
 -- 1. Add lead_id relationship to admissions if not exists
 ALTER TABLE public.admissions ADD COLUMN IF NOT EXISTS lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_admissions_lead_id ON public.admissions(lead_id);
