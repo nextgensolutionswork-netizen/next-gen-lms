@@ -410,7 +410,12 @@ export function getSafeRedirectUrl(
 
   // 9. Departmental workspaces boundary checks
   // Finance & Accounts
-  if (pathname.startsWith('/accounts') && !(safeRole === 'counsellor' && ['/accounts/payments', '/accounts/approvals'].includes(pathname)) && !['super_admin', 'admin', 'accountant'].includes(safeRole)) {
+  const counsellorPermittedAccounts = ['/accounts/fees', '/accounts/payments', '/accounts/receipts'];
+  const isCounsellorAccountsAllowed =
+    safeRole === 'counsellor' &&
+    (counsellorPermittedAccounts.includes(pathname) || pathname.startsWith('/accounts/receipts/'));
+
+  if (pathname.startsWith('/accounts') && !isCounsellorAccountsAllowed && !['super_admin', 'admin', 'accountant'].includes(safeRole)) {
     return defaultRoute;
   }
   // CRM & Admissions

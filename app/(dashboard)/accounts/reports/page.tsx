@@ -39,11 +39,10 @@ function safeAmount(val: unknown): number {
 
 export default function FinanceReportsPage() {
   const { user, role, hasPermission } = useAuth();
+  const isCounsellor = role === 'counsellor';
   const canAccessReports =
-    hasPermission('accounts:read') ||
-    role === 'accountant' ||
-    role === 'admin' ||
-    role === 'super_admin';
+    !isCounsellor &&
+    (role === 'accountant' || role === 'admin' || role === 'super_admin');
 
   const [period, setPeriod] = React.useState<TemporalPeriod>('FY_2025_26');
   const [customStart, setCustomStart] = React.useState('2026-01-01');
@@ -51,6 +50,7 @@ export default function FinanceReportsPage() {
   const [refreshTick, setRefreshTick] = React.useState(0);
 
   React.useEffect(() => {
+    if (!canAccessReports) return;
     paymentWorkflowClient
       .refresh()
       .then(() => {
@@ -60,7 +60,7 @@ export default function FinanceReportsPage() {
       .catch(() => {
         store.reconcileDualLedgers();
       });
-  }, []);
+  }, [canAccessReports]);
 
   React.useEffect(() => {
     store.reconcileDualLedgers();
@@ -201,15 +201,18 @@ export default function FinanceReportsPage() {
               <ShieldAlert className="w-6 h-6 text-red-600" />
             </div>
             <div>
+              <span className="inline-block px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
+                403 Forbidden
+              </span>
               <h2 className="text-lg font-bold text-red-950">Access Restricted</h2>
               <p className="text-xs text-red-700 mt-1 max-w-md mx-auto">
-                You do not possess the required financial permissions to view institutional financial analytics and reports.
+                Users with the Counsellor role are not authorized to view institutional financial analytics and reports.
               </p>
             </div>
             <div className="pt-2">
-              <Link href={role === 'student' ? '/portal' : '/dashboard'}>
+              <Link href={role === 'counsellor' ? '/crm/leads' : role === 'student' ? '/portal' : '/dashboard'}>
                 <Button variant="outline" size="sm" className="text-xs">
-                  {role === 'student' ? 'Go to Student Portal' : 'Return to Dashboard'}
+                  {role === 'counsellor' ? 'Return to CRM Leads' : role === 'student' ? 'Go to Student Portal' : 'Return to Dashboard'}
                 </Button>
               </Link>
             </div>

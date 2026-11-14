@@ -311,6 +311,52 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!isAllowed) {
+      if (userRole === 'counsellor' && isSensitiveDesk) {
+        const isJson =
+          request.headers.get('accept')?.includes('application/json') ||
+          request.headers.get('x-requested-with') === 'XMLHttpRequest';
+        if (isJson) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Counsellor role is not authorized to access Fee Approvals or Financial Analytics.' },
+            { status: 403 }
+          );
+        }
+        return new NextResponse(
+          `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>403 Forbidden - Access Restricted</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; }
+    .card { background: #ffffff; border: 1px solid #fecaca; border-radius: 12px; padding: 32px; max-width: 440px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .badge { display: inline-block; padding: 4px 10px; background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 700; border-radius: 9999px; font-family: monospace; letter-spacing: 0.05em; margin-bottom: 12px; }
+    h1 { font-size: 18px; font-weight: 700; color: #450a0a; margin: 0 0 8px 0; }
+    p { font-size: 13px; color: #7f1d1d; margin: 0 0 24px 0; line-height: 1.5; }
+    .btn { display: inline-block; background: #0A6ED1; color: #ffffff; padding: 8px 16px; font-size: 13px; font-weight: 600; text-decoration: none; border-radius: 6px; }
+    .btn:hover { background: #0858a7; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">403 FORBIDDEN</div>
+    <h1>Access Restricted</h1>
+    <p>Users with the Counsellor role are not authorized to view or access Fee Approvals or Financial Analytics.</p>
+    <a href="/crm/leads" class="btn">Return to CRM Leads</a>
+  </div>
+</body>
+</html>`,
+          {
+            status: 403,
+            headers: {
+              'content-type': 'text/html; charset=utf-8',
+              'cache-control': 'no-store',
+            },
+          }
+        );
+      }
+
       const fallback =
         {
           student: '/portal',

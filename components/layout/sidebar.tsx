@@ -68,8 +68,10 @@ export function Sidebar({
   // RBAC Menu Filtering
   const isSuperAdmin = currentRole === 'super_admin';
   const isAdmin = isSuperAdmin || currentRole === 'admin';
-  const isAccountant = isSuperAdmin || currentRole === 'accountant';
-  const isCounsellor = isSuperAdmin || isAdmin || currentRole === 'counsellor';
+  const isAccountant = isSuperAdmin || isAdmin || currentRole === 'accountant';
+  const isCounsellor = currentRole === 'counsellor';
+  const canAccessAccountsSection = isAccountant || isCounsellor;
+  const canAccessFinancialManagement = isAccountant;
   const isTrainer = isSuperAdmin || isAdmin || currentRole === 'trainer';
   const isPlacement = isSuperAdmin || isAdmin || currentRole === 'placement_coordinator';
   const isSupport = isSuperAdmin || isAdmin || currentRole === 'support' || currentRole === 'trainer';
@@ -305,8 +307,8 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Accounts & Finance (Accountant, Admin, Super Admin, Sales) */}
-        {(isAccountant || isCounsellor) && (
+        {/* Accounts & Finance (Accountant, Admin, Super Admin, Counsellor) */}
+        {canAccessAccountsSection && (
           <div>
             <button
               onClick={() => toggleSection('accounts')}
@@ -320,17 +322,22 @@ export function Sidebar({
             </button>
             {openSection === 'accounts' && (
               <div className="pl-9 pr-2 py-1 space-y-1">
-                <Link
-                  href="/accounts/approvals"
-                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                    isActive('/accounts/approvals') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <span>Fee Approvals</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-                    Approvals
-                  </span>
-                </Link>
+                {/* Fee Approvals: Super Admin, Admin, and Accounts only. Hidden for Counsellors */}
+                {canAccessFinancialManagement && (
+                  <Link
+                    href="/accounts/approvals"
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                      isActive('/accounts/approvals') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>Fee Approvals</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                      Approvals
+                    </span>
+                  </Link>
+                )}
+
+                {/* Student Fee Ledger: Preserved for Counsellor and Finance staff */}
                 <Link
                   href="/accounts/fees"
                   className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
@@ -339,6 +346,8 @@ export function Sidebar({
                 >
                   Student Fee Ledger
                 </Link>
+
+                {/* Payments & Receipts: Preserved for Counsellor and Finance staff */}
                 <Link
                   href="/accounts/payments"
                   className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
@@ -348,7 +357,8 @@ export function Sidebar({
                   Payments & Receipts
                 </Link>
                 
-                {isAccountant && (
+                {/* Expenses & Vendors: Accounts and Admin only */}
+                {canAccessFinancialManagement && (
                   <>
                     <Link
                       href="/accounts/expenses"
@@ -368,14 +378,18 @@ export function Sidebar({
                     </Link>
                   </>
                 )}
-                <Link
-                  href="/accounts/reports"
-                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                    isActive('/accounts/reports') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Financial Analytics
-                </Link>
+
+                {/* Financial Analytics: Super Admin, Admin, and Accounts only. Hidden for Counsellors */}
+                {canAccessFinancialManagement && (
+                  <Link
+                    href="/accounts/reports"
+                    className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                      isActive('/accounts/reports') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Financial Analytics
+                  </Link>
+                )}
               </div>
             )}
           </div>

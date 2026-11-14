@@ -64,12 +64,10 @@ function safeAmount(val: unknown): number {
 
 export default function FeeApprovalsPage() {
   const { user, role, hasPermission } = useAuth();
+  const isCounsellor = role === 'counsellor';
   const canAccessApprovals =
-    hasPermission('accounts:read') ||
-    role === 'accountant' ||
-    role === 'admin' ||
-    role === 'super_admin' ||
-    role === 'counsellor';
+    !isCounsellor &&
+    (role === 'accountant' || role === 'admin' || role === 'super_admin');
 
   // Active Desk View: 'fee_proposals' | 'payment_approvals'
   const [activeDesk, setActiveDesk] = React.useState<'fee_proposals' | 'payment_approvals'>('fee_proposals');
@@ -222,6 +220,7 @@ export default function FeeApprovalsPage() {
   }, []);
 
   React.useEffect(() => {
+    if (!canAccessApprovals) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -767,15 +766,18 @@ export default function FeeApprovalsPage() {
               <ShieldAlert className="w-6 h-6 text-red-600" />
             </div>
             <div>
+              <span className="inline-block px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
+                403 Forbidden
+              </span>
               <h2 className="text-lg font-bold text-red-950">Access Restricted</h2>
               <p className="text-xs text-red-700 mt-1 max-w-md mx-auto">
-                You do not possess the required permissions to view or manage student fee approval proposals.
+                Users with the Counsellor role are not authorized to view or manage fee approvals or pending payment queues.
               </p>
             </div>
             <div className="pt-2">
-              <Link href={role === 'student' ? '/portal' : '/dashboard'}>
+              <Link href={role === 'counsellor' ? '/crm/leads' : role === 'student' ? '/portal' : '/dashboard'}>
                 <Button variant="outline" size="sm" className="text-xs">
-                  {role === 'student' ? 'Go to Student Portal' : 'Return to Dashboard'}
+                  {role === 'counsellor' ? 'Return to CRM Leads' : role === 'student' ? 'Go to Student Portal' : 'Return to Dashboard'}
                 </Button>
               </Link>
             </div>
@@ -1283,7 +1285,7 @@ export default function FeeApprovalsPage() {
                             )}
 
                             {(fee.approval_status === 'Correction Required' || fee.approval_status === 'Draft') &&
-                              (isOwnSubmission || role === 'counsellor' || role === 'admin' || role === 'super_admin') && (
+                              (isOwnSubmission || (role as string) === 'counsellor' || role === 'admin' || role === 'super_admin') && (
                               <Button
                                 variant="outline"
                                 size="sm"
