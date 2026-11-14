@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
@@ -40,7 +41,7 @@ import { isLeadConverted } from '@/lib/services/crm-service';
 import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
 import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
-import { validateAlternatePhoneNumber, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
+import { validatePhoneNumber, validateAlternatePhoneNumber, getCanonicalPhoneDigits, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
@@ -93,7 +94,10 @@ export default function AdmissionsPage() {
   // Form State for New Admission
   const [name, setName] = React.useState('');
   const [phone, setPhone] = React.useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = React.useState('+91');
+  const [phoneError, setPhoneError] = React.useState('');
   const [alternatePhone, setAlternatePhone] = React.useState('');
+  const [altPhoneCountryCode, setAltPhoneCountryCode] = React.useState('+91');
   const [alternatePhoneError, setAlternatePhoneError] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [photoUrl, setPhotoUrl] = React.useState('');
@@ -263,7 +267,10 @@ export default function AdmissionsPage() {
           }
           setConvertedLeadId(leadId);
           setName(lead.full_name || '');
-          setPhone(lead.phone || '');
+          const parsedLeadPhone = parseStoredPhone(lead.phone || '');
+          setPhoneCountryCode(lead.country_code || parsedLeadPhone.dialCode || '+91');
+          setPhone(parsedLeadPhone.nationalNumber || lead.phone || '');
+          setPhoneError('');
           setEmail(lead.email || '');
           if (lead.interested_course_id) {
             setCourseId(lead.interested_course_id);
@@ -351,12 +358,21 @@ export default function AdmissionsPage() {
       return;
     }
 
+    const phoneVal = validatePhoneNumber(phoneCountryCode, phone, 'Phone Number', true);
+    if (!phoneVal.isValid) {
+      setPhoneError(phoneVal.error || 'Please enter a valid phone number.');
+      return;
+    }
+    setPhoneError('');
+
+    let finalAltPhone: string | undefined = undefined;
     if (alternatePhone.trim()) {
-      const altValidation = validateAlternatePhoneNumber(alternatePhone, 'Alternate mobile number');
+      const altValidation = validatePhoneNumber(altPhoneCountryCode, alternatePhone, 'Alternate mobile number', false);
       if (!altValidation.isValid) {
         setAlternatePhoneError(altValidation.error || 'Please enter a valid alternate mobile number.');
         return;
       }
+      finalAltPhone = altValidation.normalized || alternatePhone.trim();
     }
     setAlternatePhoneError('');
 
@@ -409,9 +425,9 @@ export default function AdmissionsPage() {
       const result = await createAdmissionWorkflow(
         {
           student_name: name,
-        phone,
-        alternate_phone: alternatePhone.trim() || undefined,
-        email,
+          phone: phoneVal.normalized || phone,
+          alternate_phone: finalAltPhone,
+          email,
         photo_url: photoUrl || undefined,
         dob,
         gender,
@@ -459,7 +475,10 @@ export default function AdmissionsPage() {
 
       setName('');
       setPhone('');
+      setPhoneCountryCode('+91');
+      setPhoneError('');
       setAlternatePhone('');
+      setAltPhoneCountryCode('+91');
       setAlternatePhoneError('');
       setPhotoUrl('');
       setPhotoPreview('');
@@ -732,23 +751,30 @@ export default function AdmissionsPage() {
               onChange={(e) => setName(e.target.value)}
               required
             />
-            <Input
-              label="Phone Number *"
-              placeholder="+91 98765 43210"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+            <PhoneInput
+              label="Phone Number"
+              countryCode={phoneCountryCode}
+              onCountryCodeChange={(code) => setPhoneCountryCode(code)}
+              phoneNumber={phone}
+              onPhoneNumberChange={(val) => {
+                setPhone(val);
+                if (phoneError) setPhoneError('');
+              }}
+              error={phoneError}
               required
+              placeholder="98765 43210"
             />
-            <Input
+            <PhoneInput
               label="Alternate Mobile Number (Optional)"
-              type="tel"
-              placeholder="+91 98765 43211"
-              value={alternatePhone}
-              error={alternatePhoneError}
-              onChange={(e) => {
-                setAlternatePhone(e.target.value);
+              countryCode={altPhoneCountryCode}
+              onCountryCodeChange={(code) => setAltPhoneCountryCode(code)}
+              phoneNumber={alternatePhone}
+              onPhoneNumberChange={(val) => {
+                setAlternatePhone(val);
                 if (alternatePhoneError) setAlternatePhoneError('');
               }}
+              error={alternatePhoneError}
+              placeholder="98765 43211"
             />
           </div>
 

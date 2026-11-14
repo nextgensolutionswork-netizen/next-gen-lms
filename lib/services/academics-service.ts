@@ -364,23 +364,121 @@ export async function updateVideoProgress(
 }
 
 // --- Batches & Student Transfer ---
+
+const EXCLUDED_BATCH_STATUSES = new Set(['cancelled', 'dropped', 'inactive', 'suspended', 'completed']);
+
+const BATCH_ID_ALIASES: Record<string, string[]> = {
+  'batch-fico-01': ['b1000000-0000-0000-0000-000000000001'],
+  'b1000000-0000-0000-0000-000000000001': ['batch-fico-01'],
+  'batch-mm-01': ['b1000000-0000-0000-0000-000000000002'],
+  'b1000000-0000-0000-0000-000000000002': ['batch-mm-01'],
+};
+
+export function matchesBatchId(studentBatchId: string | undefined, targetBatchId: string): boolean {
+  if (!studentBatchId || !targetBatchId) return false;
+  if (studentBatchId === targetBatchId) return true;
+  const aliases = BATCH_ID_ALIASES[targetBatchId];
+  if (aliases && aliases.includes(studentBatchId)) return true;
+  return false;
+}
+
+/**
+ * Returns the authoritative active, qualifying students enrolled in a batch.
+ *
+ * Rules:
+ * 1. Filter students strictly matching batchId (including canonical alias linkage).
+ * 2. Exclude cancelled, dropped, inactive, suspended, and completed students.
+ * 3. Exclude students whose linked admission is cancelled.
+ * 4. Deduplicate multiple records sharing canonical student identifiers (id, student_unique_id, admission_id, student_code, email).
+ * 5. Preserve legitimate enrollments in other batches/courses.
+ */
+export function getBatchActiveEnrolledStudents(batchId: string): Student[] {
+  if (!batchId || !store.students) return [];
+
+  const rawStudents = store.students.filter((s) => matchesBatchId(s.batch_id, batchId));
+  const seen = new Set<string>();
+  const activeStudents: Student[] = [];
+
+  for (const s of rawStudents) {
+    const status = (s.status || 'Active').trim().toLowerCase();
+    if (EXCLUDED_BATCH_STATUSES.has(status)) {
+      continue;
+    }
+
+    if (s.admission_id && store.admissions) {
+      const linkedAdmission = store.admissions.find((a) => a.id === s.admission_id);
+      if (linkedAdmission && linkedAdmission.status?.trim().toLowerCase() === 'cancelled') {
+        continue;
+      }
+    }
+
+    const primaryId = s.id || s.student_unique_id || s.student_code;
+    const admissionId = s.admission_id;
+    const admissionNumber = s.admission_number;
+    const email = s.email?.trim().toLowerCase();
+
+    if (primaryId && seen.has(primaryId)) continue;
+    if (admissionId && seen.has(`adm:${admissionId}`)) continue;
+    if (admissionNumber && seen.has(`admnum:${admissionNumber}`)) continue;
+    if (email && seen.has(`email:${email}`)) continue;
+
+    if (primaryId) seen.add(primaryId);
+    if (admissionId) seen.add(`adm:${admissionId}`);
+    if (admissionNumber) seen.add(`admnum:${admissionNumber}`);
+    if (email) seen.add(`email:${email}`);
+
+    activeStudents.push(s);
+  }
+
+  return activeStudents;
+}
+
+export function getBatchActiveEnrolledCount(batchId: string): number {
+  return getBatchActiveEnrolledStudents(batchId).length;
+}
+
+/**
+ * Reconciles batch current_enrolled counts in store.batches with authoritative active students.
+ */
+export function reconcileBatchCounts(): void {
+  if (!store.batches) return;
+  for (const b of store.batches) {
+    b.current_enrolled = getBatchActiveEnrolledCount(b.id);
+  }
+}
+
 export async function getBatches(): Promise<Batch[]> {
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from('batches')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [batchRes, stuRes] = await Promise.all([
+        supabase.from('batches').select('*').order('created_at', { ascending: false }),
+        supabase.from('students').select('*').order('created_at', { ascending: false }),
+      ]);
 
-      if (!error && data && data.length > 0) {
-        store.batches = data as Batch[];
-        return data as Batch[];
+      if (!stuRes.error && stuRes.data && stuRes.data.length > 0) {
+        for (const s of stuRes.data) {
+          const idx = store.students.findIndex(
+            (st) => st.id === s.id || (st.admission_number && s.admission_number && st.admission_number === s.admission_number)
+          );
+          if (idx >= 0) {
+            store.students[idx] = { ...store.students[idx], ...(s as Student) };
+          } else {
+            store.students.unshift(s as Student);
+          }
+        }
+      }
+
+      if (!batchRes.error && batchRes.data && batchRes.data.length > 0) {
+        store.batches = batchRes.data as Batch[];
+        reconcileBatchCounts();
+        return store.batches;
       }
     } catch (err) {
       console.warn('Supabase batches query error, fallback to local persistent store:', err);
     }
   }
+  reconcileBatchCounts();
   return [...store.batches];
 }
 
@@ -495,12 +593,17 @@ export async function deleteBatch(batchId: string): Promise<boolean> {
   const index = store.batches.findIndex((b) => b.id === batchId);
   if (index === -1) return false;
 
-  const enrolledStudents = store.students.filter((s) => s.batch_id === batchId);
-  if (enrolledStudents.length > 0) {
-    throw new Error(`Cannot delete batch: ${enrolledStudents.length} student(s) currently enrolled. Transfer students first.`);
+  const enrolledCount = Math.max(
+    store.students.filter((s) => s.batch_id === batchId).length,
+    getBatchActiveEnrolledCount(batchId),
+    store.batches[index].current_enrolled || 0
+  );
+  if (enrolledCount > 0) {
+    throw new Error(`Cannot delete batch: ${enrolledCount} student(s) currently enrolled. Transfer students first.`);
   }
 
   store.batches.splice(index, 1);
+  reconcileBatchCounts();
   store.persist();
 
   if (isLiveSupabaseEnabled()) {
@@ -515,7 +618,31 @@ export async function deleteBatch(batchId: string): Promise<boolean> {
 }
 
 export async function getStudentsForBatch(batchId: string): Promise<Student[]> {
-  return store.students.filter((s) => s.batch_id === batchId);
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const alias = BATCH_ID_ALIASES[batchId]?.[0];
+      const query = alias
+        ? supabase.from('students').select('*').or(`batch_id.eq.${batchId},batch_id.eq.${alias}`)
+        : supabase.from('students').select('*').eq('batch_id', batchId);
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        for (const s of data) {
+          const idx = store.students.findIndex(
+            (st) => st.id === s.id || (st.admission_number && s.admission_number && st.admission_number === s.admission_number)
+          );
+          if (idx >= 0) {
+            store.students[idx] = { ...store.students[idx], ...(s as Student) };
+          } else {
+            store.students.unshift(s as Student);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase getStudentsForBatch query error:', err);
+    }
+  }
+  return getBatchActiveEnrolledStudents(batchId);
 }
 
 export async function transferStudentBatch(
@@ -540,9 +667,13 @@ export async function transferStudentBatch(
     typeof toBatch.maximum_capacity === 'number' && toBatch.maximum_capacity > 0
       ? toBatch.maximum_capacity
       : 30;
-  if (toBatch.current_enrolled >= maxCapacity) {
+  const targetCurrentEnrolled = Math.max(
+    toBatch.current_enrolled || 0,
+    getBatchActiveEnrolledCount(toBatch.id)
+  );
+  if (targetCurrentEnrolled >= maxCapacity) {
     throw new Error(
-      `Target batch "${toBatch.batch_name}" is at maximum capacity (${toBatch.current_enrolled}/${maxCapacity} students). Cannot transfer student.`
+      `Target batch "${toBatch.batch_name}" is at maximum capacity (${targetCurrentEnrolled}/${maxCapacity} students). Cannot transfer student.`
     );
   }
 
@@ -596,16 +727,13 @@ export async function transferStudentBatch(
 
   store.batchTransferAudits.unshift(auditEntry);
 
-  // Update batch student counts
-  if (fromBatch && fromBatch.current_enrolled > 0) {
-    fromBatch.current_enrolled -= 1;
-  }
-  toBatch.current_enrolled += 1;
-
   // Update student batch
   student.batch_id = toBatch.id;
   student.batch_name = toBatch.batch_name;
   student.updated_at = new Date().toISOString();
+
+  // Reconcile batch student counts accurately across both source and destination
+  reconcileBatchCounts();
   store.persist();
 
   if (isLiveSupabaseEnabled()) {

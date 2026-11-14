@@ -5,6 +5,7 @@ import { assertSameTenant, isAccountsUser, tenantId } from '@/lib/auth/tenant';
 import { paymentAudit, paymentNotification } from './payment-events';
 import { forwardApprovedPaymentToOnboarding } from './onboarding-service';
 import { receiptAmounts } from './receipt-amounts';
+import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
 import {
   StudentFee,
   FeeCategoryItem,
@@ -1055,7 +1056,9 @@ export class FeeWorkflowService {
     updaterUserId: string,
     updaterRole = 'counsellor'
   ): StudentPaymentRecord {
-    const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
+    const payment = (store.studentPayments || []).find(
+      (p) => p.id === paymentId || p.id === paymentId.replace(/^pay-/, '') || `pay-${p.id}` === paymentId
+    );
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
 
     const updater = store.users.find((u) => u.id === updaterUserId);
@@ -1154,13 +1157,34 @@ export class FeeWorkflowService {
     verificationNotes?: string,
     verification?: ManualPaymentVerification
   ): StudentPaymentRecord {
-    const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
+    const payment = (store.studentPayments || []).find(
+      (p) => p.id === paymentId || p.id === paymentId.replace(/^pay-/, '') || `pay-${p.id}` === paymentId
+    );
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
 
-    if (payment.verification_status !== 'Pending Verification') throw new Error('Only a payment pending approval can be approved; it may already be verified or rejected.');
+    const legacyPayment = (store.payments || []).find(
+      (p) => p.id === paymentId || p.id === `pay-${payment.id}` || p.id === payment.id
+    );
+
+    const linkedReceipt = (store.receipts || []).find(
+      (r) =>
+        r.payment_id === payment.id ||
+        r.payment_id === `pay-${payment.id}` ||
+        (payment.receipt_number && r.receipt_number === payment.receipt_number)
+    );
+
+    const pendingCheck = isPaymentPending({
+      status: payment.status,
+      verification_status: payment.verification_status,
+      receipt_status: (linkedReceipt as any)?.receipt_status || (linkedReceipt?.status === 'Void' ? 'Void' : undefined),
+    }) && (!legacyPayment || isPaymentPending({ status: legacyPayment.status, receipt_status: (linkedReceipt as any)?.receipt_status || (linkedReceipt?.status === 'Void' ? 'Void' : undefined) }));
+
+    if (!pendingCheck) {
+      throw new Error('Only a payment pending approval can be approved; it may already be verified or rejected.');
+    }
 
     // Separation of duties: If recorded by a counsellor/staff who happens to be this user, enforce check
-    if (payment.recorded_by === accountantUserId) {
+    if (payment.recorded_by === accountantUserId || legacyPayment?.collected_by === accountantUserId) {
       throw new Error('Separation of duties violation: Payment recorder cannot verify their own payment entry.');
     }
 
@@ -1217,10 +1241,29 @@ export class FeeWorkflowService {
       throw new Error('A rejection reason is mandatory.');
     }
 
-    const payment = (store.studentPayments || []).find((p) => p.id === paymentId);
+    const payment = (store.studentPayments || []).find(
+      (p) => p.id === paymentId || p.id === paymentId.replace(/^pay-/, '') || `pay-${p.id}` === paymentId
+    );
     if (!payment) throw new Error(`Payment with ID ${paymentId} not found.`);
 
-    if (payment.verification_status !== 'Pending Verification') {
+    const legacyPayment = (store.payments || []).find(
+      (p) => p.id === paymentId || p.id === `pay-${payment.id}` || p.id === payment.id
+    );
+
+    const linkedReceipt = (store.receipts || []).find(
+      (r) =>
+        r.payment_id === payment.id ||
+        r.payment_id === `pay-${payment.id}` ||
+        (payment.receipt_number && r.receipt_number === payment.receipt_number)
+    );
+
+    const pendingCheck = isPaymentPending({
+      status: payment.status,
+      verification_status: payment.verification_status,
+      receipt_status: (linkedReceipt as any)?.receipt_status || (linkedReceipt?.status === 'Void' ? 'Void' : undefined),
+    }) && (!legacyPayment || isPaymentPending({ status: legacyPayment.status, receipt_status: (linkedReceipt as any)?.receipt_status || (linkedReceipt?.status === 'Void' ? 'Void' : undefined) }));
+
+    if (!pendingCheck) {
       throw new Error('Cannot reject an already verified payment. Please process a refund or adjustment note.');
     }
 
@@ -1236,7 +1279,9 @@ export class FeeWorkflowService {
     const accountantName = accountantUser?.full_name || 'Accountant';
 
     assertSameTenant(accountantUser, payment);
-    if (payment.recorded_by === accountantUserId) throw new Error('Separation of duties violation: Submitter cannot reject their own payment.');
+    if (payment.recorded_by === accountantUserId || legacyPayment?.collected_by === accountantUserId) {
+      throw new Error('Separation of duties violation: Submitter cannot reject their own payment.');
+    }
     const before = structuredClone(payment);
 
     payment.verification_status = 'Rejected';

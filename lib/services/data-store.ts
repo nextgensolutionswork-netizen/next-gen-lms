@@ -56,6 +56,7 @@ class InstituteDataStore {
   constructor() {
     this.hydrateFromDisk();
     this.reconcileDualLedgers();
+    this.reconcileBatchEnrollments();
   }
 
   public hydrateFromDisk(): boolean {
@@ -168,6 +169,7 @@ class InstituteDataStore {
         if (snapshot.onboardingCases?.length) this.onboardingCases = snapshot.onboardingCases;
         if (snapshot.onboardingAuditLogs?.length) this.onboardingAuditLogs = snapshot.onboardingAuditLogs;
         this.reconcileDualLedgers();
+        this.reconcileBatchEnrollments();
         return true;
       }
     } catch (err) {
@@ -424,6 +426,42 @@ class InstituteDataStore {
         student.paid_amount = studentPaid;
         student.outstanding_amount = Math.max(0, studentFeeAcc.net_payable - studentPaid);
       }
+    }
+  }
+
+  public reconcileBatchEnrollments(): void {
+    if (!this.batches || !this.students) return;
+    const EXCLUDED_STATUSES = new Set(['cancelled', 'dropped', 'inactive', 'suspended', 'completed']);
+
+    for (const batch of this.batches) {
+      const rawList = this.students.filter((s) => s.batch_id === batch.id);
+      const seen = new Set<string>();
+      let count = 0;
+
+      for (const s of rawList) {
+        const status = (s.status || 'Active').trim().toLowerCase();
+        if (EXCLUDED_STATUSES.has(status)) continue;
+
+        if (s.admission_id && this.admissions) {
+          const adm = this.admissions.find((a) => a.id === s.admission_id);
+          if (adm && adm.status?.trim().toLowerCase() === 'cancelled') continue;
+        }
+
+        const primaryId = s.id || s.student_unique_id || s.student_code;
+        const admissionId = s.admission_id;
+        const admissionNumber = s.admission_number;
+
+        if (primaryId && seen.has(primaryId)) continue;
+        if (admissionId && seen.has(`adm:${admissionId}`)) continue;
+        if (admissionNumber && seen.has(`admnum:${admissionNumber}`)) continue;
+
+        if (primaryId) seen.add(primaryId);
+        if (admissionId) seen.add(`adm:${admissionId}`);
+        if (admissionNumber) seen.add(`admnum:${admissionNumber}`);
+
+        count++;
+      }
+      batch.current_enrolled = count;
     }
   }
 

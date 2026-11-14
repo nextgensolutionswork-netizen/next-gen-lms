@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Filter,
+  Search,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ import {
   deleteBatch,
   transferStudentBatch,
   getStudentsForBatch,
+  getBatches,
 } from '@/lib/services/academics-service';
 import { canAccessBatch } from '@/lib/auth/rbac';
 import { formatDate } from '@/lib/utils/formatters';
@@ -50,7 +52,26 @@ export default function BatchesPage() {
   // Selected batch for editing or viewing roster
   const [activeBatch, setActiveBatch] = React.useState<Batch | null>(null);
   const [rosterStudents, setRosterStudents] = React.useState<Student[]>([]);
+  const [rosterSearchQuery, setRosterSearchQuery] = React.useState('');
+  const [rosterPage, setRosterPage] = React.useState(1);
+  const ROSTER_PAGE_SIZE = 25;
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadBatches() {
+      try {
+        const list = await getBatches();
+        if (isMounted) setBatches([...list]);
+      } catch (err) {
+        console.error('Failed to load batches:', err);
+      }
+    }
+    loadBatches();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // RBAC rules
   const canCreate = hasPermission('batches:write') || role === 'admin' || role === 'super_admin';
@@ -109,10 +130,35 @@ export default function BatchesPage() {
   const [transferReason, setTransferReason] = React.useState('');
   const [transferError, setTransferError] = React.useState<string | null>(null);
 
-  const refreshList = () => {
-    setBatches([...store.batches]);
+  const refreshList = async () => {
+    try {
+      const list = await getBatches();
+      setBatches([...list]);
+    } catch {
+      setBatches([...store.batches]);
+    }
     setTransferAudits([...store.batchTransferAudits]);
   };
+
+  const filteredRoster = React.useMemo(() => {
+    if (!rosterSearchQuery.trim()) return rosterStudents;
+    const q = rosterSearchQuery.trim().toLowerCase();
+    return rosterStudents.filter((st) => {
+      return (
+        st.full_name?.toLowerCase().includes(q) ||
+        st.student_code?.toLowerCase().includes(q) ||
+        st.admission_number?.toLowerCase().includes(q) ||
+        st.email?.toLowerCase().includes(q) ||
+        st.phone?.includes(q)
+      );
+    });
+  }, [rosterStudents, rosterSearchQuery]);
+
+  const totalRosterPages = Math.ceil(filteredRoster.length / ROSTER_PAGE_SIZE) || 1;
+  const pagedRosterStudents = React.useMemo(() => {
+    const start = (rosterPage - 1) * ROSTER_PAGE_SIZE;
+    return filteredRoster.slice(start, start + ROSTER_PAGE_SIZE);
+  }, [filteredRoster, rosterPage]);
 
   // Transferable students: if trainer, restrict to students in cohorts assigned to this trainer
   const transferableStudents = React.useMemo(() => {
@@ -266,6 +312,8 @@ export default function BatchesPage() {
     setActiveBatch(batch);
     const students = await getStudentsForBatch(batch.id);
     setRosterStudents(students);
+    setRosterSearchQuery('');
+    setRosterPage(1);
     setIsRosterModal(true);
   };
 
@@ -289,7 +337,13 @@ export default function BatchesPage() {
       setIsTransferModal(false);
       setTransferReason('');
       setStatusMessage({ type: 'success', text: 'Student batch transfer executed and logged in audit trail.' });
-      refreshList();
+      await refreshList();
+      if (activeBatch) {
+        const updatedBatch = store.batches.find((b) => b.id === activeBatch.id) || activeBatch;
+        setActiveBatch(updatedBatch);
+        const updatedStudents = await getStudentsForBatch(activeBatch.id);
+        setRosterStudents(updatedStudents);
+      }
     } catch (err: any) {
       setTransferError(err?.message || 'Transfer failed');
     }
@@ -1039,11 +1093,22 @@ export default function BatchesPage() {
         <div className="space-y-4 text-xs">
           {/* Header Stats Bar */}
           {activeBatch && (
-            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-bold">Enrolled Trainees</p>
                 <p className="text-sm font-bold text-slate-800">
                   {rosterStudents.length} / {activeBatch.maximum_capacity}
+                </p>
+                {rosterSearchQuery.trim() && (
+                  <p className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                    Filtered: {filteredRoster.length} of {rosterStudents.length}
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase font-bold">Available Seats</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {Math.max(0, activeBatch.maximum_capacity - rosterStudents.length)}
                 </p>
               </div>
               <div>
@@ -1066,6 +1131,23 @@ export default function BatchesPage() {
             </div>
           )}
 
+          {/* Roster Search Bar */}
+          {rosterStudents.length > 0 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Search by student name, code, email, or admission #..."
+                value={rosterSearchQuery}
+                onChange={(e) => {
+                  setRosterSearchQuery(e.target.value);
+                  setRosterPage(1);
+                }}
+                className="pl-8 text-xs h-8"
+              />
+            </div>
+          )}
+
           {rosterStudents.length === 0 ? (
             <div className="text-center py-8 bg-slate-50 border border-slate-200 rounded-xl text-slate-400">
               <Users className="h-8 w-8 mx-auto mb-2 text-slate-300" />
@@ -1074,60 +1156,106 @@ export default function BatchesPage() {
                 Transfer students to this cohort or enroll students from admissions.
               </p>
             </div>
+          ) : filteredRoster.length === 0 ? (
+            <div className="text-center py-6 bg-slate-50 border border-slate-200 rounded-xl text-slate-400">
+              <Users className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+              <p className="font-semibold text-slate-600">No matching students found</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                No students in this cohort match &ldquo;{rosterSearchQuery}&rdquo;
+              </p>
+            </div>
           ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-200 font-semibold">
-                  <tr>
-                    <th className="px-3 py-2.5">Student</th>
-                    <th className="px-3 py-2.5">Admission #</th>
-                    <th className="px-3 py-2.5">Attendance</th>
-                    <th className="px-3 py-2.5">Fee Status</th>
-                    <th className="px-3 py-2.5 text-right">Profile</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {rosterStudents.map((st) => (
-                    <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-3 py-2.5">
-                        <p className="font-bold text-slate-900">{st.full_name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">{st.student_code}</p>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className="font-mono text-blue-600 font-medium">{st.admission_number}</span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span
-                          className={`font-semibold ${
-                            st.attendance_percentage >= 80 ? 'text-emerald-600' : 'text-amber-600'
-                          }`}
-                        >
-                          {st.attendance_percentage}%
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {st.outstanding_amount === 0 ? (
-                          <Badge variant="success" className="text-[10px]">
-                            Cleared
-                          </Badge>
-                        ) : (
-                          <span className="text-amber-700 font-medium">
-                            Due ₹{st.outstanding_amount?.toLocaleString('en-IN')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <Link
-                          href={`/students/${st.id}`}
-                          className="text-[#0A6ED1] hover:underline font-semibold text-[11px]"
-                        >
-                          View 360 &rarr;
-                        </Link>
-                      </td>
+            <div className="space-y-2">
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-200 font-semibold">
+                    <tr>
+                      <th className="px-3 py-2.5">Student</th>
+                      <th className="px-3 py-2.5">Admission #</th>
+                      <th className="px-3 py-2.5">Attendance</th>
+                      <th className="px-3 py-2.5">Fee Status</th>
+                      <th className="px-3 py-2.5 text-right">Profile</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {pagedRosterStudents.map((st) => (
+                      <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-3 py-2.5">
+                          <p className="font-bold text-slate-900">{st.full_name}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">{st.student_code}</p>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className="font-mono text-blue-600 font-medium">{st.admission_number}</span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span
+                            className={`font-semibold ${
+                              st.attendance_percentage >= 80 ? 'text-emerald-600' : 'text-amber-600'
+                            }`}
+                          >
+                            {st.attendance_percentage}%
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {st.outstanding_amount === 0 ? (
+                            <Badge variant="success" className="text-[10px]">
+                              Cleared
+                            </Badge>
+                          ) : (
+                            <span className="text-amber-700 font-medium">
+                              Due ₹{st.outstanding_amount?.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Link
+                            href={`/students/${st.id}`}
+                            className="text-[#0A6ED1] hover:underline font-semibold text-[11px]"
+                          >
+                            View 360 &rarr;
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination footer */}
+              <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
+                <span>
+                  Showing {(rosterPage - 1) * ROSTER_PAGE_SIZE + 1} -{' '}
+                  {Math.min(rosterPage * ROSTER_PAGE_SIZE, filteredRoster.length)} of {filteredRoster.length} loaded rows
+                  {filteredRoster.length !== rosterStudents.length ? ` (Full Enrolled: ${rosterStudents.length})` : ''}
+                </span>
+                {totalRosterPages > 1 && (
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={rosterPage <= 1}
+                      onClick={() => setRosterPage((p) => Math.max(1, p - 1))}
+                      className="h-6 px-2 text-[10px]"
+                    >
+                      Prev
+                    </Button>
+                    <span className="px-2">
+                      Page {rosterPage} of {totalRosterPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={rosterPage >= totalRosterPages}
+                      onClick={() => setRosterPage((p) => Math.min(totalRosterPages, p + 1))}
+                      className="h-6 px-2 text-[10px]"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

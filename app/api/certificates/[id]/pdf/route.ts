@@ -7,10 +7,10 @@ export const runtime = 'nodejs';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const rawId = params?.id;
+    const rawId = (await params)?.id;
     if (!rawId) {
       return NextResponse.json(
         { success: false, error: 'Certificate ID or verification code is required' },

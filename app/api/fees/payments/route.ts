@@ -8,6 +8,7 @@ import { visibleWorkflowSnapshot } from '@/lib/services/payment-workflow-state';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { store } from '@/lib/services/data-store';
 import { assertSameTenant } from '@/lib/auth/tenant';
+import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -67,9 +68,47 @@ export async function POST(request: NextRequest) {
         if (!studentFee) throw new Error('Fee account not found.');
         assertSameTenant(actor, studentFee);
       } else {
-        const existing = store.studentPayments.find((p) => p.id === body.paymentId);
+        const existing = store.studentPayments.find(
+          (p) => p.id === body.paymentId || p.id === body.paymentId.replace(/^pay-/, '') || `pay-${p.id}` === body.paymentId
+        );
         if (!existing) throw new Error('Payment not found.');
         assertSameTenant(actor, existing);
+        const legacyPayment = (store.payments || []).find(
+          (p) => p.id === body.paymentId || p.id === `pay-${existing.id}` || p.id === existing.id
+        );
+        const linkedReceipt = (store.receipts || []).find(
+          (r) =>
+            r.payment_id === existing.id ||
+            r.payment_id === `pay-${existing.id}` ||
+            (existing.receipt_number && r.receipt_number === existing.receipt_number)
+        );
+
+        if (body.action === 'approve' || body.action === 'reject') {
+          if (!['accountant', 'admin', 'super_admin'].includes(actor.role)) {
+            throw new Error('Forbidden: Only Accounts or Administrators can approve or reject payments.');
+          }
+          if (existing.recorded_by === actor.id || (existing as any).collected_by === actor.id || legacyPayment?.collected_by === actor.id) {
+            throw new Error(
+              body.action === 'approve'
+                ? 'Separation of duties violation: Payment recorder cannot verify their own payment entry.'
+                : 'Separation of duties violation: Submitter cannot reject their own payment.'
+            );
+          }
+          const receiptStatus = (linkedReceipt as any)?.receipt_status || (linkedReceipt?.status === 'Void' ? 'Void' : undefined);
+          const pendingCheck = isPaymentPending({
+            status: existing.status,
+            verification_status: existing.verification_status,
+            receipt_status: receiptStatus,
+          }) && (!legacyPayment || isPaymentPending({ status: legacyPayment.status, receipt_status: receiptStatus }));
+
+          if (!pendingCheck) {
+            throw new Error(
+              body.action === 'approve'
+                ? 'Only a payment pending approval can be approved; it may already be verified or rejected.'
+                : 'Cannot reject an already verified payment. Please process a refund or adjustment note.'
+            );
+          }
+        }
       }
       if ('input' in body && body.input.payment_mode !== 'Cash' && !body.input.transaction_reference?.trim() && !body.input.bank_upi_reference?.trim()) throw new Error('Transaction reference is required for non-cash payments.');
       const payment = body.action === 'record' ? feeWorkflowService.recordPayment(body.input, actor.id, actor.role)

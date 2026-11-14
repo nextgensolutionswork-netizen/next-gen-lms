@@ -39,6 +39,7 @@ describe('Student Enrollment Enhancements Test Suite', () => {
 
     const matchingBatch = store.batches.find((b) => b.course_id === testCourseId) || store.batches[0];
     testBatchId = matchingBatch.id;
+    matchingBatch.current_enrolled = 0;
 
     // Ensure active counsellor and accountant exist in store.users
     const counsellor = store.users.find((u) => u.id === 'usr-counsellor');

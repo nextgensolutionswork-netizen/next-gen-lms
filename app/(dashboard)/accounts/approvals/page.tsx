@@ -49,6 +49,7 @@ import {
 } from '@/types';
 import { formatINR } from '@/lib/utils/formatters';
 import { feeCourseName } from '@/lib/utils/fee-course';
+import { isPaymentPending, isPaymentApproved, unifyDualLedgerPayments } from '@/lib/utils/dashboard-metrics';
 
 function courseLabel(fee: StudentFee) {
   return feeCourseName(fee, store.courses || [], store.feeAccounts || [], store.admissions || []);
@@ -173,7 +174,51 @@ export default function FeeApprovalsPage() {
     store.reconcileDualLedgers();
     setFees([...(store.studentFees || [])]);
     setCategories([...(store.feeCategories || [])]);
-    setPayments([...(store.studentPayments || [])]);
+    // Unify dual-ledger payments so mirrored records are deduplicated
+    const unified = unifyDualLedgerPayments(store.payments || [], store.studentPayments || [], {
+      receipts: store.receipts || [],
+      students: store.students || [],
+      studentFees: store.studentFees || [],
+      courses: store.courses || [],
+    });
+
+    // Map to StudentPaymentRecord shape preserving authoritative IDs for approval/rejection actions
+    const spList: StudentPaymentRecord[] = unified.map((u) => {
+      const origSp = (store.studentPayments || []).find((sp) =>
+        sp.id === u.id || sp.id === (u as any).student_payment_id || `pay-${sp.id}` === u.id || sp.id === (u.id || '').replace(/^pay-/, '')
+      );
+      return {
+        id: origSp?.id || (u as any).student_payment_id || u.id.replace(/^pay-/, ''),
+        fee_id: origSp?.fee_id || (u as any).fee_id || u.fee_account_id,
+        enrollment_id: origSp?.enrollment_id || (u as any).enrollment_id,
+        installment_id: origSp?.installment_id || u.installment_id,
+        student_id: origSp?.student_id || u.student_id,
+        student_name: origSp?.student_name || u.student_name || 'Student',
+        admission_number: origSp?.admission_number || u.admission_number || '',
+        fee_category: origSp?.fee_category || (u as any).fee_category || u.course_name || 'Course Fee',
+        amount_paid: typeof u.amount === 'number' ? u.amount : origSp?.amount_paid || 0,
+        payment_date: origSp?.payment_date || u.payment_date,
+        payment_mode: origSp?.payment_mode || (u.payment_mode as any) || 'Cash',
+        transaction_reference: origSp?.transaction_reference || u.transaction_reference,
+        bank_upi_reference: origSp?.bank_upi_reference || (u as any).bank_upi_reference,
+        receipt_number: origSp?.receipt_number || u.receipt_number,
+        payment_proof_url: origSp?.payment_proof_url || (u as any).payment_proof_url,
+        notes: origSp?.notes || u.notes,
+        recorded_by: origSp?.recorded_by || u.collected_by,
+        recorded_by_name: origSp?.recorded_by_name || u.collected_by_name || 'Staff',
+        recorded_by_role: origSp?.recorded_by_role || (u as any).recorded_by_role || 'counsellor',
+        verification_status: (u.verification_status as any) || origSp?.verification_status || 'Pending Verification',
+        verified_by: origSp?.verified_by || (u as any).verified_by,
+        verified_by_name: origSp?.verified_by_name || (u as any).verified_by_name,
+        verified_at: origSp?.verified_at || (u as any).verified_at,
+        updated_at: origSp?.updated_at || (u as any).updated_at,
+        updated_by: origSp?.updated_by || (u as any).updated_by,
+        updated_by_name: origSp?.updated_by_name || (u as any).updated_by_name,
+        created_at: origSp?.created_at || u.created_at || new Date().toISOString(),
+        status: (u.status as any) || origSp?.status,
+      };
+    });
+    setPayments(spList);
   }, []);
 
   React.useEffect(() => {
@@ -264,25 +309,29 @@ export default function FeeApprovalsPage() {
     .filter((f) => f.approval_status === 'Approved')
     .reduce((sum, f) => sum + f.final_payable, 0);
 
-  // Counts & sums for Payment Approvals desk
-  const pendingPaymentsCount = payments.filter((p) => p.verification_status === 'Pending Verification').length;
-  const verifiedPaymentsCount = payments.filter((p) => p.verification_status === 'Verified').length;
-  const rejectedPaymentsCount = payments.filter((p) => p.verification_status === 'Rejected').length;
+  // Counts & sums for Payment Approvals desk using shared accounting rules
+  const pendingPayments = React.useMemo(() => payments.filter((p) => isPaymentPending(p)), [payments]);
+  const verifiedPayments = React.useMemo(() => payments.filter((p) => isPaymentApproved(p)), [payments]);
+  const rejectedPayments = React.useMemo(() => payments.filter((p) => !isPaymentPending(p) && !isPaymentApproved(p)), [payments]);
 
-  const totalPendingPaymentsAmount = payments
-    .filter((p) => p.verification_status === 'Pending Verification')
-    .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
+  const pendingPaymentsCount = pendingPayments.length;
+  const verifiedPaymentsCount = verifiedPayments.length;
+  const rejectedPaymentsCount = rejectedPayments.length;
 
-  const totalVerifiedPaymentsAmount = payments
-    .filter((p) => p.verification_status === 'Verified')
-    .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
-
-  const totalPaymentsAmount = payments.reduce((sum, p) => sum + (p.amount_paid || 0), 0);
+  const totalPendingPaymentsAmount = pendingPayments.reduce((sum, p) => sum + safeAmount(p.amount_paid), 0);
+  const totalVerifiedPaymentsAmount = verifiedPayments.reduce((sum, p) => sum + safeAmount(p.amount_paid), 0);
+  const totalPaymentsAmount = payments.reduce((sum, p) => sum + safeAmount(p.amount_paid), 0);
 
   // Filtered Payments List
   const filteredPayments = React.useMemo(() => {
     return payments.filter((p) => {
-      if (activePaymentTab !== 'All' && p.verification_status !== activePaymentTab) {
+      if (activePaymentTab === 'Pending Verification' && !isPaymentPending(p)) {
+        return false;
+      }
+      if (activePaymentTab === 'Verified' && !isPaymentApproved(p)) {
+        return false;
+      }
+      if (activePaymentTab === 'Rejected' && (isPaymentPending(p) || isPaymentApproved(p))) {
         return false;
       }
       if (paymentSearchQuery.trim()) {
@@ -1313,7 +1362,7 @@ export default function FeeApprovalsPage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Verified & Credited
+                    Verified Collections
                   </p>
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 </div>
@@ -1341,13 +1390,14 @@ export default function FeeApprovalsPage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Total Collections
+                    Total Recorded Payments
                   </p>
                   <CreditCard className="h-4 w-4 text-slate-500" />
                 </div>
                 <h3 className="text-2xl font-bold text-slate-900 mt-1">{payments.length}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Total: <span className="font-semibold text-slate-700">{formatINR(totalPaymentsAmount)}</span>
+                  <span className="block text-[10px] text-slate-400 mt-0.5">All Statuses: Verified, Pending & Rejected</span>
                 </p>
               </CardContent>
             </Card>
@@ -1362,7 +1412,7 @@ export default function FeeApprovalsPage() {
                   { id: 'Pending Verification', label: 'Pending Approval', count: pendingPaymentsCount },
                   { id: 'Verified', label: 'Approved & Cleared', count: verifiedPaymentsCount },
                   { id: 'Rejected', label: 'Rejected', count: rejectedPaymentsCount },
-                  { id: 'All', label: 'All Collections', count: payments.length },
+                  { id: 'All', label: 'All Recorded Payments', count: payments.length },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -1436,9 +1486,9 @@ export default function FeeApprovalsPage() {
                         const isOwn = isOwnRecordedPayment(p);
                         const canAccountantVerify =
                           (role === 'accountant' || role === 'admin' || role === 'super_admin') &&
-                          !isOwn && p.verification_status === 'Pending Verification';
+                          !isOwn && isPaymentPending(p);
                         const canCounsellorEdit =
-                          p.verification_status !== 'Verified' &&
+                          !isPaymentApproved(p) &&
                           (p.recorded_by === user?.id || role === 'accountant' || role === 'admin' || role === 'super_admin');
 
                         return (
@@ -1521,7 +1571,7 @@ export default function FeeApprovalsPage() {
 
                             {/* Status */}
                             <td className="px-4 py-3">
-                              {p.verification_status === 'Verified' ? (
+                              {isPaymentApproved(p) ? (
                                 <div>
                                   <Badge variant="success" className="text-[10px]">
                                     Approved & Cleared
@@ -1532,7 +1582,7 @@ export default function FeeApprovalsPage() {
                                     </p>
                                   )}
                                 </div>
-                              ) : p.verification_status === 'Pending Verification' ? (
+                              ) : isPaymentPending(p) ? (
                                 <div>
                                   <Badge variant="warning" className="text-[10px]">
                                     Pending Approval
@@ -1553,7 +1603,7 @@ export default function FeeApprovalsPage() {
                             {/* Actions */}
                             <td className="px-4 py-3 text-center">
                               <div className="flex items-center justify-center space-x-1.5">
-                                {p.verification_status !== 'Verified' && (
+                                {!isPaymentApproved(p) && (
                                   <>
                                     {/* Sales Update Action */}
                                     {canCounsellorEdit && (

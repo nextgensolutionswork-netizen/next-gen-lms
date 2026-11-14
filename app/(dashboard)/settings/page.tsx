@@ -21,6 +21,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { store } from '@/lib/services/data-store';
 import { SystemSettings } from '@/types';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
@@ -81,6 +83,7 @@ export default function SettingsPage() {
     : isSupabaseLive ? 'Connected' : 'Local In-Memory';
   const { user } = useAuth();
   const [isSaving, setIsSaving] = React.useState(false);
+  const [phoneError, setPhoneError] = React.useState('');
 
   React.useEffect(() => {
     let isMounted = true;
@@ -180,6 +183,13 @@ export default function SettingsPage() {
     }
     setIsSaving(true);
     setSaveError(null);
+    const phoneVal = validatePhoneNumber('IN', settings.phone, 'Official Phone', true);
+    if (!phoneVal.isValid) {
+      setPhoneError(phoneVal.error || 'Please enter a valid official phone number.');
+      setIsSaving(false);
+      return;
+    }
+    setPhoneError('');
 
     const bankAcc = settings.bank_account_no || settings.bank_account_number || '';
     const updatedSettings: SystemSettings = {
@@ -367,12 +377,17 @@ export default function SettingsPage() {
                 disabled={!canManageSettings}
                 required
               />
-              <Input
-                label="Official Phone *"
+              <PhoneInput
+                label="Official Phone"
                 value={settings.phone}
-                onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                onChange={(val) => {
+                  setSettings({ ...settings, phone: val });
+                  if (phoneError) setPhoneError('');
+                }}
                 disabled={!canManageSettings}
+                error={phoneError}
                 required
+                placeholder="98765 43210"
               />
             </div>
 

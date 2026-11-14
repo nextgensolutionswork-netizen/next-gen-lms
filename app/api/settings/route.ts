@@ -4,6 +4,7 @@ import { AuditLog } from '@/types';
 import { getAuthenticatedUserFromRequest } from '@/lib/auth/server-session';
 import { AUTH_COOKIE_NAME } from '@/lib/security/auth-cookie';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
+import { validatePhoneNumber } from '@/lib/utils/phone-validation';
 
 export async function GET() {
   store.hydrateFromDisk();
@@ -93,6 +94,14 @@ export async function POST(req: NextRequest) {
       if (key in body) {
         safeUpdates[key] = body[key];
       }
+    }
+
+    if (safeUpdates.phone && typeof safeUpdates.phone === 'string' && safeUpdates.phone.trim()) {
+      const pCheck = validatePhoneNumber('IN', safeUpdates.phone, 'Official Phone', true);
+      if (!pCheck.isValid) {
+        return NextResponse.json({ success: false, error: pCheck.error || 'Invalid official phone number' }, { status: 400 });
+      }
+      safeUpdates.phone = pCheck.normalized || safeUpdates.phone;
     }
 
     const previousSettings = { ...store.settings };

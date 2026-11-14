@@ -28,6 +28,7 @@ import {
 import { Payment, Expense } from '@/types';
 import { TemporalPeriod, getDateRangeForPeriod } from '@/lib/services/finance-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { isPaymentApproved, getCanonicalPaymentKey, unifyDualLedgerPayments } from '@/lib/utils/dashboard-metrics';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -80,48 +81,20 @@ export default function FinanceReportsPage() {
 
   const dateRange = getDateRangeForPeriod(period, customStart, customEnd);
 
-  const allUnifiedPayments = (() => {
+  const allUnifiedPayments = React.useMemo(() => {
     store.reconcileDualLedgers();
-    const map = new Map<string, Payment>();
-
-    // 1. Add all from store.payments
-    for (const p of store.payments || []) {
-      const key = p.receipt_number || p.id;
-      map.set(key, p);
-    }
-
-    // 2. Add or enrich from store.studentPayments (excluding rejected entries)
-    for (const sp of store.studentPayments || []) {
-      if (sp.verification_status === 'Rejected') continue;
-      const key = sp.receipt_number || sp.id;
-      if (!map.has(key)) {
-        const student = (store.students || []).find((s) => s.id === sp.student_id);
-        const course = (store.courses || []).find((c) => c.id === student?.course_id);
-        map.set(key, {
-          id: sp.id.startsWith('pay-') ? sp.id : `pay-${sp.id}`,
-          receipt_number: sp.receipt_number || `REC-${sp.id.slice(-6)}`,
-          student_id: sp.student_id,
-          student_name: sp.student_name,
-          admission_number: sp.admission_number,
-          fee_account_id: `fa-${sp.fee_id}`,
-          installment_id: sp.installment_id,
-          course_id: student?.course_id || 'crs-general',
-          course_name: course?.course_name || student?.course_name || sp.fee_category || 'General Tuition',
-          amount: sp.amount_paid,
-          payment_date: sp.payment_date,
-          payment_mode: sp.payment_mode,
-          transaction_reference: sp.transaction_reference || sp.bank_upi_reference,
-          status: sp.verification_status === 'Verified' ? 'Success' : 'Pending',
-          collected_by: sp.recorded_by,
-          collected_by_name: sp.recorded_by_name,
-          notes: sp.notes,
-          created_at: sp.created_at,
-        });
+    return unifyDualLedgerPayments(
+      store.payments || [],
+      store.studentPayments || [],
+      {
+        students: store.students || [],
+        courses: store.courses || [],
+        studentFees: store.studentFees || [],
+        feeAccounts: store.feeAccounts || [],
+        receipts: store.receipts || [],
       }
-    }
-
-    return Array.from(map.values());
-  })();
+    );
+  }, [refreshTick]);
 
   // Filtered Payments & Expenses for Selected Temporal Range
   const filteredPayments = React.useMemo(() => {
@@ -136,10 +109,19 @@ export default function FinanceReportsPage() {
     );
   })();
 
+  // Only verified/approved payments count as collected revenue.
+  // Pending and rejected payments are excluded from all aggregations so that
+  // the Analytics totals are consistent with the Dashboard KPI card and the
+  // fee ledger (which sums feeAccount.paid_amount, itself updated only on
+  // verified payments).
+  const approvedFilteredPayments = React.useMemo(() => {
+    return filteredPayments.filter((p) => isPaymentApproved(p));
+  }, [filteredPayments]);
+
   // Aggregated Period Metrics
   const periodCollections = React.useMemo(() => {
-    return filteredPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
-  }, [filteredPayments]);
+    return approvedFilteredPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
+  }, [approvedFilteredPayments]);
 
   const periodExpenses = React.useMemo(() => {
     return filteredExpenses
@@ -156,26 +138,26 @@ export default function FinanceReportsPage() {
   // Course-wise Revenue Contribution Map for Period
   const courseRevenueMap = React.useMemo(() => {
     const map: Record<string, number> = {};
-    for (const p of filteredPayments) {
+    for (const p of approvedFilteredPayments) {
       const name = p.course_name || 'General Tuition';
       map[name] = (map[name] || 0) + (p.amount || 0);
     }
     return map;
-  }, [filteredPayments]);
+  }, [approvedFilteredPayments]);
 
   // Payment Mode Distribution Map for Period
   const paymentModeMap = React.useMemo(() => {
     const map: Record<string, number> = {};
-    for (const p of filteredPayments) {
+    for (const p of approvedFilteredPayments) {
       const mode = p.payment_mode || 'Bank Transfer';
       map[mode] = (map[mode] || 0) + (p.amount || 0);
     }
     return map;
-  }, [filteredPayments]);
+  }, [approvedFilteredPayments]);
 
 
   const handleExportCollections = () => {
-    const rows = filteredPayments.map((p) => ({
+    const rows = approvedFilteredPayments.map((p) => ({
       ReceiptNumber: p.receipt_number,
       StudentName: p.student_name,
       Course: p.course_name,
@@ -188,7 +170,7 @@ export default function FinanceReportsPage() {
   };
 
   const handleExportCollectionsExcel = () => {
-    exportCollectionsToExcel(filteredPayments);
+    exportCollectionsToExcel(approvedFilteredPayments as unknown as Payment[]);
   };
 
   const handleExportExpenses = () => {
@@ -358,7 +340,7 @@ export default function FinanceReportsPage() {
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Period Collections</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{formatINR(periodCollections)}</h3>
             <p className="text-xs text-emerald-600 font-semibold mt-1">
-              {filteredPayments.length} transactions in {dateRange.label.split(' ')[0]}
+              {approvedFilteredPayments.length} transactions in {dateRange.label.split(' ')[0]}
             </p>
           </CardContent>
         </Card>

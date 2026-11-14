@@ -22,6 +22,7 @@ import { ensureOnboardingCaseForAdmission } from './onboarding-service';
 import { feeWorkflowService } from './fee-workflow-service';
 import { tenantId } from '@/lib/auth/tenant';
 import type { StudentPaymentRecord } from '@/types';
+import { validatePhoneNumber, validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
 
 export function getNextStudentSequence(year = new Date().getFullYear()): number {
   const prefix = `NGERP-${year}-`;
@@ -314,6 +315,22 @@ export async function createAdmissionWorkflow(
     feeDueDate = rawDueDate;
   }
 
+  // Validate Phone Numbers
+  const phoneValidation = validatePhoneNumber('IN', input.phone, 'Phone number', true);
+  if (!phoneValidation.isValid) {
+    throw new Error(phoneValidation.error || 'Please enter a valid phone number.');
+  }
+  const normalizedPhone = input.phone.trim().startsWith('+') ? input.phone.trim() : (phoneValidation.normalized || input.phone.trim());
+
+  let normalizedAltPhone: string | undefined = undefined;
+  if (input.alternate_phone && input.alternate_phone.trim()) {
+    const altValidation = validateAlternatePhoneNumber(input.alternate_phone, 'Alternate mobile number');
+    if (!altValidation.isValid) {
+      throw new Error(altValidation.error || 'Please enter a valid alternate mobile number.');
+    }
+    normalizedAltPhone = input.alternate_phone.trim();
+  }
+
   // Validate Course
   const course = store.courses.find((c) => c.id === input.course_id);
   if (!course) {
@@ -411,8 +428,8 @@ export async function createAdmissionWorkflow(
     student_unique_id: studentUniqueId,
     lead_id: input.lead_id,
     student_name: input.student_name,
-    phone: input.phone,
-    alternate_phone: input.alternate_phone,
+    phone: normalizedPhone,
+    alternate_phone: normalizedAltPhone,
     email: input.email,
     photo_url: input.photo_url,
     dob: input.dob,
@@ -461,7 +478,7 @@ export async function createAdmissionWorkflow(
     email: input.email,
     full_name: input.student_name,
     role: 'student',
-    phone: input.phone,
+    phone: normalizedPhone,
     is_active: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -480,8 +497,8 @@ export async function createAdmissionWorkflow(
     admission_number,
     full_name: input.student_name,
     email: input.email,
-    phone: input.phone,
-    alternate_phone: input.alternate_phone,
+    phone: normalizedPhone,
+    alternate_phone: normalizedAltPhone,
     profile_photo: input.photo_url,
     photo_url: input.photo_url,
     address: `${input.address}, ${input.city}, ${stateVal}`,

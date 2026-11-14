@@ -394,7 +394,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
         `http://localhost:3000/api/onboarding/cases/${targetCaseId}`,
         onboardingStaffA
       );
-      const res = await getCaseDetailRoute(req, { params: { id: targetCaseId } });
+      const res = await getCaseDetailRoute(req, { params: Promise.resolve({ id: targetCaseId }) });
       expect(res.status).toBe(403);
       const data = await res.json();
       expect(data.error).toContain('not assigned to your account');
@@ -435,7 +435,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
         `http://localhost:3000/api/onboarding/cases/${myCaseId}`,
         onboardingStaffA
       );
-      const res = await getCaseDetailRoute(req, { params: { id: myCaseId } });
+      const res = await getCaseDetailRoute(req, { params: Promise.resolve({ id: myCaseId }) });
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
@@ -488,7 +488,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
         }
       );
 
-      const res = await patchCaseDetailRoute(req, { params: { id: patchCaseId } });
+      const res = await patchCaseDetailRoute(req, { params: Promise.resolve({ id: patchCaseId }) });
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
@@ -571,7 +571,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
         }
       );
 
-      const res = await patchCaseDetailRoute(req, { params: { id: provCaseId } });
+      const res = await patchCaseDetailRoute(req, { params: Promise.resolve({ id: provCaseId }) });
       expect(res.status).toBe(500);
       const data = await res.json();
       expect(data.success).toBe(false);
@@ -612,7 +612,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
           body: { action: 'block_case', reason: 'Awaiting graduation degree certificate from university' },
         }
       );
-      const blockRes = await patchCaseDetailRoute(blockReq, { params: { id: blockCaseId } });
+      const blockRes = await patchCaseDetailRoute(blockReq, { params: Promise.resolve({ id: blockCaseId }) });
       expect(blockRes.status).toBe(200);
       const blockData = await blockRes.json();
       expect(blockData.case.status).toBe('blocked');
@@ -627,7 +627,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
           body: { action: 'unblock_case' },
         }
       );
-      const unblockRes = await patchCaseDetailRoute(unblockReq, { params: { id: blockCaseId } });
+      const unblockRes = await patchCaseDetailRoute(unblockReq, { params: Promise.resolve({ id: blockCaseId }) });
       expect(unblockRes.status).toBe(200);
       const unblockData = await unblockRes.json();
       expect(unblockData.case.status).toBe('in_progress');
@@ -722,7 +722,7 @@ describe('Server-Side /api/onboarding Route Handlers & Session Security', () => 
 
     it('rejects unauthenticated requests on /api/onboarding/[id]', async () => {
       const req = createAuthRequest('http://localhost:3000/api/onboarding/case-123', null);
-      const res = await getCanonicalDetailRoute(req, { params: { id: 'case-123' } });
+      const res = await getCanonicalDetailRoute(req, { params: Promise.resolve({ id: 'case-123' }) });
       expect(res.status).toBe(401);
     });
   });

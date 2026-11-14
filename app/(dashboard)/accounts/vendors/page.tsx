@@ -26,12 +26,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Modal } from '@/components/ui/modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { Vendor } from '@/types';
 import { createVendor, updateVendor, archiveVendor, deleteVendor } from '@/lib/services/finance-service';
 import { formatINR } from '@/lib/utils/formatters';
+import { validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/i;
@@ -74,6 +76,8 @@ export default function VendorsPage() {
   const [vendorName, setVendorName] = React.useState('');
   const [contactPerson, setContactPerson] = React.useState('');
   const [phone, setPhone] = React.useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = React.useState('+91');
+  const [phoneError, setPhoneError] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [address, setAddress] = React.useState('');
   const [pan, setPan] = React.useState('');
@@ -168,11 +172,22 @@ export default function VendorsPage() {
       return;
     }
 
+    let normalizedPhone = phone.trim();
+    if (phone.trim()) {
+      const pCheck = validatePhoneNumber(phoneCountryCode, phone, 'Phone Number', false);
+      if (!pCheck.isValid) {
+        setPhoneError(pCheck.error || 'Please enter a valid phone number.');
+        return;
+      }
+      normalizedPhone = pCheck.normalized || phone.trim();
+    }
+    setPhoneError('');
+
     await createVendor(
       {
         vendor_name: vendorName.trim(),
         contact_person: contactPerson.trim(),
-        phone: phone.trim(),
+        phone: normalizedPhone,
         email: email.trim(),
         address: address.trim(),
         pan_number: pan.trim().toUpperCase(),
@@ -197,7 +212,10 @@ export default function VendorsPage() {
     setEditingVendor(v);
     setVendorName(v.vendor_name);
     setContactPerson(v.contact_person || '');
-    setPhone(v.phone || '');
+    const parsed = parseStoredPhone(v.phone || '');
+    setPhoneCountryCode(parsed.dialCode || '+91');
+    setPhone(parsed.nationalNumber);
+    setPhoneError('');
     setEmail(v.email || '');
     setAddress(v.address || '');
     const panMatch = v.pan_number || v.notes?.match(/PAN:\s*([A-Z0-9]+)/i)?.[1] || '';
@@ -233,12 +251,23 @@ export default function VendorsPage() {
       return;
     }
 
+    let normalizedPhone = phone.trim();
+    if (phone.trim()) {
+      const pCheck = validatePhoneNumber(phoneCountryCode, phone, 'Phone Number', false);
+      if (!pCheck.isValid) {
+        setPhoneError(pCheck.error || 'Please enter a valid phone number.');
+        return;
+      }
+      normalizedPhone = pCheck.normalized || phone.trim();
+    }
+    setPhoneError('');
+
     await updateVendor(
       editingVendor.id,
       {
         vendor_name: vendorName.trim(),
         contact_person: contactPerson.trim(),
-        phone: phone.trim(),
+        phone: normalizedPhone,
         email: email.trim(),
         address: address.trim(),
         pan_number: pan.trim().toUpperCase(),
@@ -293,6 +322,8 @@ export default function VendorsPage() {
     setVendorName('');
     setContactPerson('');
     setPhone('');
+    setPhoneCountryCode('+91');
+    setPhoneError('');
     setEmail('');
     setAddress('');
     setPan('');
@@ -596,11 +627,17 @@ export default function VendorsPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
+            <PhoneInput
               label="Phone Number"
-              placeholder="+91 98765 00000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              countryCode={phoneCountryCode}
+              onCountryCodeChange={(code) => setPhoneCountryCode(code)}
+              phoneNumber={phone}
+              onPhoneNumberChange={(val) => {
+                setPhone(val);
+                if (phoneError) setPhoneError('');
+              }}
+              error={phoneError}
+              placeholder="98765 00000"
             />
             <Input
               label="Email Address"
@@ -730,10 +767,17 @@ export default function VendorsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Input
+              <PhoneInput
                 label="Phone Number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                countryCode={phoneCountryCode}
+                onCountryCodeChange={(code) => setPhoneCountryCode(code)}
+                phoneNumber={phone}
+                onPhoneNumberChange={(val) => {
+                  setPhone(val);
+                  if (phoneError) setPhoneError('');
+                }}
+                error={phoneError}
+                placeholder="98765 00000"
               />
               <Input
                 label="Email Address"

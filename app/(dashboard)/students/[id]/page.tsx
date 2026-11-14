@@ -42,7 +42,8 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
-import { validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { validateAlternatePhoneNumber, validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { transferStudentBatch } from '@/lib/services/academics-service';
@@ -108,6 +109,7 @@ export default function StudentDetailsPage() {
   // Edit Personal Details Modal state (Alternate Mobile Number & Photo)
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = React.useState(false);
   const [editAltPhone, setEditAltPhone] = React.useState('');
+  const [editAltPhoneCountryCode, setEditAltPhoneCountryCode] = React.useState('+91');
   const [editAltPhoneError, setEditAltPhoneError] = React.useState('');
   const [editPhotoUrl, setEditPhotoUrl] = React.useState('');
   const [editPhotoPreview, setEditPhotoPreview] = React.useState('');
@@ -200,7 +202,9 @@ export default function StudentDetailsPage() {
     (role as string) === 'operations';
 
   const openEditProfileModal = () => {
-    setEditAltPhone(student?.alternate_phone || '');
+    const parsed = parseStoredPhone(student?.alternate_phone || '');
+    setEditAltPhoneCountryCode(parsed.dialCode || '+91');
+    setEditAltPhone(parsed.nationalNumber);
     setEditAltPhoneError('');
     setEditPhotoUrl(student?.photo_url || student?.profile_photo || '');
     setEditPhotoPreview(student?.photo_url || student?.profile_photo || '');
@@ -253,17 +257,19 @@ export default function StudentDetailsPage() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!student) return;
+    let normalizedAlt: string | undefined = undefined;
     if (editAltPhone.trim()) {
-      const val = validateAlternatePhoneNumber(editAltPhone, 'Alternate mobile number');
+      const val = validatePhoneNumber(editAltPhoneCountryCode, editAltPhone, 'Alternate mobile number', false);
       if (!val.isValid) {
         setEditAltPhoneError(val.error || 'Invalid alternate mobile number.');
         return;
       }
+      normalizedAlt = val.normalized || editAltPhone.trim();
     }
     setEditProfileSaving(true);
     setEditAltPhoneError('');
     try {
-      student.alternate_phone = editAltPhone.trim() || undefined;
+      student.alternate_phone = normalizedAlt;
       student.photo_url = editPhotoUrl.trim() || undefined;
       if (editPhotoUrl.trim()) {
         student.profile_photo = editPhotoUrl.trim();
@@ -2403,23 +2409,18 @@ export default function StudentDetailsPage() {
             <Input value={student.phone} disabled className="bg-slate-100" />
           </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Alternate Mobile Number (Optional)
-            </label>
-            <Input
-              type="tel"
-              placeholder="e.g. +91 98765 43211 or 9876543211"
-              value={editAltPhone}
-              onChange={(e) => {
-                setEditAltPhone(e.target.value);
-                if (editAltPhoneError) setEditAltPhoneError('');
-              }}
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Valid 10-digit Indian phone number or standard international format.
-            </p>
-          </div>
+          <PhoneInput
+            label="Alternate Mobile Number (Optional)"
+            countryCode={editAltPhoneCountryCode}
+            onCountryCodeChange={(code) => setEditAltPhoneCountryCode(code)}
+            phoneNumber={editAltPhone}
+            onPhoneNumberChange={(val) => {
+              setEditAltPhone(val);
+              if (editAltPhoneError) setEditAltPhoneError('');
+            }}
+            error={editAltPhoneError}
+            placeholder="98765 43211"
+          />
 
           <div className="space-y-2 pt-2 border-t border-slate-100">
             <label className="font-semibold text-slate-700 block">

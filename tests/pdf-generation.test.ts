@@ -161,7 +161,7 @@ describe('PDF Generation Service & API Routes', () => {
       try {
         delete (receipt as Partial<typeof receipt>).payment_amount;
         delete (receipt as Partial<typeof receipt>).remaining_balance;
-        const res = await getReceiptPdfRoute(receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf?download=true`), { params: { id: receipt.id } });
+        const res = await getReceiptPdfRoute(receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf?download=true`), { params: Promise.resolve({ id: receipt.id }) });
         expect(res.status).toBe(200);
         expect(res.headers.get('content-disposition')).toContain('attachment');
         const text = pdfText(Buffer.from(await res.arrayBuffer()));
@@ -177,7 +177,7 @@ describe('PDF Generation Service & API Routes', () => {
       try {
         delete (receipt as Partial<typeof receipt>).payment_amount;
         receipt.payment_id = 'missing-linked-payment';
-        const res = await getReceiptPdfRoute(receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`), { params: { id: receipt.id } });
+        const res = await getReceiptPdfRoute(receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`), { params: Promise.resolve({ id: receipt.id }) });
         expect(res.status).toBe(422);
         expect((await res.json()).error).toContain('has no valid payment amount');
       } finally { store.receipts = store.receipts.map((r) => r.id === before.id ? before : r); }
@@ -185,7 +185,7 @@ describe('PDF Generation Service & API Routes', () => {
     it('returns 200 with inline application/pdf for a valid receipt ID', async () => {
       const receipt = store.receipts[0];
       const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf`);
-      const res = await getReceiptPdfRoute(req, { params: { id: receipt.id } });
+      const res = await getReceiptPdfRoute(req, { params: Promise.resolve({ id: receipt.id }) });
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toBe('application/pdf');
@@ -200,7 +200,7 @@ describe('PDF Generation Service & API Routes', () => {
     it('returns attachment disposition when download=true is requested', async () => {
       const receipt = store.receipts[0];
       const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.id}/pdf?download=true`);
-      const res = await getReceiptPdfRoute(req, { params: { id: receipt.id } });
+      const res = await getReceiptPdfRoute(req, { params: Promise.resolve({ id: receipt.id }) });
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-disposition')).toContain('attachment');
@@ -210,7 +210,7 @@ describe('PDF Generation Service & API Routes', () => {
     it('looks up receipt by receipt_number as well', async () => {
       const receipt = store.receipts[0];
       const req = receiptRequest(`http://localhost:3000/api/receipts/${receipt.receipt_number}/pdf`);
-      const res = await getReceiptPdfRoute(req, { params: { id: receipt.receipt_number } });
+      const res = await getReceiptPdfRoute(req, { params: Promise.resolve({ id: receipt.receipt_number }) });
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toBe('application/pdf');
@@ -218,7 +218,7 @@ describe('PDF Generation Service & API Routes', () => {
 
     it('returns 404 for non-existent receipt ID', async () => {
       const req = receiptRequest('http://localhost:3000/api/receipts/non-existent-id/pdf');
-      const res = await getReceiptPdfRoute(req, { params: { id: 'non-existent-id' } });
+      const res = await getReceiptPdfRoute(req, { params: Promise.resolve({ id: 'non-existent-id' }) });
 
       expect(res.status).toBe(404);
       const json = await res.json();
@@ -231,7 +231,7 @@ describe('PDF Generation Service & API Routes', () => {
     it('returns 200 with inline application/pdf for a valid certificate ID', async () => {
       const cert = store.certificates[0];
       const req = new NextRequest(`http://localhost:3000/api/certificates/${cert.certificate_id}/pdf`);
-      const res = await getCertificatePdfRoute(req, { params: { id: cert.certificate_id } });
+      const res = await getCertificatePdfRoute(req, { params: Promise.resolve({ id: cert.certificate_id }) });
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toBe('application/pdf');
@@ -246,7 +246,7 @@ describe('PDF Generation Service & API Routes', () => {
     it('returns attachment disposition when download=true is requested', async () => {
       const cert = store.certificates[0];
       const req = new NextRequest(`http://localhost:3000/api/certificates/${cert.id}/pdf?download=true`);
-      const res = await getCertificatePdfRoute(req, { params: { id: cert.id } });
+      const res = await getCertificatePdfRoute(req, { params: Promise.resolve({ id: cert.id }) });
 
       expect(res.status).toBe(200);
       expect(res.headers.get('content-disposition')).toContain('attachment');
@@ -255,7 +255,7 @@ describe('PDF Generation Service & API Routes', () => {
 
     it('returns 404 for non-existent certificate ID', async () => {
       const req = new NextRequest('http://localhost:3000/api/certificates/invalid-cert-id/pdf');
-      const res = await getCertificatePdfRoute(req, { params: { id: 'invalid-cert-id' } });
+      const res = await getCertificatePdfRoute(req, { params: Promise.resolve({ id: 'invalid-cert-id' }) });
 
       expect(res.status).toBe(404);
       const json = await res.json();

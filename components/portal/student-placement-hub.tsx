@@ -30,6 +30,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { Modal } from '@/components/ui/modal';
 import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
@@ -85,8 +87,13 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
   // Form State for Enrollment Registration
   const [currentStatus, setCurrentStatus] = React.useState<PlacementCurrentStatus>('Student');
   const [employmentStatus, setEmploymentStatus] = React.useState<PlacementEmploymentStatus>('Fresher');
-  const [mobileNumber, setMobileNumber] = React.useState(student.phone || '');
-  const [whatsappNumber, setWhatsappNumber] = React.useState(student.phone || '');
+  const parsedInitialMobile = parseStoredPhone(student.phone || '');
+  const [mobileCountryCode, setMobileCountryCode] = React.useState(parsedInitialMobile.dialCode || '+91');
+  const [mobileNumber, setMobileNumber] = React.useState(parsedInitialMobile.nationalNumber);
+  const [mobileError, setMobileError] = React.useState('');
+  const [whatsappCountryCode, setWhatsappCountryCode] = React.useState(parsedInitialMobile.dialCode || '+91');
+  const [whatsappNumber, setWhatsappNumber] = React.useState(parsedInitialMobile.nationalNumber);
+  const [whatsappError, setWhatsappError] = React.useState('');
 
   // Experienced Fields
   const [currentCompany, setCurrentCompany] = React.useState('');
@@ -161,13 +168,29 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
       return;
     }
 
+    const mobCheck = validatePhoneNumber(mobileCountryCode, mobileNumber, 'Primary Mobile Number', true);
+    if (!mobCheck.isValid) {
+      setMobileError(mobCheck.error || 'Please enter a valid mobile number.');
+      alert(mobCheck.error || 'Please enter a valid mobile number.');
+      return;
+    }
+    setMobileError('');
+
+    const waCheck = validatePhoneNumber(whatsappCountryCode, whatsappNumber, 'WhatsApp Notification Number', true);
+    if (!waCheck.isValid) {
+      setWhatsappError(waCheck.error || 'Please enter a valid WhatsApp notification number.');
+      alert(waCheck.error || 'Please enter a valid WhatsApp notification number.');
+      return;
+    }
+    setWhatsappError('');
+
     try {
       const newEnr = await createPlacementEnrollment(
         {
           student_id: student.id,
           student_name: student.full_name,
-          mobile_number: mobileNumber,
-          whatsapp_number: whatsappNumber,
+          mobile_number: mobCheck.normalized || mobileNumber,
+          whatsapp_number: waCheck.normalized || whatsappNumber,
           sap_module: student.sap_module || 'SAP FICO',
           current_status: currentStatus,
           employment_status: employmentStatus,
@@ -1071,17 +1094,31 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
 
           {/* Contact Numbers */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
+            <PhoneInput
               label="Primary Mobile Number"
-              value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value)}
+              countryCode={mobileCountryCode}
+              onCountryCodeChange={(code) => setMobileCountryCode(code)}
+              phoneNumber={mobileNumber}
+              onPhoneNumberChange={(val) => {
+                setMobileNumber(val);
+                if (mobileError) setMobileError('');
+              }}
+              error={mobileError}
               required
+              placeholder="98765 43210"
             />
-            <Input
+            <PhoneInput
               label="WhatsApp Notification Number"
-              value={whatsappNumber}
-              onChange={(e) => setWhatsappNumber(e.target.value)}
+              countryCode={whatsappCountryCode}
+              onCountryCodeChange={(code) => setWhatsappCountryCode(code)}
+              phoneNumber={whatsappNumber}
+              onPhoneNumberChange={(val) => {
+                setWhatsappNumber(val);
+                if (whatsappError) setWhatsappError('');
+              }}
+              error={whatsappError}
               required
+              placeholder="98765 43210"
             />
           </div>
 

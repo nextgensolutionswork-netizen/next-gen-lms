@@ -29,7 +29,19 @@ import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Payment } from '@/types';
-import { courseBucket, paymentCourseBucket, UNASSIGNED_COURSE, formatDashboardPercentage, calculatePaymentApprovalMetrics, calculateEnrollmentMetrics, isPaymentApproved } from '@/lib/utils/dashboard-metrics';
+import {
+  courseBucket,
+  paymentCourseBucket,
+  UNASSIGNED_COURSE,
+  formatDashboardPercentage,
+  calculatePaymentApprovalMetrics,
+  calculateEnrollmentMetrics,
+  isPaymentApproved,
+  getCanonicalPaymentKey,
+  unifyDualLedgerPayments,
+  getRecentVerifiedCollections,
+} from '@/lib/utils/dashboard-metrics';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -54,6 +66,20 @@ function parseDateNormalized(dateStr?: string): Date | null {
 export default function DashboardPage() {
   const [filterPeriod, setFilterPeriod] = React.useState<'month' | 'today' | 'week' | 'all'>('month');
   const [filterCourse, setFilterCourse] = React.useState<string>('All');
+  const [refreshTick, setRefreshTick] = React.useState(0);
+
+  React.useEffect(() => {
+    paymentWorkflowClient
+      .refresh()
+      .then(() => {
+        store.reconcileDualLedgers();
+        setRefreshTick((t) => t + 1);
+      })
+      .catch(() => {
+        store.reconcileDualLedgers();
+      });
+  }, []);
+
   const courseIdSignature = JSON.stringify((store.courses || []).map((c) => c.id));
   const courseIds = React.useMemo<Set<string>>(() => new Set(JSON.parse(courseIdSignature)), [courseIdSignature]);
   const matchesCourse = React.useCallback((courseId?: string) => filterCourse === 'All' || courseBucket(courseId, courseIds) === filterCourse, [filterCourse, courseIds]);
@@ -61,50 +87,18 @@ export default function DashboardPage() {
   // Unified dual-ledger payments (reconciles store.payments & store.studentPayments)
   const allUnifiedPayments = React.useMemo(() => {
     store.reconcileDualLedgers();
-    const map = new Map<string, Payment & { verification_status?: string }>();
-
-    for (const p of store.payments || []) {
-      const key = p.receipt_number || p.id;
-      map.set(key, {
-        ...p,
-        verification_status: (p as any).verification_status || (p.status === 'Success' ? 'Verified' : p.status === 'Failed' ? 'Rejected' : 'Pending Verification'),
-      });
-    }
-
-    for (const sp of store.studentPayments || []) {
-      if (sp.verification_status === 'Rejected') continue;
-      const key = sp.receipt_number || sp.id;
-      if (!map.has(key)) {
-        const student = (store.students || []).find((s) => s.id === sp.student_id);
-        const fee = (store.studentFees || []).find((f) => f.id === sp.fee_id);
-        const courseId = fee?.course_id || student?.course_id;
-        const course = (store.courses || []).find((c) => c.id === courseId);
-        map.set(key, {
-          id: sp.id.startsWith('pay-') ? sp.id : `pay-${sp.id}`,
-          receipt_number: sp.receipt_number || `REC-${sp.id.slice(-6)}`,
-          student_id: sp.student_id,
-          student_name: sp.student_name,
-          admission_number: sp.admission_number,
-          fee_account_id: fee?.fee_account_id || `fa-${sp.fee_id}`,
-          installment_id: sp.installment_id,
-          course_id: courseId || 'crs-general',
-          course_name: course?.course_name || student?.course_name || sp.fee_category || 'General Tuition',
-          amount: sp.amount_paid,
-          payment_date: sp.payment_date,
-          payment_mode: sp.payment_mode,
-          transaction_reference: sp.transaction_reference || sp.bank_upi_reference,
-          status: sp.verification_status === 'Verified' ? 'Success' : 'Pending',
-          verification_status: sp.verification_status,
-          collected_by: sp.recorded_by,
-          collected_by_name: sp.recorded_by_name,
-          notes: sp.notes,
-          created_at: sp.created_at,
-        });
+    return unifyDualLedgerPayments(
+      store.payments || [],
+      store.studentPayments || [],
+      {
+        students: store.students || [],
+        courses: store.courses || [],
+        studentFees: store.studentFees || [],
+        feeAccounts: store.feeAccounts || [],
+        receipts: store.receipts || [],
       }
-    }
-
-    return Array.from(map.values());
-  }, []);
+    );
+  }, [refreshTick]);
 
   // Timezone-safe Period filtering calculation
   const isDateInSelectedPeriod = React.useCallback(
@@ -167,6 +161,10 @@ export default function DashboardPage() {
     return periodPayments.filter((p) => isPaymentApproved(p));
   }, [periodPayments]);
 
+  const recentVerifiedCollections = React.useMemo(() => {
+    return getRecentVerifiedCollections(periodPayments, 5);
+  }, [periodPayments]);
+
   const periodCollections = React.useMemo(() => {
     return periodApprovedPayments.reduce((sum, p) => sum + safeAmount(p.amount), 0);
   }, [periodApprovedPayments]);
@@ -185,8 +183,12 @@ export default function DashboardPage() {
 
   const courseBreakdown = [...(store.courses || []).map((c) => ({ id: c.id, name: c.course_name })),
     { id: UNASSIGNED_COURSE, name: 'Unassigned / unknown course' }].map((course) => {
+    // Only approved/verified payments count as collected revenue in the reconciliation table.
+    // This must match the same isPaymentApproved predicate used by periodCollections above
+    // so that the course-row totals sum exactly to the KPI card total for the same period.
     const payments = allUnifiedPayments.filter((p) =>
       isDateInSelectedPeriod(p.payment_date || p.created_at) &&
+      isPaymentApproved(p) &&
       paymentCourseBucket(p, courseIds, store.feeAccounts || [], store.students || []) === course.id);
     return { ...course, transactions: payments.length,
       amount: payments.reduce((sum, p) => sum + safeAmount(p.amount), 0),
@@ -643,7 +645,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-base">Recent Payments & Receipts</CardTitle>
+              <CardTitle className="text-base">Recent Verified Fee Collections</CardTitle>
               <p className="text-xs text-slate-500">Verified fee collections and transaction receipts</p>
             </div>
             <Link href="/accounts/payments">
@@ -662,24 +664,39 @@ export default function DashboardPage() {
                     <th className="px-4 py-3">Student</th>
                     <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Method</th>
+                    <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Date</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {periodPayments.length === 0 ? (
+                  {recentVerifiedCollections.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                        No payment collections found for the selected {periodLabel.toLowerCase()}{filterCourse !== 'All' ? ` (${filterCourse})` : ''}.
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                        No verified fee collections found for the selected {periodLabel.toLowerCase()}{filterCourse !== 'All' ? ` (${filterCourse})` : ''}.
                       </td>
                     </tr>
                   ) : (
-                    periodPayments.slice(0, 5).map((pay) => (
+                    recentVerifiedCollections.map((pay) => (
                       <tr key={pay.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-800">{pay.receipt_number}</td>
+                        <td className="px-4 py-3">
+                          {pay.receipt_number && !pay.receipt_number.startsWith('PENDING-') ? (
+                            <Link
+                              href={`/accounts/receipts/${encodeURIComponent(pay.receipt_number)}`}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {pay.receipt_number}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold text-slate-800">{pay.receipt_number || '—'}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 font-medium text-slate-800">{pay.student_name}</td>
                         <td className="px-4 py-3 font-bold text-emerald-600">{formatINR(pay.amount)}</td>
                         <td className="px-4 py-3">
                           <Badge variant="outline">{pay.payment_mode}</Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant="success">Verified</Badge>
                         </td>
                         <td className="px-4 py-3 text-slate-500">{formatDate(pay.payment_date)}</td>
                       </tr>

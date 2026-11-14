@@ -5,6 +5,7 @@ import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
 import { paymentTransaction } from '@/lib/services/payment-workflow-transaction';
 import { visibleWorkflowSnapshot } from '@/lib/services/payment-workflow-state';
 import { createAdmissionWorkflow, CreateAdmissionInput } from '@/lib/services/admission-service';
+import { validatePhoneNumber, validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,16 @@ export async function POST(request: NextRequest) {
     const actor = await authenticatePaymentRequest(request);
     if (!['counsellor', 'admin', 'super_admin'].includes(actor.role)) throw new Error('Forbidden: Admission registration requires counsellor access.');
     const input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
+    const phoneCheck = validatePhoneNumber('IN', input.phone, 'Phone number', true);
+    if (!phoneCheck.isValid) {
+      throw new Error(phoneCheck.error || 'Please enter a valid phone number.');
+    }
+    if (input.alternate_phone && input.alternate_phone.trim()) {
+      const altCheck = validateAlternatePhoneNumber(input.alternate_phone, 'Alternate mobile number');
+      if (!altCheck.isValid) {
+        throw new Error(altCheck.error || 'Please enter a valid alternate mobile number.');
+      }
+    }
     if (input.initial_payment_amount && input.initial_payment_amount > 0) {
       const mode = input.payment_mode || 'UPI';
       if (mode !== 'Cash' && !input.transaction_reference?.trim() && !input.bank_upi_reference?.trim()) {

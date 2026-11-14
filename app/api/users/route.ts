@@ -5,6 +5,7 @@ import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { recordAuditLog } from '@/lib/services/audit-service';
 import { UserProfile, UserRole } from '@/types';
+import { validatePhoneNumber } from '@/lib/utils/phone-validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let normalizedPhone: string | undefined = undefined;
+    if (phone && typeof phone === 'string' && phone.trim()) {
+      const pCheck = validatePhoneNumber('IN', phone, 'Phone number', false);
+      if (!pCheck.isValid) {
+        return NextResponse.json({ success: false, error: pCheck.error || 'Invalid phone number' }, { status: 400 });
+      }
+      normalizedPhone = pCheck.normalized || phone;
+    }
+
     let authUserId = `usr-${Date.now()}`;
 
     // 1. Supabase Auth Admin creation if live database is enabled
@@ -74,7 +84,7 @@ export async function POST(req: NextRequest) {
             data: {
               full_name: full_name.trim(),
               role: role || 'trainer',
-              phone: phone || '',
+              phone: normalizedPhone || '',
               assigned_course_ids: assigned_course_ids || [],
             },
           }
@@ -95,7 +105,7 @@ export async function POST(req: NextRequest) {
             email: email.trim().toLowerCase(),
             full_name: full_name.trim(),
             role: role || 'trainer',
-            phone: phone || null,
+            phone: normalizedPhone || null,
             is_active: true,
             updated_at: new Date().toISOString(),
           });
@@ -115,7 +125,7 @@ export async function POST(req: NextRequest) {
       email: email.trim().toLowerCase(),
       full_name: full_name.trim(),
       role: (role as UserRole) || 'trainer',
-      phone: phone || undefined,
+      phone: normalizedPhone || undefined,
       is_active: true,
       assigned_course_ids: assigned_course_ids || [],
       created_at: new Date().toISOString(),
@@ -195,12 +205,21 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    let normalizedPhone = phone;
+    if (phone !== undefined && phone !== null && typeof phone === 'string' && phone.trim()) {
+      const pCheck = validatePhoneNumber('IN', phone, 'Phone number', false);
+      if (!pCheck.isValid) {
+        return NextResponse.json({ success: false, error: pCheck.error || 'Invalid phone number' }, { status: 400 });
+      }
+      normalizedPhone = pCheck.normalized || phone;
+    }
+
     const oldUser = { ...store.users[idx] };
     const updatedUser: UserProfile = {
       ...store.users[idx],
       full_name: full_name !== undefined ? full_name : store.users[idx].full_name,
       email: email !== undefined ? email.trim().toLowerCase() : store.users[idx].email,
-      phone: phone !== undefined ? phone : store.users[idx].phone,
+      phone: phone !== undefined ? normalizedPhone : store.users[idx].phone,
       role: role !== undefined ? (role as UserRole) : store.users[idx].role,
       is_active: is_active !== undefined ? is_active : store.users[idx].is_active,
       assigned_course_ids: assigned_course_ids !== undefined ? assigned_course_ids : store.users[idx].assigned_course_ids,

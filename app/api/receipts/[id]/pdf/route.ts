@@ -10,12 +10,12 @@ export const runtime = 'nodejs';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const actor = await authenticatePaymentRequest(request);
     return await paymentTransaction(actor, async () => {
-    const rawId = params?.id;
+    const rawId = (await params)?.id;
     if (!rawId) {
       return NextResponse.json(
         { success: false, error: 'Receipt ID or number is required' },

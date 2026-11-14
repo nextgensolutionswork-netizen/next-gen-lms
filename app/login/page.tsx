@@ -336,7 +336,7 @@ export default function LoginPage() {
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">Multi-Role Institute ERP & LMS</p>
           <h1 className="max-w-lg text-3xl font-semibold leading-tight lg:text-5xl">Build skills.<br />Create your future.</h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">Complete enterprise training management for students, trainers, accountants, sales staff, support mentors, and administrators.</p>
-          <div className="mt-8 flex items-center gap-3 text-xs text-slate-300"><BookOpen aria-hidden="true" className="text-blue-400" size={18} />8 Dedicated Role Workspaces & Portals</div>
+          <div className="mt-8 flex items-center gap-3 text-xs text-slate-300"><BookOpen aria-hidden="true" className="text-blue-400" size={18} />{DEMO_ACCOUNTS.length} Dedicated Role Workspaces &amp; Portals</div>
         </div>
         <p className="text-[11px] text-slate-500">Next-Gen ERP Solutions · SAP Training Institute</p>
       </section>
@@ -362,7 +362,7 @@ export default function LoginPage() {
                   : 'Enter and confirm your new password below.'
                 : forgotPasswordMode
                   ? 'Enter your account email and we’ll send you a fresh recovery link.'
-                  : 'Select any of the 8 accounts below or enter credentials manually.'}
+                  : 'Select any of the ' + DEMO_ACCOUNTS.length + ' accounts below or enter credentials manually.'}
           </p>
 
           {passwordResetComplete ? (
@@ -506,7 +506,7 @@ export default function LoginPage() {
           {/* Quick Demo Fill Buttons for ALL 8 ROLES */}
           <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">8 Preset Role Accounts:</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">{DEMO_ACCOUNTS.length} Preset Role Accounts:</span>
               <span className="text-[10px] text-blue-600 font-medium">Click to fill</span>
             </div>
 

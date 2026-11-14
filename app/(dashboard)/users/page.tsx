@@ -27,13 +27,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { UserProfile, UserRole } from '@/types';
 import { generatePasswordResetLink } from '@/lib/services/auth-service';
 import { dispatchMultiChannelNotification } from '@/lib/services/notification-service';
 import { formatDate } from '@/lib/utils/formatters';
-import { getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
+import { getCanonicalPhoneDigits, validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function UsersPage() {
@@ -57,6 +58,8 @@ export default function UsersPage() {
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [phone, setPhone] = React.useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = React.useState('+91');
+  const [phoneError, setPhoneError] = React.useState('');
   const [role, setRole] = React.useState<UserRole>('trainer');
   const [assignedCourseId, setAssignedCourseId] = React.useState(store.courses?.[0]?.id || '');
 
@@ -66,6 +69,8 @@ export default function UsersPage() {
   const [editName, setEditName] = React.useState('');
   const [editEmail, setEditEmail] = React.useState('');
   const [editPhone, setEditPhone] = React.useState('');
+  const [editPhoneCountryCode, setEditPhoneCountryCode] = React.useState('+91');
+  const [editPhoneError, setEditPhoneError] = React.useState('');
   const [editRole, setEditRole] = React.useState<UserRole>('trainer');
   const [editCourseId, setEditCourseId] = React.useState('');
 
@@ -121,6 +126,17 @@ export default function UsersPage() {
     e.preventDefault();
     if (!name || !email) return;
 
+    let normalizedPhone: string | undefined = undefined;
+    if (phone.trim()) {
+      const pCheck = validatePhoneNumber(phoneCountryCode, phone, 'Phone Number', false);
+      if (!pCheck.isValid) {
+        setPhoneError(pCheck.error || 'Please enter a valid phone number.');
+        return;
+      }
+      normalizedPhone = pCheck.normalized || phone;
+    }
+    setPhoneError('');
+
     try {
       const res = await fetch('/api/users', {
         method: 'POST',
@@ -128,7 +144,7 @@ export default function UsersPage() {
         body: JSON.stringify({
           full_name: name,
           email,
-          phone,
+          phone: normalizedPhone || '',
           role,
           assigned_course_ids: role === 'trainer' ? [assignedCourseId] : [],
         }),
@@ -144,6 +160,8 @@ export default function UsersPage() {
       setName('');
       setEmail('');
       setPhone('');
+      setPhoneCountryCode('+91');
+      setPhoneError('');
       refreshList();
     } catch (err: any) {
       setActionError(err.message || 'Failed to create user.');
@@ -155,7 +173,10 @@ export default function UsersPage() {
     setEditingUser(u);
     setEditName(u.full_name);
     setEditEmail(u.email);
-    setEditPhone(u.phone || '');
+    const parsed = parseStoredPhone(u.phone || '');
+    setEditPhoneCountryCode(parsed.dialCode || '+91');
+    setEditPhone(parsed.nationalNumber);
+    setEditPhoneError('');
     setEditRole(u.role);
     setEditCourseId(u.assigned_course_ids?.[0] || store.courses?.[0]?.id || '');
     setIsEditModal(true);
@@ -176,6 +197,17 @@ export default function UsersPage() {
       return;
     }
 
+    let normalizedPhone: string | undefined = undefined;
+    if (editPhone.trim()) {
+      const pCheck = validatePhoneNumber(editPhoneCountryCode, editPhone, 'Phone Number', false);
+      if (!pCheck.isValid) {
+        setEditPhoneError(pCheck.error || 'Please enter a valid phone number.');
+        return;
+      }
+      normalizedPhone = pCheck.normalized || editPhone;
+    }
+    setEditPhoneError('');
+
     try {
       const res = await fetch('/api/users', {
         method: 'PATCH',
@@ -184,7 +216,7 @@ export default function UsersPage() {
           id: editingUser.id,
           full_name: editName,
           email: editEmail,
-          phone: editPhone,
+          phone: normalizedPhone || '',
           role: editRole,
           assigned_course_ids: editRole === 'trainer' ? [editCourseId] : [],
         }),
@@ -656,10 +688,17 @@ export default function UsersPage() {
               onChange={(e) => setEditEmail(e.target.value)}
               required
             />
-            <Input
+            <PhoneInput
               label="Phone Number"
-              value={editPhone}
-              onChange={(e) => setEditPhone(e.target.value)}
+              countryCode={editPhoneCountryCode}
+              onCountryCodeChange={(code) => setEditPhoneCountryCode(code)}
+              phoneNumber={editPhone}
+              onPhoneNumberChange={(val) => {
+                setEditPhone(val);
+                if (editPhoneError) setEditPhoneError('');
+              }}
+              error={editPhoneError}
+              placeholder="98765 43210"
             />
           </div>
 
@@ -887,11 +926,17 @@ export default function UsersPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <Input
+            <PhoneInput
               label="Phone Number"
-              placeholder="+91..."
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              countryCode={phoneCountryCode}
+              onCountryCodeChange={(code) => setPhoneCountryCode(code)}
+              phoneNumber={phone}
+              onPhoneNumberChange={(val) => {
+                setPhone(val);
+                if (phoneError) setPhoneError('');
+              }}
+              error={phoneError}
+              placeholder="98765 43210"
             />
           </div>
 

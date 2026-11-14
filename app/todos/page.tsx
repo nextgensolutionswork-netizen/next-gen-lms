@@ -25,7 +25,7 @@ export default async function TodosDiagnosticsPage() {
 
   // 1. Verify live Supabase SSR session if available
   try {
-    const supabase = createClient(cookieStore);
+    const supabase = await createClient(cookieStore);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase
@@ -44,10 +44,9 @@ export default async function TodosDiagnosticsPage() {
 
   // 2. Cryptographically verify HMAC-signed session cookie
   if (!isSuperAdmin && authCookie) {
-    let isSigValid = true;
-    if (sigCookie) {
-      isSigValid = await verifyAuthCookieSignature(authCookie, sigCookie);
-    }
+    const isSigValid = sigCookie
+      ? await verifyAuthCookieSignature(authCookie, sigCookie)
+      : false;
     if (isSigValid) {
       try {
         const parsed = JSON.parse(decodeURIComponent(authCookie));
@@ -74,7 +73,7 @@ export default async function TodosDiagnosticsPage() {
   let probeDurationMs = 0;
 
   try {
-    const supabase = createClient(cookieStore);
+    const supabase = await createClient(cookieStore);
     const res = await supabase.from('todos').select();
     todos = res.data;
     error = res.error;
