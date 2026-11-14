@@ -33,6 +33,11 @@ import {
 } from '@/lib/services/academics-service';
 import { canAccessBatch } from '@/lib/auth/rbac';
 import { formatDate } from '@/lib/utils/formatters';
+import {
+  isValidYMD,
+  getTodayInInstituteTimezone,
+  stepDate,
+} from '@/lib/utils/schedule-date';
 
 export default function SchedulePage() {
   const { user, role, hasPermission } = useAuth();
@@ -40,15 +45,26 @@ export default function SchedulePage() {
   const [view, setView] = React.useState<'day' | 'week' | 'month' | 'all'>('month');
   const [selectedBatchFilter, setSelectedBatchFilter] = React.useState<string>('all');
   const [selectedReferenceDate, setSelectedReferenceDate] = React.useState(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const thisMonthPrefix = today.slice(0, 7);
-    const hasThisMonth = store.classSessions.some((s) => s.session_date.startsWith(thisMonthPrefix));
-    if (hasThisMonth) return today;
-    if (store.classSessions.length > 0) {
-      return store.classSessions[0].session_date;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlDate = params.get('date');
+      if (urlDate && isValidYMD(urlDate)) {
+        return urlDate;
+      }
     }
-    return today;
+    return getTodayInInstituteTimezone();
   });
+
+  // URL search parameter synchronization for ?date=YYYY-MM-DD
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlDate = params.get('date');
+      if (urlDate && isValidYMD(urlDate)) {
+        setSelectedReferenceDate(urlDate);
+      }
+    }
+  }, []);
 
   const isStudent = role === 'student';
   const isTrainer = role === 'trainer';
@@ -134,33 +150,15 @@ export default function SchedulePage() {
 
   // Date navigation handlers
   const handlePrevDate = () => {
-    const { year, month, day } = parseYMD(selectedReferenceDate);
-    const d = new Date(year, month - 1, day, 12, 0, 0);
-    if (view === 'day') {
-      d.setDate(d.getDate() - 1);
-    } else if (view === 'week') {
-      d.setDate(d.getDate() - 7);
-    } else {
-      d.setMonth(d.getMonth() - 1);
-    }
-    setSelectedReferenceDate(formatYMD(d));
+    setSelectedReferenceDate((prev) => stepDate(prev, view, -1));
   };
 
   const handleNextDate = () => {
-    const { year, month, day } = parseYMD(selectedReferenceDate);
-    const d = new Date(year, month - 1, day, 12, 0, 0);
-    if (view === 'day') {
-      d.setDate(d.getDate() + 1);
-    } else if (view === 'week') {
-      d.setDate(d.getDate() + 7);
-    } else {
-      d.setMonth(d.getMonth() + 1);
-    }
-    setSelectedReferenceDate(formatYMD(d));
+    setSelectedReferenceDate((prev) => stepDate(prev, view, 1));
   };
 
   const handleToday = () => {
-    setSelectedReferenceDate(formatYMD(new Date()));
+    setSelectedReferenceDate(getTodayInInstituteTimezone());
   };
 
   // Apply Day / Week / Month / All View Filter and sort chronologically
@@ -210,7 +208,7 @@ export default function SchedulePage() {
   // New Session form state
   const [batchId, setBatchId] = React.useState(accessibleBatches[0]?.id || store.batches[0]?.id || '');
   const [topic, setTopic] = React.useState('');
-  const [date, setDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = React.useState(() => getTodayInInstituteTimezone());
   const [startTime, setStartTime] = React.useState('08:00');
   const [endTime, setEndTime] = React.useState('10:00');
   const [mode, setMode] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Hybrid');
@@ -510,7 +508,12 @@ export default function SchedulePage() {
             <input
               type="date"
               value={selectedReferenceDate}
-              onChange={(e) => setSelectedReferenceDate(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val || isValidYMD(val)) {
+                  setSelectedReferenceDate(val);
+                }
+              }}
               className="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 font-medium"
               title="Jump to date"
             />
