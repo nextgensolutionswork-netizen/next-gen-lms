@@ -432,9 +432,17 @@ class InstituteDataStore {
   public reconcileBatchEnrollments(): void {
     if (!this.batches || !this.students) return;
     const EXCLUDED_STATUSES = new Set(['cancelled', 'dropped', 'inactive', 'suspended', 'completed']);
+    const BATCH_ALIASES: Record<string, string[]> = {
+      'batch-mm-01': ['b1000000-0000-0000-0000-000000000002', 'B-2026-MM-01'],
+      'b1000000-0000-0000-0000-000000000002': ['batch-mm-01', 'B-2026-MM-01'],
+      'batch-fico-01': ['b1000000-0000-0000-0000-000000000001', 'B-2026-FICO-01'],
+      'b1000000-0000-0000-0000-000000000001': ['batch-fico-01', 'B-2026-FICO-01'],
+    };
 
     for (const batch of this.batches) {
-      const rawList = this.students.filter((s) => s.batch_id === batch.id);
+      const rawList = this.students.filter(
+        (s) => s.batch_id === batch.id || Boolean(s.batch_id && BATCH_ALIASES[batch.id]?.includes(s.batch_id))
+      );
       const seen = new Set<string>();
       let count = 0;
 

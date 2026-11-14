@@ -54,6 +54,8 @@ export default function BatchesPage() {
   const [rosterStudents, setRosterStudents] = React.useState<Student[]>([]);
   const [rosterSearchQuery, setRosterSearchQuery] = React.useState('');
   const [rosterPage, setRosterPage] = React.useState(1);
+  const [isRosterLoading, setIsRosterLoading] = React.useState(false);
+  const [rosterError, setRosterError] = React.useState<string | null>(null);
   const ROSTER_PAGE_SIZE = 25;
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -310,11 +312,20 @@ export default function BatchesPage() {
 
   const openRoster = async (batch: Batch) => {
     setActiveBatch(batch);
-    const students = await getStudentsForBatch(batch.id);
-    setRosterStudents(students);
+    setRosterStudents([]);
     setRosterSearchQuery('');
     setRosterPage(1);
+    setRosterError(null);
+    setIsRosterLoading(true);
     setIsRosterModal(true);
+    try {
+      const students = await getStudentsForBatch(batch.id);
+      setRosterStudents(students);
+    } catch (err: any) {
+      setRosterError(err?.message || 'Failed to retrieve authoritative batch roster.');
+    } finally {
+      setIsRosterLoading(false);
+    }
   };
 
   const handleTransfer = async (e: React.FormEvent) => {
@@ -1093,13 +1104,24 @@ export default function BatchesPage() {
         <div className="space-y-4 text-xs">
           {/* Header Stats Bar */}
           {activeBatch && (
-            <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center relative">
+              {isTrainer && (
+                <div className="col-span-4 pb-2 mb-1 border-b border-slate-200 flex items-center justify-center space-x-1.5">
+                  <Badge variant="outline" className="text-[10px] text-amber-800 bg-amber-50 border-amber-200 font-medium">
+                    Restricted Scope: Assigned Trainer View
+                  </Badge>
+                </div>
+              )}
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-bold">Enrolled Trainees</p>
                 <p className="text-sm font-bold text-slate-800">
-                  {rosterStudents.length} / {activeBatch.maximum_capacity}
+                  {isRosterLoading ? (
+                    <span className="text-slate-400 animate-pulse">Loading...</span>
+                  ) : (
+                    `${rosterStudents.length} / ${activeBatch.maximum_capacity}`
+                  )}
                 </p>
-                {rosterSearchQuery.trim() && (
+                {!isRosterLoading && rosterSearchQuery.trim() && (
                   <p className="text-[10px] text-blue-600 font-semibold mt-0.5">
                     Filtered: {filteredRoster.length} of {rosterStudents.length}
                   </p>
@@ -1108,7 +1130,11 @@ export default function BatchesPage() {
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-bold">Available Seats</p>
                 <p className="text-sm font-bold text-slate-800">
-                  {Math.max(0, activeBatch.maximum_capacity - rosterStudents.length)}
+                  {isRosterLoading ? (
+                    <span className="text-slate-400 animate-pulse">--</span>
+                  ) : (
+                    Math.max(0, activeBatch.maximum_capacity - rosterStudents.length)
+                  )}
                 </p>
               </div>
               <div>
@@ -1132,7 +1158,7 @@ export default function BatchesPage() {
           )}
 
           {/* Roster Search Bar */}
-          {rosterStudents.length > 0 && (
+          {!isRosterLoading && !rosterError && rosterStudents.length > 0 && (
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
@@ -1148,7 +1174,28 @@ export default function BatchesPage() {
             </div>
           )}
 
-          {rosterStudents.length === 0 ? (
+          {isRosterLoading ? (
+            <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="inline-block animate-spin rounded-full h-7 w-7 border-2 border-blue-600 border-t-transparent mb-2" />
+              <p className="font-semibold text-slate-700">Loading cohort roster...</p>
+              <p className="text-[11px] text-slate-400 mt-1">Retrieving authoritative student enrollments</p>
+            </div>
+          ) : rosterError ? (
+            <div className="text-center py-8 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 p-4">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2 text-rose-500" />
+              <p className="font-semibold text-sm">Failed to Load Roster</p>
+              <p className="text-xs text-rose-600 mt-1">{rosterError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => activeBatch && openRoster(activeBatch)}
+                className="mt-3 text-xs bg-white text-rose-700 border-rose-300 hover:bg-rose-100"
+              >
+                Retry Query
+              </Button>
+            </div>
+          ) : rosterStudents.length === 0 ? (
             <div className="text-center py-8 bg-slate-50 border border-slate-200 rounded-xl text-slate-400">
               <Users className="h-8 w-8 mx-auto mb-2 text-slate-300" />
               <p className="font-semibold text-slate-600">No students currently enrolled</p>

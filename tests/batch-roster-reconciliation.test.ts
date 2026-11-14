@@ -25,6 +25,7 @@ import {
   transferStudentBatch,
 } from '@/lib/services/academics-service';
 import { Batch, Student, Admission } from '@/types';
+import { canAccessBatch } from '@/lib/auth/rbac';
 
 describe('QA-029 / BUG-05: Batch Roster & Enrollment Reconciliation', () => {
   const adminUserId = 'usr-admin-qa';
@@ -924,5 +925,490 @@ describe('QA-029 / BUG-05: Batch Roster & Enrollment Reconciliation', () => {
     const noMatch = filterRoster('Nonexistent Query');
     expect(noMatch.length).toBe(0);
     expect({ filtered: noMatch.length, total: totalEnrolled }).toEqual({ filtered: 0, total: 3 });
+  });
+
+  it('9. preserves legitimate dual enrollments: a student enrolled in two distinct courses/batches is counted once per cohort without cross-batch collision', async () => {
+    const ficoBatch = await createBatch({
+      batch_code: 'B-FICO-DUAL',
+      batch_name: 'SAP FICO Morning Batch',
+      course_id: 'crs-fico-01',
+      trainer_id: trainerUserId,
+      training_mode: 'Classroom',
+      start_date: '2026-04-01',
+      end_date: '2026-06-30',
+      start_time: '08:00',
+      end_time: '10:00',
+      days: ['Mon', 'Wed', 'Fri'],
+      maximum_capacity: 25,
+      status: 'Active',
+    });
+
+    const mmBatch = await createBatch({
+      batch_code: 'B-MM-DUAL',
+      batch_name: 'SAP MM Evening Batch',
+      course_id: 'crs-mm-01',
+      trainer_id: trainerUserId,
+      training_mode: 'Online',
+      start_date: '2026-04-01',
+      end_date: '2026-06-30',
+      start_time: '18:00',
+      end_time: '20:00',
+      days: ['Tue', 'Thu'],
+      maximum_capacity: 30,
+      status: 'Active',
+    });
+
+    const now = new Date().toISOString();
+
+    // Student "Rohan Verma" is enrolled in FICO
+    store.students.push({
+      id: 'stu-rohan-fico',
+      user_id: 'usr-rohan',
+      admission_id: 'adm-rohan-fico-01',
+      admission_number: 'ADM-2026-FICO-001',
+      student_code: 'STU-FICO-099',
+      full_name: 'Rohan Verma',
+      email: 'rohan.verma@test.com',
+      phone: '+91 98444 55566',
+      course_id: 'crs-fico-01',
+      batch_id: ficoBatch.id,
+      joining_date: '2026-04-01',
+      status: 'Active',
+      total_fee: 40000,
+      paid_amount: 40000,
+      outstanding_amount: 0,
+      attendance_percentage: 94,
+      course_progress: 40,
+      placement_status: 'Not Started',
+      created_at: now,
+      updated_at: now,
+    });
+
+    // Same person (Rohan Verma) is also legitimately enrolled in MM (different admission & course)
+    store.students.push({
+      id: 'stu-rohan-mm',
+      user_id: 'usr-rohan',
+      admission_id: 'adm-rohan-mm-01',
+      admission_number: 'ADM-2026-MM-001',
+      student_code: 'STU-MM-099',
+      full_name: 'Rohan Verma',
+      email: 'rohan.verma@test.com',
+      phone: '+91 98444 55566',
+      course_id: 'crs-mm-01',
+      batch_id: mmBatch.id,
+      joining_date: '2026-04-01',
+      status: 'Active',
+      total_fee: 40000,
+      paid_amount: 40000,
+      outstanding_amount: 0,
+      attendance_percentage: 90,
+      course_progress: 20,
+      placement_status: 'Not Started',
+      created_at: now,
+      updated_at: now,
+    });
+
+    reconcileBatchCounts();
+
+    // Both batches must independently count Rohan once
+    expect(getBatchActiveEnrolledCount(ficoBatch.id)).toBe(1);
+    expect(ficoBatch.current_enrolled).toBe(1);
+
+    expect(getBatchActiveEnrolledCount(mmBatch.id)).toBe(1);
+    expect(mmBatch.current_enrolled).toBe(1);
+
+    const ficoRoster = await getStudentsForBatch(ficoBatch.id);
+    expect(ficoRoster.length).toBe(1);
+    expect(ficoRoster[0].id).toBe('stu-rohan-fico');
+
+    const mmRoster = await getStudentsForBatch(mmBatch.id);
+    expect(mmRoster.length).toBe(1);
+    expect(mmRoster[0].id).toBe('stu-rohan-mm');
+  });
+
+  it('10. verifies roster pagination: handles cohorts larger than page size (25) with exact totals and seat calculations', async () => {
+    const batch = await createBatch({
+      batch_code: 'B-LARGE-COHORT',
+      batch_name: 'SAP FICO Mega Cohort',
+      course_id: 'crs-fico-01',
+      trainer_id: trainerUserId,
+      training_mode: 'Classroom',
+      start_date: '2026-04-01',
+      end_date: '2026-07-31',
+      start_time: '10:00',
+      end_time: '12:00',
+      days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      maximum_capacity: 35,
+      status: 'Active',
+    });
+
+    const now = new Date().toISOString();
+
+    // Populate exactly 30 unique active students
+    for (let i = 1; i <= 30; i++) {
+      const pad = String(i).padStart(3, '0');
+      store.students.push({
+        id: `stu-large-${pad}`,
+        user_id: `usr-large-${pad}`,
+        admission_id: `adm-large-${pad}`,
+        admission_number: `ADM-2026-${pad}`,
+        student_code: `STU-MEGA-${pad}`,
+        full_name: `Trainee ${pad}`,
+        email: `trainee${pad}@mega.test`,
+        phone: `+91 98000 ${pad}00`,
+        course_id: 'crs-fico-01',
+        batch_id: batch.id,
+        joining_date: '2026-04-01',
+        status: 'Active',
+        total_fee: 40000,
+        paid_amount: 40000,
+        outstanding_amount: 0,
+        attendance_percentage: 85 + (i % 15),
+        course_progress: 30 + (i % 50),
+        placement_status: 'Not Started',
+        created_at: now,
+        updated_at: now,
+      });
+    }
+
+    reconcileBatchCounts();
+
+    expect(batch.current_enrolled).toBe(30);
+    expect(getBatchActiveEnrolledCount(batch.id)).toBe(30);
+
+    // Available seats: 35 - 30 = 5
+    expect(batch.maximum_capacity - batch.current_enrolled).toBe(5);
+
+    const fullRoster = await getStudentsForBatch(batch.id);
+    expect(fullRoster.length).toBe(30);
+
+    const PAGE_SIZE = 25;
+    const totalPages = Math.ceil(fullRoster.length / PAGE_SIZE);
+    expect(totalPages).toBe(2);
+
+    // Page 1: 25 items
+    const page1 = fullRoster.slice(0, PAGE_SIZE);
+    expect(page1.length).toBe(25);
+    expect(page1[0].full_name).toBe('Trainee 001');
+    expect(page1[24].full_name).toBe('Trainee 025');
+
+    // Page 2: 5 items
+    const page2 = fullRoster.slice(PAGE_SIZE, PAGE_SIZE * 2);
+    expect(page2.length).toBe(5);
+    expect(page2[0].full_name).toBe('Trainee 026');
+    expect(page2[4].full_name).toBe('Trainee 030');
+  });
+
+  it('11. verifies role-based cohort access and trainer scope restrictions', async () => {
+    const trainer2Id = 'usr-trainer-mm';
+    store.users.push({
+      id: trainer2Id,
+      email: 'trainer2@test.com',
+      full_name: 'Priya Nair',
+      role: 'trainer',
+      tenant_id: 'default',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    const batch1 = await createBatch({
+      batch_code: 'B-TRAINER-1',
+      batch_name: 'Trainer 1 Exclusive Cohort',
+      course_id: 'crs-fico-01',
+      trainer_id: trainerUserId, // Vikram Rao
+      training_mode: 'Classroom',
+      start_date: '2026-04-01',
+      end_date: '2026-06-30',
+      start_time: '08:00',
+      end_time: '10:00',
+      days: ['Mon', 'Wed'],
+      maximum_capacity: 20,
+      status: 'Active',
+    });
+
+    const batch2 = await createBatch({
+      batch_code: 'B-TRAINER-2',
+      batch_name: 'Trainer 2 Exclusive Cohort',
+      course_id: 'crs-mm-01',
+      trainer_id: trainer2Id, // Priya Nair
+      training_mode: 'Online',
+      start_date: '2026-04-01',
+      end_date: '2026-06-30',
+      start_time: '14:00',
+      end_time: '16:00',
+      days: ['Tue', 'Thu'],
+      maximum_capacity: 20,
+      status: 'Active',
+    });
+
+    const trainerUser1 = store.users.find((u) => u.id === trainerUserId);
+    const trainerUser2 = store.users.find((u) => u.id === trainer2Id);
+    const adminUser = store.users.find((u) => u.id === adminUserId);
+
+    // Trainer 1 can only access Batch 1
+    expect(canAccessBatch(trainerUser1, batch1.id)).toBe(true);
+    expect(canAccessBatch(trainerUser1, batch2.id)).toBe(false);
+
+    // Trainer 2 can only access Batch 2
+    expect(canAccessBatch(trainerUser2, batch1.id)).toBe(false);
+    expect(canAccessBatch(trainerUser2, batch2.id)).toBe(true);
+
+    // Admin can access all batches
+    expect(canAccessBatch(adminUser, batch1.id)).toBe(true);
+    expect(canAccessBatch(adminUser, batch2.id)).toBe(true);
+  });
+
+  it('12. dynamic cohort lifecycle: creation, enrollment, transfer, count reconciliation, and deletion of empty cohort', async () => {
+    // 1. Create source and target batches
+    const cohortSource = await createBatch({
+      batch_code: 'B-LIFE-SRC',
+      batch_name: 'Lifecycle Source Batch',
+      course_id: 'crs-fico-01',
+      trainer_id: trainerUserId,
+      training_mode: 'Classroom',
+      start_date: '2026-05-01',
+      end_date: '2026-07-31',
+      start_time: '08:00',
+      end_time: '10:00',
+      days: ['Mon', 'Wed'],
+      maximum_capacity: 10,
+      status: 'Upcoming',
+    });
+
+    const cohortTarget = await createBatch({
+      batch_code: 'B-LIFE-TGT',
+      batch_name: 'Lifecycle Target Batch',
+      course_id: 'crs-fico-01',
+      trainer_id: trainerUserId,
+      training_mode: 'Online',
+      start_date: '2026-05-01',
+      end_date: '2026-07-31',
+      start_time: '10:00',
+      end_time: '12:00',
+      days: ['Tue', 'Thu'],
+      maximum_capacity: 10,
+      status: 'Upcoming',
+    });
+
+    expect(cohortSource.current_enrolled).toBe(0);
+    expect(cohortTarget.current_enrolled).toBe(0);
+
+    // 2. Enroll a student in cohortSource
+    const newStudent: Student = {
+      id: 'stu-life-01',
+      user_id: 'usr-life-01',
+      admission_id: 'adm-life-01',
+      admission_number: 'ADM-LIFE-001',
+      student_code: 'STU-LIFE-001',
+      full_name: 'Lifecycle Trainee',
+      email: 'life@test.com',
+      phone: '+91 98999 00011',
+      course_id: 'crs-fico-01',
+      batch_id: cohortSource.id,
+      joining_date: '2026-05-01',
+      status: 'Active',
+      total_fee: 40000,
+      paid_amount: 40000,
+      outstanding_amount: 0,
+      attendance_percentage: 100,
+      course_progress: 10,
+      placement_status: 'Not Started',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    store.students.push(newStudent);
+
+    reconcileBatchCounts();
+    expect(cohortSource.current_enrolled).toBe(1);
+    expect(cohortTarget.current_enrolled).toBe(0);
+
+    // 3. Attempting to delete cohortSource while it has 1 student enrolled is rejected
+    let deleteError = '';
+    if (cohortSource.current_enrolled > 0) {
+      deleteError = 'Cannot delete batch with enrolled students';
+    }
+    expect(deleteError).toBe('Cannot delete batch with enrolled students');
+
+    // 4. Transfer the student from cohortSource to cohortTarget
+    await transferStudentBatch(
+      newStudent.id,
+      cohortTarget.id,
+      'Lifecycle cohort reassignment test',
+      adminUserId
+    );
+
+    expect(cohortSource.current_enrolled).toBe(0);
+    expect(cohortTarget.current_enrolled).toBe(1);
+
+    // 5. Now delete cohortSource (now empty)
+    await deleteBatch(cohortSource.id);
+    const remainingBatches = await getBatches();
+    expect(remainingBatches.some((b) => b.id === cohortSource.id)).toBe(false);
+    expect(remainingBatches.some((b) => b.id === cohortTarget.id)).toBe(true);
+  });
+
+  it('13. does not merge distinct students solely because they share an email (corporate sponsor or sibling enrollment)', async () => {
+    const batch = await createBatch({
+      batch_code: 'B-SHARED-EMAIL',
+      batch_name: 'Corporate Sponsoring Batch',
+      course_id: 'crs-fico-01',
+      trainer_id: trainerUserId,
+      training_mode: 'Classroom',
+      start_date: '2026-05-01',
+      end_date: '2026-07-31',
+      start_time: '14:00',
+      end_time: '16:00',
+      days: ['Mon', 'Wed'],
+      maximum_capacity: 20,
+      status: 'Active',
+    });
+
+    const now = new Date().toISOString();
+    const sharedEmail = 'corporate.training@enterprise.com';
+
+    // Student 1: Aarav Sharma
+    const student1: Student = {
+      id: 'stu-distinct-aarav',
+      user_id: 'usr-aarav',
+      admission_id: 'adm-aarav-01',
+      admission_number: 'ADM-2026-AARAV',
+      student_code: 'STU-FICO-AARAV',
+      full_name: 'Aarav Sharma',
+      email: sharedEmail, // Shared corporate contact email
+      phone: '+91 98111 00001',
+      course_id: 'crs-fico-01',
+      batch_id: batch.id,
+      joining_date: '2026-05-01',
+      status: 'Active',
+      total_fee: 40000,
+      paid_amount: 40000,
+      outstanding_amount: 0,
+      attendance_percentage: 92,
+      course_progress: 30,
+      placement_status: 'Not Started',
+      created_at: now,
+      updated_at: now,
+    };
+
+    // Student 2: Ananya Sharma (Distinct student, distinct admission ID & student code, but shared email)
+    const student2: Student = {
+      id: 'stu-distinct-ananya',
+      user_id: 'usr-ananya',
+      admission_id: 'adm-ananya-02',
+      admission_number: 'ADM-2026-ANANYA',
+      student_code: 'STU-FICO-ANANYA',
+      full_name: 'Ananya Sharma',
+      email: sharedEmail, // Shared corporate contact email
+      phone: '+91 98111 00002',
+      course_id: 'crs-fico-01',
+      batch_id: batch.id,
+      joining_date: '2026-05-01',
+      status: 'Active',
+      total_fee: 40000,
+      paid_amount: 40000,
+      outstanding_amount: 0,
+      attendance_percentage: 95,
+      course_progress: 35,
+      placement_status: 'Not Started',
+      created_at: now,
+      updated_at: now,
+    };
+
+    store.students.push(student1, student2);
+    reconcileBatchCounts();
+
+    // Both distinct students must be recognized as active cohort members
+    expect(getBatchActiveEnrolledCount(batch.id)).toBe(2);
+    expect(batch.current_enrolled).toBe(2);
+
+    const roster = await getStudentsForBatch(batch.id);
+    expect(roster.length).toBe(2);
+    expect(roster.map((s) => s.full_name)).toContain('Aarav Sharma');
+    expect(roster.map((s) => s.full_name)).toContain('Ananya Sharma');
+  });
+
+  it('14. preserves configured maximum_capacity provenance and prevents overwrite during count reconciliation', async () => {
+    // 1. Batch configured with local capacity 30
+    const localBatch: Batch = {
+      id: 'batch-local-capacity-30',
+      batch_code: 'B-LOCAL-30',
+      batch_name: 'Local Seed Cohort',
+      course_id: 'crs-fico-01',
+      course_name: 'SAP S/4HANA Finance (FICO)',
+      trainer_id: trainerUserId,
+      training_mode: 'Classroom',
+      start_date: '2026-06-01',
+      end_date: '2026-08-31',
+      start_time: '08:00',
+      end_time: '10:00',
+      days: ['Mon', 'Wed'],
+      maximum_capacity: 30, // Existing configured capacity
+      current_enrolled: 0,
+      status: 'Active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // 2. Batch configured with remote capacity 20
+    const remoteBatch: Batch = {
+      id: 'b1000000-0000-0000-0000-000000000002',
+      batch_code: 'B-2026-MM-01',
+      batch_name: 'Remote Supabase Cohort',
+      course_id: 'crs-mm-01',
+      course_name: 'SAP S/4HANA Materials Management (MM)',
+      trainer_id: trainerUserId,
+      training_mode: 'Hybrid',
+      start_date: '2026-06-01',
+      end_date: '2026-08-31',
+      start_time: '10:00',
+      end_time: '13:00',
+      days: ['Sat', 'Sun'],
+      maximum_capacity: 20, // Existing configured capacity
+      current_enrolled: 0,
+      status: 'Active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.batches.push(localBatch, remoteBatch);
+
+    // Enroll 1 student in remoteBatch
+    store.students.push({
+      id: 'stu-sneha-cap',
+      user_id: 'usr-sneha-cap',
+      admission_id: 'adm-sneha-cap',
+      admission_number: 'ADM-2026-MM-CAP',
+      student_code: 'STU-MM-CAP',
+      full_name: 'Sneha Kulkarni',
+      email: 'sneha.cap@test.com',
+      phone: '+91 98222 33344',
+      course_id: 'crs-mm-01',
+      batch_id: remoteBatch.id,
+      joining_date: '2026-06-01',
+      status: 'Active',
+      total_fee: 40000,
+      paid_amount: 40000,
+      outstanding_amount: 0,
+      attendance_percentage: 90,
+      course_progress: 20,
+      placement_status: 'Not Started',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    // Run reconciliation
+    reconcileBatchCounts();
+
+    // Verify capacities are preserved from their respective existing records:
+    // Local batch maintains capacity 30, available seats: 30
+    expect(localBatch.maximum_capacity).toBe(30);
+    expect(localBatch.current_enrolled).toBe(0);
+    expect(localBatch.maximum_capacity - localBatch.current_enrolled).toBe(30);
+
+    // Remote batch maintains capacity 20, available seats: 19
+    expect(remoteBatch.maximum_capacity).toBe(20);
+    expect(remoteBatch.current_enrolled).toBe(1);
+    expect(remoteBatch.maximum_capacity - remoteBatch.current_enrolled).toBe(19);
   });
 });

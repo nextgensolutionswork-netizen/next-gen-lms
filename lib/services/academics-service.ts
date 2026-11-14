@@ -383,21 +383,28 @@ export function matchesBatchId(studentBatchId: string | undefined, targetBatchId
 }
 
 /**
- * Returns the authoritative active, qualifying students enrolled in a batch.
+ * Filters and returns the authoritative active, qualifying students enrolled in a batch
+ * from any student collection (remote or local).
  *
  * Rules:
  * 1. Filter students strictly matching batchId (including canonical alias linkage).
  * 2. Exclude cancelled, dropped, inactive, suspended, and completed students.
  * 3. Exclude students whose linked admission is cancelled.
- * 4. Deduplicate multiple records sharing canonical student identifiers (id, student_unique_id, admission_id, student_code, email).
+ * 4. Deduplicate multiple records sharing canonical student identifiers (id, student_unique_id, admission_id, student_code).
+ *    Do NOT merge distinct students solely because they share an email (e.g. corporate sponsors, family/sibling enrollments).
  * 5. Preserve legitimate enrollments in other batches/courses.
  */
-export function getBatchActiveEnrolledStudents(batchId: string): Student[] {
-  if (!batchId || !store.students) return [];
+export function filterActiveEnrolledStudents(
+  candidates: Student[],
+  batchId: string,
+  admissionsList?: { id: string; status?: string }[]
+): Student[] {
+  if (!batchId || !candidates || candidates.length === 0) return [];
 
-  const rawStudents = store.students.filter((s) => matchesBatchId(s.batch_id, batchId));
+  const rawStudents = candidates.filter((s) => matchesBatchId(s.batch_id, batchId));
   const seen = new Set<string>();
   const activeStudents: Student[] = [];
+  const admissions = admissionsList || store.admissions;
 
   for (const s of rawStudents) {
     const status = (s.status || 'Active').trim().toLowerCase();
@@ -405,8 +412,8 @@ export function getBatchActiveEnrolledStudents(batchId: string): Student[] {
       continue;
     }
 
-    if (s.admission_id && store.admissions) {
-      const linkedAdmission = store.admissions.find((a) => a.id === s.admission_id);
+    if (s.admission_id && admissions) {
+      const linkedAdmission = admissions.find((a) => a.id === s.admission_id);
       if (linkedAdmission && linkedAdmission.status?.trim().toLowerCase() === 'cancelled') {
         continue;
       }
@@ -415,22 +422,24 @@ export function getBatchActiveEnrolledStudents(batchId: string): Student[] {
     const primaryId = s.id || s.student_unique_id || s.student_code;
     const admissionId = s.admission_id;
     const admissionNumber = s.admission_number;
-    const email = s.email?.trim().toLowerCase();
 
     if (primaryId && seen.has(primaryId)) continue;
     if (admissionId && seen.has(`adm:${admissionId}`)) continue;
     if (admissionNumber && seen.has(`admnum:${admissionNumber}`)) continue;
-    if (email && seen.has(`email:${email}`)) continue;
 
     if (primaryId) seen.add(primaryId);
     if (admissionId) seen.add(`adm:${admissionId}`);
     if (admissionNumber) seen.add(`admnum:${admissionNumber}`);
-    if (email) seen.add(`email:${email}`);
 
     activeStudents.push(s);
   }
 
   return activeStudents;
+}
+
+export function getBatchActiveEnrolledStudents(batchId: string): Student[] {
+  if (!batchId || !store.students) return [];
+  return filterActiveEnrolledStudents(store.students, batchId, store.admissions);
 }
 
 export function getBatchActiveEnrolledCount(batchId: string): number {
@@ -447,35 +456,112 @@ export function reconcileBatchCounts(): void {
   }
 }
 
+/**
+ * Paginated fetch helper for remote students from Supabase PostgREST.
+ * Handles large cohort sizes (> 1000 items) and strict batch ID / alias filtering.
+ */
+async function fetchAllRemoteStudents(
+  supabase: any,
+  batchId?: string,
+  batchAliases?: string[]
+): Promise<Student[]> {
+  const pageSize = 1000;
+  let allRows: Student[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabase
+      .from('students')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (batchId) {
+      if (batchAliases && batchAliases.length > 0) {
+        query = query.in('batch_id', [batchId, ...batchAliases]);
+      } else {
+        query = query.eq('batch_id', batchId);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allRows.push(...(data as Student[]));
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        from += pageSize;
+      }
+    }
+  }
+
+  return allRows;
+}
+
+/**
+ * Paginated fetch helper for remote batches from Supabase PostgREST.
+ */
+async function fetchAllRemoteBatches(supabase: any): Promise<Batch[]> {
+  const pageSize = 1000;
+  let allRows: Batch[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('batches')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allRows.push(...(data as Batch[]));
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        from += pageSize;
+      }
+    }
+  }
+
+  return allRows;
+}
+
 export async function getBatches(): Promise<Batch[]> {
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      const [batchRes, stuRes] = await Promise.all([
-        supabase.from('batches').select('*').order('created_at', { ascending: false }),
-        supabase.from('students').select('*').order('created_at', { ascending: false }),
+      const [remoteBatches, remoteStudents] = await Promise.all([
+        fetchAllRemoteBatches(supabase),
+        fetchAllRemoteStudents(supabase),
       ]);
 
-      if (!stuRes.error && stuRes.data && stuRes.data.length > 0) {
-        for (const s of stuRes.data) {
-          const idx = store.students.findIndex(
-            (st) => st.id === s.id || (st.admission_number && s.admission_number && st.admission_number === s.admission_number)
-          );
-          if (idx >= 0) {
-            store.students[idx] = { ...store.students[idx], ...(s as Student) };
-          } else {
-            store.students.unshift(s as Student);
-          }
+      if (remoteBatches && remoteBatches.length > 0) {
+        // Reconcile counts for remote batches directly from the authoritative remote students dataset
+        for (const b of remoteBatches) {
+          const activeMembers = filterActiveEnrolledStudents(remoteStudents, b.id, store.admissions);
+          b.current_enrolled = activeMembers.length;
         }
-      }
-
-      if (!batchRes.error && batchRes.data && batchRes.data.length > 0) {
-        store.batches = batchRes.data as Batch[];
-        reconcileBatchCounts();
+        store.batches = remoteBatches;
         return store.batches;
       }
-    } catch (err) {
-      console.warn('Supabase batches query error, fallback to local persistent store:', err);
+    } catch (err: any) {
+      console.error('Supabase batches query error:', err);
+      // Re-throw so caller/UI detects query failure rather than silently masking with local demo data
+      throw new Error(`Failed to retrieve authoritative remote batches: ${err?.message || err}`);
     }
   }
   reconcileBatchCounts();
@@ -622,24 +708,14 @@ export async function getStudentsForBatch(batchId: string): Promise<Student[]> {
     try {
       const supabase = createClient();
       const alias = BATCH_ID_ALIASES[batchId]?.[0];
-      const query = alias
-        ? supabase.from('students').select('*').or(`batch_id.eq.${batchId},batch_id.eq.${alias}`)
-        : supabase.from('students').select('*').eq('batch_id', batchId);
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        for (const s of data) {
-          const idx = store.students.findIndex(
-            (st) => st.id === s.id || (st.admission_number && s.admission_number && st.admission_number === s.admission_number)
-          );
-          if (idx >= 0) {
-            store.students[idx] = { ...store.students[idx], ...(s as Student) };
-          } else {
-            store.students.unshift(s as Student);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Supabase getStudentsForBatch query error:', err);
+      const aliases = alias ? [alias] : [];
+      const remoteStudents = await fetchAllRemoteStudents(supabase, batchId, aliases);
+      // Authoritative remote dataset: filter qualifying active trainees directly from remote records
+      return filterActiveEnrolledStudents(remoteStudents, batchId, store.admissions);
+    } catch (err: any) {
+      console.error('Supabase getStudentsForBatch query error:', err);
+      // Re-throw so caller/UI detects query failure rather than masking with local demo data
+      throw new Error(`Failed to retrieve authoritative remote roster: ${err?.message || err}`);
     }
   }
   return getBatchActiveEnrolledStudents(batchId);
