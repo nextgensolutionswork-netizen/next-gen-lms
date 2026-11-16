@@ -2,7 +2,7 @@ import { enteredPaymentVerification } from './payment-verification-fixture';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
-import { transferStudentBatch } from '@/lib/services/academics-service';
+import { transferStudentBatch, reconcileBatchCounts } from '@/lib/services/academics-service';
 import { verifyAndGenerateCertificate, issueCertificate } from '@/lib/services/certificate-service';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 
@@ -163,6 +163,7 @@ describe('Domain 4: Student 360 Profile & Operations Suite', () => {
 
   describe('2. Batch Transfer Workflow & Audit Trail', () => {
     it('transfers student to target batch, adjusts enrollment counts, and posts audit event', async () => {
+      reconcileBatchCounts();
       const student = store.students.find((s) => s.id === testStudentId)!;
       const initialBatchId = student.batch_id;
       const targetBatchId = testBatch2Id;

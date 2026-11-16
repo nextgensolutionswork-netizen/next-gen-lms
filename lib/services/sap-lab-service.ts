@@ -2,6 +2,21 @@ import { store } from './data-store';
 import { SapServerAllocation, SapServerSystem } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import {
+  getEffectiveSapAllocationStatus,
+  getSystemCapacityMetrics,
+} from '@/lib/utils/sap-server-status';
+
+export {
+  getEffectiveSapAllocationStatus,
+  isAllocationMatchingFilter,
+  getSapAllocationStatusCounts,
+  getSystemCapacityMetrics,
+  type EffectiveSapAllocationStatus,
+  type EffectiveStatusOptions,
+  type SapAllocationStatusCounts,
+  type SystemCapacityMetrics,
+} from '@/lib/utils/sap-server-status';
 
 export async function getSapSystems(): Promise<SapServerSystem[]> {
   if (isLiveSupabaseEnabled()) {
@@ -19,11 +34,12 @@ export async function getSapSystems(): Promise<SapServerSystem[]> {
   return [...store.sapSystems];
 }
 
-export function syncSapAllocationExpirations(): boolean {
-  const today = new Date().toISOString().slice(0, 10);
+export function syncSapAllocationExpirations(referenceDate?: Date): boolean {
+  const ref = referenceDate || new Date();
   let updated = false;
   for (const alloc of store.sapAllocations) {
-    if (alloc.status === 'Active' && alloc.valid_to < today) {
+    const eff = getEffectiveSapAllocationStatus(alloc, { referenceDate: ref });
+    if (alloc.status === 'Active' && eff === 'Expired') {
       alloc.status = 'Expired';
       alloc.updated_at = new Date().toISOString();
       updated = true;
@@ -81,7 +97,11 @@ export async function getAllocationForStudent(studentId: string): Promise<SapSer
   }
 
   return store.sapAllocations.find(
-    (a) => a.student_id === studentId && (a.status === 'Active' || a.status === 'Expired')
+    (a) => {
+      if (a.student_id !== studentId) return false;
+      const eff = getEffectiveSapAllocationStatus(a);
+      return eff === 'Active' || eff === 'Expired';
+    }
   );
 }
 
@@ -104,20 +124,20 @@ export async function provisionSapAccess(
   const system = store.sapSystems.find((sys) => sys.id === input.system_id);
   if (!system) throw new Error('SAP Server System not found');
 
-  // Enforce system quota and active capacity
-  const activeSysCount = store.sapAllocations.filter(
-    (a) => a.system_id === input.system_id && a.status === 'Active'
-  ).length;
-  const maxCapacity = (system as any).capacity || 50;
-  if (activeSysCount >= maxCapacity) {
+  // Enforce system quota and provisioned capacity
+  const metrics = getSystemCapacityMetrics(store.sapAllocations, input.system_id, (system as any).capacity || 50);
+  if (metrics.isAtCapacity) {
     throw new Error(
-      `SAP Server "${system.sid}" is at maximum capacity (${activeSysCount}/${maxCapacity} active users). Cannot provision additional sandbox access.`
+      `SAP Server "${system.sid}" is at maximum capacity (${metrics.provisionedCount}/${metrics.maxCapacity} provisioned users). Cannot provision additional sandbox access.`
     );
   }
 
   // Prevent multiple active allocations on same system
   const existingActive = store.sapAllocations.find(
-    (a) => a.student_id === input.student_id && a.system_id === input.system_id && a.status === 'Active'
+    (a) =>
+      a.student_id === input.student_id &&
+      a.system_id === input.system_id &&
+      (a.status === 'Active' || getEffectiveSapAllocationStatus(a) === 'Active')
   );
   if (existingActive) {
     throw new Error(`Student already has an active SAP sandbox allocation (${existingActive.sap_user_id}) on ${system.system_name}`);

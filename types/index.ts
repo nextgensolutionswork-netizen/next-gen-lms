@@ -827,6 +827,14 @@ export interface JobOpening {
   created_at: string;
 }
 
+export type JobApplicationStatus =
+  | 'Applied'
+  | 'Shortlisted'
+  | 'Interview Scheduled'
+  | 'Selected'
+  | 'Rejected'
+  | 'Withdrawn';
+
 export interface JobApplication {
   id: string;
   job_id: string;
@@ -834,9 +842,14 @@ export interface JobApplication {
   company_name?: string;
   student_id: string;
   student_name?: string;
+  student_code?: string;
+  student_email?: string;
   applied_at: string;
-  status: 'Applied' | 'Shortlisted' | 'Interview Scheduled' | 'Selected' | 'Rejected';
+  status: JobApplicationStatus;
   notes?: string;
+  tenant_id?: string;
+  withdrawn_at?: string;
+  withdrawal_reason?: string;
 }
 
 export interface Certificate {
@@ -932,14 +945,22 @@ export interface AuthorizedBankAccount {
   account_holder_name: string;
   bank_name: string;
   account_number: string;
-  ifsc_code: string;
-  branch: string;
+  ifsc_code?: string; // Optional: completely removed from active bank UI while preserving DB compatibility
+  branch?: string;
   account_type?: 'Current' | 'Savings' | 'Escrow';
   upi_id?: string;
   is_primary?: boolean;
   is_active?: boolean;
+  is_verified?: boolean;
+  verification_status?: 'verified' | 'pending' | 'rejected' | 'archived';
+  is_archived?: boolean;
+  archived_at?: string;
+  verified_at?: string;
+  verified_by?: string;
   authorized_signatory?: string;
   authorized_roles?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SystemSettings {
@@ -1007,7 +1028,7 @@ export interface SapServerAllocation {
   sap_password: string;
   valid_from: string;
   valid_to: string;
-  status: 'Active' | 'Expired' | 'Revoked';
+  status: 'Active' | 'Expired' | 'Revoked' | 'Suspended' | 'Cancelled';
   allocated_by: string;
   created_at: string;
   updated_at: string;

@@ -32,7 +32,8 @@ export function isLiveSupabaseEnabled(): boolean {
 
   // Staging Isolation Guardrail: Ensure staging cannot accidentally connect to production database
   const isStaging = (process.env.NODE_ENV as string) === 'staging' || process.env.NEXT_PUBLIC_APP_ENV === 'staging';
-  if (isStaging && url.includes('tgohtdzwehhjfahtgovq')) {
+  const blocklist = process.env.PROD_SUPABASE_HOST_BLOCKLIST;
+  if ((isStaging && url.includes('tgohtdzwehhjfahtgovq')) || (blocklist && url.includes(blocklist))) {
     throw new Error(
       'CRITICAL ISOLATION BLOCKER: Staging environment attempted to connect to production database (tgohtdzwehhjfahtgovq). Staging must connect exclusively to nextgen-lms-staging.'
     );
@@ -158,6 +159,8 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
   private orderColumn?: string;
   private orderAscending: boolean = true;
   private limitCount?: number;
+  private rangeFrom?: number;
+  private rangeTo?: number;
   private isSingle: boolean = false;
   private isMaybeSingle: boolean = false;
 
@@ -292,6 +295,13 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
     return this;
   }
 
+  range(from: number, to: number): this {
+    this.ops.push({ type: 'range', args: [from, to] });
+    this.rangeFrom = from;
+    this.rangeTo = to;
+    return this;
+  }
+
   single(): this {
     this.isSingle = true;
     return this;
@@ -385,8 +395,10 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
         });
       }
 
-      // Apply LIMIT
-      if (this.limitCount !== undefined) {
+      // Apply RANGE / LIMIT
+      if (this.rangeFrom !== undefined && this.rangeTo !== undefined) {
+        filtered = filtered.slice(this.rangeFrom, this.rangeTo + 1);
+      } else if (this.limitCount !== undefined) {
         filtered = filtered.slice(0, this.limitCount);
       }
 

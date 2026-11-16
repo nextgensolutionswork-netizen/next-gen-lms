@@ -41,6 +41,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Security Defense: Non-Super-Admin cannot reset credentials for Super Admin accounts
+    if (auth.user.role !== 'super_admin' && targetUser.role === 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Administrators are not authorized to reset credentials for Super Administrator accounts.' },
+        { status: 403 }
+      );
+    }
+
     // 2. Call Supabase Auth Admin API if live database is enabled
     if (isLiveSupabaseEnabled()) {
       try {

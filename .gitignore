@@ -47,6 +47,10 @@ supabase/.temp/
 
 # Local staging isolated runtime
 staging-runtime/
+scratch/
+browser_evidence/
+*.vsix
+~$*
 
 .vercel
 .env*

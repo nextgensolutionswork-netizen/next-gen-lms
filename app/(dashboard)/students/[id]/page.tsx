@@ -42,6 +42,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
 import { getStudentProfileFullDetails } from '@/lib/services/student-service';
 import { formatINR, formatDate, formatDateTime } from '@/lib/utils/formatters';
+import { calculateAuthoritativeStudentFinancials } from '@/lib/utils/student-financials';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { validateAlternatePhoneNumber, validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -303,17 +304,28 @@ export default function StudentDetailsPage() {
     (b) => b.course_id === student.course_id && b.id !== student.batch_id
   );
 
+  const authoritativeFinancials = React.useMemo(() => {
+    return calculateAuthoritativeStudentFinancials({
+      student,
+      admission,
+      feeAccount,
+      studentFees,
+      payments,
+      studentPayments,
+    });
+  }, [student, admission, feeAccount, studentFees, payments, studentPayments]);
+
   const isCertEligible =
     (student.attendance_percentage || 0) >= 80 &&
     (student.course_progress || 0) >= 80 &&
-    (student.outstanding_amount || 0) <= 0;
+    authoritativeFinancials.outstandingDue <= 0;
 
   const openRecordPaymentModal = (feeId?: string, defaultAmt?: number) => {
     setPayError(null);
     setPaySuccessMsg(null);
     const targetFeeId = feeId || studentFees[0]?.id || (feeAccount ? `fee-${feeAccount.id}` : '');
     setPayFeeId(targetFeeId);
-    const due = defaultAmt ?? (feeAccount?.outstanding_amount || studentFees[0]?.outstanding_amount || 0);
+    const due = defaultAmt ?? authoritativeFinancials.outstandingDue;
     setPayAmount(due > 0 ? due : 5000);
     setPayDate(new Date().toISOString().slice(0, 10));
     setPayTxnRef('');
@@ -727,7 +739,7 @@ export default function StudentDetailsPage() {
               </div>
               <div className="text-center px-3">
                 <p className="text-[10px] text-slate-400 uppercase font-semibold">Fee Due</p>
-                <p className="text-lg font-bold text-amber-400">{formatINR(student.outstanding_amount)}</p>
+                <p className="text-lg font-bold text-amber-400">{formatINR(authoritativeFinancials.outstandingDue)}</p>
               </div>
             </div>
           </div>
@@ -931,15 +943,15 @@ export default function StudentDetailsPage() {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 font-bold">
                 <span className="text-slate-800">Net Payable:</span>
-                <span className="text-slate-900">{formatINR(feeAccount?.net_payable)}</span>
+                <span className="text-slate-900">{formatINR(authoritativeFinancials.totalPayable)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 text-blue-600 font-bold">
                 <span>Amount Paid:</span>
-                <span>{formatINR(feeAccount?.paid_amount)}</span>
+                <span>{formatINR(authoritativeFinancials.paidAmount)}</span>
               </div>
               <div className="flex justify-between py-1 font-bold text-amber-600">
                 <span>Outstanding Balance:</span>
-                <span>{formatINR(feeAccount?.outstanding_amount)}</span>
+                <span>{formatINR(authoritativeFinancials.outstandingDue)}</span>
               </div>
               <div className="pt-2 flex flex-col space-y-2">
                 {canRecordPayment && (
@@ -952,7 +964,7 @@ export default function StudentDetailsPage() {
                     Record Fee Payment
                   </Button>
                 )}
-                <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${feeAccount?.outstanding_amount || 0}`}>
+                <Link href={`/accounts/payments?studentId=${student.id}&feeAccountId=${feeAccount?.id || ''}&amount=${authoritativeFinancials.outstandingDue}`}>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1685,9 +1697,9 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Approved Fees</p>
                 <h4 className="text-xl font-bold text-slate-900 mt-1">
-                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.final_payable || 0), 0))}
+                  {formatINR(authoritativeFinancials.totalPayable)}
                 </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">{studentFees.length} Fee Category Plan(s)</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{authoritativeFinancials.feePlansCount} Fee Category Plan(s)</p>
               </CardContent>
             </Card>
 
@@ -1695,7 +1707,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Verified Paid</p>
                 <h4 className="text-xl font-bold text-emerald-700 mt-1">
-                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.paid_amount || 0), 0))}
+                  {formatINR(authoritativeFinancials.paidAmount)}
                 </h4>
                 <p className="text-[11px] text-emerald-600 mt-0.5 font-medium">Financially cleared</p>
               </CardContent>
@@ -1705,7 +1717,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Outstanding Due</p>
                 <h4 className="text-xl font-bold text-amber-700 mt-1">
-                  {formatINR(studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.outstanding_amount || 0), 0))}
+                  {formatINR(authoritativeFinancials.outstandingDue)}
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">Remaining balance</p>
               </CardContent>
@@ -1715,7 +1727,7 @@ export default function StudentDetailsPage() {
               <CardContent className="p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Clearance Standing</p>
                 <h4 className="text-sm font-bold text-indigo-700 mt-1">
-                  {studentFees.filter((f: any) => f.approval_status === 'Approved').reduce((acc: number, f: any) => acc + (f.outstanding_amount || 0), 0) === 0 && studentFees.length > 0 ? (
+                  {authoritativeFinancials.outstandingDue === 0 && authoritativeFinancials.totalPayable > 0 ? (
                     <Badge variant="success">Financially Cleared ✓</Badge>
                   ) : (
                     <Badge variant="warning">Payment Pending</Badge>
@@ -1932,10 +1944,10 @@ export default function StudentDetailsPage() {
                       <div className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
                         <div>
                           <p className="text-[11px] text-slate-500 font-medium">3. Fee Balance (₹0 Remaining)</p>
-                          <p className="text-sm font-bold text-slate-800 mt-0.5">{formatINR(student.outstanding_amount)}</p>
+                          <p className="text-sm font-bold text-slate-800 mt-0.5">{formatINR(authoritativeFinancials.outstandingDue)}</p>
                         </div>
-                        <Badge variant={(student.outstanding_amount || 0) <= 0 ? 'success' : 'destructive'} className="text-[10px]">
-                          {(student.outstanding_amount || 0) <= 0 ? 'Financially Cleared ✓' : 'Fee Pending'}
+                        <Badge variant={authoritativeFinancials.outstandingDue <= 0 ? 'success' : 'destructive'} className="text-[10px]">
+                          {authoritativeFinancials.outstandingDue <= 0 ? 'Financially Cleared ✓' : 'Fee Pending'}
                         </Badge>
                       </div>
                     </div>
@@ -2259,7 +2271,7 @@ export default function StudentDetailsPage() {
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1">
-                Payment Amount (₹) <span className="text-amber-600 font-normal">(Outstanding: {formatINR(student.outstanding_amount)})</span>
+                Payment Amount (₹) <span className="text-amber-600 font-normal">(Outstanding: {formatINR(authoritativeFinancials.outstandingDue)})</span>
               </label>
               <Input
                 type="number"

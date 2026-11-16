@@ -490,7 +490,7 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">Tuition Fee Status</span>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-900">
-                      {prereqAudit.outstanding_amount <= 0 ? '₹0 No Dues' : `₹${formatINR(prereqAudit.outstanding_amount)} Due`}
+                      {prereqAudit.outstanding_amount <= 0 ? '₹0 No Dues' : `${formatINR(prereqAudit.outstanding_amount)} Due`}
                     </span>
                     <Badge variant={prereqAudit.passes_fees ? 'success' : 'destructive'} className="text-[10px]">
                       {prereqAudit.passes_fees ? 'CLEARED' : 'ARREARS DUE'}
@@ -915,7 +915,7 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
 
                       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                         <span className="text-[10px] text-slate-400">
-                          {job.applications_count || 0} candidates applied
+                          {(job.applications_count ?? 0)} {(job.applications_count ?? 0) === 1 ? 'candidate applied' : 'candidates applied'}
                         </span>
 
                         {hasApplied ? (
@@ -1072,7 +1072,7 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
                   <span className="font-bold text-slate-800">
                     {prereqAudit.outstanding_amount <= 0
                       ? 'Cleared'
-                      : `₹${formatINR(prereqAudit.outstanding_amount)}`}
+                      : formatINR(prereqAudit.outstanding_amount)}
                   </span>
                   <span
                     className={`text-[10px] font-bold ${

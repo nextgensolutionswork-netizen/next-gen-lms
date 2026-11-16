@@ -1,47 +1,78 @@
 import { store } from '@/lib/services/data-store';
 import { AuthorizedBankAccount } from '@/types';
+import {
+  PRIVILEGED_FINANCIAL_ROLES,
+  REFERENCE_20_BANK_ACCOUNTS,
+  isObsoleteBankPreset,
+  formatBankAccountPresetLabel,
+  maskSensitiveAccountNumber,
+  buildDefaultReferenceBankAccounts,
+  ReferenceBankAccountConfig,
+} from '@/lib/constants/bank-accounts';
 
-/**
- * Roles permitted to view unmasked banking details (account numbers, IFSC).
- */
-const PRIVILEGED_FINANCIAL_ROLES = ['super_admin', 'admin', 'accountant'];
+export {
+  PRIVILEGED_FINANCIAL_ROLES,
+  REFERENCE_20_BANK_ACCOUNTS,
+  isObsoleteBankPreset,
+  formatBankAccountPresetLabel,
+  maskSensitiveAccountNumber,
+  buildDefaultReferenceBankAccounts,
+};
+export type { ReferenceBankAccountConfig };
 
-/**
- * Masks sensitive account numbers for non-finance roles to defend against data exfiltration.
- * Example: '50200088991122' -> '•••• •••• 1122'
- */
-export function maskSensitiveAccountNumber(accountNumber?: string | null): string {
-  if (!accountNumber) return '—';
-  const clean = accountNumber.replace(/\s+/g, '');
-  if (clean.length <= 4) return clean;
-  const last4 = clean.slice(-4);
-  return `•••• •••• ${last4}`;
+export interface BankAccountQueryOptions {
+  includePending?: boolean;
+  includeArchived?: boolean;
 }
 
 /**
- * Returns the list of authorized bank accounts configured in the institute settings.
- * If the requesting user does not hold a financial role, the account number is safely masked.
+ * Returns authorized bank accounts.
+ *
+ * For fee collection / payment dropdowns (default includePending=false):
+ *   Only returns verified, active, non-archived accounts.
+ *
+ * For Super Admin management views (includePending=true):
+ *   Returns all active/pending accounts.
+ *
+ * Account numbers are masked for non-finance roles to prevent exfiltration.
  */
-export function getAuthorizedBankAccounts(role?: string): AuthorizedBankAccount[] {
-  const accounts: AuthorizedBankAccount[] = store.settings?.authorized_bank_accounts || [
-    {
-      id: 'default-primary',
-      account_holder_name: store.settings?.bank_account_name || 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED',
-      bank_name: store.settings?.bank_name || 'HDFC Bank Ltd',
-      account_number: store.settings?.bank_account_number || store.settings?.bank_account_no || '50200088991122',
-      ifsc_code: store.settings?.bank_ifsc || 'HDFC0000123',
-      branch: store.settings?.bank_branch || 'Hitec City, Hyderabad',
-      account_type: 'Current',
-      upi_id: store.settings?.upi_id || 'nextgenerp@hdfcbank',
-      is_primary: true,
-      authorized_signatory: store.settings?.authorized_signatory_name || 'Dr. Rajesh Kumar',
-      authorized_roles: ['super_admin', 'admin', 'accountant'],
-    },
-  ];
+export function getAuthorizedBankAccounts(
+  role?: string,
+  options?: BankAccountQueryOptions
+): AuthorizedBankAccount[] {
+  const source = store.settings?.authorized_bank_accounts;
+  const accounts: AuthorizedBankAccount[] =
+    source && source.length > 0 ? source : buildDefaultReferenceBankAccounts();
 
   const isPrivileged = role ? PRIVILEGED_FINANCIAL_ROLES.includes(role) : false;
+  const isAdmin = role === 'super_admin' || role === 'admin';
+  const includePending = options?.includePending ?? false;
+  const includeArchived = options?.includeArchived ?? false;
 
-  return accounts.map((acc) => {
+  // Filter accounts
+  const filtered = accounts.filter((acc) => {
+    // 1. Exclude obsolete presets from active lists
+    if (isObsoleteBankPreset(acc) && !includeArchived) {
+      return false;
+    }
+
+    // 2. Archived accounts filter
+    if (acc.is_archived && !includeArchived) {
+      return false;
+    }
+
+    // 3. For Super Admin / Admin with includePending=true, return all non-archived accounts
+    if (isAdmin && includePending) {
+      return true;
+    }
+
+    // 4. For regular fee collection dropdown: only verified and active accounts (exclude pending/rejected)
+    const isPending = acc.is_verified === false || acc.verification_status === 'pending' || acc.verification_status === 'rejected';
+    const isActive = acc.is_active ?? true;
+    return !isPending && isActive;
+  });
+
+  return filtered.map((acc) => {
     if (isPrivileged) {
       return { ...acc };
     }
@@ -57,11 +88,12 @@ export function getAuthorizedBankAccounts(role?: string): AuthorizedBankAccount[
  */
 export function findBankAccountByHolder(
   query: string,
-  role?: string
+  role?: string,
+  options?: BankAccountQueryOptions
 ): AuthorizedBankAccount | undefined {
   if (!query || !query.trim()) return undefined;
   const q = query.trim().toLowerCase();
-  const accounts = getAuthorizedBankAccounts(role);
+  const accounts = getAuthorizedBankAccounts(role, options);
 
   return accounts.find(
     (acc) =>

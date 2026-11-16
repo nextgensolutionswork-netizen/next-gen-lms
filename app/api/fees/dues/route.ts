@@ -30,6 +30,21 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = parseInt(searchParams.get('page_size') || '10', 10);
 
+    const rawBaseDate =
+      searchParams.get('base_date') ||
+      searchParams.get('as_of') ||
+      request.headers.get('x-reference-date') ||
+      request.headers.get('x-base-date') ||
+      undefined;
+
+    let baseDate: Date | undefined = undefined;
+    if (rawBaseDate) {
+      const parsed = new Date(rawBaseDate);
+      if (!isNaN(parsed.getTime())) {
+        baseDate = parsed;
+      }
+    }
+
     const result = getAllPaymentDues(actor, {
       scope,
       search,
@@ -39,6 +54,7 @@ export async function GET(request: NextRequest) {
       endDate,
       page,
       pageSize,
+      baseDate,
     });
 
     return NextResponse.json(result, {

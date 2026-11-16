@@ -44,6 +44,8 @@ import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
 import { validatePhoneNumber, validateAlternatePhoneNumber, getCanonicalPhoneDigits, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { validateEmailAddress } from '@/lib/utils/email-validation';
 import { useAuth } from '@/components/providers/auth-provider';
+import { getAuthorizedBankAccounts, formatBankAccountPresetLabel } from '@/lib/utils/bank-autofill';
+import { BankAccountSearchableDropdown } from '@/components/ui/bank-account-searchable-dropdown';
 
 export default function AdmissionsPage() {
   const router = useRouter();
@@ -132,17 +134,14 @@ export default function AdmissionsPage() {
   const [discountReason, setDiscountReason] = React.useState('');
   const [convertedLeadId, setConvertedLeadId] = React.useState<string | undefined>(undefined);
 
-  // Requirement 6: Four Bank Details Fields in Payments in exact order
-  const defaultBankName = store.settings?.bank_name || 'HDFC Bank Ltd';
-  const defaultAccountName = store.settings?.bank_account_name || 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED';
-  const defaultAccountId = store.settings?.bank_account_number || '50200088991122';
-  const defaultUpi = store.settings?.upi_id || 'nextgenerp@hdfcbank';
-
-  const [ourBankName, setOurBankName] = React.useState(defaultBankName);
-  const [ourBankAccountName, setOurBankAccountName] = React.useState(defaultAccountName);
-  const [ourBankAccountId, setOurBankAccountId] = React.useState(defaultAccountId);
-  const [ourUpiDetails, setOurUpiDetails] = React.useState(defaultUpi);
-  const [bankPreset, setBankPreset] = React.useState<'default' | 'custom'>('default');
+  // Bank Details (Institute Receiving Account Presets)
+  const authorizedAccounts = React.useMemo(() => getAuthorizedBankAccounts(role), [role]);
+  const initialAccount = authorizedAccounts[0];
+  const [ourBankName, setOurBankName] = React.useState(initialAccount?.bank_name || '');
+  const [ourBankAccountName, setOurBankAccountName] = React.useState(initialAccount?.account_holder_name || '');
+  const [ourBankAccountId, setOurBankAccountId] = React.useState(initialAccount?.account_number || '');
+  const [ourUpiDetails, setOurUpiDetails] = React.useState(initialAccount?.upi_id || '');
+  const [bankPreset, setBankPreset] = React.useState<string>(initialAccount?.id || 'custom');
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1230,7 +1229,7 @@ export default function AdmissionsPage() {
 
                   {initialPaymentMode !== 'Cash' && (
                     <div className="p-3 bg-white border border-slate-200 rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                           <span className="font-semibold text-xs text-slate-800 block">
                             Bank Details
@@ -1239,25 +1238,28 @@ export default function AdmissionsPage() {
                             Institute receiving account details for fee reconciliation
                           </span>
                         </div>
-                        <div className="flex items-center space-x-1.5">
-                          <label className="text-[10px] text-slate-500 font-medium">Account Preset:</label>
-                          <select
-                            value={bankPreset}
-                            onChange={(e) => {
-                              const val = e.target.value as 'default' | 'custom';
-                              setBankPreset(val);
-                              if (val === 'default') {
-                                setOurBankName(defaultBankName);
-                                setOurBankAccountName(defaultAccountName);
-                                setOurBankAccountId(defaultAccountId);
-                                setOurUpiDetails(defaultUpi);
+                        <div className="w-full sm:w-80">
+                          <BankAccountSearchableDropdown
+                            accounts={authorizedAccounts}
+                            selectedId={bankPreset}
+                            mode="fee-collection"
+                            onSelect={(acc) => {
+                              // Clear old account-specific values before populating newly selected account
+                              setOurBankName('');
+                              setOurBankAccountName('');
+                              setOurBankAccountId('');
+                              setOurUpiDetails('');
+                              if (acc === 'custom') {
+                                setBankPreset('custom');
+                              } else {
+                                setBankPreset(acc.id);
+                                setOurBankName(acc.bank_name);
+                                setOurBankAccountName(acc.account_holder_name);
+                                setOurBankAccountId(acc.account_number);
+                                setOurUpiDetails(acc.upi_id || '');
                               }
                             }}
-                            className="text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-700 font-medium"
-                          >
-                            <option value="default">Primary Account ({defaultBankName})</option>
-                            <option value="custom">Custom Bank Account</option>
-                          </select>
+                          />
                         </div>
                       </div>
 
@@ -1277,7 +1279,7 @@ export default function AdmissionsPage() {
                         <div>
                           <Input
                             label="Our Bank Account Name *"
-                            placeholder="e.g. Next-Gen ERP Solutions"
+                            placeholder="e.g. Katari Charitha"
                             value={ourBankAccountName}
                             onChange={(e) => {
                               setOurBankAccountName(e.target.value);
@@ -1290,7 +1292,7 @@ export default function AdmissionsPage() {
                           <Input
                             label="Our Bank Account ID *"
                             type="text"
-                            placeholder="e.g. 50200088991122"
+                            placeholder="e.g. 50100 76776 1140"
                             value={ourBankAccountId}
                             onChange={(e) => {
                               setOurBankAccountId(e.target.value);
@@ -1303,7 +1305,7 @@ export default function AdmissionsPage() {
                           <Input
                             label="Our UPI Details"
                             type="text"
-                            placeholder="e.g. nextgenerp@bank"
+                            placeholder="e.g. 9550499661-2@ybl (Optional)"
                             value={ourUpiDetails}
                             onChange={(e) => {
                               setOurUpiDetails(e.target.value);

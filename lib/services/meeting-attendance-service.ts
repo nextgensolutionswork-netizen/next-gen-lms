@@ -150,22 +150,28 @@ export function matchStudentParticipant(
   // 3. Name match if email not matched or missing
   if (normalizedName) {
     if (batchId) {
-      const studentsByNameInBatch = store.students.filter(
-        (s) =>
-          s.batch_id === batchId &&
-          (s.full_name.toLowerCase() === normalizedName ||
-           normalizedName.includes(s.full_name.toLowerCase()) ||
-           s.full_name.toLowerCase().includes(normalizedName))
-      );
+      const studentsByNameInBatch = store.students.filter((s) => {
+        if (s.batch_id !== batchId) return false;
+        const sName = (s.full_name || '').trim().toLowerCase();
+        if (!sName) return false;
+        return (
+          sName === normalizedName ||
+          normalizedName.includes(sName) ||
+          sName.includes(normalizedName)
+        );
+      });
       if (studentsByNameInBatch.length === 1) return studentsByNameInBatch[0];
     }
 
-    const studentsByName = store.students.filter(
-      (s) =>
-        s.full_name.toLowerCase() === normalizedName ||
-        normalizedName.includes(s.full_name.toLowerCase()) ||
-        s.full_name.toLowerCase().includes(normalizedName)
-    );
+    const studentsByName = store.students.filter((s) => {
+      const sName = (s.full_name || '').trim().toLowerCase();
+      if (!sName) return false;
+      return (
+        sName === normalizedName ||
+        normalizedName.includes(sName) ||
+        sName.includes(normalizedName)
+      );
+    });
     if (studentsByName.length === 1) return studentsByName[0];
   }
 

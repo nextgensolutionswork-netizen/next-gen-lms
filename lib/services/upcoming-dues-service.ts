@@ -108,6 +108,20 @@ export function getUpcoming3DaysDates(
   return { dateToday, dateTomorrow, dateIn2Days, targetDates };
 }
 
+let defaultReferenceDate: Date | null = null;
+
+/**
+ * Sets an optional global default reference date for upcoming dues calculation.
+ * Useful for deterministic testing, time-travel audits, or report generation.
+ */
+export function setDefaultUpcomingDuesReferenceDate(date: Date | null): void {
+  defaultReferenceDate = date;
+}
+
+export function getDefaultUpcomingDuesReferenceDate(): Date | null {
+  return defaultReferenceDate;
+}
+
 /**
  * Classifies an obligation's payment status based on its due date relative to today.
  */
@@ -117,10 +131,11 @@ export function classifyPaymentDueStatus(
   dateTomorrow: string,
   dateIn2Days: string
 ): PaymentDueStatus {
-  if (dueDate < dateToday) return 'Overdue';
-  if (dueDate === dateToday) return 'Due Today';
-  if (dueDate === dateTomorrow) return 'Due Tomorrow';
-  if (dueDate === dateIn2Days) return 'Due in 2 Days';
+  const cleanDueDate = dueDate.trim();
+  if (cleanDueDate < dateToday) return 'Overdue';
+  if (cleanDueDate === dateToday) return 'Due Today';
+  if (cleanDueDate === dateTomorrow) return 'Due Tomorrow';
+  if (cleanDueDate === dateIn2Days) return 'Due in 2 Days';
   return 'Upcoming';
 }
 
@@ -159,7 +174,7 @@ export function getAllPaymentDues(
   store.reconcileDualLedgers();
 
   const timeZone = options?.timeZone || getInstituteTimezone();
-  const baseDate = options?.baseDate || new Date();
+  const baseDate = options?.baseDate || defaultReferenceDate || new Date();
   const scope = options?.scope || 'all';
 
   // Compute reference calendar dates in configured institute timezone
@@ -180,14 +195,18 @@ export function getAllPaymentDues(
     }
     const cleanDueDate = inst.due_date.trim();
 
-    // Obligation status check: exclude cancelled, voided, waived, written off, or fully paid
+    // Obligation status check: exclude cancelled, voided, waived, written off, settled, or fully paid
     const instStatus = (inst.status as unknown as string) || '';
+    const instStatusNorm = instStatus.toLowerCase().replace(/[-_]/g, ' ').trim();
     if (
-      instStatus === 'Cancelled' ||
-      instStatus === 'Waived' ||
-      instStatus === 'Void' ||
-      instStatus === 'Written Off' ||
-      instStatus === 'Paid'
+      instStatusNorm === 'cancelled' ||
+      instStatusNorm === 'waived' ||
+      instStatusNorm === 'void' ||
+      instStatusNorm === 'voided' ||
+      instStatusNorm === 'written off' ||
+      instStatusNorm === 'settled' ||
+      instStatusNorm === 'paid' ||
+      instStatusNorm === 'refunded'
     ) {
       continue;
     }
@@ -203,9 +222,15 @@ export function getAllPaymentDues(
       (fa) => fa.id === inst.fee_account_id || fa.student_id === inst.student_id
     );
     const faStatus = (feeAccount?.status as unknown as string) || '';
+    const faStatusNorm = faStatus.toLowerCase().replace(/[-_]/g, ' ').trim();
     if (
-      faStatus === 'Discontinued / Adjusted' ||
-      faStatus === 'Waived' ||
+      faStatusNorm.includes('discontinued') ||
+      faStatusNorm === 'waived' ||
+      faStatusNorm === 'void' ||
+      faStatusNorm === 'voided' ||
+      faStatusNorm === 'paid' ||
+      faStatusNorm === 'settled' ||
+      faStatusNorm === 'written off' ||
       feeAccount?.discontinuation_record ||
       (feeAccount && feeAccount.outstanding_amount <= 0 && (feeAccount.paid_amount || 0) > 0)
     ) {
@@ -228,9 +253,10 @@ export function getAllPaymentDues(
 
     const dueStatus = classifyPaymentDueStatus(cleanDueDate, dateToday, dateTomorrow, dateIn2Days);
 
-    const dedupKey = `${inst.student_id}-${cleanDueDate}-${inst.installment_number || 1}`;
+    const dedupKey = inst.id ? `inst-${inst.id}` : `inst-${inst.student_id}-${cleanDueDate}-${inst.installment_number || 1}`;
     if (processedKeys.has(dedupKey)) continue;
     processedKeys.add(dedupKey);
+    processedKeys.add(`std-date-${inst.student_id}-${cleanDueDate}`);
 
     allDues.push({
       id: inst.id,
@@ -259,10 +285,15 @@ export function getAllPaymentDues(
     if (!invoiceDueDate || !/^\d{4}-\d{2}-\d{2}$/.test(invoiceDueDate)) continue;
 
     const faStatus = (fa.status as unknown as string) || '';
+    const faStatusNorm = faStatus.toLowerCase().replace(/[-_]/g, ' ').trim();
     if (
-      faStatus === 'Discontinued / Adjusted' ||
-      faStatus === 'Waived' ||
-      faStatus === 'Paid' ||
+      faStatusNorm.includes('discontinued') ||
+      faStatusNorm === 'waived' ||
+      faStatusNorm === 'void' ||
+      faStatusNorm === 'voided' ||
+      faStatusNorm === 'paid' ||
+      faStatusNorm === 'settled' ||
+      faStatusNorm === 'written off' ||
       fa.discontinuation_record
     ) {
       continue;
@@ -271,11 +302,12 @@ export function getAllPaymentDues(
     const remaining = Number(fa.outstanding_amount) || 0;
     if (remaining <= 0) continue;
 
-    // Check if installments already covered this student's due date
-    const alreadyCovered = allDues.some(
-      (d) => d.student_id === fa.student_id && d.due_date === invoiceDueDate
-    );
-    if (alreadyCovered) continue;
+    // Check if installments or processed keys already covered this student's due date
+    if (processedKeys.has(`std-date-${fa.student_id}-${invoiceDueDate}`)) continue;
+    const faDedupKey = `fa-${fa.id}-${invoiceDueDate}`;
+    if (processedKeys.has(faDedupKey)) continue;
+    processedKeys.add(faDedupKey);
+    processedKeys.add(`std-date-${fa.student_id}-${invoiceDueDate}`);
 
     if (actor.role === 'counsellor' && !isCounsellorAuthorizedForStudent(actor, fa.student_id)) {
       continue;
@@ -290,10 +322,6 @@ export function getAllPaymentDues(
     );
 
     const dueStatus = classifyPaymentDueStatus(invoiceDueDate, dateToday, dateTomorrow, dateIn2Days);
-
-    const dedupKey = `${fa.student_id}-${invoiceDueDate}-invoice`;
-    if (processedKeys.has(dedupKey)) continue;
-    processedKeys.add(dedupKey);
 
     allDues.push({
       id: `inv-${fa.id}`,
@@ -317,7 +345,17 @@ export function getAllPaymentDues(
   const admissions = store.admissions || [];
   for (const adm of admissions) {
     if (tenantId(adm) !== tenantId(actor)) continue;
-    if (adm.status === 'Cancelled') continue;
+    const admStatus = (adm.status as unknown as string) || '';
+    const admStatusNorm = admStatus.toLowerCase().replace(/[-_]/g, ' ').trim();
+    if (
+      admStatusNorm === 'cancelled' ||
+      admStatusNorm === 'void' ||
+      admStatusNorm === 'voided' ||
+      admStatusNorm === 'discontinued'
+    ) {
+      continue;
+    }
+
     const feeDueDate = typeof adm.fee_due_date === 'string' ? adm.fee_due_date.trim() : undefined;
     if (!feeDueDate || !/^\d{4}-\d{2}-\d{2}$/.test(feeDueDate)) continue;
 
@@ -340,10 +378,11 @@ export function getAllPaymentDues(
     if (outstanding <= 0) continue;
 
     // Check if already covered by installments or invoice due dates
-    const alreadyCovered = allDues.some(
-      (d) => d.student_id === studentId && d.due_date === feeDueDate
-    );
-    if (alreadyCovered) continue;
+    if (processedKeys.has(`std-date-${studentId}-${feeDueDate}`)) continue;
+    const admDedupKey = `adm-${adm.id}-${feeDueDate}`;
+    if (processedKeys.has(admDedupKey)) continue;
+    processedKeys.add(admDedupKey);
+    processedKeys.add(`std-date-${studentId}-${feeDueDate}`);
 
     if (actor.role === 'counsellor' && !isCounsellorAuthorizedForStudent(actor, studentId)) {
       continue;

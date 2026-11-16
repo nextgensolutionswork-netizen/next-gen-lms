@@ -50,6 +50,11 @@ import {
 } from '@/types';
 import { tenantId } from '@/lib/auth/tenant';
 import { persistentStorage } from './persistent-storage-adapter';
+import {
+  buildDefaultReferenceBankAccounts,
+  isObsoleteBankPreset,
+  REFERENCE_20_BANK_ACCOUNTS,
+} from '@/lib/constants/bank-accounts';
 
 // In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
@@ -58,6 +63,7 @@ class InstituteDataStore {
     this.reconcileAdmissionsAndStudents();
     this.reconcileDualLedgers();
     this.reconcileBatchEnrollments();
+    this.reconcileBankPresets();
   }
 
   public hydrateFromDisk(): boolean {
@@ -71,9 +77,20 @@ class InstituteDataStore {
               ? { ...u, id: '44444444-4444-4444-4444-444444444444' }
               : u
           );
-          const ananya = mappedUsers.find((u: any) => u.id === '44444444-4444-4444-4444-444444444444');
+          const ananya = mappedUsers.find((u: any) => u.id === '44444444-4444-4444-4444-444444444444' || u.email?.toLowerCase() === 'counsellor@next-generpsolutions.com');
           if (ananya && !mappedUsers.some((u: any) => u.id === 'usr-counsellor')) {
             mappedUsers.push({ ...ananya, id: 'usr-counsellor' });
+          }
+          const suresh = mappedUsers.find((u: any) => u.id === '33333333-3333-3333-3333-333333333333' || u.email?.toLowerCase() === 'accounts@next-generpsolutions.com');
+          if (suresh && !mappedUsers.some((u: any) => u.id === 'usr-accounts')) {
+            mappedUsers.push({ ...suresh, id: 'usr-accounts' });
+          }
+          const rajesh = mappedUsers.find((u: any) => u.id === '11111111-1111-1111-1111-111111111111' || u.email?.toLowerCase() === 'admin@next-generpsolutions.com');
+          if (rajesh && !mappedUsers.some((u: any) => u.id === 'usr-admin')) {
+            mappedUsers.push({ ...rajesh, id: 'usr-admin' });
+          }
+          if (rajesh && !mappedUsers.some((u: any) => u.id === 'usr-superadmin')) {
+            mappedUsers.push({ ...rajesh, id: 'usr-superadmin' });
           }
           const existingEmails = new Set(mappedUsers.map((u: any) => u.email?.toLowerCase()));
           const existingIds = new Set(mappedUsers.map((u: any) => u.id));
@@ -82,8 +99,16 @@ class InstituteDataStore {
             .map((u) => (existingIds.has(u.id) ? { ...u, id: `${u.id}-seed` } : u));
           this.users = [...mappedUsers, ...missingSeedUsers];
         }
-        if (snapshot.admissions?.length) this.admissions = snapshot.admissions;
-        if (snapshot.students?.length) this.students = snapshot.students;
+        if (snapshot.admissions?.length) {
+          const existingAdmIds = new Set(snapshot.admissions.map((a: any) => a.id));
+          const missingSeedAdmissions = this.admissions.filter((a) => !existingAdmIds.has(a.id));
+          this.admissions = [...snapshot.admissions, ...missingSeedAdmissions];
+        }
+        if (snapshot.students?.length) {
+          const existingStudentIds = new Set(snapshot.students.map((s: any) => s.id));
+          const missingSeedStudents = this.students.filter((s) => !existingStudentIds.has(s.id));
+          this.students = [...snapshot.students, ...missingSeedStudents];
+        }
         if (snapshot.leads?.length) this.leads = snapshot.leads;
         if (snapshot.courses?.length) this.courses = snapshot.courses;
         if (snapshot.modules?.length) this.modules = snapshot.modules;
@@ -148,6 +173,12 @@ class InstituteDataStore {
         if (snapshot.placementProfiles?.length) this.placementProfiles = snapshot.placementProfiles;
         if (snapshot.jobOpenings?.length) this.jobOpenings = snapshot.jobOpenings;
         if (snapshot.jobApplications?.length) this.jobApplications = snapshot.jobApplications;
+        // BUG-09: Synchronize job opening application counts with authoritative job applications
+        if (this.jobOpenings?.length && this.jobApplications) {
+          for (const job of this.jobOpenings) {
+            job.applications_count = this.jobApplications.filter((a) => a && a.job_id === job.id && a.status !== 'Withdrawn').length;
+          }
+        }
         if (snapshot.certificates?.length) this.certificates = snapshot.certificates;
         if (snapshot.notifications?.length) this.notifications = snapshot.notifications;
         if (snapshot.auditLogs?.length) this.auditLogs = snapshot.auditLogs;
@@ -172,6 +203,7 @@ class InstituteDataStore {
         this.reconcileAdmissionsAndStudents();
         this.reconcileDualLedgers();
         this.reconcileBatchEnrollments();
+        this.reconcileBankPresets();
         return true;
       }
     } catch (err) {
@@ -600,6 +632,74 @@ class InstituteDataStore {
     }
   }
 
+  public reconcileBankPresets(): void {
+    if (!this.settings) return;
+    const existing = this.settings.authorized_bank_accounts || [];
+
+    // 1. Archive obsolete presets (50200088991122, NEXT GEN ERP SOLUTIONS, etc.)
+    const updated = existing.map((acc) => {
+      if (isObsoleteBankPreset(acc) && !acc.is_archived) {
+        return {
+          ...acc,
+          is_primary: false,
+          is_active: false,
+          is_verified: false,
+          verification_status: 'archived' as const,
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+        };
+      }
+      return acc;
+    });
+
+    // 2. Ensure the 20 reference accounts exist
+    const refDefaults = buildDefaultReferenceBankAccounts();
+    const finalAccounts = [...updated];
+
+    refDefaults.forEach((ref) => {
+      const cleanRefNumber = ref.account_number.replace(/\s+/g, '');
+      const idx = finalAccounts.findIndex(
+        (a) => a.id === ref.id || a.account_number.replace(/\s+/g, '') === cleanRefNumber
+      );
+      if (idx === -1) {
+        finalAccounts.push(ref);
+      } else {
+        finalAccounts[idx] = {
+          ...finalAccounts[idx],
+          id: ref.id,
+          account_holder_name: ref.account_holder_name,
+          bank_name: ref.bank_name,
+          account_number: ref.account_number,
+          upi_id: ref.upi_id || '',
+          is_primary: ref.is_primary ?? false,
+          is_archived: false,
+        };
+      }
+    });
+
+    this.settings.authorized_bank_accounts = finalAccounts;
+
+    // 3. Clean obsolete primary institute settings
+    if (
+      this.settings.bank_account_name === 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED' ||
+      this.settings.bank_account_no === '50200088991122' ||
+      this.settings.bank_account_number === '50200088991122' ||
+      this.settings.bank_account_no === '998877665544' ||
+      !this.settings.bank_account_name
+    ) {
+      this.settings.bank_account_name = 'Katari Charitha';
+      this.settings.bank_name = 'HDFC Bank';
+      this.settings.bank_account_no = '50100 76776 1140';
+      this.settings.bank_account_number = '50100 76776 1140';
+    }
+    if (this.settings.upi_id === 'nextgenerp@hdfcbank') {
+      this.settings.upi_id = '';
+    }
+    if (this.settings.bank_ifsc === 'HDFC0000123') {
+      this.settings.bank_ifsc = '';
+    }
+  }
+
   public persist(): void {
     persistentStorage.scheduleSave(this);
   }
@@ -615,54 +715,14 @@ class InstituteDataStore {
     phone: '+91 98765 43210',
     email: 'admissions@next-generpsolutions.com',
     gst_number: '36AAACN1234F1Z8',
-    bank_account_name: 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED',
-    bank_name: 'HDFC Bank Ltd',
-    bank_account_no: '50200088991122',
-    bank_account_number: '50200088991122',
-    bank_ifsc: 'HDFC0000123',
-    bank_branch: 'Hitec City, Hyderabad',
-    upi_id: 'nextgenerp@hdfcbank',
-    authorized_bank_accounts: [
-      {
-        id: 'bank-acc-01',
-        account_holder_name: 'Dr. Rajesh Kumar (Managing Director & Signatory)',
-        bank_name: 'HDFC Bank Ltd',
-        account_number: '50200088991122',
-        ifsc_code: 'HDFC0000123',
-        branch: 'Hitec City, Hyderabad',
-        account_type: 'Current',
-        upi_id: 'nextgenerp@hdfcbank',
-        is_primary: true,
-        authorized_signatory: 'Dr. Rajesh Kumar',
-        authorized_roles: ['super_admin', 'admin', 'accountant'],
-      },
-      {
-        id: 'bank-acc-02',
-        account_holder_name: 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED (Tuition Collections)',
-        bank_name: 'ICICI Bank Ltd',
-        account_number: '001205009988',
-        ifsc_code: 'ICIC0000012',
-        branch: 'Banjara Hills, Hyderabad',
-        account_type: 'Current',
-        upi_id: 'nextgen.tuition@icici',
-        is_primary: false,
-        authorized_signatory: 'Ananya Deshmukh (Finance Director)',
-        authorized_roles: ['super_admin', 'admin', 'accountant'],
-      },
-      {
-        id: 'bank-acc-03',
-        account_holder_name: 'State Bank of India (Student Fee Escrow Account)',
-        bank_name: 'State Bank of India',
-        account_number: '33182749102',
-        ifsc_code: 'SBIN0004123',
-        branch: 'Koramangala, Bengaluru',
-        account_type: 'Escrow',
-        upi_id: 'nextgenfees@sbi',
-        is_primary: false,
-        authorized_signatory: 'Finance Comptroller',
-        authorized_roles: ['super_admin', 'admin', 'accountant'],
-      },
-    ],
+    bank_account_name: 'Katari Charitha',
+    bank_name: 'HDFC Bank',
+    bank_account_no: '50100 76776 1140',
+    bank_account_number: '50100 76776 1140',
+    bank_ifsc: '',
+    bank_branch: 'Main Branch',
+    upi_id: '',
+    authorized_bank_accounts: buildDefaultReferenceBankAccounts(),
     default_currency: 'INR',
     academic_year: '2026-2027',
     receipt_prefix: 'REC',
@@ -1764,7 +1824,7 @@ class InstituteDataStore {
       description: 'Seeking trained SAP FICO consultants with solid grasp on General Ledger, Accounts Payable, Accounts Receivable, and Asset Accounting on S/4HANA.',
       application_deadline: '2026-12-31',
       status: 'Open',
-      applications_count: 8,
+      applications_count: 1, // Authoritatively synchronized with jobApplications (app-01)
       created_at: '2026-02-15T10:00:00Z',
     },
     {
@@ -1778,7 +1838,7 @@ class InstituteDataStore {
       description: 'Procure to pay lifecycle, master data governance, inventory control, and purchase order configuration.',
       application_deadline: '2026-12-31',
       status: 'Open',
-      applications_count: 5,
+      applications_count: 0, // Authoritatively synchronized with jobApplications (0 applications)
       created_at: '2026-02-18T10:00:00Z',
     },
   ];
@@ -2278,16 +2338,16 @@ class InstituteDataStore {
       batch_id: 'batch-fico-01',
       batch_name: 'SAP FICO Morning Fast-Track Batch',
       sap_module: 'SAP FICO',
-      standard_fee: 65000,
-      proposed_fee: 65000,
-      discount_amount: 15000,
-      discount_percentage: 23.08,
-      discount_reason: 'Corporate sponsorship partial voucher',
+      standard_fee: 45000,
+      proposed_fee: 45000,
+      discount_amount: 5000,
+      discount_percentage: 11.11,
+      discount_reason: 'Early bird registration discount',
       discount_approval_level: 'Accountant',
-      tax_gst_amount: 9000,
+      tax_gst_amount: 0,
       additional_charges: 0,
-      final_payable: 59000,
-      paid_amount: 59000,
+      final_payable: 40000,
+      paid_amount: 40000,
       outstanding_amount: 0,
       payment_plan: '2 Installments',
       number_of_installments: 2,
@@ -2301,10 +2361,10 @@ class InstituteDataStore {
       approved_by: 'usr-accounts',
       approved_by_name: 'Suresh Kumar (Chief Accountant)',
       approved_at: '2026-01-10T12:00:00Z',
-      approved_fee: 50000,
-      approved_discount: 15000,
-      approved_tax: 9000,
-      approved_total: 59000,
+      approved_fee: 40000,
+      approved_discount: 5000,
+      approved_tax: 0,
+      approved_total: 40000,
       version: 1,
       is_payable: true,
       created_at: '2026-01-10T11:00:00Z',
@@ -2499,27 +2559,27 @@ class InstituteDataStore {
       fee_category: 'Course Fee',
       reference_type: 'Course',
       reference_id: 'fee-03',
-      debit: 59000,
+      debit: 40000,
       credit: 0,
-      running_balance: 59000,
-      description: 'Approved Course Fee: SAP FICO Fast-Track',
+      running_balance: 40000,
+      description: 'Approved Course Fee: SAP S/4HANA Finance (FICO) (Net of ₹5,000 Early Bird Discount)',
       recorded_by: 'usr-accounts',
       created_at: '2026-01-10T12:00:00Z',
     },
     {
       id: 'sfl-04',
       student_id: 'stu-01',
-      entry_date: '2026-01-15',
+      entry_date: '2026-01-25',
       entry_type: 'Payment Verified',
       fee_category: 'Course Fee',
       reference_type: 'Course',
       reference_id: 'pay-01',
       debit: 0,
-      credit: 49000,
-      running_balance: 10000,
-      description: 'Verified Initial Payment via Net Banking (REC-2026-0001)',
+      credit: 15000,
+      running_balance: 25000,
+      description: 'Verified Initial Installment via UPI (REC-2026-0001)',
       recorded_by: 'usr-accounts',
-      created_at: '2026-01-15T10:00:00Z',
+      created_at: '2026-01-25T10:15:00Z',
     },
     {
       id: 'sfl-05',
@@ -2530,9 +2590,9 @@ class InstituteDataStore {
       reference_type: 'Course',
       reference_id: 'pay-02',
       debit: 0,
-      credit: 10000,
+      credit: 25000,
       running_balance: 0,
-      description: 'Verified Balance Payment via UPI (REC-2026-0002) - Account Fully Cleared',
+      description: 'Verified Balance Payments via Bank Transfer & UPI (REC-2026-0002) - Account Fully Cleared',
       recorded_by: 'usr-accounts',
       created_at: '2026-02-24T11:45:00Z',
     },

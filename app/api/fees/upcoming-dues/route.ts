@@ -20,6 +20,22 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const scopeParam = searchParams.get('scope');
+
+    const rawBaseDate =
+      searchParams.get('base_date') ||
+      searchParams.get('as_of') ||
+      request.headers.get('x-reference-date') ||
+      request.headers.get('x-base-date') ||
+      undefined;
+
+    let baseDate: Date | undefined = undefined;
+    if (rawBaseDate) {
+      const parsed = new Date(rawBaseDate);
+      if (!isNaN(parsed.getTime())) {
+        baseDate = parsed;
+      }
+    }
+
     const result =
       scopeParam === 'all'
         ? getAllPaymentDues(actor, {
@@ -31,8 +47,9 @@ export async function GET(request: NextRequest) {
             endDate: searchParams.get('end_date') || undefined,
             page: parseInt(searchParams.get('page') || '1', 10),
             pageSize: parseInt(searchParams.get('page_size') || '10', 10),
+            baseDate,
           })
-        : getUpcomingPaymentDues(actor);
+        : getUpcomingPaymentDues(actor, { baseDate });
 
     return NextResponse.json(result, {
       headers: {

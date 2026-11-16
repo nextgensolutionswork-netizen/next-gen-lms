@@ -70,6 +70,7 @@ export function Sidebar({
   const isAdmin = isSuperAdmin || currentRole === 'admin';
   const isAccountant = isSuperAdmin || isAdmin || currentRole === 'accountant';
   const isCounsellor = currentRole === 'counsellor';
+  const canAccessCrm = isAdmin || isCounsellor;
   const canAccessAccountsSection = isAccountant || isCounsellor;
   const canAccessFinancialManagement = isAccountant;
   const isTrainer = isSuperAdmin || isAdmin || currentRole === 'trainer';
@@ -160,7 +161,7 @@ export function Sidebar({
         )}
 
         {/* CRM Module (Sales, Admin, Super Admin) */}
-        {isCounsellor && (
+        {canAccessCrm && (
           <div>
             <button
               onClick={() => toggleSection('crm')}

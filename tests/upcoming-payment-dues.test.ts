@@ -15,7 +15,7 @@
  * 10. API route authorization (401 unauthenticated, 403 student, 200 authorized roles).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { store } from '@/lib/services/data-store';
 import {
@@ -24,6 +24,7 @@ import {
   getUpcoming3DaysDates,
   classifyPaymentDueStatus,
   isCounsellorAuthorizedForStudent,
+  setDefaultUpcomingDuesReferenceDate,
 } from '@/lib/services/upcoming-dues-service';
 import { GET as upcomingDuesRoute } from '@/app/api/fees/upcoming-dues/route';
 import { GET as duesRoute } from '@/app/api/fees/dues/route';
@@ -766,6 +767,8 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
     const overdueDate = '2026-11-10';
 
     beforeEach(() => {
+      setDefaultUpcomingDuesReferenceDate(fixedBase);
+
       // Set up clean fee accounts for test students
       store.feeAccounts = [
         {
@@ -825,6 +828,10 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
           tenant_id: 'default',
         } as StudentFeeAccount,
       ];
+    });
+
+    afterEach(() => {
+      setDefaultUpcomingDuesReferenceDate(null);
     });
 
     // Test 1: Payment due today
@@ -1196,9 +1203,6 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
 
     // Test 12: View All Due Dates navigation and dedicated API endpoint
     it('12. serves complete student payment due dates list via GET /api/fees/dues with authorization', async () => {
-      const realToday = getUpcoming3DaysDates(new Date()).dateToday;
-      const realOverdue = '2026-01-01'; // Definitely overdue relative to today
-
       store.installments = [
         {
           id: 'inst-api-overdue',
@@ -1206,7 +1210,7 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
           student_id: 'std-1',
           amount: 10000,
           paid_amount: 0,
-          due_date: realOverdue,
+          due_date: overdueDate,
           status: 'Pending',
           tenant_id: 'default',
         } as Installment,
@@ -1216,7 +1220,7 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
           student_id: 'std-2',
           amount: 15000,
           paid_amount: 0,
-          due_date: realToday,
+          due_date: dateToday,
           status: 'Pending',
           tenant_id: 'default',
         } as Installment,
@@ -1239,6 +1243,54 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
       expect(json.pagination).toBeDefined();
       expect(json.summary.overdueCount).toBe(1);
       expect(json.summary.todayCount).toBe(1);
+    });
+
+    it('12b. honors explicit as_of query parameter and x-reference-date header in API', async () => {
+      // Clear global default to test pure request parameter parsing
+      setDefaultUpcomingDuesReferenceDate(null);
+
+      store.installments = [
+        {
+          id: 'inst-param-overdue',
+          fee_account_id: 'fa-1',
+          student_id: 'std-1',
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-10',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+        {
+          id: 'inst-param-today',
+          fee_account_id: 'fa-2',
+          student_id: 'std-2',
+          amount: 15000,
+          paid_amount: 0,
+          due_date: '2026-11-14',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+      ];
+
+      // A. Query parameter as_of=2026-11-14
+      const { req: queryReq } = createMockAuthRequest('accountant', {}, '/api/fees/dues?scope=all&as_of=2026-11-14T10:00:00Z');
+      const queryRes = await duesRoute(queryReq);
+      expect(queryRes.status).toBe(200);
+      const queryJson = await queryRes.json();
+      expect(queryJson.summary.overdueCount).toBe(1);
+      expect(queryJson.summary.todayCount).toBe(1);
+
+      // B. Header x-reference-date
+      const { req: headerReq } = createMockAuthRequest('accountant', {}, '/api/fees/dues?scope=all');
+      headerReq.headers.set('x-reference-date', '2026-11-14T10:00:00Z');
+      const headerRes = await duesRoute(headerReq);
+      expect(headerRes.status).toBe(200);
+      const headerJson = await headerRes.json();
+      expect(headerJson.summary.overdueCount).toBe(1);
+      expect(headerJson.summary.todayCount).toBe(1);
+
+      // Restore
+      setDefaultUpcomingDuesReferenceDate(fixedBase);
     });
 
     // Test 13: Pagination, filtering, and totals
@@ -1344,6 +1396,298 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
       for (const id of page1Ids) {
         expect(page2Ids).not.toContain(id);
       }
+    });
+  });
+
+  // =========================================================================
+  // 9. OVERDUE COUNT & LIFECYCLE INTEGRITY SPECIFICATION TESTS (BUG-08)
+  // =========================================================================
+  describe('9. Overdue Count & Financial Lifecycle Integrity (BUG-08)', () => {
+    const adminActor: UserProfile = {
+      id: 'usr-admin-overdue-test',
+      email: 'admin@next-generpsolutions.com',
+      full_name: 'Admin Overdue Tester',
+      role: 'admin',
+      tenant_id: 'default',
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    beforeEach(() => {
+      setDefaultUpcomingDuesReferenceDate(null);
+      store.feeAccounts = [
+        {
+          id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          student_name: 'Overdue Test Student 1',
+          course_id: 'crs-sap-fico',
+          course_name: 'SAP FICO',
+          original_fee: 50000,
+          discount: 0,
+          net_payable: 50000,
+          paid_amount: 0,
+          outstanding_amount: 50000,
+          status: 'Unpaid',
+          tenant_id: 'default',
+        } as StudentFeeAccount,
+        {
+          id: 'fa-ov-2',
+          student_id: 'std-ov-2',
+          student_name: 'Overdue Test Student 2',
+          course_id: 'crs-sap-mm',
+          course_name: 'SAP MM',
+          original_fee: 50000,
+          discount: 0,
+          net_payable: 50000,
+          paid_amount: 0,
+          outstanding_amount: 50000,
+          status: 'Unpaid',
+          tenant_id: 'default',
+        } as StudentFeeAccount,
+      ];
+    });
+
+    afterEach(() => {
+      setDefaultUpcomingDuesReferenceDate(null);
+    });
+
+    it('3 & 4. Evaluates Asia/Kolkata date boundaries: payments due today are strictly NOT overdue', () => {
+      // 2026-11-15T20:00:00Z is 2026-11-16T01:30:00+05:30 in Asia/Kolkata (IST calendar date: Nov 16)
+      const lateUtcTime = new Date('2026-11-15T20:00:00.000Z');
+
+      store.installments = [
+        // Due on Nov 15: overdue in IST on Nov 16
+        {
+          id: 'inst-nov15',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-15',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+        // Due on Nov 16: due TODAY in IST on Nov 16 (MUST NOT be classified as Overdue!)
+        {
+          id: 'inst-nov16',
+          fee_account_id: 'fa-ov-2',
+          student_id: 'std-ov-2',
+          amount: 20000,
+          paid_amount: 0,
+          due_date: '2026-11-16',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+      ];
+
+      const res = getAllPaymentDues(adminActor, { baseDate: lateUtcTime, timeZone: 'Asia/Kolkata' });
+
+      // Nov 15 is overdue
+      const nov15Item = res.dues.find((d) => d.id === 'inst-nov15')!;
+      expect(nov15Item.due_status).toBe('Overdue');
+
+      // Nov 16 is Due Today, NEVER Overdue
+      const nov16Item = res.dues.find((d) => d.id === 'inst-nov16')!;
+      expect(nov16Item.due_status).toBe('Due Today');
+
+      expect(res.summary.overdueCount).toBe(1);
+      expect(res.summary.overdueAmount).toBe(10000);
+      expect(res.summary.todayCount).toBe(1);
+      expect(res.summary.todayAmount).toBe(20000);
+    });
+
+    it('5 & 6. Excludes fully settled, cancelled, voided, waived, and written-off obligations', () => {
+      const fixedRef = new Date('2026-11-16T12:00:00+05:30');
+
+      store.installments = [
+        // 1. Past due but Cancelled -> Excluded
+        {
+          id: 'inst-cancelled',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-01',
+          status: 'Cancelled',
+          tenant_id: 'default',
+        } as unknown as Installment,
+        // 2. Past due but Waived -> Excluded
+        {
+          id: 'inst-waived',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-02',
+          status: 'Waived',
+          tenant_id: 'default',
+        } as unknown as Installment,
+        // 3. Past due but Void -> Excluded
+        {
+          id: 'inst-void',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-03',
+          status: 'Void',
+          tenant_id: 'default',
+        } as unknown as Installment,
+        // 4. Past due but Written Off -> Excluded
+        {
+          id: 'inst-written-off',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-04',
+          status: 'Written Off',
+          tenant_id: 'default',
+        } as unknown as Installment,
+        // 5. Past due but Paid (fully settled) -> Excluded
+        {
+          id: 'inst-paid',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 10000,
+          due_date: '2026-11-05',
+          status: 'Paid',
+          tenant_id: 'default',
+        } as unknown as Installment,
+        // 6. Past due genuine unpaid obligation -> Included
+        {
+          id: 'inst-valid-overdue',
+          fee_account_id: 'fa-ov-2',
+          student_id: 'std-ov-2',
+          installment_number: 1,
+          amount: 15000,
+          paid_amount: 0,
+          due_date: '2026-11-06',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as unknown as Installment,
+      ];
+
+      const res = getAllPaymentDues(adminActor, { baseDate: fixedRef });
+      expect(res.dues).toHaveLength(1);
+      expect(res.dues[0].id).toBe('inst-valid-overdue');
+      expect(res.summary.overdueCount).toBe(1);
+      expect(res.summary.overdueAmount).toBe(15000);
+    });
+
+    it('7. Handles partially paid installments correctly: counts only remaining payable balance towards overdue', () => {
+      const fixedRef = new Date('2026-11-16T12:00:00+05:30');
+
+      store.installments = [
+        // Scheduled: 25,000, verified paid: 15,000, remaining: 10,000 (Overdue)
+        {
+          id: 'inst-partial-overdue',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          amount: 25000,
+          paid_amount: 15000,
+          due_date: '2026-11-05',
+          status: 'Partial',
+          tenant_id: 'default',
+        } as Installment,
+      ];
+
+      const res = getAllPaymentDues(adminActor, { baseDate: fixedRef });
+      expect(res.dues).toHaveLength(1);
+      const item = res.dues[0];
+      expect(item.installment_amount).toBe(25000);
+      expect(item.paid_amount).toBe(15000);
+      expect(item.outstanding_amount).toBe(10000);
+      expect(item.is_partial).toBe(true);
+      expect(item.due_status).toBe('Overdue');
+
+      // Summary must count exactly the 10,000 remaining, NOT the original 25,000
+      expect(res.summary.overdueCount).toBe(1);
+      expect(res.summary.overdueAmount).toBe(10000);
+    });
+
+    it('8. Avoids duplicate counting: deduplicates multiple occurrences of the same obligation', () => {
+      const fixedRef = new Date('2026-11-16T12:00:00+05:30');
+
+      // Duplicate installment entries with the same ID or same student-date-installment
+      store.installments = [
+        {
+          id: 'inst-dup-1',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-05',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+        {
+          id: 'inst-dup-1', // Same ID
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          installment_number: 1,
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-05',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+      ];
+
+      const res = getAllPaymentDues(adminActor, { baseDate: fixedRef });
+      expect(res.dues).toHaveLength(1);
+      expect(res.summary.overdueCount).toBe(1);
+      expect(res.summary.overdueAmount).toBe(10000);
+    });
+
+    it('9. Strictly separates Dashboard 3-day window from complete overdue listing', () => {
+      const fixedRef = new Date('2026-11-16T12:00:00+05:30');
+
+      store.installments = [
+        // Overdue (Nov 10)
+        {
+          id: 'inst-dash-overdue',
+          fee_account_id: 'fa-ov-1',
+          student_id: 'std-ov-1',
+          amount: 10000,
+          paid_amount: 0,
+          due_date: '2026-11-10',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+        // Today (Nov 16)
+        {
+          id: 'inst-dash-today',
+          fee_account_id: 'fa-ov-2',
+          student_id: 'std-ov-2',
+          amount: 15000,
+          paid_amount: 0,
+          due_date: '2026-11-16',
+          status: 'Pending',
+          tenant_id: 'default',
+        } as Installment,
+      ];
+
+      // A. Dashboard 3-day window: MUST NOT include the Nov 10 overdue installment
+      const dashRes = getUpcomingPaymentDues(adminActor, { baseDate: fixedRef });
+      expect(dashRes.dues).toHaveLength(1);
+      expect(dashRes.dues[0].id).toBe('inst-dash-today');
+      expect(dashRes.totalDueAmount).toBe(15000);
+
+      // B. Full due dates listing: MUST include BOTH, with overdue clearly designated
+      const fullRes = getAllPaymentDues(adminActor, { baseDate: fixedRef, scope: 'all' });
+      expect(fullRes.dues).toHaveLength(2);
+      expect(fullRes.summary.overdueCount).toBe(1);
+      expect(fullRes.summary.todayCount).toBe(1);
+      expect(fullRes.summary.totalCount).toBe(2);
     });
   });
 });

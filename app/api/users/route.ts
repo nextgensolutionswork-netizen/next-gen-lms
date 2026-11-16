@@ -57,6 +57,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { email, full_name, role, phone, assigned_course_ids, password } = body;
 
+    // Privilege Escalation Defense: Only Super Administrators can create Super Admin accounts
+    if (role === 'super_admin' && auth.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Only Super Administrators can create Super Admin accounts.' },
+        { status: 403 }
+      );
+    }
+
     if (!email || !full_name) {
       return NextResponse.json(
         { success: false, error: 'Email and Full Name are required.' },
@@ -202,20 +210,34 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // Self-demotion defense: cannot strip admin privileges from own session
-    if (
-      id === auth.user.id &&
-      role !== undefined &&
-      role !== store.users[idx].role &&
-      !['super_admin', 'admin'].includes(role)
-    ) {
+    const targetUser = store.users[idx];
+
+    // Defense 1: Non-Super-Admin cannot modify, edit, or deactivate a Super Admin account
+    if (auth.user.role !== 'super_admin' && targetUser.role === 'super_admin') {
       return NextResponse.json(
-        { success: false, error: 'Self-Demotion Blocked: You cannot revoke administrator rights from your own active account.' },
+        { success: false, error: 'Forbidden: Administrators are not authorized to modify Super Administrator accounts.' },
         { status: 403 }
       );
     }
 
-    // Self-deactivation defense
+    // Defense 2: Non-Super-Admin cannot assign the super_admin role (privilege escalation)
+    if (auth.user.role !== 'super_admin' && role === 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Only Super Administrators can grant or elevate users to the Super Admin role.' },
+        { status: 403 }
+      );
+    }
+
+    // Defense 3: Admin self-demotion & self-role-change defense
+    // Admin cannot change their own role to any other role (demotion or promotion)
+    if (id === auth.user.id && role !== undefined && role !== targetUser.role) {
+      return NextResponse.json(
+        { success: false, error: 'Self-Demotion Blocked: You cannot modify administrator rights on your own active account.' },
+        { status: 403 }
+      );
+    }
+
+    // Defense 4: Self-deactivation defense
     if (id === auth.user.id && is_active === false) {
       return NextResponse.json(
         { success: false, error: 'Action Prohibited: You cannot deactivate your own active session account.' },

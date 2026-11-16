@@ -120,7 +120,7 @@ describe('User Administration & Password Reset Tests (G19, G20)', () => {
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
-      expect(data.user.phone).toBe('9111223344');
+      expect(data.user.phone).toBe('+91 91112 23344');
     });
 
     it('prevents administrator self-demotion and self-deactivation', async () => {

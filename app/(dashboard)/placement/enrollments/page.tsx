@@ -196,7 +196,7 @@ export default function PlacementEnrollmentsPage() {
         `Automated Eligibility Audit Warning: Candidate has not fulfilled mandatory institutional prerequisites:\n` +
           (!audit.passes_attendance ? `• Attendance is ${audit.attendance_percentage}% (Required: ≥ ${audit.min_attendance_percentage}%)\n` : '') +
           (!audit.passes_progress ? `• Course progress is ${audit.course_progress}% (Required: ≥ ${audit.min_course_progress}%)\n` : '') +
-          (!audit.passes_fees ? `• Outstanding fee balance is ₹${formatINR(audit.outstanding_amount)} (Required: ₹0 No Dues)\n` : '') +
+          (!audit.passes_fees ? `• Outstanding fee balance is ${formatINR(audit.outstanding_amount)} (Required: ₹0 No Dues)\n` : '') +
           `\nTo approve this student, please grant an Authorized Admin Override with mandatory justification.`
       );
       return;
@@ -231,7 +231,7 @@ export default function PlacementEnrollmentsPage() {
         `Automated Eligibility Audit Failed: Candidate does not meet mandatory prerequisites (` +
           (!passesAttendance ? `Attendance ${attendance}% < ${minAtt}%; ` : '') +
           (!passesProgress ? `Course Progress ${progress}% < ${minProg}%; ` : '') +
-          (!passesFees ? `Fee Arrears: ₹${formatINR(outstanding)}; ` : '') +
+          (!passesFees ? `Fee Arrears: ${formatINR(outstanding)}; ` : '') +
           `). Check "Grant Authorized Administrative Override" with justification to proceed.`
       );
       return;
@@ -733,9 +733,9 @@ export default function PlacementEnrollmentsPage() {
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                       : 'bg-rose-50 text-rose-700 border border-rose-200'
                                   }`}
-                                  title={`Outstanding Fee Dues: ₹${dues}`}
+                                  title={`Outstanding Fee Dues: ${formatINR(dues)}`}
                                 >
-                                  {passDues ? '₹0 Dues' : `₹${formatINR(dues)} Due`}
+                                  {passDues ? '₹0 Dues' : `${formatINR(dues)} Due`}
                                 </span>
                               </div>
                               {isOverridden && (
@@ -1599,7 +1599,7 @@ export default function PlacementEnrollmentsPage() {
                     <span className="font-bold text-slate-800">
                       {candidateAuditResult.outstanding <= 0
                         ? 'Cleared'
-                        : `₹${formatINR(candidateAuditResult.outstanding)}`}
+                        : formatINR(candidateAuditResult.outstanding)}
                     </span>
                     <span
                       className={`text-[10px] font-bold ${

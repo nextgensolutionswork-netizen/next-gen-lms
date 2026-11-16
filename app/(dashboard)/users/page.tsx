@@ -180,6 +180,10 @@ export default function UsersPage() {
 
   const openEditModal = (u: UserProfile) => {
     setActionError(null);
+    if (currentRole !== 'super_admin' && u.role === 'super_admin') {
+      setActionError('Access Denied: Administrators cannot modify Super Administrator accounts.');
+      return;
+    }
     setEditingUser(u);
     setEditName(u.full_name);
     setEditEmail(u.email);
@@ -197,13 +201,24 @@ export default function UsersPage() {
     if (!editingUser) return;
     setActionError(null);
 
-    // Self-demotion defense: cannot strip admin privileges from own session
+    // Target Super Admin defense
+    if (currentRole !== 'super_admin' && editingUser.role === 'super_admin') {
+      setActionError('Access Denied: Administrators cannot modify Super Administrator accounts.');
+      return;
+    }
+
+    // Privilege escalation defense: non-super_admin cannot elevate to super_admin
+    if (currentRole !== 'super_admin' && editRole === 'super_admin') {
+      setActionError('Privilege Escalation Blocked: Only Super Administrators can grant the Super Admin role.');
+      return;
+    }
+
+    // Self-demotion defense: cannot change own role
     if (
       (editingUser.id === currentUser?.id || editingUser.email.toLowerCase() === currentUser?.email?.toLowerCase()) &&
-      editRole !== editingUser.role &&
-      !['super_admin', 'admin'].includes(editRole)
+      editRole !== editingUser.role
     ) {
-      setActionError('Self-Demotion Blocked: You cannot revoke administrator rights from your own active account.');
+      setActionError('Self-Demotion Blocked: You cannot modify administrator rights on your own active account.');
       return;
     }
 
@@ -256,6 +271,10 @@ export default function UsersPage() {
 
   const handleToggleActive = async (u: UserProfile) => {
     setActionError(null);
+    if (currentRole !== 'super_admin' && u.role === 'super_admin') {
+      setActionError('Access Denied: Administrators cannot deactivate Super Administrator accounts.');
+      return;
+    }
     // Self-deactivation defense
     if (u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase()) {
       setActionError('Action Prohibited: You cannot deactivate your own active session account.');
@@ -285,6 +304,10 @@ export default function UsersPage() {
 
   const openResetModal = (u: UserProfile) => {
     setActionError(null);
+    if (currentRole !== 'super_admin' && u.role === 'super_admin') {
+      setActionError('Access Denied: Administrators cannot reset credentials for Super Administrator accounts.');
+      return;
+    }
     setResettingUser(u);
     const token = `rst_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://lms.next-generpsolutions.com';
@@ -432,7 +455,7 @@ export default function UsersPage() {
         </div>
         <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
         <p className="text-sm text-slate-500">
-          Faculty & Staff directory and security configuration are strictly restricted to Super Administrators and Sales Leads.
+          Faculty & Staff directory and security configuration are strictly restricted to Super Administrators and Administrators.
         </p>
       </div>
     );
@@ -606,18 +629,20 @@ export default function UsersPage() {
                           <button
                             type="button"
                             onClick={() => canManageUsers && handleToggleActive(u)}
-                            disabled={!canManageUsers || u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase()}
+                            disabled={!canManageUsers || u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase() || (currentRole !== 'super_admin' && u.role === 'super_admin')}
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all ${
                               u.is_active
                                 ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                                 : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
                             } ${
-                              !canManageUsers || u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase()
+                              !canManageUsers || u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase() || (currentRole !== 'super_admin' && u.role === 'super_admin')
                                 ? 'opacity-80 cursor-default'
                                 : 'cursor-pointer hover:shadow-xs'
                             }`}
                             title={
-                              u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase()
+                              currentRole !== 'super_admin' && u.role === 'super_admin'
+                                ? 'Super Administrator accounts can only be managed by Super Administrators'
+                                : u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase()
                                 ? 'Cannot deactivate your own active session'
                                 : canManageUsers
                                 ? (u.is_active ? 'Click to deactivate user' : 'Click to activate user')
@@ -633,25 +658,45 @@ export default function UsersPage() {
                           <td className="px-3.5 py-2.5 text-right space-x-1 whitespace-nowrap">
                             <button
                               onClick={() => openEditModal(u)}
-                              className="p-1 rounded text-slate-600 hover:text-blue-600 hover:bg-slate-100"
-                              title="Edit Role & Courses"
+                              disabled={currentRole !== 'super_admin' && u.role === 'super_admin'}
+                              className={`p-1 rounded ${
+                                currentRole !== 'super_admin' && u.role === 'super_admin'
+                                  ? 'text-slate-300 cursor-not-allowed'
+                                  : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+                              }`}
+                              title={
+                                currentRole !== 'super_admin' && u.role === 'super_admin'
+                                  ? 'Super Administrator accounts can only be edited by Super Administrators'
+                                  : 'Edit Role & Courses'
+                              }
                               aria-label={`Edit ${u.full_name}`}
                             >
                               <Edit2 className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => openResetModal(u)}
-                              className="p-1 rounded text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                              title="Reset Password"
+                              disabled={currentRole !== 'super_admin' && u.role === 'super_admin'}
+                              className={`p-1 rounded ${
+                                currentRole !== 'super_admin' && u.role === 'super_admin'
+                                  ? 'text-slate-300 cursor-not-allowed'
+                                  : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+                              }`}
+                              title={
+                                currentRole !== 'super_admin' && u.role === 'super_admin'
+                                  ? 'Super Administrator credentials can only be reset by Super Administrators'
+                                  : 'Reset Password'
+                              }
                               aria-label={`Reset password for ${u.full_name}`}
                             >
                               <Key className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => handleToggleActive(u)}
-                              disabled={u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase()}
+                              disabled={u.id === currentUser?.id || u.email.toLowerCase() === currentUser?.email?.toLowerCase() || (currentRole !== 'super_admin' && u.role === 'super_admin')}
                               className={`p-1 rounded ${
-                                u.is_active
+                                currentRole !== 'super_admin' && u.role === 'super_admin'
+                                  ? 'text-slate-300 cursor-not-allowed'
+                                  : u.is_active
                                   ? 'text-emerald-600 hover:text-rose-600 hover:bg-rose-50'
                                   : 'text-rose-600 hover:text-emerald-600 hover:bg-emerald-50'
                               } ${
@@ -732,9 +777,10 @@ export default function UsersPage() {
             <select
               value={editRole}
               onChange={(e) => setEditRole(e.target.value as UserRole)}
-              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+              disabled={editingUser?.id === currentUser?.id || editingUser?.email?.toLowerCase() === currentUser?.email?.toLowerCase()}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-500"
             >
-              <option value="super_admin">Super Admin / Director</option>
+              {currentRole === 'super_admin' && <option value="super_admin">Super Admin / Director</option>}
               <option value="admin">{getRoleLabel('admin')}</option>
               <option value="onboarding_team">Student Onboarding Specialist</option>
               <option value="trainer">Trainer (Assigned Courses Only)</option>
@@ -744,6 +790,11 @@ export default function UsersPage() {
               <option value="placement_coordinator">Placement Coordinator</option>
               <option value="student">Student Account</option>
             </select>
+            {(editingUser?.id === currentUser?.id || editingUser?.email?.toLowerCase() === currentUser?.email?.toLowerCase()) && (
+              <p className="text-[10px] text-amber-600 font-medium mt-1">
+                Self-demotion prevention: You cannot modify your own administrative role.
+              </p>
+            )}
           </div>
 
           {editRole === 'trainer' && (
@@ -978,7 +1029,7 @@ export default function UsersPage() {
               onChange={(e) => setRole(e.target.value as UserRole)}
               className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
             >
-              <option value="super_admin">Super Admin / Director</option>
+              {currentRole === 'super_admin' && <option value="super_admin">Super Admin / Director</option>}
               <option value="admin">{getRoleLabel('admin')}</option>
               <option value="onboarding_team">Student Onboarding Specialist</option>
               <option value="trainer">Trainer (Assigned Courses Only)</option>

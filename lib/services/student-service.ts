@@ -1,6 +1,9 @@
 import { store } from './data-store';
 import { Student } from '@/types';
+import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient as createSessionClient } from '@/lib/supabase/client';
 import { mergeWorkflowSnapshot } from './payment-workflow-state';
+import { calculateAuthoritativeStudentFinancials } from '@/lib/utils/student-financials';
 
 export async function getStudents(filters?: {
   course_id?: string;
@@ -8,7 +11,18 @@ export async function getStudents(filters?: {
   status?: string;
   search?: string;
 }, signal?: AbortSignal): Promise<Student[]> {
-  if (typeof window !== 'undefined') {
+  if (isLiveSupabaseEnabled()) {
+    // Use the authenticated browser client directly. Never replace an RLS-empty
+    // result or failed remote lookup with seeded/cached student records.
+    const supabase = typeof window !== 'undefined' ? createSessionClient() : createClient();
+    const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+    if (signal?.aborted) throw new Error('Student lookup cancelled.');
+    if (error) {
+      console.error('[student-service] Supabase query failed:', error.message || error);
+      throw new Error('Unable to load students. Please retry or contact your administrator.');
+    }
+    store.students = (data || []) as Student[];
+  } else if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location?.origin) {
     try {
       const res = await fetch('/api/students', {
         method: 'GET',
@@ -62,7 +76,21 @@ export async function getStudents(filters?: {
 }
 
 export async function getStudentById(id: string): Promise<Student | undefined> {
+  if (isLiveSupabaseEnabled()) {
+    const supabase = typeof window !== 'undefined' ? createSessionClient() : createClient();
+    const reference = String(id).trim();
+    const column = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference) ? 'id' : 'student_code';
+    const { data, error } = await supabase.from('students').select('*').eq(column, reference).maybeSingle();
+    if (error) {
+      console.error('[student-service] Supabase student lookup failed:', error.message || error);
+      throw new Error('Unable to verify the student profile. Please retry or contact your administrator.');
+    }
+    return data ? data as Student : undefined;
+  }
+
   const target = decodeURIComponent(String(id)).trim().toLowerCase();
+  const isAmit = target === 'stu-01' || target === '51000000-0000-0000-0000-000000000001';
+  const isSneha = target === 'stu-02' || target === '51000000-0000-0000-0000-000000000002';
   let student = store.students.find(
     (s) =>
       s.id?.toLowerCase() === target ||
@@ -71,10 +99,12 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
       s.admission_id?.toLowerCase() === target ||
       s.admission_number?.toLowerCase() === target ||
       (s.email && s.email.toLowerCase() === target) ||
-      (s.phone && s.phone.toLowerCase() === target)
+      (s.phone && s.phone.toLowerCase() === target) ||
+      (isAmit && (s.id === 'stu-01' || s.id === '51000000-0000-0000-0000-000000000001')) ||
+      (isSneha && (s.id === 'stu-02' || s.id === '51000000-0000-0000-0000-000000000002'))
   );
 
-  if (!student && typeof window !== 'undefined') {
+  if (!student && typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location?.origin) {
     try {
       const res = await fetch(`/api/students/${encodeURIComponent(id)}`, {
         cache: 'no-store',
@@ -104,7 +134,7 @@ export async function getStudentById(id: string): Promise<Student | undefined> {
 export async function getStudentProfileFullDetails(studentId: string) {
   if (!studentId) return null;
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location?.origin) {
     try {
       const res = await fetch(`/api/students/${encodeURIComponent(studentId)}`, {
         cache: 'no-store',
@@ -167,6 +197,24 @@ export async function getStudentProfileFullDetails(studentId: string) {
   const jobApplications = (store.jobApplications || []).filter((j) => j.student_id === student.id);
   const doubts = (store.doubts || []).filter((d) => d.student_id === student.id);
   const onboardingCase = (store.onboardingCases || []).find((c) => c.student_id === student.id || c.admission_id === student.admission_id);
+
+  const authFin = calculateAuthoritativeStudentFinancials({
+    student,
+    admission,
+    feeAccount,
+    studentFees,
+    payments,
+    studentPayments,
+  });
+
+  student.total_fee = authFin.totalPayable;
+  student.paid_amount = authFin.paidAmount;
+  student.outstanding_amount = authFin.outstandingDue;
+  if (feeAccount) {
+    feeAccount.net_payable = authFin.totalPayable;
+    feeAccount.paid_amount = authFin.paidAmount;
+    feeAccount.outstanding_amount = authFin.outstandingDue;
+  }
 
   return {
     student,

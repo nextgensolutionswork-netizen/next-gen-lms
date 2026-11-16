@@ -38,6 +38,10 @@ import {
   updateSapServerSystem,
   deleteSapServerSystem,
   logSapCredentialAccess,
+  getEffectiveSapAllocationStatus,
+  isAllocationMatchingFilter,
+  getSapAllocationStatusCounts,
+  getSystemCapacityMetrics,
 } from '@/lib/services/sap-lab-service';
 import { SapServerAllocation, SapServerSystem } from '@/types';
 import { formatDate } from '@/lib/utils/formatters';
@@ -48,6 +52,21 @@ export default function SapServersPage() {
   const [allocations, setAllocations] = React.useState<SapServerAllocation[]>(store.sapAllocations);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<'All' | 'Active' | 'Expired' | 'Revoked'>('All');
+  const [now, setNow] = React.useState<Date>(() => new Date());
+
+  // Dynamic status refresh on interval (30s) and window focus / visibility change
+  React.useEffect(() => {
+    const updateTime = () => setNow(new Date());
+    const timer = setInterval(updateTime, 30_000);
+    window.addEventListener('focus', updateTime);
+    document.addEventListener('visibilitychange', updateTime);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', updateTime);
+      document.removeEventListener('visibilitychange', updateTime);
+    };
+  }, []);
+
   const [isProvisionModalOpen, setIsProvisionModalOpen] = React.useState(false);
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
   const [revealedPasswords, setRevealedPasswords] = React.useState<Record<string, boolean>>({});
@@ -388,20 +407,27 @@ export default function SapServersPage() {
     return allocations;
   }, [allocations, isStudent, currentStudent]);
 
-  const filteredAllocations = scopedAllocations.filter((alloc) => {
-    if (statusFilter !== 'All' && alloc.status !== statusFilter) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        alloc.student_name.toLowerCase().includes(q) ||
-        alloc.sap_user_id.toLowerCase().includes(q) ||
-        alloc.admission_number.toLowerCase().includes(q) ||
-        alloc.system_name.toLowerCase().includes(q) ||
-        alloc.sid.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // Unified status counts using authoritative effective-status calculation
+  const statusCounts = React.useMemo(() => {
+    return getSapAllocationStatusCounts(scopedAllocations, { referenceDate: now });
+  }, [scopedAllocations, now]);
+
+  const filteredAllocations = React.useMemo(() => {
+    return scopedAllocations.filter((alloc) => {
+      if (!isAllocationMatchingFilter(alloc, statusFilter, { referenceDate: now })) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (
+          alloc.student_name.toLowerCase().includes(q) ||
+          alloc.sap_user_id.toLowerCase().includes(q) ||
+          alloc.admission_number.toLowerCase().includes(q) ||
+          alloc.system_name.toLowerCase().includes(q) ||
+          alloc.sid.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [scopedAllocations, statusFilter, search, now]);
 
   return (
     <div className="space-y-6">
@@ -510,9 +536,7 @@ export default function SapServersPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {systems.map((sys) => {
-            const activeCount = allocations.filter((a) => a.system_id === sys.id && a.status === 'Active').length;
-            const maxCap = (sys as any).capacity || 50;
-            const usagePercent = Math.round((activeCount / maxCap) * 100);
+            const metrics = getSystemCapacityMetrics(allocations, sys.id, (sys as any).capacity || 50, { referenceDate: now });
             return (
               <Card key={sys.id} className="hover:border-[#0A6ED1] transition-all flex flex-col justify-between">
                 <CardContent className="p-4 space-y-3">
@@ -541,17 +565,23 @@ export default function SapServersPage() {
 
                   <div className="space-y-1.5 pt-1">
                     <div className="flex justify-between text-xs text-slate-600">
-                      <span>Server Capacity:</span>
+                      <span>Active Entitlements:</span>
                       <span className="font-semibold text-slate-900">
-                        {activeCount} / {maxCap} trainees ({usagePercent}%)
+                        {metrics.activeCount} / {metrics.maxCapacity} trainees ({metrics.usagePercent}%)
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-slate-500">
+                      <span>Provisioned Accounts:</span>
+                      <span className="font-medium text-slate-700">
+                        {metrics.provisionedCount} provisioned {metrics.expiredCount > 0 ? `(${metrics.expiredCount} expired)` : ''}
                       </span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all ${
-                          usagePercent > 90 ? 'bg-rose-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                          metrics.usagePercent > 90 ? 'bg-rose-500' : metrics.usagePercent > 75 ? 'bg-amber-500' : 'bg-emerald-500'
                         }`}
-                        style={{ width: `${Math.min(100, usagePercent)}%` }}
+                        style={{ width: `${Math.min(100, metrics.usagePercent)}%` }}
                       />
                     </div>
                   </div>
@@ -623,17 +653,24 @@ export default function SapServersPage() {
           </div>
 
           <div className="flex items-center space-x-1.5 w-full sm:w-auto overflow-x-auto">
-            {(['All', 'Active', 'Expired', 'Revoked'] as const).map((st) => (
+            {(
+              [
+                { id: 'All', label: `All (${statusCounts.all})` },
+                { id: 'Active', label: `Active (${statusCounts.active})` },
+                { id: 'Expired', label: `Expired (${statusCounts.expired})` },
+                { id: 'Revoked', label: `Revoked (${statusCounts.revoked})` },
+              ] as const
+            ).map((tab) => (
               <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  statusFilter === st
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  statusFilter === tab.id
                     ? 'bg-[#0A6ED1] text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {st}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -682,7 +719,8 @@ export default function SapServersPage() {
                   {filteredAllocations.map((alloc) => {
                     const isAllowedToView = canRevealPassword(alloc);
                     const isRevealed = isAllowedToView && Boolean(revealedPasswords[alloc.id]);
-                    const isExpired = new Date(alloc.valid_to).getTime() < Date.now();
+                    const effectiveStatus = getEffectiveSapAllocationStatus(alloc, { referenceDate: now });
+                    const isExpired = effectiveStatus === 'Expired';
 
                     return (
                       <tr key={alloc.id} className="hover:bg-slate-50/80 transition-colors">
@@ -753,14 +791,16 @@ export default function SapServersPage() {
                         <td className="px-4 py-3">
                           <Badge
                             variant={
-                              alloc.status === 'Active' && !isExpired
+                              effectiveStatus === 'Active'
                                 ? 'success'
-                                : alloc.status === 'Expired' || isExpired
+                                : effectiveStatus === 'Expired'
                                 ? 'warning'
+                                : effectiveStatus === 'Future'
+                                ? 'outline'
                                 : 'destructive'
                             }
                           >
-                            {isExpired && alloc.status === 'Active' ? 'Expired' : alloc.status}
+                            {effectiveStatus}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">

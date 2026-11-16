@@ -32,17 +32,30 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
     const db = live ? createAdminClient() : null;
     let revision = 0;
     if (db) {
-      const [state, roster] = await Promise.all([
-        db.from('fee_workflow_state').select('revision, snapshot').eq('tenant_id', tenant).maybeSingle(),
-        db.from('profiles').select('*').eq('tenant_id', tenant),
-      ]);
-      const { data, error } = state;
-      if (error) throw new Error(`Payment database unavailable: ${error.message}`);
-      if (roster.error) throw new Error('Payment database unavailable: Could not verify the current staff roster.');
-      if (data) {
-        revision = data.revision;
-        mergeWorkflowSnapshot(data.snapshot, tenant);
-      } else {
+      try {
+        const [state, roster] = await Promise.all([
+          db.from('fee_workflow_state').select('revision, snapshot').eq('tenant_id', tenant).maybeSingle(),
+          db.from('profiles').select('*').eq('tenant_id', tenant),
+        ]);
+        const { data, error } = state;
+        if (error) {
+          if (readOnly) {
+            console.warn('[paymentTransaction] Database query failed in readOnly mode:', error.message);
+          } else {
+            throw new Error(`Payment database unavailable: ${error.message}`);
+          }
+        }
+        if (roster.error) {
+          if (readOnly) {
+            console.warn('[paymentTransaction] Roster query failed in readOnly mode:', roster.error.message);
+          } else {
+            throw new Error('Payment database unavailable: Could not verify the current staff roster.');
+          }
+        }
+        if (data) {
+          revision = data.revision;
+          mergeWorkflowSnapshot(data.snapshot, tenant);
+        } else {
         // Explicit bootstrap, performed from trusted database rows, never a browser snapshot.
         const tables = { users: 'profiles', students: 'students', admissions: 'admissions', feeAccounts: 'student_fee_accounts', installments: 'installments', payments: 'payments', receipts: 'receipts', onboardingCases: 'onboarding_cases' } as const;
         const rows = await Promise.all(Object.entries(tables).map(async ([key, table]) => {
@@ -69,6 +82,13 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         ...store.users.filter((u) => tenantId(u) !== tenant || (u.role === 'student' && !profileIds.has(u.id))),
         ...(roster.data || []) as UserProfile[],
       ];
+      } catch (dbErr: any) {
+        if (readOnly) {
+          console.warn('[paymentTransaction] Database network error in readOnly mode, using in-memory store:', dbErr?.message);
+        } else {
+          throw dbErr;
+        }
+      }
     }
     const userIndex = store.users.findIndex((u) => u.id === actor.id);
     if (userIndex < 0) store.users.push(actor); else store.users[userIndex] = actor;

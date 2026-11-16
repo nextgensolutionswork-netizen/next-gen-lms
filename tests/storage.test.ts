@@ -378,7 +378,7 @@ describe('9. Storage & File Upload Tests (Resumes, Screenshots, Assignments)', (
         description: 'Configure APP run and post bank transactions.',
         course_id: store.courses[0].id,
         batch_id: store.batches[0].id,
-        due_date: '2026-04-15T23:59',
+        due_date: '2027-04-15T23:59',
         maximum_marks: 100,
         attachment_url: 'https://supabase.co/storage/v1/object/public/assignments/batch-01/f110_spec.pdf',
         created_by: 'usr-trainer',

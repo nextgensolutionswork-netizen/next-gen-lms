@@ -195,15 +195,41 @@ export class PersistentStorageAdapter {
     }
 
     try {
-      const { STORAGE_FILE } = getStoragePaths();
-      if (!STORAGE_FILE) return null;
-
+      const { STORAGE_FILE, STORAGE_DIR } = getStoragePaths();
       const fs = getFs();
-      if (fs && fs.existsSync(STORAGE_FILE)) {
+      if (!fs) return null;
+
+      // 1. Try primary storage file (e.g. /tmp/data/institute_store.json or local data dir)
+      if (STORAGE_FILE && fs.existsSync(STORAGE_FILE)) {
         const raw = fs.readFileSync(STORAGE_FILE, 'utf-8');
-        if (!raw || !raw.trim()) return null;
-        const parsed = JSON.parse(raw);
-        return parsed;
+        if (raw && raw.trim()) {
+          const parsed = JSON.parse(raw);
+          return parsed;
+        }
+      }
+
+      // 2. Fallback to process.cwd() data/institute_store.json if primary does not exist (e.g. Lambda cold start)
+      const p = getPathModule();
+      if (p && typeof process !== 'undefined' && typeof process.cwd === 'function') {
+        const baselineFile = p.join(process.cwd(), 'data', 'institute_store.json');
+        if (baselineFile !== STORAGE_FILE && fs.existsSync(baselineFile)) {
+          const raw = fs.readFileSync(baselineFile, 'utf-8');
+          if (raw && raw.trim()) {
+            const parsed = JSON.parse(raw);
+            // Optionally seed into the runtime storage location so future writes persist
+            if (STORAGE_FILE && STORAGE_DIR && !fs.existsSync(STORAGE_FILE)) {
+              try {
+                if (!fs.existsSync(STORAGE_DIR)) {
+                  fs.mkdirSync(STORAGE_DIR, { recursive: true });
+                }
+                fs.writeFileSync(STORAGE_FILE, raw, 'utf-8');
+              } catch (writeErr) {
+                console.warn('[PersistentStorageAdapter] Could not pre-seed runtime storage file:', writeErr);
+              }
+            }
+            return parsed;
+          }
+        }
       }
     } catch (err) {
       console.warn('[PersistentStorageAdapter] Could not load state from disk:', err);

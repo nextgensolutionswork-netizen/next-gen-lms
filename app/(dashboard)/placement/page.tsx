@@ -17,6 +17,12 @@ import {
   Users,
   Check,
   GraduationCap,
+  AlertCircle,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  UserX,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,23 +31,31 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { FileUpload } from '@/components/ui/file-upload';
 import { store } from '@/lib/services/data-store';
-import { JobOpening, PlacementProfile, JobApplication } from '@/types';
+import { JobOpening, PlacementProfile, JobApplication, JobApplicationStatus } from '@/types';
 import {
+  getJobOpenings,
+  getJobApplications,
+  getPlacementProfiles,
   createJobOpening,
   updatePlacementProfile,
   applyForJob,
   updateJobOpeningStatus,
   deleteJobOpening,
   updateJobApplicationStatus,
+  withdrawJobApplication,
+  deduplicateJobApplications,
 } from '@/lib/services/placement-service';
 import { formatDate } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function PlacementPage() {
   const { user, role, hasPermission } = useAuth();
-  const [profiles, setProfiles] = React.useState<PlacementProfile[]>(store.placementProfiles || []);
-  const [jobs, setJobs] = React.useState<JobOpening[]>(store.jobOpenings || []);
-  const [applications, setApplications] = React.useState<JobApplication[]>(store.jobApplications || []);
+  const [profiles, setProfiles] = React.useState<PlacementProfile[]>([]);
+  const [jobs, setJobs] = React.useState<JobOpening[]>([]);
+  const [applications, setApplications] = React.useState<JobApplication[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
+
   const [isJobModalOpen, setIsJobModalOpen] = React.useState(false);
   const [selectedStudentForProfile, setSelectedStudentForProfile] = React.useState<PlacementProfile | null>(null);
   const [resumeUrl, setResumeUrl] = React.useState('');
@@ -62,8 +76,12 @@ export default function PlacementPage() {
   const [referError, setReferError] = React.useState<string | null>(null);
   const [referSuccess, setReferSuccess] = React.useState(false);
 
-  // View Applicants modal state
+  // View Applicants modal state & pagination
   const [viewJobApplications, setViewJobApplications] = React.useState<JobOpening | null>(null);
+  const [modalSearch, setModalSearch] = React.useState('');
+  const [modalStatusFilter, setModalStatusFilter] = React.useState<string>('All');
+  const [modalPage, setModalPage] = React.useState(1);
+  const modalPageSize = 5;
 
   const coordinatorActorId = React.useMemo(() => {
     return user?.id || (store.users || []).find((u) => u.role === 'placement_coordinator')?.id || 'usr-placement';
@@ -98,6 +116,49 @@ export default function PlacementPage() {
   const [profileSearch, setProfileSearch] = React.useState('');
   const [profileStageFilter, setProfileStageFilter] = React.useState<string>('All');
 
+  const loadData = React.useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const [jobList, appList, profileList] = await Promise.all([
+        getJobOpenings(),
+        getJobApplications(),
+        getPlacementProfiles(),
+      ]);
+      setJobs(jobList);
+      setApplications(appList);
+      setProfiles(profileList);
+    } catch (err: any) {
+      console.error('Error fetching placement data:', err);
+      setFetchError(err.message || 'Failed to load corporate hiring drives and applicant records.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const refreshData = async () => {
+    try {
+      const [jobList, appList, profileList] = await Promise.all([
+        getJobOpenings(),
+        getJobApplications(),
+        getPlacementProfiles(),
+      ]);
+      setJobs(jobList);
+      setApplications(appList);
+      setProfiles(profileList);
+    } catch (err: any) {
+      console.warn('Failed to refresh placement data:', err);
+      // Fallback local memory state
+      setProfiles([...(store.placementProfiles || [])]);
+      setJobs([...(store.jobOpenings || [])]);
+      setApplications(deduplicateJobApplications(store.jobApplications || []));
+    }
+  };
+
   const filteredJobs = React.useMemo(() => {
     return jobs.filter((j) => {
       const q = jobSearch.toLowerCase().trim();
@@ -125,11 +186,40 @@ export default function PlacementPage() {
     });
   }, [profiles, profileSearch, profileStageFilter]);
 
-  const refreshData = () => {
-    setProfiles([...(store.placementProfiles || [])]);
-    setJobs([...(store.jobOpenings || [])]);
-    setApplications([...(store.jobApplications || [])]);
-  };
+  // Derived application counts for current modal
+  const allDriveApplicants = React.useMemo(() => {
+    if (!viewJobApplications) return [];
+    return applications.filter((a) => a.job_id === viewJobApplications.id);
+  }, [applications, viewJobApplications]);
+
+  const activeDriveApplicantsCount = React.useMemo(() => {
+    return allDriveApplicants.filter((a) => a.status !== 'Withdrawn').length;
+  }, [allDriveApplicants]);
+
+  const filteredDriveApplicants = React.useMemo(() => {
+    return allDriveApplicants.filter((a) => {
+      const matchesStatus = modalStatusFilter === 'All' || a.status === modalStatusFilter;
+      const q = modalSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        a.student_name?.toLowerCase().includes(q) ||
+        a.student_id?.toLowerCase().includes(q) ||
+        a.notes?.toLowerCase().includes(q);
+      return matchesStatus && matchesSearch;
+    });
+  }, [allDriveApplicants, modalStatusFilter, modalSearch]);
+
+  const totalModalPages = Math.max(1, Math.ceil(filteredDriveApplicants.length / modalPageSize));
+
+  const paginatedDriveApplicants = React.useMemo(() => {
+    const start = (modalPage - 1) * modalPageSize;
+    return filteredDriveApplicants.slice(start, start + modalPageSize);
+  }, [filteredDriveApplicants, modalPage, modalPageSize]);
+
+  // Reset modal pagination when filter or selected drive changes
+  React.useEffect(() => {
+    setModalPage(1);
+  }, [modalStatusFilter, modalSearch, viewJobApplications?.id]);
 
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,19 +238,19 @@ export default function PlacementPage() {
     setIsJobModalOpen(false);
     setCompany('');
     setTitle('');
-    refreshData();
+    await refreshData();
   };
 
   const handleToggleJobStatus = async (jobId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
     await updateJobOpeningStatus(jobId, newStatus);
-    refreshData();
+    await refreshData();
   };
 
   const handleDeleteJob = async (jobId: string) => {
     if (confirm('Are you sure you want to delete this job opening?')) {
       await deleteJobOpening(jobId);
-      refreshData();
+      await refreshData();
     }
   };
 
@@ -172,7 +262,7 @@ export default function PlacementPage() {
     try {
       await applyForJob(selectedJobForApply.id, applyStudentId, coordinatorActorId);
       setApplySuccess(true);
-      refreshData();
+      await refreshData();
       setTimeout(() => {
         setIsApplyModalOpen(false);
         setSelectedJobForApply(null);
@@ -193,7 +283,7 @@ export default function PlacementPage() {
     try {
       await applyForJob(referJobId, selectedStudentForReferral.student_id, coordinatorActorId);
       setReferSuccess(true);
-      refreshData();
+      await refreshData();
       setTimeout(() => {
         setIsReferStudentModalOpen(false);
         setSelectedStudentForReferral(null);
@@ -208,10 +298,25 @@ export default function PlacementPage() {
 
   const handleUpdateApplicantStatus = async (applicationId: string, newStatus: JobApplication['status']) => {
     try {
-      await updateJobApplicationStatus(applicationId, newStatus, coordinatorActorId);
-      refreshData();
+      if (newStatus === 'Withdrawn') {
+        await withdrawJobApplication(applicationId, coordinatorActorId, 'Status set to Withdrawn by coordinator');
+      } else {
+        await updateJobApplicationStatus(applicationId, newStatus, coordinatorActorId);
+      }
+      await refreshData();
     } catch (err: any) {
       alert('Error updating application status: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const handleWithdrawApplicant = async (applicationId: string) => {
+    if (confirm('Are you sure you want to withdraw this candidate application?')) {
+      try {
+        await withdrawJobApplication(applicationId, coordinatorActorId, 'Withdrawn by placement coordinator');
+        await refreshData();
+      } catch (err: any) {
+        alert('Error withdrawing application: ' + (err.message || 'Unknown error'));
+      }
     }
   };
 
@@ -231,7 +336,7 @@ export default function PlacementPage() {
       coordinatorActorId
     );
     setSelectedStudentForProfile(null);
-    refreshData();
+    await refreshData();
   };
 
   const canAccess =
@@ -274,6 +379,28 @@ export default function PlacementPage() {
           </Button>
         )}
       </div>
+
+      {/* Query Failure Alert */}
+      {fetchError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800">
+          <div className="flex items-center space-x-2.5">
+            <AlertCircle className="h-5 w-5 text-rose-600 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-rose-900">Unable to load placement records</p>
+              <p className="text-xs text-rose-700">{fetchError}</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            className="text-xs border-rose-300 text-rose-800 hover:bg-rose-100 self-start sm:self-auto flex items-center space-x-1.5"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Retry Query</span>
+          </Button>
+        </div>
+      )}
 
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center space-x-2 border-b border-slate-200 pb-3 text-sm">
@@ -329,123 +456,152 @@ export default function PlacementPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredJobs.length === 0 ? (
-          <div className="col-span-1 md:col-span-2 p-10 text-center bg-white border border-slate-200 rounded-xl space-y-3">
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
-              <Briefcase className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm">
-                {jobSearch || jobStatusFilter !== 'All'
-                  ? 'No Matching Job Openings Found'
-                  : 'No Corporate Job Drives Active'}
-              </h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                {jobSearch || jobStatusFilter !== 'All'
-                  ? `No job openings matched "${jobSearch || jobStatusFilter}". Try adjusting your keywords or clearing the filter.`
-                  : 'There are currently no corporate hiring drives open. Post a job opening to start referring eligible candidates.'}
-              </p>
-            </div>
-            {canManage && !jobSearch && jobStatusFilter === 'All' && (
-              <Button
-                variant="sap"
-                size="sm"
-                onClick={() => setIsJobModalOpen(true)}
-                className="text-xs inline-flex items-center space-x-1"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Post Job Opening</span>
-              </Button>
-            )}
-          </div>
-        ) : (
-          filteredJobs.map((j) => (
-            <Card key={j.id} className="hover:border-[#0A6ED1] transition-all">
+      {/* Job Openings Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <Card key={i} className="animate-pulse">
               <CardContent className="p-5 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">{j.job_title}</h3>
-                    <p className="text-xs text-[#0A6ED1] font-semibold mt-0.5">{j.company_name}</p>
-                  </div>
-                  <Badge variant={j.status === 'Open' ? 'success' : 'secondary'}>{j.status}</Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <div className="flex items-center space-x-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{j.location}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <Briefcase className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{j.salary_range}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5 col-span-2">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Deadline: {formatDate(j.application_deadline)}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-600">{j.description}</p>
-
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setViewJobApplications(j)}
-                    className="font-bold text-[#0A6ED1] hover:underline flex items-center space-x-1.5"
-                    title="Click to view all student applicants for this drive"
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    <span>{j.applications_count || 0} Student Applications</span>
-                  </button>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[10px] text-slate-400">Target: {j.module}</span>
-                    {canManage && (
-                      <>
-                        <Button
-                          variant="sap"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedJobForApply(j);
-                            setApplyError(null);
-                            setApplySuccess(false);
-                            const firstEligible = (store.students || []).find((s) => {
-                              const enr = (store.placementEnrollments || []).find((e) => e.student_id === s.id);
-                              return enr?.is_placement_eligible;
-                            });
-                            setApplyStudentId(firstEligible?.id || store.students?.[0]?.id || '');
-                            setIsApplyModalOpen(true);
-                          }}
-                          disabled={j.status !== 'Open'}
-                          className="text-xs px-2.5 py-1"
-                        >
-                          Refer Candidate
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleJobStatus(j.id, j.status)}
-                          className="text-xs px-2 py-1"
-                        >
-                          {j.status === 'Open' ? 'Close Drive' : 'Reopen'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteJob(j.id)}
-                          className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
+                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                <div className="h-16 bg-slate-100 rounded"></div>
+                <div className="h-3 bg-slate-200 rounded w-full"></div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredJobs.length === 0 ? (
+            <div className="col-span-1 md:col-span-2 p-10 text-center bg-white border border-slate-200 rounded-xl space-y-3">
+              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <Briefcase className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">
+                  {jobSearch || jobStatusFilter !== 'All'
+                    ? 'No Matching Job Openings Found'
+                    : 'No Corporate Job Drives Active'}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                  {jobSearch || jobStatusFilter !== 'All'
+                    ? `No job openings matched "${jobSearch || jobStatusFilter}". Try adjusting your keywords or clearing the filter.`
+                    : 'There are currently no corporate hiring drives open. Post a job opening to start referring eligible candidates.'}
+                </p>
+              </div>
+              {canManage && !jobSearch && jobStatusFilter === 'All' && (
+                <Button
+                  variant="sap"
+                  size="sm"
+                  onClick={() => setIsJobModalOpen(true)}
+                  className="text-xs inline-flex items-center space-x-1"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Post Job Opening</span>
+                </Button>
+              )}
+            </div>
+          ) : (
+            filteredJobs.map((j) => {
+              // Authoritative applications count derived directly from authoritative applications dataset
+              const driveApps = applications.filter((a) => a.job_id === j.id && a.status !== 'Withdrawn');
+              const count = driveApps.length;
+
+              return (
+                <Card key={j.id} className="hover:border-[#0A6ED1] transition-all">
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm">{j.job_title}</h3>
+                        <p className="text-xs text-[#0A6ED1] font-semibold mt-0.5">{j.company_name}</p>
+                      </div>
+                      <Badge variant={j.status === 'Open' ? 'success' : 'secondary'}>{j.status}</Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <div className="flex items-center space-x-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                        <span>{j.location}</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <Briefcase className="h-3.5 w-3.5 text-slate-400" />
+                        <span>{j.salary_range}</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5 col-span-2">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                        <span>Deadline: {formatDate(j.application_deadline)}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600">{j.description}</p>
+
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewJobApplications(j);
+                          setModalStatusFilter('All');
+                          setModalSearch('');
+                          setModalPage(1);
+                        }}
+                        className="font-bold text-[#0A6ED1] hover:underline flex items-center space-x-1.5"
+                        title="Click to view all student applicants for this drive"
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        <span>
+                          {count} {count === 1 ? 'Student Application' : 'Student Applications'}
+                        </span>
+                      </button>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] text-slate-400">Target: {j.module}</span>
+                        {canManage && (
+                          <>
+                            <Button
+                              variant="sap"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedJobForApply(j);
+                                setApplyError(null);
+                                setApplySuccess(false);
+                                const firstEligible = (store.students || []).find((s) => {
+                                  const enr = (store.placementEnrollments || []).find((e) => e.student_id === s.id);
+                                  return enr?.is_placement_eligible;
+                                });
+                                setApplyStudentId(firstEligible?.id || store.students?.[0]?.id || '');
+                                setIsApplyModalOpen(true);
+                              }}
+                              disabled={j.status !== 'Open'}
+                              className="text-xs px-2.5 py-1"
+                            >
+                              Refer Candidate
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleJobStatus(j.id, j.status)}
+                              className="text-xs px-2 py-1"
+                            >
+                              {j.status === 'Open' ? 'Close Drive' : 'Reopen'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteJob(j.id)}
+                              className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {/* Student Placement Profiles Table */}
       <Card>
@@ -814,7 +970,7 @@ export default function PlacementPage() {
         </Modal>
       )}
 
-      {/* Apply / Refer Candidate Modal */}
+      {/* Apply / Refer Candidate Modal (From Job Card) */}
       {selectedJobForApply && (
         <Modal
           isOpen={isApplyModalOpen}
@@ -853,8 +1009,8 @@ export default function PlacementPage() {
                 {(store.students || []).map((s) => {
                   const enr = (store.placementEnrollments || []).find((e) => e.student_id === s.id);
                   const isEligible = enr?.is_placement_eligible;
-                  const alreadyApplied = (store.jobApplications || []).some(
-                    (a) => a.job_id === selectedJobForApply.id && a.student_id === s.id
+                  const alreadyApplied = (applications || []).some(
+                    (a) => a.job_id === selectedJobForApply.id && a.student_id === s.id && a.status !== 'Withdrawn'
                   );
                   return (
                     <option key={s.id} value={s.id} disabled={alreadyApplied}>
@@ -969,8 +1125,8 @@ export default function PlacementPage() {
               >
                 <option value="">Select an open job drive...</option>
                 {jobs.filter((j) => j.status === 'Open').map((job) => {
-                  const alreadyApplied = (store.jobApplications || []).some(
-                    (a) => a.job_id === job.id && a.student_id === selectedStudentForReferral.student_id
+                  const alreadyApplied = (applications || []).some(
+                    (a) => a.job_id === job.id && a.student_id === selectedStudentForReferral.student_id && a.status !== 'Withdrawn'
                   );
                   return (
                     <option key={job.id} value={job.id} disabled={alreadyApplied}>
@@ -1015,7 +1171,7 @@ export default function PlacementPage() {
         </Modal>
       )}
 
-      {/* View Job Applicants Modal */}
+      {/* View Job Applicants Modal — Synchronized, Filterable & Paginated */}
       {viewJobApplications && (
         <Modal
           isOpen={!!viewJobApplications}
@@ -1024,54 +1180,175 @@ export default function PlacementPage() {
           description={`${viewJobApplications.company_name} • ${viewJobApplications.location} • Target: ${viewJobApplications.module}`}
         >
           <div className="space-y-4 text-xs">
-            {applications.filter((a) => a.job_id === viewJobApplications.id).length === 0 ? (
-              <div className="py-8 text-center text-slate-400">
+            {/* Header Metrics Pill Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="bg-white text-slate-700 font-semibold border-slate-200">
+                  Total Active: {activeDriveApplicantsCount} {activeDriveApplicantsCount === 1 ? 'Applicant' : 'Applicants'}
+                </Badge>
+                {allDriveApplicants.some((a) => a.status === 'Withdrawn') && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {allDriveApplicants.filter((a) => a.status === 'Withdrawn').length} Withdrawn
+                  </Badge>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-500">
+                {filteredDriveApplicants.length === 0
+                  ? 'No matching applicants'
+                  : `Showing ${Math.min((modalPage - 1) * modalPageSize + 1, filteredDriveApplicants.length)}–${Math.min(
+                      modalPage * modalPageSize,
+                      filteredDriveApplicants.length
+                    )} of ${filteredDriveApplicants.length} applicants`}
+              </span>
+            </div>
+
+            {/* Filter and Search Bar for Modal */}
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search applicant name, ID..."
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                />
+              </div>
+
+              <div className="flex items-center space-x-1.5">
+                <span className="text-slate-500 font-medium">Status:</span>
+                <select
+                  value={modalStatusFilter}
+                  onChange={(e) => setModalStatusFilter(e.target.value)}
+                  className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                >
+                  <option value="All">All Statuses ({allDriveApplicants.length})</option>
+                  <option value="Applied">Applied</option>
+                  <option value="Shortlisted">Shortlisted</option>
+                  <option value="Interview Scheduled">Interview Scheduled</option>
+                  <option value="Selected">Selected</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Withdrawn">Withdrawn</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Applicants List */}
+            {filteredDriveApplicants.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 bg-white border border-dashed border-slate-200 rounded-lg">
                 <Users className="h-8 w-8 mx-auto mb-2 text-slate-300" />
-                <p className="font-semibold text-slate-600">No Student Applications Yet</p>
-                <p className="text-[11px] mt-0.5">Use "Refer Candidate" to submit eligible students to this opening.</p>
+                <p className="font-semibold text-slate-600">
+                  {allDriveApplicants.length === 0
+                    ? 'No Student Applications Yet'
+                    : 'No Applications Match Filters'}
+                </p>
+                <p className="text-[11px] mt-0.5">
+                  {allDriveApplicants.length === 0
+                    ? 'Use "Refer Candidate" to submit eligible students to this opening.'
+                    : 'Try clearing your search query or switching the status filter to All.'}
+                </p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-                {applications
-                  .filter((a) => a.job_id === viewJobApplications.id)
-                  .map((app) => (
-                    <div key={app.id} className="p-3 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50">
-                      <div>
-                        <p className="font-bold text-slate-900">{app.student_name}</p>
-                        <p className="text-[11px] text-slate-500">
-                          Applied on {formatDate(app.applied_at)}
-                        </p>
-                      </div>
-
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+                {paginatedDriveApplicants.map((app) => (
+                  <div
+                    key={app.id}
+                    className={`p-3 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 ${
+                      app.status === 'Withdrawn' ? 'opacity-70 bg-slate-50/50' : ''
+                    }`}
+                  >
+                    <div>
                       <div className="flex items-center space-x-2">
+                        <p className="font-bold text-slate-900">{app.student_name}</p>
+                        {app.status === 'Withdrawn' && (
+                          <Badge variant="outline" className="text-[9px] text-slate-500 border-slate-300">
+                            Withdrawn
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Applied on {formatDate(app.applied_at)}
+                        {app.notes ? ` • Note: ${app.notes}` : ''}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {canManage && (
                         <select
                           value={app.status}
                           onChange={(e) => handleUpdateApplicantStatus(app.id, e.target.value as any)}
-                          className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-700 font-semibold"
+                          className="text-xs bg-white border border-slate-300 rounded px-2 py-1 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
                         >
                           <option value="Applied">Applied</option>
                           <option value="Shortlisted">Shortlisted</option>
                           <option value="Interview Scheduled">Interview Scheduled</option>
                           <option value="Selected">Selected</option>
                           <option value="Rejected">Rejected</option>
+                          <option value="Withdrawn">Withdrawn</option>
                         </select>
-                        <Badge
-                          variant={
-                            app.status === 'Selected'
-                              ? 'success'
-                              : app.status === 'Shortlisted'
-                              ? 'info'
-                              : app.status === 'Rejected'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
-                          className="text-[10px]"
+                      )}
+                      <Badge
+                        variant={
+                          app.status === 'Selected'
+                            ? 'success'
+                            : app.status === 'Shortlisted'
+                            ? 'info'
+                            : app.status === 'Rejected'
+                            ? 'destructive'
+                            : app.status === 'Withdrawn'
+                            ? 'outline'
+                            : 'secondary'
+                        }
+                        className="text-[10px]"
+                      >
+                        {app.status}
+                      </Badge>
+                      {canManage && app.status !== 'Withdrawn' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleWithdrawApplicant(app.id)}
+                          className="text-xs px-2 py-0.5 text-rose-600 hover:bg-rose-50 h-7"
+                          title="Withdraw this candidate application"
                         >
-                          {app.status}
-                        </Badge>
-                      </div>
+                          <UserX className="h-3.5 w-3.5 mr-1" />
+                          <span>Withdraw</span>
+                        </Button>
+                      )}
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalModalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                <span className="text-slate-500 text-[11px]">
+                  Page {modalPage} of {totalModalPages}
+                </span>
+                <div className="flex items-center space-x-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={modalPage <= 1}
+                    onClick={() => setModalPage((p) => Math.max(1, p - 1))}
+                    className="h-7 px-2 text-xs flex items-center space-x-1"
+                  >
+                    <ChevronLeft className="h-3 w-3" />
+                    <span>Previous</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={modalPage >= totalModalPages}
+                    onClick={() => setModalPage((p) => Math.min(totalModalPages, p + 1))}
+                    className="h-7 px-2 text-xs flex items-center space-x-1"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             )}
 

@@ -36,6 +36,7 @@ describe('11. Zoom / Google Meet Automated Webhook Attendance Tracking Tests', (
     const student1 = store.students[0];
     if (student1) {
       student1.attendance_percentage = 90;
+      student1.full_name = 'Unique Attendance Test Student';
     }
 
     const session1 = store.classSessions[0];

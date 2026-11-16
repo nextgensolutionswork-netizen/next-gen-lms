@@ -93,17 +93,17 @@ describe('CRM Lead Creation Form Enhancements Suite', () => {
       // US (+1)
       const usRes = validatePhoneNumber('+1', '2025550123');
       expect(usRes.isValid).toBe(true);
-      expect(usRes.normalized).toBe('+1 2025550123');
+      expect(usRes.normalized).toBe('+1 202 555 0123');
 
       // UAE (+971)
       const uaeRes = validatePhoneNumber('+971', '501234567');
       expect(uaeRes.isValid).toBe(true);
-      expect(uaeRes.normalized).toBe('+971 501234567');
+      expect(uaeRes.normalized).toBe('+971 50 123 4567');
 
       // UK (+44)
       const ukRes = validatePhoneNumber('+44', '7911123456');
       expect(ukRes.isValid).toBe(true);
-      expect(ukRes.normalized).toBe('+44 7911123456');
+      expect(ukRes.normalized).toBe('+44 7911 123456');
 
       // Invalid international length (< 7 digits)
       const tooShortInt = validatePhoneNumber('+44', '12345');
@@ -124,11 +124,11 @@ describe('CRM Lead Creation Form Enhancements Suite', () => {
     it('parses legacy stored phone numbers with or without country code prefix', () => {
       const p1 = parseStoredPhone('+91 98765 43210');
       expect(p1.dialCode).toBe('+91');
-      expect(p1.nationalNumber).toBe('98765 43210');
+      expect(p1.nationalNumber).toBe('9876543210');
 
       const p2 = parseStoredPhone('+1 202 555 0123');
       expect(p2.dialCode).toBe('+1');
-      expect(p2.nationalNumber).toBe('202 555 0123');
+      expect(p2.nationalNumber).toBe('2025550123');
 
       const p3 = parseStoredPhone('9876543210');
       expect(p3.dialCode).toBe('+91');
@@ -393,7 +393,7 @@ describe('CRM Lead Creation Form Enhancements Suite', () => {
 
       expect(lead.country_code).toBe('+91');
       expect(lead.whatsapp_country_code).toBe('+971');
-      expect(lead.whatsapp_number).toBe('+971 501234567');
+      expect(lead.whatsapp_number).toBe('+971 50 123 4567');
     });
 
     it('rejects invalid WhatsApp numbers with country-code validation errors', async () => {

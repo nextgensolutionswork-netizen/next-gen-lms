@@ -1,0 +1,11 @@
+*.vsix
+browser_evidence/
+data/backups/
+docs/audits/
+scratch/
+.git
+.next*
+.audit-build-check
+staging-runtime
+node_modules
+*.log

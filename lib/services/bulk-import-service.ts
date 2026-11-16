@@ -567,7 +567,7 @@ export function validateAttendanceRows(
     // If not matched by unique ID, check by full name with multiple-student ambiguity detection
     if (!student && studentIdentifier) {
       const matchingByName = store.students.filter(
-        (s) => s.full_name.toLowerCase() === studentIdentifier.toLowerCase()
+        (s) => (s.full_name || '').toLowerCase() === studentIdentifier.toLowerCase()
       );
       if (matchingByName.length === 1) {
         student = matchingByName[0];

@@ -15,16 +15,14 @@ import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export async function getPlacementProfiles(): Promise<PlacementProfile[]> {
   if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.from('placement_profiles').select('*');
-      if (!error && data && data.length > 0) {
-        store.placementProfiles = data as PlacementProfile[];
-        return data as PlacementProfile[];
-      }
-    } catch (err) {
-      console.warn('Supabase placement profiles query error, fallback to local persistent store:', err);
+    const supabase = createClient();
+    const { data, error } = await supabase.from('placement_profiles').select('*');
+    if (error) {
+      throw new Error(`Failed to retrieve placement profiles: ${error.message}`);
     }
+    // Treat empty array [] as authoritative
+    store.placementProfiles = (data || []) as PlacementProfile[];
+    return [...store.placementProfiles];
   }
   return [...(store.placementProfiles || [])];
 }
@@ -200,19 +198,193 @@ export async function uploadStudentResume(
   return profile;
 }
 
-export async function getJobOpenings(): Promise<JobOpening[]> {
-  if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.from('job_openings').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data)) {
-        store.jobOpenings = data as JobOpening[];
-        return data as JobOpening[];
+export interface JobApplicationQueryOptions {
+  jobId?: string;
+  studentId?: string;
+  tenantId?: string;
+  status?: JobApplication['status'] | 'All';
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  deduplicate?: boolean;
+}
+
+export interface PaginatedJobApplicationsResult {
+  applications: JobApplication[];
+  total: number;
+  totalForDrive: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Deduplicate mirrored copies by authoritative application identity.
+ * - Primary key: app.id (if unique).
+ * - Secondary key: canonical (tenant_id + ':' + job_id + ':' + student_id) tuple.
+ * - Preserves application history if requested; otherwise deterministically chooses the current application.
+ * - Legitimate separate applications across different drives (different job_id) are PRESERVED.
+ * - Distinct students who share an email/phone are PRESERVED (keyed by student_id).
+ */
+export function deduplicateJobApplications(
+  apps: JobApplication[],
+  options?: { preserveHistory?: boolean }
+): JobApplication[] {
+  if (options?.preserveHistory) {
+    return [...apps];
+  }
+
+  const seenIds = new Set<string>();
+  const seenJobStudent = new Map<string, JobApplication>();
+
+  for (const app of apps) {
+    if (!app || !app.job_id || !app.student_id) continue;
+    if (app.id && seenIds.has(app.id)) continue;
+    if (app.id) seenIds.add(app.id);
+
+    const tenantKey = app.tenant_id || 'default-tenant';
+    const tupleKey = `${tenantKey}:${app.job_id}:${app.student_id}`;
+    const existing = seenJobStudent.get(tupleKey);
+    if (!existing) {
+      seenJobStudent.set(tupleKey, app);
+    } else {
+      const existingTime = new Date(existing.applied_at || 0).getTime();
+      const currentTime = new Date(app.applied_at || 0).getTime();
+      if (currentTime > existingTime) {
+        seenJobStudent.set(tupleKey, app);
+      } else if (currentTime === existingTime) {
+        // Active non-withdrawn application takes precedence over withdrawn
+        if (existing.status === 'Withdrawn' && app.status !== 'Withdrawn') {
+          seenJobStudent.set(tupleKey, app);
+        } else if (existing.status === app.status) {
+          // Deterministic tie-breaker by ID
+          if ((app.id || '') > (existing.id || '')) {
+            seenJobStudent.set(tupleKey, app);
+          }
+        }
       }
-    } catch (err) {
-      console.warn('Supabase job openings query error, fallback to local persistent store:', err);
     }
   }
+
+  return Array.from(seenJobStudent.values());
+}
+
+/**
+ * Synchronize all job openings' applications_count with the authoritative job applications collection.
+ */
+export function syncJobOpeningApplicationCounts(): void {
+  const allApps = deduplicateJobApplications(store.jobApplications || []);
+  for (const job of (store.jobOpenings || [])) {
+    const driveApps = allApps.filter((a) => a.job_id === job.id && a.status !== 'Withdrawn');
+    job.applications_count = driveApps.length;
+  }
+}
+
+/**
+ * Get the authoritative application count for a specific job drive.
+ */
+export function getJobOpeningApplicationCount(jobId: string, options?: { includeWithdrawn?: boolean }): number {
+  const allApps = deduplicateJobApplications(store.jobApplications || []);
+  return allApps.filter(
+    (a) => a.job_id === jobId && (options?.includeWithdrawn ? true : a.status !== 'Withdrawn')
+  ).length;
+}
+
+/**
+ * Authoritative query engine for job applications supporting drive filtering,
+ * deduplication, status filtering, search, pagination, and total count metadata.
+ */
+export function getAuthoritativeJobApplications(
+  options: JobApplicationQueryOptions = {}
+): PaginatedJobApplicationsResult {
+  const {
+    jobId,
+    studentId,
+    tenantId,
+    status = 'All',
+    search = '',
+    page = 1,
+    pageSize = 10,
+    deduplicate = true,
+  } = options;
+
+  let rawList = [...(store.jobApplications || [])];
+  if (deduplicate) {
+    rawList = deduplicateJobApplications(rawList);
+  }
+
+  // Filter by job_id if requested
+  if (jobId) {
+    rawList = rawList.filter((a) => a.job_id === jobId);
+  }
+
+  // Filter by student_id if requested
+  if (studentId) {
+    rawList = rawList.filter((a) => a.student_id === studentId);
+  }
+
+  // Filter by tenant_id if requested
+  if (tenantId) {
+    rawList = rawList.filter((a) => !a.tenant_id || a.tenant_id === tenantId);
+  }
+
+  // Calculate total active/valid applications for this drive before search/status filter
+  const totalForDrive = rawList.filter((a) => a.status !== 'Withdrawn').length;
+
+  // Filter by status if specified
+  if (status && status !== 'All') {
+    rawList = rawList.filter((a) => a.status === status);
+  }
+
+  // Search by student name, code, or email
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    rawList = rawList.filter((a) => {
+      const student = (store.students || []).find((s) => s.id === a.student_id);
+      return (
+        a.student_name?.toLowerCase().includes(q) ||
+        a.student_id?.toLowerCase().includes(q) ||
+        student?.student_code?.toLowerCase().includes(q) ||
+        student?.email?.toLowerCase().includes(q) ||
+        student?.full_name?.toLowerCase().includes(q)
+      );
+    });
+  }
+
+  // Sort descending by applied_at
+  rawList.sort((a, b) => new Date(b.applied_at || 0).getTime() - new Date(a.applied_at || 0).getTime());
+
+  const total = rawList.length;
+  const safePageSize = Math.max(1, pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+
+  const startIndex = (safePage - 1) * safePageSize;
+  const paginatedApplications = rawList.slice(startIndex, startIndex + safePageSize);
+
+  return {
+    applications: paginatedApplications,
+    total,
+    totalForDrive,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages,
+  };
+}
+
+export async function getJobOpenings(): Promise<JobOpening[]> {
+  if (isLiveSupabaseEnabled()) {
+    const supabase = createClient();
+    const { data, error } = await supabase.from('job_openings').select('*').order('created_at', { ascending: false });
+    if (error) {
+      throw new Error(`Failed to retrieve job openings: ${error.message}`);
+    }
+    // Treat empty array [] as authoritative: display zero jobs and clear stale records
+    store.jobOpenings = (data || []) as JobOpening[];
+    syncJobOpeningApplicationCounts();
+    return [...store.jobOpenings];
+  }
+  syncJobOpeningApplicationCounts();
   return [...(store.jobOpenings || [])];
 }
 
@@ -290,18 +462,21 @@ export async function deleteJobOpening(jobId: string): Promise<boolean> {
 
 export async function getJobApplications(): Promise<JobApplication[]> {
   if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.from('job_applications').select('*').order('applied_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        store.jobApplications = data as JobApplication[];
-        return data as JobApplication[];
-      }
-    } catch (err) {
-      console.warn('Supabase job applications query error, fallback to local persistent store:', err);
+    const supabase = createClient();
+    const { data, error } = await supabase.from('job_applications').select('*').order('applied_at', { ascending: false });
+    if (error) {
+      throw new Error(`Failed to retrieve job applications: ${error.message}`);
     }
+    // Treat empty array [] as authoritative: display zero applications and clear stale records
+    const deduped = deduplicateJobApplications((data || []) as JobApplication[]);
+    store.jobApplications = deduped;
+    syncJobOpeningApplicationCounts();
+    return [...deduped];
   }
-  return [...(store.jobApplications || [])];
+  const deduped = deduplicateJobApplications(store.jobApplications || []);
+  store.jobApplications = deduped;
+  syncJobOpeningApplicationCounts();
+  return [...deduped];
 }
 
 /**
@@ -326,7 +501,7 @@ export async function applyForJob(
   }
 
   const existing = (store.jobApplications || []).find(
-    (a) => a.job_id === jobId && a.student_id === studentId
+    (a) => a.job_id === jobId && a.student_id === studentId && a.status !== 'Withdrawn'
   );
   if (existing) throw new Error('Already applied to this opening');
 
@@ -350,19 +525,21 @@ export async function applyForJob(
   }
 
   const application: JobApplication = {
-    id: `app-${Date.now()}`,
+    id: `app-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     job_id: jobId,
     job_title: job?.job_title,
     company_name: job?.company_name,
     student_id: studentId,
     student_name: student?.full_name,
+    student_code: student?.student_code,
+    student_email: student?.email,
     applied_at: new Date().toISOString(),
     status: 'Applied',
   };
 
   if (!store.jobApplications) store.jobApplications = [];
   store.jobApplications.push(application);
-  if (job) job.applications_count = (job.applications_count || 0) + 1;
+  syncJobOpeningApplicationCounts();
   store.persist();
 
   if (isLiveSupabaseEnabled()) {
@@ -414,6 +591,7 @@ export async function updateJobApplicationStatus(
   }
 
   application.status = status;
+  syncJobOpeningApplicationCounts();
   store.persist();
 
   if (isLiveSupabaseEnabled()) {
@@ -436,6 +614,90 @@ export async function updateJobApplicationStatus(
     module: 'PLACEMENT',
     record_id: applicationId,
     new_value: { status },
+  });
+
+  return application;
+}
+
+/**
+ * Withdraw a job application.
+ * Callable by the student candidate themselves or an authorized placement coordinator/administrator.
+ */
+export async function withdrawJobApplication(
+  applicationId: string,
+  actorUserId: string,
+  reason?: string
+): Promise<JobApplication> {
+  const application = (store.jobApplications || []).find((a) => a.id === applicationId);
+  if (!application) throw new Error('Job application not found');
+
+  const actor = (store.users || []).find((u) => u.id === actorUserId);
+  const student = (store.students || []).find(
+    (s) => s.id === application.student_id || s.user_id === application.student_id
+  );
+  const actorStudent = (store.students || []).find(
+    (s) => s.id === actorUserId || s.user_id === actorUserId || (s.email && s.email.toLowerCase() === actor?.email?.toLowerCase())
+  );
+
+  // Check if actor is the owner student: either actorUserId directly matches student_id,
+  // or the actor's student record matches the application's student record.
+  const isOwnerStudent =
+    actorUserId === application.student_id ||
+    (actorStudent && student && actorStudent.id === student.id) ||
+    Boolean(actor?.role === 'student' && actorStudent && student && actorStudent.id === student.id);
+
+  const isAuthorizedStaff = ['super_admin', 'admin', 'placement_coordinator'].includes(actor?.role || '');
+
+  if (!isOwnerStudent && !isAuthorizedStaff) {
+    throw new Error('Unauthorized: You do not possess permission to withdraw this application.');
+  }
+
+  // Cross-tenant access check
+  if (actor?.tenant_id && application.tenant_id && actor.tenant_id !== application.tenant_id) {
+    throw new Error('Unauthorized: Cross-tenant access is prohibited.');
+  }
+
+  // Handle repeated withdrawal safely (idempotent)
+  if (application.status === 'Withdrawn') {
+    if (reason && reason !== application.withdrawal_reason) {
+      application.withdrawal_reason = reason;
+      store.persist();
+    }
+    return application;
+  }
+
+  const now = new Date().toISOString();
+  application.status = 'Withdrawn';
+  application.withdrawn_at = now;
+  application.withdrawal_reason = reason || 'Withdrawn by candidate';
+
+  syncJobOpeningApplicationCounts();
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('job_applications')
+        .update({
+          status: 'Withdrawn',
+          withdrawn_at: now,
+          withdrawal_reason: application.withdrawal_reason,
+        })
+        .eq('id', applicationId);
+    } catch (err) {
+      console.warn('Supabase withdrawJobApplication warning, preserved locally:', err);
+    }
+  }
+
+  await recordAuditLog({
+    user_id: actorUserId,
+    user_name: actor?.full_name || application.student_name || 'Candidate',
+    user_role: actor?.role || (isOwnerStudent ? 'student' : 'placement_coordinator'),
+    action: 'JOB_APPLICATION_WITHDRAWN',
+    module: 'PLACEMENT',
+    record_id: applicationId,
+    new_value: { status: 'Withdrawn', reason: application.withdrawal_reason },
   });
 
   return application;

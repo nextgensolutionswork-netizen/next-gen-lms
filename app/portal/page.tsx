@@ -59,7 +59,11 @@ import {
   submitAssignment,
   isLessonUnlocked,
 } from '@/lib/services/academics-service';
-import { getAllocationForStudent, generateSapGuiShortcutContent } from '@/lib/services/sap-lab-service';
+import {
+  getAllocationForStudent,
+  generateSapGuiShortcutContent,
+  getEffectiveSapAllocationStatus,
+} from '@/lib/services/sap-lab-service';
 import { recordPaymentAtomic } from '@/lib/services/finance-service';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { getDoubts, createStudentDoubt, replyToDoubt } from '@/lib/services/doubt-service';
@@ -588,7 +592,14 @@ export default function StudentPortalPage() {
     }
   };
 
-  const sapAllocation = (store.sapAllocations || []).find((a) => a.student_id === student?.id && a.status === 'Active');
+  const sapAllocation = (store.sapAllocations || []).find((a) => {
+    if (a.student_id !== student?.id) return false;
+    const eff = getEffectiveSapAllocationStatus(a);
+    return eff === 'Active' || eff === 'Expired';
+  });
+  const sapEffectiveStatus = sapAllocation ? getEffectiveSapAllocationStatus(sapAllocation) : null;
+  const isSapActive = sapEffectiveStatus === 'Active';
+
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
 
   const handleCopy = (text: string, key: string) => {
@@ -598,7 +609,7 @@ export default function StudentPortalPage() {
   };
 
   const handleDownloadShortcut = () => {
-    if (!sapAllocation) return;
+    if (!sapAllocation || !isSapActive) return;
     const content = generateSapGuiShortcutContent(sapAllocation);
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -1142,21 +1153,27 @@ export default function StudentPortalPage() {
 
         {/* SAP GUI Practice Sandbox Access */}
         {sapAllocation && (
-          <Card className="border-2 border-[#0A6ED1]/40 shadow-sm overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-4">
+          <Card className={`border-2 shadow-sm overflow-hidden ${isSapActive ? 'border-[#0A6ED1]/40' : 'border-amber-400/50'}`}>
+            <CardHeader className={`text-white p-4 ${isSapActive ? 'bg-gradient-to-r from-blue-900 to-indigo-950' : 'bg-gradient-to-r from-amber-950 via-slate-900 to-stone-900'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center space-x-3">
-                  <div className="h-9 w-9 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center">
-                    <Server className="h-5 w-5 text-blue-300" />
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${isSapActive ? 'bg-blue-500/20 border border-blue-400/40 text-blue-300' : 'bg-amber-500/20 border border-amber-400/40 text-amber-300'}`}>
+                    <Server className="h-5 w-5" />
                   </div>
                   <div>
                     <CardTitle className="text-sm font-bold text-white flex items-center space-x-2">
                       <span>My Dedicated SAP GUI Sandbox Lab</span>
-                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
-                        ACTIVE
-                      </span>
+                      {isSapActive ? (
+                        <span className="text-[10px] bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
+                          ACTIVE
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-semibold">
+                          EXPIRED
+                        </span>
+                      )}
                     </CardTitle>
-                    <p className="text-[11px] text-blue-200 mt-0.5">{sapAllocation.system_name}</p>
+                    <p className={`text-[11px] mt-0.5 ${isSapActive ? 'text-blue-200' : 'text-amber-200'}`}>{sapAllocation.system_name}</p>
                   </div>
                 </div>
 
@@ -1164,14 +1181,28 @@ export default function StudentPortalPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleDownloadShortcut}
-                  className="bg-white/10 text-white hover:bg-white/20 border-white/20 text-xs flex items-center space-x-1.5 self-start sm:self-auto"
+                  disabled={!isSapActive}
+                  className={`text-xs flex items-center space-x-1.5 self-start sm:self-auto ${
+                    isSapActive
+                      ? 'bg-white/10 text-white hover:bg-white/20 border-white/20'
+                      : 'bg-white/5 text-slate-400 border-white/10 cursor-not-allowed opacity-60'
+                  }`}
+                  title={isSapActive ? 'Download 1-Click SAP GUI Shortcut' : 'Access expired - shortcut generation disabled'}
                 >
-                  <Download className="h-3.5 w-3.5 text-blue-300" />
+                  <Download className={`h-3.5 w-3.5 ${isSapActive ? 'text-blue-300' : 'text-slate-400'}`} />
                   <span>Download .sap GUI Shortcut</span>
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="p-5 text-xs">
+              {!isSapActive && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center space-x-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>
+                    Your SAP sandbox access expired on <strong>{formatDate(sapAllocation.valid_to)}</strong>. Please contact your instructor or administrator to request a validity extension.
+                  </span>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <p className="text-[10px] uppercase font-bold text-slate-400">Server Host / SID</p>
