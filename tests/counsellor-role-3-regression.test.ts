@@ -88,7 +88,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
         { isJson: true }
       );
 
-      const res = await studentGet(req, { params: { id: 'stu-01' } });
+      const res = await studentGet(req, { params: Promise.resolve({ id: 'stu-01' }) });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
@@ -105,7 +105,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
         { isJson: true }
       );
 
-      const res = await studentGet(req, { params: { id: '51000000-0000-0000-0000-000000000001' } });
+      const res = await studentGet(req, { params: Promise.resolve({ id: '51000000-0000-0000-0000-000000000001' }) });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
@@ -122,7 +122,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
         { userId: '77777777-7777-7777-7777-777777777771', email: 'amit.gupta@student.next-gen.com', isJson: true }
       );
 
-      const res = await studentGet(req, { params: { id: 'stu-02' } });
+      const res = await studentGet(req, { params: Promise.resolve({ id: 'stu-02' }) });
       expect(res.status).toBe(403);
     });
 
@@ -149,7 +149,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
         { userId: foreignId, email: 'foreign.counsellor@competitor.com', tenantId: 'tenant-competitor-99', isJson: true }
       );
 
-      const res = await studentGet(req, { params: { id: 'stu-01' } });
+      const res = await studentGet(req, { params: Promise.resolve({ id: 'stu-01' }) });
       expect(res.status).toBe(403);
     });
   });
@@ -409,7 +409,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
 
       const initialReceiptsCount = (store.receipts || []).length;
       const initialVerifiedCollections = (store.payments || [])
-        .filter((p) => p.status === 'Success' || p.status === 'Approved')
+        .filter((p: any) => p.status === 'Success' || p.status === 'Approved')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
 
       const req = createMockAuthRequest(
@@ -447,7 +447,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
 
       // Verify verified collections did NOT increase
       const finalVerifiedCollections = (store.payments || [])
-        .filter((p) => p.status === 'Success' || p.status === 'Approved')
+        .filter((p: any) => p.status === 'Success' || p.status === 'Approved')
         .reduce((sum, p) => sum + (p.amount || 0), 0);
       expect(finalVerifiedCollections).toBe(initialVerifiedCollections);
     });
@@ -455,7 +455,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
     it('Counsellor cannot verify their own recorded payment (separation of duties violation 403)', async () => {
       const counsellorId = 'usr-counsellor-01';
       // Find a payment recorded by this counsellor
-      const pendingPayment = store.studentPayments.find((p) => p.status === 'Pending') || {
+      const pendingPayment = store.studentPayments.find((p: any) => p.status === 'Pending' || p.status === 'Pending Approval') || {
         id: 'pay-pending-counsellor',
         fee_id: store.studentFees[0].id,
         amount_paid: 5000,

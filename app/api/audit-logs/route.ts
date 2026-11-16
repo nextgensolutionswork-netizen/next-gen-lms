@@ -6,7 +6,7 @@ import { authenticateApiRequest } from '@/lib/auth/server-session';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { tenantId } from '@/lib/auth/tenant';
-import { AuditLog } from '@/types';
+import { AuditLog, UserRole } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     store.hydrateFromDisk();
 
     // 1. RBAC Session Authentication (All authenticated staff roles can record audit telemetry)
-    const allowedStaffRoles = [
+    const allowedStaffRoles: UserRole[] = [
       'super_admin',
       'admin',
       'counsellor',
@@ -131,10 +131,14 @@ export async function POST(req: NextRequest) {
 
     const parseResult = AuditLogInputSchema.safeParse(rawBody);
     if (!parseResult.success) {
+      const issues = (parseResult.error as any).issues || (parseResult.error as any).errors || [];
+      const errorMsg = issues.length > 0
+        ? issues.map((i: any) => i.message).join(', ')
+        : parseResult.error.message;
       return NextResponse.json(
         {
           success: false,
-          error: `Validation error: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
+          error: `Validation error: ${errorMsg}`,
         },
         { status: 400 }
       );
@@ -196,7 +200,7 @@ export async function POST(req: NextRequest) {
       record_id: recordId,
       old_value: oldValue,
       new_value: newValue,
-      ip_address: req.ip || req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1',
+      ip_address: req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1',
       created_at: new Date().toISOString(),
     };
 
@@ -242,18 +246,20 @@ export async function POST(req: NextRequest) {
           const stageBefore = oldValue?.stage || 'Previous';
           const stageAfter = newValue?.stage || 'Current';
 
-          await supabase.from('lead_followups').insert({
-            id: crypto.randomUUID(),
-            lead_id: recordId,
-            counsellor_id: actor.id,
-            stage_before: stageBefore,
-            stage_after: stageAfter,
-            notes: notesText,
-            next_follow_up_date: newValue?.follow_up_date || null,
-            created_at: auditEntry.created_at,
-          }).catch((fErr: any) => {
+          try {
+            await supabase.from('lead_followups').insert({
+              id: crypto.randomUUID(),
+              lead_id: recordId,
+              counsellor_id: actor.id,
+              stage_before: stageBefore,
+              stage_after: stageAfter,
+              notes: notesText,
+              next_follow_up_date: newValue?.follow_up_date || null,
+              created_at: auditEntry.created_at,
+            });
+          } catch (fErr: any) {
             console.warn('[AuditLogs API] lead_followups secondary mirror notice:', fErr?.message);
-          });
+          }
         }
       } catch (dbErr: any) {
         console.warn('[AuditLogs API] Supabase PostgreSQL insert warning, preserved locally:', dbErr?.message);
