@@ -1196,6 +1196,9 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
 
     // Test 12: View All Due Dates navigation and dedicated API endpoint
     it('12. serves complete student payment due dates list via GET /api/fees/dues with authorization', async () => {
+      const realToday = getUpcoming3DaysDates(new Date()).dateToday;
+      const realOverdue = '2026-01-01'; // Definitely overdue relative to today
+
       store.installments = [
         {
           id: 'inst-api-overdue',
@@ -1203,7 +1206,7 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
           student_id: 'std-1',
           amount: 10000,
           paid_amount: 0,
-          due_date: overdueDate,
+          due_date: realOverdue,
           status: 'Pending',
           tenant_id: 'default',
         } as Installment,
@@ -1213,7 +1216,7 @@ describe('Upcoming Payment Dues — Next 3 Days', () => {
           student_id: 'std-2',
           amount: 15000,
           paid_amount: 0,
-          due_date: dateToday,
+          due_date: realToday,
           status: 'Pending',
           tenant_id: 'default',
         } as Installment,

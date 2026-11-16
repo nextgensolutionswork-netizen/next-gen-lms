@@ -413,8 +413,12 @@ export default function StudentPaymentDueDatesPage() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6">
-              <TableSkeleton columns={7} rows={6} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <tbody className="divide-y divide-slate-100">
+                  <TableSkeleton columns={8} rows={6} />
+                </tbody>
+              </table>
             </div>
           ) : dues.length === 0 ? (
             <div className="py-16 text-center space-y-2">
