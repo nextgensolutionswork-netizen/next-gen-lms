@@ -410,7 +410,7 @@ export function getSafeRedirectUrl(
 
   // 9. Departmental workspaces boundary checks
   // Finance & Accounts
-  const counsellorPermittedAccounts = ['/accounts/fees', '/accounts/payments', '/accounts/receipts'];
+  const counsellorPermittedAccounts = ['/accounts/fees', '/accounts/payments', '/accounts/receipts', '/accounts/dues'];
   const isCounsellorAccountsAllowed =
     safeRole === 'counsellor' &&
     (counsellorPermittedAccounts.includes(pathname) || pathname.startsWith('/accounts/receipts/'));

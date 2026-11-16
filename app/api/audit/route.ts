@@ -1,1 +1,1 @@
-export { GET, dynamic } from '../audit-logs/route';
+export { GET, POST, dynamic } from '../audit-logs/route';

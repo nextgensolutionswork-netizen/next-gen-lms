@@ -1,6 +1,7 @@
 import { store } from './data-store';
 import { AuditLog } from '@/types';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function getAuditLogs(): Promise<AuditLog[]> {
   if (typeof window !== 'undefined') {
@@ -46,6 +47,32 @@ export async function getAuditLogs(): Promise<AuditLog[]> {
 export async function recordAuditLog(
   data: Omit<AuditLog, 'id' | 'created_at'>
 ): Promise<AuditLog> {
+  // 1. Client-Side Browser Path: Forward to authoritative POST /api/audit-logs
+  if (typeof window !== 'undefined' && typeof window.location !== 'undefined') {
+    try {
+      const res = await fetch('/api/audit-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.log) {
+          store.auditLogs.unshift(json.log);
+          return json.log;
+        }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.warn('[audit-service] Remote audit submission returned error:', res.status, errJson);
+      }
+    } catch (err) {
+      console.warn('[audit-service] Client audit-logs remote fetch error, falling back to local store:', err);
+    }
+  }
+
+  // 2. Server-Side Path: Atomic Local Storage & Database Mirror
   const log: AuditLog = {
     ...data,
     id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -57,21 +84,28 @@ export async function recordAuditLog(
 
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
+      const supabase = createAdminClient();
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(log.user_id || '');
+      const user = (store.users || []).find((u) => u.id === log.user_id);
+      const userEmail = user?.email || (log.user_id?.includes('@') ? log.user_id : `${log.user_id || 'system'}@lms.internal`);
+
       await supabase.from('audit_logs').insert({
-        id: log.id,
-        user_id: log.user_id,
-        user_name: log.user_name,
-        user_role: log.user_role,
+        id: crypto.randomUUID(),
+        user_id: isUUID ? log.user_id : null,
+        user_email: userEmail,
         action: log.action,
         module: log.module,
         record_id: log.record_id,
-        old_value: log.old_value,
-        new_value: log.new_value,
+        payload: {
+          user_name: log.user_name,
+          user_role: log.user_role,
+          old_value: log.old_value,
+          new_value: log.new_value,
+        },
         created_at: log.created_at,
       });
     } catch (err) {
-      console.warn('Supabase audit log insert warning, preserved locally:', err);
+      console.warn('[audit-service] Supabase audit log insert warning, preserved locally:', err);
     }
   }
 

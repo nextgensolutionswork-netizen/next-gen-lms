@@ -299,7 +299,7 @@ export async function middleware(request: NextRequest) {
   // 15. Financial workspace boundary: Deny-by-default for all /accounts/* routes (NG-03)
   if (isAuthenticated && (pathname === '/accounts' || pathname.startsWith('/accounts/'))) {
     const isSensitiveDesk = ['/accounts/approvals', '/accounts/expenses', '/accounts/vendors', '/accounts/reports'].some((p) => pathname.startsWith(p));
-    const isOperationalDesk = ['/accounts/fees', '/accounts/payments', '/accounts/installments', '/accounts/receipts'].some((p) => pathname.startsWith(p));
+    const isOperationalDesk = ['/accounts/fees', '/accounts/payments', '/accounts/installments', '/accounts/receipts', '/accounts/dues'].some((p) => pathname.startsWith(p));
 
     let isAllowed = false;
     if (userRole === 'super_admin' || userRole === 'admin' || userRole === 'accountant') {

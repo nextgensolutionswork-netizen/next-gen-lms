@@ -119,6 +119,20 @@ export default function StudentDetailsPage() {
   const [editProfileSaving, setEditProfileSaving] = React.useState(false);
   const [editProfileSuccess, setEditProfileSuccess] = React.useState<string | null>(null);
 
+  // BUG-CO-002: Invariant hook execution - calculate financials above all early returns
+  // to avoid React hook mismatch crashes during loading/error/auth transitions.
+  const authoritativeFinancialsMemo = React.useMemo(() => {
+    if (!data?.student) return null;
+    return calculateAuthoritativeStudentFinancials({
+      student: data.student,
+      admission: data.admission,
+      feeAccount: data.feeAccount,
+      studentFees: data.studentFees || [],
+      payments: data.payments || [],
+      studentPayments: data.studentPayments || [],
+    });
+  }, [data]);
+
   if (!authLoading && !user) return <p role="alert">Please sign in to view this student profile.</p>;
   if (loadStatus === 'loading') return <p role="status" className="p-8 text-center">Loading student profile…</p>;
   if (loadStatus === 'error') return <div className="p-8 text-center space-y-3"><p role="alert">{loadError}</p><Button onClick={() => void reloadData()}>Retry loading profile</Button></div>;
@@ -304,16 +318,18 @@ export default function StudentDetailsPage() {
     (b) => b.course_id === student.course_id && b.id !== student.batch_id
   );
 
-  const authoritativeFinancials = React.useMemo(() => {
-    return calculateAuthoritativeStudentFinancials({
-      student,
-      admission,
-      feeAccount,
-      studentFees,
-      payments,
-      studentPayments,
-    });
-  }, [student, admission, feeAccount, studentFees, payments, studentPayments]);
+  const authoritativeFinancials = authoritativeFinancialsMemo || {
+    contractTotal: 0,
+    grossFee: 0,
+    discountAmount: 0,
+    totalPayable: 0,
+    paidAmount: 0,
+    outstandingDue: 0,
+    isFullyPaid: false,
+    verifiedPaymentsCount: 0,
+    pendingPaymentsCount: 0,
+    feePlansCount: 0,
+  };
 
   const isCertEligible =
     (student.attendance_percentage || 0) >= 80 &&

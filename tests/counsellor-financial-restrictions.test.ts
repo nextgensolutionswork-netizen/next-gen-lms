@@ -105,6 +105,14 @@ describe('Counsellor Role Financial Restrictions & Boundary Enforcement', () => 
       expect(res.status).toBe(200);
       expect(res.headers.get('location')).toBeNull();
     });
+
+    it('BUG-CO-003: allows Counsellor direct access to Student Payment Due Dates (/accounts/dues)', async () => {
+      const req = createMockAuthRequest('http://localhost:3000/accounts/dues', 'counsellor');
+      const res = await middleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('location')).toBeNull();
+    });
   });
 
   // =========================================================================
@@ -281,6 +289,15 @@ describe('Counsellor Role Financial Restrictions & Boundary Enforcement', () => 
     it('completely hides Accounts & Finance section for non-financial roles (trainer, student)', () => {
       expect(computeSidebarAccountsVisibility('trainer').sectionVisible).toBe(false);
       expect(computeSidebarAccountsVisibility('student').sectionVisible).toBe(false);
+    });
+
+    it('BUG-CO-003: getSafeRedirectUrl permits Counsellor access to /accounts/dues', () => {
+      expect(getSafeRedirectUrl('counsellor', '/accounts/dues')).toBe('/accounts/dues');
+      expect(getSafeRedirectUrl('counsellor', '/accounts/fees')).toBe('/accounts/fees');
+      expect(getSafeRedirectUrl('counsellor', '/accounts/payments')).toBe('/accounts/payments');
+      expect(getSafeRedirectUrl('counsellor', '/accounts/approvals')).toBe('/crm/leads');
+      expect(getSafeRedirectUrl('counsellor', '/accounts/expenses')).toBe('/crm/leads');
+      expect(getSafeRedirectUrl('counsellor', '/accounts/reports')).toBe('/crm/leads');
     });
   });
 });
