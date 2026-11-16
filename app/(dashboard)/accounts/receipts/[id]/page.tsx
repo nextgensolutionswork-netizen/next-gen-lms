@@ -179,22 +179,117 @@ export default function ReceiptPrintPage() {
         </div>
       </div>
       <article className="bg-white border border-slate-200 rounded-xl p-8 print:border-0 print:p-0 space-y-6">
-        {receipt.status === 'Void' && <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800"><strong>VOID / CANCELLED — {receipt.credit_note_number}</strong><p>{receipt.void_reason}</p><p>Voided by {receipt.void_by} on {formatDate(receipt.void_at || receipt.payment_date)}</p></div>}
-        <div className="flex justify-between gap-6 border-b pb-6">
-          <div><h1 className="text-2xl font-bold">{receipt.institute_name}</h1><p className="text-sm text-slate-500">{receipt.institute_address}</p><p className="text-sm">{receipt.institute_phone}</p></div>
-          <div className="text-right"><h2 className="font-bold text-blue-700">Official Fee Receipt</h2><p className="font-mono">{receipt.receipt_number}</p><p>{formatDate(receipt.payment_date)}</p></div>
+        {receipt.status === 'Void' && (
+          <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">
+            <strong>VOID / CANCELLED — {receipt.credit_note_number}</strong>
+            <p>{receipt.void_reason}</p>
+            <p>Voided by {receipt.void_by} on {formatDate(receipt.void_at || receipt.payment_date)}</p>
+          </div>
+        )}
+        {receipt.status === 'Partially Reversed' && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+            <strong>PARTIALLY REVERSED — {receipt.credit_note_number || 'Credit Note Issued'}</strong>
+            <p>Reversed Amount: {formatINR(receipt.reversed_amount || 0)} | Net Active Amount: {formatINR((receipt.original_amount ?? receipt.payment_amount) - (receipt.reversed_amount || 0))}</p>
+            {receipt.void_reason && <p className="text-xs text-amber-700 mt-1">Reason: {receipt.void_reason}</p>}
+          </div>
+        )}
+        <div className="flex justify-between items-start gap-6 border-b pb-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center space-x-2 bg-blue-900 text-white px-3 py-1 rounded font-bold text-xs tracking-wider uppercase mb-2">
+              <span>Next-Gen LMS</span>
+              <span className="text-blue-300">•</span>
+              <span className="text-[10px] text-blue-200 font-normal">Official Institutional Receipt</span>
+            </div>
+            <h1 className="text-2xl font-bold">{receipt.institute_name}</h1>
+            <p className="text-sm text-slate-500">{receipt.institute_address}</p>
+            <p className="text-sm text-slate-600">{receipt.institute_phone}</p>
+            <p className="text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">Place of Supply:</span> {receipt.place_of_supply || 'Karnataka (29)'}
+            </p>
+          </div>
+          <div className="text-right space-y-1">
+            <h2 className="font-bold text-blue-700 text-lg">Official Fee Receipt</h2>
+            <p className="font-mono font-semibold text-slate-900">{receipt.receipt_number}</p>
+            <p className="text-sm text-slate-600">Date: {formatDate(receipt.payment_date)}</p>
+            {receipt.remaining_balance > 0 && (
+              <p className="text-xs font-semibold text-rose-600">
+                Installment Due Date: {receipt.due_date ? formatDate(receipt.due_date) : 'Within 15 days'}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><p className="text-slate-500">Student</p><p className="font-bold">{receipt.student_name}</p><p>{receipt.admission_number}</p><p>{receipt.student_email}</p></div>
-          <div><p className="text-slate-500">Course</p><p className="font-bold">{receipt.course_name}</p><p>Payment mode: {receipt.payment_mode}</p><p>Reference: {receipt.transaction_reference || '—'}</p></div>
+        <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-lg border border-slate-100">
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Student Details</p>
+            <p className="font-bold text-slate-900 text-base">{receipt.student_name}</p>
+            <p className="font-mono text-slate-600">{receipt.admission_number}</p>
+            <p className="text-slate-600">{receipt.student_email}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Payment Details</p>
+            <p className="font-bold text-slate-900">{receipt.course_name}</p>
+            <p className="text-slate-600">Payment mode: {receipt.payment_mode}</p>
+            <p className="text-slate-600 font-mono text-xs">Reference: {receipt.transaction_reference || '—'}</p>
+          </div>
         </div>
-        <table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="text-left p-3">Description</th><th className="text-right p-3">Amount received</th></tr></thead><tbody><tr className="border-b"><td className="p-3">Fee payment — {receipt.course_name}</td><td className="p-3 text-right font-bold">{formatINR(receipt.payment_amount)}</td></tr></tbody></table>
-        <p className="text-sm">{amountToWordsINR(receipt.payment_amount)}</p>
-        <dl className="ml-auto max-w-sm space-y-2 text-sm">
-          <div className="flex justify-between"><dt>This payment</dt><dd>{formatINR(receipt.payment_amount)}</dd></div>
-          <div className="flex justify-between border-t pt-2 font-bold"><dt>Remaining balance</dt><dd>{formatINR(receipt.remaining_balance)}</dd></div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left p-3 font-semibold text-slate-700">Description</th>
+              <th className="text-right p-3 font-semibold text-slate-700">Amount Received</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b">
+              <td className="p-3">Fee payment — {receipt.course_name}</td>
+              <td className="p-3 text-right font-bold text-slate-900">{formatINR(receipt.payment_amount)}</td>
+            </tr>
+            {receipt.reversed_amount ? (
+              <tr className="border-b text-amber-700 bg-amber-50/50">
+                <td className="p-3 font-medium">Reversed / Refunded (Credit Note Adjustment)</td>
+                <td className="p-3 text-right font-bold">- {formatINR(receipt.reversed_amount)}</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+        <p className="text-xs text-slate-600 italic">
+          Amount in words: {amountToWordsINR(receipt.reversed_amount ? (receipt.original_amount ?? receipt.payment_amount) - receipt.reversed_amount : receipt.payment_amount)}
+        </p>
+        <dl className="ml-auto max-w-sm space-y-2 text-sm bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <div className="flex justify-between">
+            <dt className="text-slate-600">This Payment</dt>
+            <dd className="font-mono font-medium">{formatINR(receipt.payment_amount)}</dd>
+          </div>
+          {receipt.reversed_amount ? (
+            <div className="flex justify-between text-amber-700">
+              <dt>Net Retained</dt>
+              <dd className="font-mono font-bold">{formatINR((receipt.original_amount ?? receipt.payment_amount) - receipt.reversed_amount)}</dd>
+            </div>
+          ) : null}
+          <div className="flex justify-between border-t border-slate-200 pt-2 font-bold">
+            <dt className="text-slate-800">Remaining Balance</dt>
+            <dd className="font-mono text-amber-700">{formatINR(receipt.remaining_balance)}</dd>
+          </div>
         </dl>
-        <footer className="border-t pt-4 text-sm text-slate-500"><p>Authorized by: {receipt.authorized_by}</p><p>Generated: {formatDateTime(receipt.created_at)}</p><p>This receipt records the payment credited to the student account.</p></footer>
+
+        {/* Terms & Conditions Section */}
+        <div className="border-t border-slate-200 pt-4 space-y-1.5">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Terms & Conditions</h4>
+          <p className="text-[11px] text-slate-500 whitespace-pre-line leading-relaxed">
+            {receipt.terms_and_conditions || `1. All fee payments are non-refundable and non-transferable unless specified in writing by institute management.
+2. Receipts are issued subject to bank realization of cheques, UPI, and online transfers.
+3. Installment payments must be cleared on or before the due date to avoid automated late fees.
+4. Jurisdiction: Any disputes arising hereunder shall be subject to the exclusive jurisdiction of the institute's principal city.`}
+          </p>
+        </div>
+
+        <footer className="border-t pt-4 text-xs text-slate-500 flex justify-between items-center">
+          <div>
+            <p>Authorized by: <span className="font-semibold text-slate-700">{receipt.authorized_by}</span></p>
+            <p>Generated: {formatDateTime(receipt.created_at)}</p>
+          </div>
+          <p className="italic">Computer-generated official receipt.</p>
+        </footer>
       </article>
     </div>
   );

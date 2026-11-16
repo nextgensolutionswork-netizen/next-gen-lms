@@ -23,6 +23,7 @@ import { feeWorkflowService } from './fee-workflow-service';
 import { tenantId } from '@/lib/auth/tenant';
 import type { StudentPaymentRecord } from '@/types';
 import { validatePhoneNumber, validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
+import { validateEmailAddress } from '@/lib/utils/email-validation';
 
 export function getNextStudentSequence(year = new Date().getFullYear()): number {
   const prefix = `NGERP-${year}-`;
@@ -315,6 +316,13 @@ export async function createAdmissionWorkflow(
     feeDueDate = rawDueDate;
   }
 
+  // Validate Email Address
+  const emailValidation = validateEmailAddress(input.email, 'Student email', true);
+  if (!emailValidation.isValid) {
+    throw new Error(emailValidation.error || 'Please enter a valid student email address.');
+  }
+  const normalizedEmail = emailValidation.normalized!;
+
   // Validate Phone Numbers
   const phoneValidation = validatePhoneNumber('IN', input.phone, 'Phone number', true);
   if (!phoneValidation.isValid) {
@@ -430,7 +438,7 @@ export async function createAdmissionWorkflow(
     student_name: input.student_name,
     phone: normalizedPhone,
     alternate_phone: normalizedAltPhone,
-    email: input.email,
+    email: normalizedEmail,
     photo_url: input.photo_url,
     dob: input.dob,
     gender: input.gender,
@@ -475,7 +483,7 @@ export async function createAdmissionWorkflow(
   store.users.push({
     tenant_id: admissionTenant,
     id: studentUserId,
-    email: input.email,
+    email: normalizedEmail,
     full_name: input.student_name,
     role: 'student',
     phone: normalizedPhone,
@@ -496,7 +504,7 @@ export async function createAdmissionWorkflow(
     student_unique_id: studentUniqueId,
     admission_number,
     full_name: input.student_name,
-    email: input.email,
+    email: normalizedEmail,
     phone: normalizedPhone,
     alternate_phone: normalizedAltPhone,
     profile_photo: input.photo_url,
@@ -512,6 +520,8 @@ export async function createAdmissionWorkflow(
     batch_name: batch?.batch_name,
     trainer_id: trainer?.id,
     trainer_name: trainer?.full_name,
+    counsellor_id: counsellor?.id,
+    lead_id: input.lead_id,
     joining_date: input.admission_date,
     status: 'Active',
     total_fee: net_payable,

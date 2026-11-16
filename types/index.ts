@@ -232,6 +232,8 @@ export interface Student {
   batch_name?: string;
   trainer_id?: string;
   trainer_name?: string;
+  counsellor_id?: string;
+  lead_id?: string;
   joining_date: string;
   status: 'Active' | 'On Hold' | 'Completed' | 'Suspended' | 'Dropped';
   total_fee: number;
@@ -503,7 +505,16 @@ export interface QuizAttempt {
   question_results?: any[];
 }
 
-export type FeeStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Refunded';
+export type FeeStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Refunded' | 'Discontinued / Adjusted';
+
+export interface FeeDiscontinuationRecord {
+  discontinued_at: string;
+  reason: string;
+  approved_by: string;
+  approved_by_name: string;
+  adjusted_amount: number;
+  original_outstanding: number;
+}
 
 export interface StudentFeeAccount {
   tenant_id?: string;
@@ -521,6 +532,7 @@ export interface StudentFeeAccount {
   outstanding_amount: number;
   payment_plan: string;
   status: FeeStatus;
+  discontinuation_record?: FeeDiscontinuationRecord;
   created_at: string;
   updated_at: string;
 }
@@ -536,6 +548,72 @@ export interface Installment {
   paid_amount: number;
   paid_date?: string;
   status: 'Upcoming' | 'Due' | 'Paid' | 'Partial' | 'Overdue' | 'Pending';
+}
+
+export type PaymentDueStatus =
+  | 'Overdue'
+  | 'Due Today'
+  | 'Due Tomorrow'
+  | 'Due in 2 Days'
+  | 'Upcoming';
+
+export interface UpcomingPaymentDueItem {
+  id: string;
+  student_id: string;
+  student_name: string;
+  admission_number: string;
+  course_id: string;
+  course_name: string;
+  installment_number?: number;
+  due_date: string;
+  installment_amount: number;
+  paid_amount: number;
+  outstanding_amount: number;
+  due_status: PaymentDueStatus;
+  fee_account_id?: string;
+  is_partial?: boolean;
+}
+
+export interface AllPaymentDuesSummary {
+  totalOutstanding: number;
+  totalCount: number;
+  overdueAmount: number;
+  overdueCount: number;
+  todayAmount: number;
+  todayCount: number;
+  next3DaysAmount: number;
+  next3DaysCount: number;
+  upcomingAmount: number;
+  upcomingCount: number;
+}
+
+export interface AllPaymentDuesPagination {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface UpcomingPaymentDuesResponse {
+  success: boolean;
+  dues: UpcomingPaymentDueItem[];
+  totalDueAmount: number;
+  asOfDate: string;
+  dates: [string, string, string];
+  error?: string;
+  summary?: AllPaymentDuesSummary;
+  pagination?: AllPaymentDuesPagination;
+}
+
+export interface AllPaymentDuesResponse {
+  success: boolean;
+  dues: UpcomingPaymentDueItem[];
+  totalDueAmount: number;
+  summary: AllPaymentDuesSummary;
+  pagination: AllPaymentDuesPagination;
+  asOfDate: string;
+  dates: [string, string, string];
+  error?: string;
 }
 
 export type PaymentMethod =
@@ -621,12 +699,30 @@ export interface Receipt {
   ack_date?: string;
   pdf_url?: string;
 
-  // Receipt Cancellation & Credit Note Workflow
-  status?: 'Valid' | 'Void';
+  // Terms, Due Date & Branding
+  terms_and_conditions?: string;
+  due_date?: string;
+  logo_url?: string;
+
+  // Receipt Cancellation, Reversal & Credit Note Workflow
+  status?: 'Valid' | 'Void' | 'Partially Reversed';
+  original_amount?: number;
+  reversed_amount?: number;
+  reversals?: ReceiptReversal[];
   void_reason?: string;
   void_at?: string;
   void_by?: string;
   credit_note_number?: string;
+}
+
+export interface ReceiptReversal {
+  id: string;
+  credit_note_number: string;
+  amount: number;
+  reason: string;
+  reversed_by: string;
+  reversed_by_name?: string;
+  reversed_at: string;
 }
 
 export type ExpenseCategory =
@@ -831,6 +927,21 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface AuthorizedBankAccount {
+  id: string;
+  account_holder_name: string;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch: string;
+  account_type?: 'Current' | 'Savings' | 'Escrow';
+  upi_id?: string;
+  is_primary?: boolean;
+  is_active?: boolean;
+  authorized_signatory?: string;
+  authorized_roles?: string[];
+}
+
 export interface SystemSettings {
   id: string;
   institute_name: string;
@@ -847,6 +958,7 @@ export interface SystemSettings {
   bank_ifsc?: string;
   bank_branch?: string;
   upi_id?: string;
+  authorized_bank_accounts?: AuthorizedBankAccount[];
   default_currency: string;
   academic_year: string;
   receipt_prefix: string;

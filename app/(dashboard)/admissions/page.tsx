@@ -42,6 +42,7 @@ import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/uti
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
 import { actualPaymentDate } from '@/lib/services/payment-entry-rules';
 import { validatePhoneNumber, validateAlternatePhoneNumber, getCanonicalPhoneDigits, parseStoredPhone } from '@/lib/utils/phone-validation';
+import { validateEmailAddress } from '@/lib/utils/email-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function AdmissionsPage() {
@@ -100,6 +101,7 @@ export default function AdmissionsPage() {
   const [altPhoneCountryCode, setAltPhoneCountryCode] = React.useState('+91');
   const [alternatePhoneError, setAlternatePhoneError] = React.useState('');
   const [email, setEmail] = React.useState('');
+  const [emailError, setEmailError] = React.useState('');
   const [photoUrl, setPhotoUrl] = React.useState('');
   const [photoPreview, setPhotoPreview] = React.useState('');
   const [photoError, setPhotoError] = React.useState('');
@@ -357,6 +359,13 @@ export default function AdmissionsPage() {
       alert('Authentication required: Please sign in to register admissions.');
       return;
     }
+
+    const emailVal = validateEmailAddress(email, 'Email address', true);
+    if (!emailVal.isValid) {
+      setEmailError(emailVal.error || 'Please enter a valid email address.');
+      return;
+    }
+    setEmailError('');
 
     const phoneVal = validatePhoneNumber(phoneCountryCode, phone, 'Phone Number', true);
     if (!phoneVal.isValid) {
@@ -837,14 +846,20 @@ export default function AdmissionsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Input
-              label="Email Address *"
-              type="email"
-              placeholder="student@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <div>
+              <Input
+                label="Email Address *"
+                type="email"
+                placeholder="student@example.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError('');
+                }}
+                required
+              />
+              {emailError && <p className="text-xs text-rose-500 font-medium mt-1">{emailError}</p>}
+            </div>
             <Input
               label="Date of Birth *"
               type="date"

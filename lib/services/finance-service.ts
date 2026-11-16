@@ -1182,3 +1182,130 @@ export function getDateRangeForPeriod(
   }
 }
 
+export interface DiscontinuedStudentAdjustmentInput {
+  fee_account_id: string;
+  reason: string;
+  adjusted_amount: number;
+  approved_by_user_id: string;
+}
+
+/**
+ * Controlled administrative workflow for clearing outstanding fee invoices
+ * when a student discontinues their course.
+ *
+ * - Never deletes the original invoice or alters received payments.
+ * - Never marks unpaid fee as collected revenue.
+ * - Records an auditable adjustment / write-off in the student financial ledger.
+ */
+export function adjustDiscontinuedStudentFee(
+  input: DiscontinuedStudentAdjustmentInput
+): { feeAccount: StudentFeeAccount; ledgerEntry: StudentFinancialLedgerEntry } {
+  const { fee_account_id, reason, adjusted_amount, approved_by_user_id } = input;
+
+  if (!reason || reason.trim().length < 5) {
+    throw new Error('Mandatory Reason: Please provide a clear administrative reason for discontinuing and adjusting the student fee.');
+  }
+
+  const approver = store.users.find((u) => u.id === approved_by_user_id);
+  if (!approver || !['super_admin', 'admin', 'accountant'].includes(approver.role)) {
+    throw new Error('Unauthorized: Only an Accountant or Administrator can approve a fee adjustment / write-off.');
+  }
+
+  const feeAccount = store.feeAccounts.find(
+    (fa) => fa.id === fee_account_id || fa.student_id === fee_account_id
+  );
+  if (!feeAccount) {
+    throw new Error(`Fee account with ID "${fee_account_id}" not found.`);
+  }
+
+  if (feeAccount.outstanding_amount <= 0) {
+    throw new Error('This student fee account has no outstanding balance to clear.');
+  }
+
+  if (!Number.isFinite(adjusted_amount) || adjusted_amount <= 0) {
+    throw new Error('Adjustment amount must be greater than zero.');
+  }
+
+  if (adjusted_amount > feeAccount.outstanding_amount) {
+    throw new Error(
+      `Adjustment amount (₹${adjusted_amount}) cannot exceed the current outstanding balance (₹${feeAccount.outstanding_amount}).`
+    );
+  }
+
+  const now = new Date().toISOString();
+  const approverName = approver.full_name || 'Accounts Administrator';
+  const originalOutstanding = feeAccount.outstanding_amount;
+  const newOutstanding = Number((feeAccount.outstanding_amount - adjusted_amount).toFixed(2));
+
+  // 1. Update Fee Account
+  feeAccount.outstanding_amount = newOutstanding;
+  feeAccount.status = 'Discontinued / Adjusted';
+  feeAccount.discontinuation_record = {
+    discontinued_at: now,
+    reason: reason.trim(),
+    approved_by: approver.id,
+    approved_by_name: approverName,
+    adjusted_amount,
+    original_outstanding: originalOutstanding,
+  };
+  feeAccount.updated_at = now;
+
+  // 2. Synchronize matching StudentFee if present
+  const matchingStudentFee = (store.studentFees || []).find(
+    (sf) => sf.student_id === feeAccount.student_id
+  );
+  if (matchingStudentFee) {
+    matchingStudentFee.outstanding_amount = Math.max(
+      0,
+      Number((matchingStudentFee.outstanding_amount - adjusted_amount).toFixed(2))
+    );
+    matchingStudentFee.updated_at = now;
+  }
+
+  // 3. Update student profile outstanding snapshot & status
+  const student = store.students.find((s) => s.id === feeAccount.student_id);
+  if (student) {
+    student.outstanding_amount = newOutstanding;
+    (student as any).status = 'Discontinued';
+    student.updated_at = now;
+  }
+
+  // 4. Cancel remaining pending installments
+  if (store.installments) {
+    const pendingInstallments = store.installments.filter(
+      (inst) =>
+        (inst.fee_account_id === feeAccount.id || inst.student_id === feeAccount.student_id) &&
+        inst.status === 'Pending'
+    );
+    for (const inst of pendingInstallments) {
+      (inst as any).status = 'Cancelled';
+      (inst as any).notes = `Cancelled due to student discontinuation: ${reason.trim()} (Approved by ${approverName})`;
+    }
+  }
+
+  // 5. Append non-destructive auditable adjustment entry into student financial ledger
+  const ledgerSeq = `ADJ-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+  const ledgerEntry: StudentFinancialLedgerEntry = {
+    id: `ledg-${Date.now()}`,
+    student_id: feeAccount.student_id,
+    entry_date: now.split('T')[0],
+    entry_type: 'Fee Adjustment',
+    fee_category: feeAccount.course_name || 'Course Fee',
+    reference_type: 'Adjustment',
+    reference_id: ledgerSeq,
+    debit: 0,
+    credit: adjusted_amount,
+    running_balance: newOutstanding,
+    description: `Discontinued Student Fee Adjustment / Write-Off: ₹${adjusted_amount} cleared against outstanding balance. Reason: ${reason.trim()} (Approved by ${approverName})`,
+    recorded_by: approver.id,
+    created_at: now,
+  };
+
+  if (!store.studentFinancialLedgers) store.studentFinancialLedgers = [];
+  store.studentFinancialLedgers.push(ledgerEntry);
+
+  store.persistSync();
+
+  return { feeAccount, ledgerEntry };
+}
+

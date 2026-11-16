@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { recordAuditLog } from '@/lib/services/audit-service';
 import { UserProfile, UserRole } from '@/types';
 import { validatePhoneNumber } from '@/lib/utils/phone-validation';
+import { validateEmailAddress } from '@/lib/utils/email-validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Email and Full Name are required.' },
         { status: 400 }
+      );
+    }
+
+    const emailCheck = validateEmailAddress(email, 'Email address', true);
+    if (!emailCheck.isValid) {
+      return NextResponse.json(
+        { success: false, error: emailCheck.error || 'Invalid email address.' },
+        { status: 400 }
+      );
+    }
+    const normalizedEmail = emailCheck.normalized!;
+
+    // Check duplicate email
+    if (store.users?.some((u) => u.email.toLowerCase() === normalizedEmail)) {
+      return NextResponse.json(
+        { success: false, error: 'A user account with this email address already exists.' },
+        { status: 409 }
       );
     }
 
@@ -214,11 +232,23 @@ export async function PATCH(req: NextRequest) {
       normalizedPhone = pCheck.normalized || phone;
     }
 
+    let normalizedEmail = store.users[idx].email;
+    if (email !== undefined) {
+      const emailCheck = validateEmailAddress(email, 'Email address', true);
+      if (!emailCheck.isValid) {
+        return NextResponse.json({ success: false, error: emailCheck.error || 'Invalid email address.' }, { status: 400 });
+      }
+      normalizedEmail = emailCheck.normalized!;
+      if (store.users?.some((u) => u.id !== id && u.email.toLowerCase() === normalizedEmail)) {
+        return NextResponse.json({ success: false, error: 'Another user account already uses this email address.' }, { status: 409 });
+      }
+    }
+
     const oldUser = { ...store.users[idx] };
     const updatedUser: UserProfile = {
       ...store.users[idx],
       full_name: full_name !== undefined ? full_name : store.users[idx].full_name,
-      email: email !== undefined ? email.trim().toLowerCase() : store.users[idx].email,
+      email: normalizedEmail,
       phone: phone !== undefined ? normalizedPhone : store.users[idx].phone,
       role: role !== undefined ? (role as UserRole) : store.users[idx].role,
       is_active: is_active !== undefined ? is_active : store.users[idx].is_active,

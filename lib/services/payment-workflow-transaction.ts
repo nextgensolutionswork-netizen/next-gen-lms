@@ -59,6 +59,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         for (const payment of store.payments.filter((p) => tenantId(p) === tenant && !p.status)) {
           payment.status = store.receipts.some((r) => r.payment_id === payment.id && tenantId(r) === tenant) ? 'Success' : 'Pending';
         }
+        store.reconcileAdmissionsAndStudents();
         store.reconcileDualLedgers();
       }
       // Assignment and notification recipients must use current membership, not
@@ -79,6 +80,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
     try {
       const result = await operation();
       if (!readOnly) {
+        store.reconcileAdmissionsAndStudents();
         store.reconcileDualLedgers();
         const snapshot = workflowSnapshot(tenant);
         if (db) {

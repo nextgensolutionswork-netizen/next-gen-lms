@@ -27,7 +27,7 @@ const command = z.discriminatedUnion('action', [
   z.object({ action: z.literal('update'), paymentId: z.string(), input: details }),
   z.object({ action: z.literal('approve'), paymentId: z.string(), notes: z.string().max(2000).optional(), verification: z.object({ reference: z.string().max(200).optional(), amount: z.string().max(100), payment_date: z.string().max(40) }).optional() }),
   z.object({ action: z.literal('reject'), paymentId: z.string(), reason: z.string().trim().min(1).max(2000) }),
-  z.object({ action: z.literal('void_receipt'), receiptId: z.string().min(1), reason: z.string().trim().min(1).max(2000) }),
+  z.object({ action: z.literal('void_receipt'), receiptId: z.string().min(1), reason: z.string().trim().min(1).max(2000), amount: z.number().finite().positive().optional() }),
 ]);
 
 function failure(error: unknown) {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         const receipt = (store.receipts || []).find((r) => r.id === body.receiptId || r.receipt_number === body.receiptId);
         if (!receipt) throw new Error('Receipt not found.');
         assertSameTenant(actor, receipt);
-        const voidRes = feeWorkflowService.voidReceipt(receipt.id, actor.id, body.reason);
+        const voidRes = feeWorkflowService.voidReceipt(receipt.id, actor.id, body.reason, body.amount);
         return { result: voidRes, snapshot: visibleWorkflowSnapshot(actor) };
       }
       if (body.action === 'record') {

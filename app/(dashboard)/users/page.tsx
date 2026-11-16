@@ -35,6 +35,7 @@ import { generatePasswordResetLink } from '@/lib/services/auth-service';
 import { dispatchMultiChannelNotification } from '@/lib/services/notification-service';
 import { formatDate } from '@/lib/utils/formatters';
 import { getCanonicalPhoneDigits, validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
+import { validateEmailAddress } from '@/lib/utils/email-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function UsersPage() {
@@ -57,6 +58,7 @@ export default function UsersPage() {
   // New User Form state
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
+  const [emailError, setEmailError] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [phoneCountryCode, setPhoneCountryCode] = React.useState('+91');
   const [phoneError, setPhoneError] = React.useState('');
@@ -68,6 +70,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = React.useState<UserProfile | null>(null);
   const [editName, setEditName] = React.useState('');
   const [editEmail, setEditEmail] = React.useState('');
+  const [editEmailError, setEditEmailError] = React.useState('');
   const [editPhone, setEditPhone] = React.useState('');
   const [editPhoneCountryCode, setEditPhoneCountryCode] = React.useState('+91');
   const [editPhoneError, setEditPhoneError] = React.useState('');
@@ -125,6 +128,13 @@ export default function UsersPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email) return;
+
+    const emailCheck = validateEmailAddress(email, 'Email address', true);
+    if (!emailCheck.isValid) {
+      setEmailError(emailCheck.error || 'Please enter a valid email address.');
+      return;
+    }
+    setEmailError('');
 
     let normalizedPhone: string | undefined = undefined;
     if (phone.trim()) {
@@ -196,6 +206,13 @@ export default function UsersPage() {
       setActionError('Self-Demotion Blocked: You cannot revoke administrator rights from your own active account.');
       return;
     }
+
+    const emailCheck = validateEmailAddress(editEmail, 'Email address', true);
+    if (!emailCheck.isValid) {
+      setEditEmailError(emailCheck.error || 'Please enter a valid email address.');
+      return;
+    }
+    setEditEmailError('');
 
     let normalizedPhone: string | undefined = undefined;
     if (editPhone.trim()) {
@@ -681,13 +698,19 @@ export default function UsersPage() {
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Email Address *"
-              type="email"
-              value={editEmail}
-              onChange={(e) => setEditEmail(e.target.value)}
-              required
-            />
+            <div>
+              <Input
+                label="Email Address *"
+                type="email"
+                value={editEmail}
+                onChange={(e) => {
+                  setEditEmail(e.target.value);
+                  if (editEmailError) setEditEmailError('');
+                }}
+                required
+              />
+              {editEmailError && <p className="text-xs text-rose-500 font-medium mt-1">{editEmailError}</p>}
+            </div>
             <PhoneInput
               label="Phone Number"
               countryCode={editPhoneCountryCode}
@@ -918,14 +941,20 @@ export default function UsersPage() {
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Email Address *"
-              type="email"
-              placeholder="manoj@next-generpsolutions.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <div>
+              <Input
+                label="Email Address *"
+                type="email"
+                placeholder="manoj@next-generpsolutions.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError('');
+                }}
+                required
+              />
+              {emailError && <p className="text-xs text-rose-500 font-medium mt-1">{emailError}</p>}
+            </div>
             <PhoneInput
               label="Phone Number"
               countryCode={phoneCountryCode}

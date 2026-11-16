@@ -48,6 +48,7 @@ import {
   formatDisplayPhone,
   DEFAULT_COUNTRY,
 } from '@/lib/utils/phone-validation';
+import { validateEmailAddress } from '@/lib/utils/email-validation';
 
 const CURRENT_STATUS_OPTIONS: LeadCurrentStatus[] = [
   'Fresher',
@@ -149,6 +150,7 @@ export default function LeadsPage() {
   const [whatsappError, setWhatsappError] = React.useState('');
 
   const [email, setEmail] = React.useState('');
+  const [emailError, setEmailError] = React.useState('');
   const [courseId, setCourseId] = React.useState(store.courses?.[0]?.id || '');
   const [counsellorId, setCounsellorId] = React.useState<string>(user?.id || '');
   const [currentStatus, setCurrentStatus] = React.useState<LeadCurrentStatus>('Working Professional');
@@ -170,6 +172,7 @@ export default function LeadsPage() {
   const [editWaError, setEditWaError] = React.useState('');
 
   const [editEmail, setEditEmail] = React.useState('');
+  const [editEmailError, setEditEmailError] = React.useState('');
   const [editCourseId, setEditCourseId] = React.useState('');
   const [editCounsellorId, setEditCounsellorId] = React.useState('');
   const [editCurrentStatus, setEditCurrentStatus] = React.useState<LeadCurrentStatus>('Working Professional');
@@ -338,6 +341,13 @@ export default function LeadsPage() {
       return;
     }
 
+    const emailCheck = validateEmailAddress(email, 'Email address', true);
+    if (!emailCheck.isValid) {
+      setEmailError(emailCheck.error || 'Please enter a valid email address.');
+      return;
+    }
+    setEmailError('');
+
     const pCheck = validatePhoneNumber(countryCode, phone, 'Mobile number');
     if (!pCheck.isValid) {
       setPhoneError(pCheck.error || 'Invalid mobile number');
@@ -500,6 +510,15 @@ export default function LeadsPage() {
         return;
       }
     }
+
+    if (editEmail.trim()) {
+      const emailCheck = validateEmailAddress(editEmail, 'Email address', false);
+      if (!emailCheck.isValid) {
+        setEditEmailError(emailCheck.error || 'Please enter a valid email address.');
+        return;
+      }
+    }
+    setEditEmailError('');
 
     try {
       await updateLeadDetails(
@@ -1172,14 +1191,20 @@ export default function LeadsPage() {
             )}
           </div>
 
-          <Input
-            label="Email Address *"
-            type="email"
-            placeholder="ramesh@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          <div>
+            <Input
+              label="Email Address *"
+              type="email"
+              placeholder="ramesh@example.com"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError('');
+              }}
+              required
+            />
+            {emailError && <p className="text-xs text-rose-500 font-medium mt-1">{emailError}</p>}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -1514,13 +1539,19 @@ export default function LeadsPage() {
                   )}
                 </div>
 
-                <Input
-                  label="Email Address *"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  required
-                />
+                <div>
+                  <Input
+                    label="Email Address *"
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => {
+                      setEditEmail(e.target.value);
+                      if (editEmailError) setEditEmailError('');
+                    }}
+                    required
+                  />
+                  {editEmailError && <p className="text-xs text-rose-500 font-medium mt-1">{editEmailError}</p>}
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {/* Current Status: Exactly 4 options */}

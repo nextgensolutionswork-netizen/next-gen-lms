@@ -55,6 +55,7 @@ import { persistentStorage } from './persistent-storage-adapter';
 class InstituteDataStore {
   constructor() {
     this.hydrateFromDisk();
+    this.reconcileAdmissionsAndStudents();
     this.reconcileDualLedgers();
     this.reconcileBatchEnrollments();
   }
@@ -168,6 +169,7 @@ class InstituteDataStore {
         if (snapshot.financeSettings) this.financeSettings = snapshot.financeSettings;
         if (snapshot.onboardingCases?.length) this.onboardingCases = snapshot.onboardingCases;
         if (snapshot.onboardingAuditLogs?.length) this.onboardingAuditLogs = snapshot.onboardingAuditLogs;
+        this.reconcileAdmissionsAndStudents();
         this.reconcileDualLedgers();
         this.reconcileBatchEnrollments();
         return true;
@@ -320,7 +322,13 @@ class InstituteDataStore {
         fa.paid_amount = sf.paid_amount;
         fa.outstanding_amount = sf.outstanding_amount;
         fa.payment_plan = sf.payment_plan || fa.payment_plan;
-        fa.status = sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+        if (
+          fa.status !== 'Discontinued / Adjusted' &&
+          (fa.status as string) !== 'Waived' &&
+          !fa.discontinuation_record
+        ) {
+          fa.status = sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+        }
         fa.updated_at = sf.updated_at || new Date().toISOString();
       }
 
@@ -429,6 +437,125 @@ class InstituteDataStore {
     }
   }
 
+  public reconcileAdmissionsAndStudents(): void {
+    if (!this.admissions) this.admissions = [];
+    if (!this.students) this.students = [];
+
+    const existingStudentMapById = new Map<string, Student>();
+    const existingStudentMapByAdmId = new Map<string, Student>();
+    const existingStudentMapByAdmNum = new Map<string, Student>();
+    const existingStudentMapByUniqueId = new Map<string, Student>();
+
+    for (const s of this.students) {
+      if (s.id) existingStudentMapById.set(s.id.toLowerCase(), s);
+      if (s.admission_id) existingStudentMapByAdmId.set(s.admission_id.toLowerCase(), s);
+      if (s.admission_number) existingStudentMapByAdmNum.set(s.admission_number.toLowerCase(), s);
+      if (s.student_unique_id) existingStudentMapByUniqueId.set(s.student_unique_id.toLowerCase(), s);
+    }
+
+    for (const adm of this.admissions) {
+      if (!adm || adm.status === 'Cancelled') continue;
+
+      let student = (adm.student_id ? existingStudentMapById.get(adm.student_id.toLowerCase()) : undefined)
+        || existingStudentMapByAdmId.get(adm.id.toLowerCase())
+        || (adm.admission_number ? existingStudentMapByAdmNum.get(adm.admission_number.toLowerCase()) : undefined)
+        || (adm.student_unique_id ? existingStudentMapByUniqueId.get(adm.student_unique_id.toLowerCase()) : undefined);
+
+      if (!student) {
+        student = this.students.find(
+          (s) =>
+            (s.email && adm.email && s.email.toLowerCase() === adm.email.toLowerCase() && s.course_id === adm.course_id) ||
+            (s.phone && adm.phone && s.phone.replace(/\D/g, '') === adm.phone.replace(/\D/g, '') && s.course_id === adm.course_id)
+        );
+      }
+
+      const course = (this.courses || []).find((c) => c.id === adm.course_id);
+      const batch = (this.batches || []).find((b) => b.id === adm.batch_id);
+      const feeAccount = (this.feeAccounts || []).find(
+        (fa) => fa.admission_id === adm.id || (student && fa.student_id === student.id)
+      );
+
+      if (!student) {
+        const studentId = adm.student_id || `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        student = {
+          tenant_id: adm.tenant_id || 'default',
+          id: studentId,
+          user_id: `usr-stu-${studentId}`,
+          admission_id: adm.id,
+          student_code: `STU-${course?.course_code?.slice(4, 8) || 'GEN'}-${String(this.students.length + 1).padStart(3, '0')}`,
+          student_unique_id: adm.student_unique_id,
+          admission_number: adm.admission_number,
+          full_name: adm.student_name,
+          email: adm.email,
+          phone: adm.phone,
+          alternate_phone: adm.alternate_phone,
+          photo_url: adm.photo_url,
+          profile_photo: adm.photo_url,
+          address: adm.address,
+          city: adm.city,
+          state: adm.state,
+          state_code: adm.state_code,
+          gstin: adm.gstin,
+          course_id: adm.course_id,
+          course_name: adm.course_name || course?.course_name,
+          batch_id: adm.batch_id,
+          batch_name: adm.batch_name || batch?.batch_name,
+          trainer_id: adm.trainer_id,
+          trainer_name: adm.trainer_name,
+          joining_date: adm.admission_date,
+          status: 'Active',
+          total_fee: feeAccount?.net_payable ?? adm.net_payable,
+          paid_amount: feeAccount?.paid_amount ?? 0,
+          outstanding_amount: feeAccount?.outstanding_amount ?? (adm.net_payable || 0),
+          attendance_percentage: 0,
+          course_progress: 0,
+          placement_status: 'Not Started',
+          lead_id: adm.lead_id,
+          created_at: adm.created_at || new Date().toISOString(),
+          updated_at: adm.updated_at || new Date().toISOString(),
+        };
+        this.students.push(student);
+        existingStudentMapById.set(student.id.toLowerCase(), student);
+        existingStudentMapByAdmId.set(adm.id.toLowerCase(), student);
+        if (student.admission_number) existingStudentMapByAdmNum.set(student.admission_number.toLowerCase(), student);
+        if (student.student_unique_id) existingStudentMapByUniqueId.set(student.student_unique_id.toLowerCase(), student);
+      }
+
+      // Ensure linkages are bidirectionally consistent
+      if (!adm.student_id || adm.student_id !== student.id) {
+        adm.student_id = student.id;
+      }
+      if (!student.admission_id) {
+        student.admission_id = adm.id;
+      }
+      if (!student.admission_number) {
+        student.admission_number = adm.admission_number;
+      }
+      if (adm.student_unique_id && !student.student_unique_id) {
+        student.student_unique_id = adm.student_unique_id;
+      }
+      if (adm.lead_id && !student.lead_id) {
+        student.lead_id = adm.lead_id;
+      }
+      if (adm.photo_url && !student.photo_url) {
+        student.photo_url = adm.photo_url;
+      }
+      if (course && !student.course_name) {
+        student.course_name = course.course_name;
+      }
+      if (batch && !student.batch_name) {
+        student.batch_name = batch.batch_name;
+      }
+
+      // Reconcile fee balances from fee account if present
+      if (feeAccount) {
+        student.paid_amount = feeAccount.paid_amount;
+        student.outstanding_amount = feeAccount.outstanding_amount;
+        student.total_fee = feeAccount.net_payable;
+      }
+    }
+  }
+
   public reconcileBatchEnrollments(): void {
     if (!this.batches || !this.students) return;
     const EXCLUDED_STATUSES = new Set(['cancelled', 'dropped', 'inactive', 'suspended', 'completed']);
@@ -495,6 +622,47 @@ class InstituteDataStore {
     bank_ifsc: 'HDFC0000123',
     bank_branch: 'Hitec City, Hyderabad',
     upi_id: 'nextgenerp@hdfcbank',
+    authorized_bank_accounts: [
+      {
+        id: 'bank-acc-01',
+        account_holder_name: 'Dr. Rajesh Kumar (Managing Director & Signatory)',
+        bank_name: 'HDFC Bank Ltd',
+        account_number: '50200088991122',
+        ifsc_code: 'HDFC0000123',
+        branch: 'Hitec City, Hyderabad',
+        account_type: 'Current',
+        upi_id: 'nextgenerp@hdfcbank',
+        is_primary: true,
+        authorized_signatory: 'Dr. Rajesh Kumar',
+        authorized_roles: ['super_admin', 'admin', 'accountant'],
+      },
+      {
+        id: 'bank-acc-02',
+        account_holder_name: 'NEXT GEN ERP SOLUTIONS PRIVATE LIMITED (Tuition Collections)',
+        bank_name: 'ICICI Bank Ltd',
+        account_number: '001205009988',
+        ifsc_code: 'ICIC0000012',
+        branch: 'Banjara Hills, Hyderabad',
+        account_type: 'Current',
+        upi_id: 'nextgen.tuition@icici',
+        is_primary: false,
+        authorized_signatory: 'Ananya Deshmukh (Finance Director)',
+        authorized_roles: ['super_admin', 'admin', 'accountant'],
+      },
+      {
+        id: 'bank-acc-03',
+        account_holder_name: 'State Bank of India (Student Fee Escrow Account)',
+        bank_name: 'State Bank of India',
+        account_number: '33182749102',
+        ifsc_code: 'SBIN0004123',
+        branch: 'Koramangala, Bengaluru',
+        account_type: 'Escrow',
+        upi_id: 'nextgenfees@sbi',
+        is_primary: false,
+        authorized_signatory: 'Finance Comptroller',
+        authorized_roles: ['super_admin', 'admin', 'accountant'],
+      },
+    ],
     default_currency: 'INR',
     academic_year: '2026-2027',
     receipt_prefix: 'REC',

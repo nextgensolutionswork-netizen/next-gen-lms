@@ -50,6 +50,7 @@ import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { CreateAdmissionInput } from './admission-service';
 import { validatePhoneNumber, findDuplicateLeadByPhone, normalizePhoneForStorage, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
+import { validateEmailAddress } from '@/lib/utils/email-validation';
 
 export async function getLeads(filters?: {
   stage?: LeadStage | 'All';
@@ -172,7 +173,17 @@ export async function createLead(
     whatsapp_number = normalizedPhone;
   }
 
-  // 3. Duplicate mobile number check
+  // 3. Email validation (if provided)
+  let normalizedEmail = data.email?.trim() || undefined;
+  if (normalizedEmail) {
+    const emailValidation = validateEmailAddress(normalizedEmail, 'Email address', false);
+    if (!emailValidation.isValid) {
+      throw new Error(emailValidation.error || 'Please enter a valid email address.');
+    }
+    normalizedEmail = emailValidation.normalized;
+  }
+
+  // 4. Duplicate mobile number check
   const duplicate = findDuplicateLeadByPhone(
     store.leads || [],
     normalizedPhone,
@@ -192,6 +203,7 @@ export async function createLead(
     phone: normalizedPhone,
     whatsapp_country_code,
     whatsapp_number,
+    email: normalizedEmail || data.email,
   };
 
   if (typeof window !== 'undefined') {
@@ -395,7 +407,17 @@ export async function updateLeadDetails(
   if (updates.country_code !== undefined) lead.country_code = country_code;
   if (whatsapp_number !== undefined) lead.whatsapp_number = whatsapp_number;
   if (updates.whatsapp_country_code !== undefined) lead.whatsapp_country_code = whatsapp_country_code;
-  if (updates.email !== undefined) lead.email = updates.email;
+  if (updates.email !== undefined) {
+    if (updates.email && updates.email.trim()) {
+      const emailValidation = validateEmailAddress(updates.email, 'Email address', false);
+      if (!emailValidation.isValid) {
+        throw new Error(emailValidation.error || 'Please enter a valid email address.');
+      }
+      lead.email = emailValidation.normalized || updates.email.trim();
+    } else {
+      lead.email = '';
+    }
+  }
   if (updates.interested_course_id !== undefined) {
     lead.interested_course_id = updates.interested_course_id;
     const course = (store.courses || []).find((c) => c.id === updates.interested_course_id);

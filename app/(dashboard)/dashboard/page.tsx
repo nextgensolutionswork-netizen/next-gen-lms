@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
-import { Payment } from '@/types';
+import { Payment, UpcomingPaymentDueItem } from '@/types';
 import {
   courseBucket,
   paymentCourseBucket,
@@ -264,29 +264,43 @@ export default function DashboardPage() {
   const convertedLeads = displayLeads.filter((l) => l.stage === 'Converted').length;
   const conversionRate = formatDashboardPercentage(convertedLeads, totalLeads);
   const upcomingDemos = (store.leads || []).filter((l) => l.stage === 'Demo Scheduled').length;
-
-  // Placement aggregates calculated dynamically
-  const placementProfiles = (store.placementProfiles || []).filter((p) => matchesCourse((store.students || []).find((s) => s.id === p.student_id)?.course_id));
-  const totalPlacementProfiles = placementProfiles.length;
-  const approvedResumes = placementProfiles.filter(
-    (p) => p.resume_status === 'Reviewed & Approved'
-  ).length;
-  const resumeApprovedPct = formatDashboardPercentage(approvedResumes, totalPlacementProfiles);
-
-  const completedMocks = placementProfiles.filter(
-    (p) => p.mock_interview_status === 'Completed'
-  ).length;
-  const mockInterviewPct = formatDashboardPercentage(completedMocks, totalPlacementProfiles);
-
-  const placedProfiles = placementProfiles.filter((p) => (p.placed_package_lpa || 0) > 0);
-  const avgCtcLpa = placedProfiles.length > 0
-    ? (placedProfiles.reduce((sum, p) => sum + (p.placed_package_lpa || 0), 0) / placedProfiles.length).toFixed(1)
-    : 'N/A';
-
-  const totalPlaced = placementProfiles.filter((p) => p.placement_status === 'Placed').length;
   const activeJobOpenings = (store.jobOpenings || []).filter((j) => j.status === 'Open').length;
 
-  const { role } = useAuth();
+  const { role, user } = useAuth();
+
+  // Upcoming Payment Dues state (Next 3 Days in Asia/Kolkata)
+  const [upcomingDues, setUpcomingDues] = React.useState<UpcomingPaymentDueItem[]>([]);
+  const [totalUpcomingDueAmount, setTotalUpcomingDueAmount] = React.useState<number>(0);
+  const [upcomingDuesLoading, setUpcomingDuesLoading] = React.useState<boolean>(true);
+
+  const fetchUpcomingDues = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/fees/upcoming-dues');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.dues)) {
+          setUpcomingDues(data.dues);
+          setTotalUpcomingDueAmount(data.totalDueAmount || 0);
+          setUpcomingDuesLoading(false);
+          return;
+        }
+      }
+    } catch {}
+
+    if (user) {
+      try {
+        const { getUpcomingPaymentDues } = await import('@/lib/services/upcoming-dues-service');
+        const fallback = getUpcomingPaymentDues(user);
+        setUpcomingDues(fallback.dues);
+        setTotalUpcomingDueAmount(fallback.totalDueAmount);
+      } catch {}
+    }
+    setUpcomingDuesLoading(false);
+  }, [user]);
+
+  React.useEffect(() => {
+    fetchUpcomingDues();
+  }, [fetchUpcomingDues, refreshTick]);
 
   if (role === 'student') {
     return (
@@ -760,42 +774,122 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Placement Track Card */}
+        {/* Student Payment Due Dates — Next 3 Days Card */}
         <Card className="flex flex-col justify-between">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Placement Drive Overview</CardTitle>
-            <p className="text-xs text-slate-500">Student corporate interview preparedness (current roster, selected course)</p>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                Student Payment Due Dates
+              </CardTitle>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-slate-500">Business timezone: Asia/Kolkata</p>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                Total: {formatINR(totalUpcomingDueAmount)}
+              </span>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 border border-purple-100">
-              <div>
-                <p className="text-xs text-purple-700 font-medium">Resume Approved</p>
-                <p className="text-lg font-bold text-purple-900">{resumeApprovedPct} <span className="text-xs font-normal">({approvedResumes}/{totalPlacementProfiles})</span></p>
+          <CardContent className="space-y-3 flex-1 flex flex-col justify-between">
+            {upcomingDuesLoading ? (
+              <div className="py-12 text-center text-slate-400 text-xs">
+                Loading upcoming dues...
               </div>
-              <CheckCircle className="h-6 w-6 text-purple-600" />
-            </div>
-
-            <div className="flex justify-between items-center p-3 rounded-lg bg-blue-50 border border-blue-100">
-              <div>
-                <p className="text-xs text-blue-700 font-medium">Mock Interviews Done</p>
-                <p className="text-lg font-bold text-blue-900">{mockInterviewPct} <span className="text-xs font-normal">({completedMocks}/{totalPlacementProfiles})</span></p>
+            ) : upcomingDues.length === 0 ? (
+              <div className="py-10 text-center space-y-2 my-auto">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-semibold text-slate-700">No payments due in the next 3 days.</p>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  All active student installments are up to date or scheduled beyond the 3-day window.
+                </p>
               </div>
-              <Users className="h-6 w-6 text-blue-600" />
-            </div>
+            ) : (
+              <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                {upcomingDues.map((item) => {
+                  const isDueToday = item.due_status === 'Due Today';
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-lg border transition-all text-xs space-y-2 ${
+                        isDueToday
+                          ? 'bg-rose-50/60 border-rose-200 border-l-4 border-l-rose-500 shadow-sm'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 truncate text-sm">
+                            {item.student_name}
+                          </p>
+                          <div className="flex items-center gap-2 text-slate-500 font-mono text-[11px]">
+                            <span>{item.admission_number}</span>
+                            <span>•</span>
+                            <span className="font-sans font-medium text-slate-600 truncate">{item.course_name}</span>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={
+                            item.due_status === 'Due Today'
+                              ? 'destructive'
+                              : item.due_status === 'Due Tomorrow'
+                              ? 'warning'
+                              : 'outline'
+                          }
+                          className={
+                            item.due_status === 'Due Today'
+                              ? 'bg-rose-600 text-white font-bold shrink-0 animate-pulse'
+                              : item.due_status === 'Due Tomorrow'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300 font-semibold shrink-0'
+                              : 'bg-blue-50 text-blue-700 border-blue-200 font-semibold shrink-0'
+                          }
+                        >
+                          {item.due_status}
+                        </Badge>
+                      </div>
 
-            <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-              <div>
-                <p className="text-xs text-emerald-700 font-medium">Avg Offered CTC</p>
-                <p className="text-lg font-bold text-emerald-900">{avgCtcLpa === 'N/A' ? 'N/A' : `₹${avgCtcLpa} LPA`}</p>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Due: {formatDate(item.due_date)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] text-slate-500 block">Outstanding</span>
+                          <span className="font-bold text-slate-900 text-sm">
+                            {formatINR(item.outstanding_amount)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-1 flex justify-end">
+                        <Link
+                          href={`/accounts/fees?search=${encodeURIComponent(item.admission_number || item.student_name)}`}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-sap-blue hover:underline"
+                        >
+                          View Student Fee Ledger
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <Briefcase className="h-6 w-6 text-emerald-600" />
-            </div>
+            )}
 
-            <Link href="/placement" className="block pt-2">
-              <Button variant="sap" size="sm" className="w-full text-xs">
-                Open Placement Portal
-              </Button>
-            </Link>
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <Link href="/accounts/dues" className="block">
+                <Button variant="sap" size="sm" className="w-full text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs">
+                  <span>View All Due Dates</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
+              <Link href="/accounts/fees" className="block text-center">
+                <span className="text-[11px] text-slate-500 hover:text-slate-700 hover:underline">
+                  Open Student Fee Ledger
+                </span>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

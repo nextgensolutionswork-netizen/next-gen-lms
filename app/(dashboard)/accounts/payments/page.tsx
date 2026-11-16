@@ -37,6 +37,7 @@ import {
 } from '@/types';
 import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { exportCollectionsToExcel } from '@/lib/utils/excel-export';
+import { getAuthorizedBankAccounts, findBankAccountByHolder } from '@/lib/utils/bank-autofill';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
@@ -119,11 +120,15 @@ export default function PaymentsPage() {
   const defaultAccountId = store.settings?.bank_account_number || '50200088991122';
   const defaultUpi = store.settings?.upi_id || 'nextgenerp@hdfcbank';
 
-  const [ourBankName, setOurBankName] = React.useState(defaultBankName);
-  const [ourBankAccountName, setOurBankAccountName] = React.useState(defaultAccountName);
-  const [ourBankAccountId, setOurBankAccountId] = React.useState(defaultAccountId);
-  const [ourUpiDetails, setOurUpiDetails] = React.useState(defaultUpi);
-  const [bankPreset, setBankPreset] = React.useState<'default' | 'custom'>('default');
+  const authorizedAccounts = React.useMemo(() => getAuthorizedBankAccounts(role), [role]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = React.useState(authorizedAccounts[0]?.id || 'bank-acc-01');
+  const [bankAccountSearch, setBankAccountSearch] = React.useState('');
+
+  const [ourBankName, setOurBankName] = React.useState(authorizedAccounts[0]?.bank_name || defaultBankName);
+  const [ourBankAccountName, setOurBankAccountName] = React.useState(authorizedAccounts[0]?.account_holder_name || defaultAccountName);
+  const [ourBankAccountId, setOurBankAccountId] = React.useState(authorizedAccounts[0]?.account_number || defaultAccountId);
+  const [ourUpiDetails, setOurUpiDetails] = React.useState(authorizedAccounts[0]?.upi_id || defaultUpi);
+  const [bankPreset, setBankPreset] = React.useState<string>('bank-acc-01');
 
   const selectedFee = (store.studentFees || []).find((f) => f.id === selectedFeeId);
 
@@ -1037,25 +1042,51 @@ export default function PaymentsPage() {
                     Institute receiving account details for reconciliation
                   </span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <label className="text-[10px] text-slate-500 font-medium">Account Preset:</label>
-                  <select
-                    value={bankPreset}
-                    onChange={(e) => {
-                      const val = e.target.value as 'default' | 'custom';
-                      setBankPreset(val);
-                      if (val === 'default') {
-                        setOurBankName(defaultBankName);
-                        setOurBankAccountName(defaultAccountName);
-                        setOurBankAccountId(defaultAccountId);
-                        setOurUpiDetails(defaultUpi);
-                      }
-                    }}
-                    className="text-[11px] bg-white border border-slate-200 rounded px-2 py-1 text-slate-700 font-medium"
-                  >
-                    <option value="default">Primary Account ({defaultBankName})</option>
-                    <option value="custom">Custom Bank Account</option>
-                  </select>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex items-center space-x-1.5">
+                    <label className="text-[10px] text-slate-500 font-medium whitespace-nowrap">Authorized Account:</label>
+                    <select
+                      value={selectedBankAccountId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedBankAccountId(val);
+                        if (val === 'custom') {
+                          setBankPreset('custom');
+                        } else {
+                          const matched = authorizedAccounts.find((a) => a.id === val);
+                          if (matched) {
+                            setOurBankName(matched.bank_name);
+                            setOurBankAccountName(matched.account_holder_name);
+                            setOurBankAccountId(matched.account_number);
+                            setOurUpiDetails(matched.upi_id || '');
+                            setBankPreset(val);
+                          }
+                        }
+                      }}
+                      className="text-[11px] bg-white border border-slate-200 rounded px-2 py-1 text-slate-700 font-medium max-w-[280px] truncate"
+                      title="Select Authorized Bank Account Holder"
+                    >
+                      {authorizedAccounts
+                        .filter((acc) =>
+                          !bankAccountSearch.trim() ||
+                          acc.account_holder_name.toLowerCase().includes(bankAccountSearch.toLowerCase()) ||
+                          acc.bank_name.toLowerCase().includes(bankAccountSearch.toLowerCase())
+                        )
+                        .map((acc) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.account_holder_name} — {acc.bank_name} ({acc.account_number})
+                          </option>
+                        ))}
+                      <option value="custom">-- Custom Bank Account --</option>
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search account holder..."
+                    value={bankAccountSearch}
+                    onChange={(e) => setBankAccountSearch(e.target.value)}
+                    className="text-[10px] bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-600 placeholder:text-slate-400 w-36"
+                  />
                 </div>
               </div>
 
@@ -1067,6 +1098,7 @@ export default function PaymentsPage() {
                     value={ourBankName}
                     onChange={(e) => {
                       setOurBankName(e.target.value);
+                      setSelectedBankAccountId('custom');
                       setBankPreset('custom');
                     }}
                     required
@@ -1074,11 +1106,12 @@ export default function PaymentsPage() {
                 </div>
                 <div>
                   <Input
-                    label="Our Bank Account Name *"
+                    label="Our Bank Account Name / Holder *"
                     placeholder="e.g. Next-Gen ERP Solutions"
                     value={ourBankAccountName}
                     onChange={(e) => {
                       setOurBankAccountName(e.target.value);
+                      setSelectedBankAccountId('custom');
                       setBankPreset('custom');
                     }}
                     required
@@ -1086,12 +1119,13 @@ export default function PaymentsPage() {
                 </div>
                 <div>
                   <Input
-                    label="Our Bank Account ID *"
+                    label="Our Bank Account ID / Number *"
                     type="text"
                     placeholder="e.g. 50200088991122"
                     value={ourBankAccountId}
                     onChange={(e) => {
                       setOurBankAccountId(e.target.value);
+                      setSelectedBankAccountId('custom');
                       setBankPreset('custom');
                     }}
                     required
@@ -1105,6 +1139,7 @@ export default function PaymentsPage() {
                     value={ourUpiDetails}
                     onChange={(e) => {
                       setOurUpiDetails(e.target.value);
+                      setSelectedBankAccountId('custom');
                       setBankPreset('custom');
                     }}
                   />

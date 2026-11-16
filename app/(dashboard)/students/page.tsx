@@ -233,6 +233,16 @@ export default function StudentsListPage() {
               <span>Export CSV ({filteredStudents.length})</span>
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshList}
+            className="text-xs flex items-center space-x-1 text-slate-700 hover:text-slate-900"
+            title="Refresh student directory from authoritative records"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Refresh</span>
+          </Button>
           <Link href="/admissions">
             <Button variant="sap" size="sm" className="text-xs">
               Admissions Desk

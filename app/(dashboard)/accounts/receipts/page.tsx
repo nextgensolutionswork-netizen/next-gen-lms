@@ -57,6 +57,7 @@ export default function ReceiptsListPage() {
 
   // Receipt Cancellation / Void & Credit Note Modal State
   const [selectedReceiptForVoid, setSelectedReceiptForVoid] = React.useState<Receipt | null>(null);
+  const [amountToReverse, setAmountToReverse] = React.useState<number>(0);
   const [voidModalOpen, setVoidModalOpen] = React.useState(false);
   const [voidReasonCategory, setVoidReasonCategory] = React.useState('Cheque Bounced / Dishonoured');
   const [voidReasonDetails, setVoidReasonDetails] = React.useState('');
@@ -93,11 +94,25 @@ export default function ReceiptsListPage() {
   const allReceipts = receipts || [];
   const activeReceipts = allReceipts.filter((r) => r.status !== 'Void');
   const voidedReceipts = allReceipts.filter((r) => r.status === 'Void');
-  const totalCollected = activeReceipts.reduce((sum, r) => sum + safeAmount(r.payment_amount), 0);
+  const totalCollected = activeReceipts.reduce((sum, r) => {
+    const orig = safeAmount(r.original_amount ?? r.payment_amount);
+    const rev = safeAmount(r.reversed_amount ?? 0);
+    return sum + Math.max(0, orig - rev);
+  }, 0);
 
   const handleConfirmVoid = async () => {
     if (!selectedReceiptForVoid || !user || !canVoidReceipt) return;
     setVoidError(null);
+
+    const orig = safeAmount(selectedReceiptForVoid.original_amount ?? selectedReceiptForVoid.payment_amount);
+    const prevRev = safeAmount(selectedReceiptForVoid.reversed_amount ?? 0);
+    const maxReversible = Math.max(0, Number((orig - prevRev).toFixed(2)));
+
+    if (amountToReverse <= 0 || amountToReverse > maxReversible) {
+      setVoidError(`Amount to reverse must be between ₹1 and ${formatINR(maxReversible)}`);
+      return;
+    }
+
     const finalReason = voidReasonDetails.trim()
       ? `${voidReasonCategory}: ${voidReasonDetails.trim()}`
       : voidReasonCategory;
@@ -106,14 +121,14 @@ export default function ReceiptsListPage() {
       let creditNoteNumber = '';
       if (typeof window !== 'undefined') {
         const { paymentWorkflowClient } = await import('@/lib/services/payment-workflow-client');
-        const res = await paymentWorkflowClient.voidReceipt(selectedReceiptForVoid.id, finalReason);
+        const res = await paymentWorkflowClient.voidReceipt(selectedReceiptForVoid.id, finalReason, amountToReverse);
         creditNoteNumber = res?.creditNoteNumber || '';
       } else {
-        const res = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason);
+        const res = feeWorkflowService.voidReceipt(selectedReceiptForVoid.id, user.id, finalReason, amountToReverse);
         creditNoteNumber = res.creditNoteNumber;
       }
       setVoidSuccessMsg(
-        `Receipt ${selectedReceiptForVoid.receipt_number} has been voided. Official Credit Note ${creditNoteNumber} issued and student ledger restored.`
+        `Receipt ${selectedReceiptForVoid.receipt_number} reversed for ${formatINR(amountToReverse)}. Official Credit Note ${creditNoteNumber} issued and student ledger updated.`
       );
       setVoidModalOpen(false);
       setSelectedReceiptForVoid(null);
@@ -393,6 +408,15 @@ export default function ReceiptsListPage() {
                                 </p>
                               )}
                             </div>
+                          ) : r.status === 'Partially Reversed' ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                                Partially Reversed
+                              </span>
+                              <p className="text-[10px] font-mono text-slate-500">
+                                Rev: {formatINR(r.reversed_amount || 0)}
+                              </p>
+                            </div>
                           ) : (
                             <Badge variant="success" className="text-[10px]">
                               Valid ✓
@@ -426,14 +450,18 @@ export default function ReceiptsListPage() {
                                   setVoidError(null);
                                   setVoidReasonDetails('');
                                   setVoidReasonCategory('Cheque Bounced / Dishonoured');
+                                  const orig = safeAmount(r.original_amount ?? r.payment_amount);
+                                  const prevRev = safeAmount(r.reversed_amount ?? 0);
+                                  const remaining = Math.max(0, Number((orig - prevRev).toFixed(2)));
+                                  setAmountToReverse(remaining);
                                   setSelectedReceiptForVoid(r);
                                   setVoidModalOpen(true);
                                 }}
                                 className="text-xs px-2 py-1 text-rose-700 hover:bg-rose-50 border-rose-200 flex items-center space-x-1"
-                                title="Void Receipt & Issue Credit Note"
+                                title={r.status === 'Partially Reversed' ? "Reverse Remaining Balance & Issue Credit Note" : "Void Receipt & Issue Credit Note"}
                               >
                                 <Ban className="h-3 w-3 text-rose-600" />
-                                <span>Void</span>
+                                <span>{r.status === 'Partially Reversed' ? 'Reverse' : 'Void'}</span>
                               </Button>
                             )}
                           </div>
@@ -452,98 +480,151 @@ export default function ReceiptsListPage() {
       <Modal
         isOpen={voidModalOpen}
         onClose={() => setVoidModalOpen(false)}
-        title="Void Receipt & Issue Credit Note"
-        description="Cancels an official fee receipt, reverses payments in dual ledgers, restores student balance, and issues an official Credit Note."
+        title="Void / Reverse Receipt & Issue Credit Note"
+        description="Reverses an official fee receipt or partial amount, updates dual ledgers, restores student balance, and issues an official Credit Note."
         maxWidth="md"
       >
-        {selectedReceiptForVoid && (
-          <div className="space-y-4 text-xs">
-            {voidError && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-2">
-                <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                <span>{voidError}</span>
-              </div>
-            )}
+        {selectedReceiptForVoid && (() => {
+          const orig = safeAmount(selectedReceiptForVoid.original_amount ?? selectedReceiptForVoid.payment_amount);
+          const prevRev = safeAmount(selectedReceiptForVoid.reversed_amount ?? 0);
+          const remaining = Math.max(0, Number((orig - prevRev).toFixed(2)));
 
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Receipt Number:</span>
-                <span className="font-mono font-bold text-slate-900">{selectedReceiptForVoid.receipt_number}</span>
+          return (
+            <div className="space-y-4 text-xs">
+              {voidError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-2">
+                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                  <span>{voidError}</span>
+                </div>
+              )}
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Receipt Number:</span>
+                  <span className="font-mono font-bold text-slate-900">{selectedReceiptForVoid.receipt_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Student:</span>
+                  <span className="font-semibold text-slate-800">
+                    {selectedReceiptForVoid.student_name} ({selectedReceiptForVoid.admission_number})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Original Amount:</span>
+                  <span className="font-mono font-bold text-slate-800">
+                    {formatINR(orig)}
+                  </span>
+                </div>
+                {prevRev > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Previously Reversed:</span>
+                    <span className="font-mono font-bold text-amber-600">
+                      - {formatINR(prevRev)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-slate-200 pt-1">
+                  <span className="text-slate-700 font-semibold">Remaining Reversible Balance:</span>
+                  <span className="font-mono font-bold text-rose-600 text-sm">
+                    {formatINR(remaining)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Payment Mode:</span>
+                  <span className="font-medium text-slate-800">{selectedReceiptForVoid.payment_mode}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Student:</span>
-                <span className="font-semibold text-slate-800">
-                  {selectedReceiptForVoid.student_name} ({selectedReceiptForVoid.admission_number})
-                </span>
+
+              {/* Amount to reverse input */}
+              <div className="space-y-1.5 bg-rose-50/50 p-3 rounded-lg border border-rose-100">
+                <label className="block text-slate-800 font-semibold">
+                  Amount to Reverse (₹) <span className="text-rose-500">*</span>:
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max={remaining}
+                    step="0.01"
+                    value={amountToReverse || ''}
+                    onChange={(e) => setAmountToReverse(Number(e.target.value) || 0)}
+                    className="w-full text-sm font-mono font-bold p-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-500 text-rose-700"
+                    placeholder={`Max ${remaining}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAmountToReverse(remaining)}
+                    className="whitespace-nowrap text-[11px]"
+                  >
+                    Full Balance ({formatINR(remaining)})
+                  </Button>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {amountToReverse < remaining
+                    ? `Partial reversal of ${formatINR(amountToReverse)}. Remaining balance of ${formatINR(Math.max(0, remaining - amountToReverse))} will remain active.`
+                    : `Full reversal of ${formatINR(amountToReverse)}. Receipt will be marked as Void.`}
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Amount to Reverse:</span>
-                <span className="font-mono font-bold text-rose-600 text-sm">
-                  {formatINR(selectedReceiptForVoid.payment_amount)}
-                </span>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Cancellation Reason Category <span className="text-rose-500">*</span>:
+                </label>
+                <select
+                  value={voidReasonCategory}
+                  onChange={(e) => setVoidReasonCategory(e.target.value)}
+                  className="w-full text-xs p-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                >
+                  <option value="Cheque Bounced / Dishonoured">Cheque Bounced / Dishonoured</option>
+                  <option value="Chargeback / Bank Transaction Disputed">Chargeback / Bank Transaction Disputed</option>
+                  <option value="Duplicate Billing Entry / System Error">Duplicate Billing Entry / System Error</option>
+                  <option value="Admission Cancelled / Tuition Fee Refunded">Admission Cancelled / Tuition Fee Refunded</option>
+                  <option value="Wrong Student Account Credited">Wrong Student Account Credited</option>
+                  <option value="Other Financial Reversal">Other Financial Reversal</option>
+                </select>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Payment Mode:</span>
-                <span className="font-medium text-slate-800">{selectedReceiptForVoid.payment_mode}</span>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Detailed Reversal Justification (Mandatory for audit) <span className="text-rose-500">*</span>:
+                </label>
+                <textarea
+                  rows={3}
+                  value={voidReasonDetails}
+                  onChange={(e) => setVoidReasonDetails(e.target.value)}
+                  placeholder="e.g. Bank CTS return code 03 (Insufficient funds), or duplicate entry confirmed by accountant."
+                  className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                  required
+                />
+              </div>
+
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 space-y-1">
+                <p className="font-semibold">⚠️ Accounting Audit Note:</p>
+                <p>
+                  Reversing this receipt will generate a sequential Credit Note (CN-2026-XXXX), restore the reversed amount on the student's fee ledger, and post a credit note reversal audit entry. Original receipt and payment records are preserved permanently.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <Button variant="outline" size="sm" onClick={() => setVoidModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={!voidReasonDetails.trim() || amountToReverse <= 0 || amountToReverse > remaining}
+                  onClick={handleConfirmVoid}
+                  className="flex items-center space-x-1"
+                >
+                  <Ban className="h-3.5 w-3.5" />
+                  <span>Confirm Reversal & Issue Credit Note</span>
+                </Button>
               </div>
             </div>
-
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1">
-                Cancellation Reason Category <span className="text-rose-500">*</span>:
-              </label>
-              <select
-                value={voidReasonCategory}
-                onChange={(e) => setVoidReasonCategory(e.target.value)}
-                className="w-full text-xs p-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
-              >
-                <option value="Cheque Bounced / Dishonoured">Cheque Bounced / Dishonoured</option>
-                <option value="Chargeback / Bank Transaction Disputed">Chargeback / Bank Transaction Disputed</option>
-                <option value="Duplicate Billing Entry / System Error">Duplicate Billing Entry / System Error</option>
-                <option value="Admission Cancelled / Tuition Fee Refunded">Admission Cancelled / Tuition Fee Refunded</option>
-                <option value="Wrong Student Account Credited">Wrong Student Account Credited</option>
-                <option value="Other Financial Reversal">Other Financial Reversal</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1">
-                Detailed Reversal Justification (Mandatory for audit) <span className="text-rose-500">*</span>:
-              </label>
-              <textarea
-                rows={3}
-                value={voidReasonDetails}
-                onChange={(e) => setVoidReasonDetails(e.target.value)}
-                placeholder="e.g. Bank CTS return code 03 (Insufficient funds), or duplicate entry confirmed by accountant."
-                className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
-                required
-              />
-            </div>
-
-            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 space-y-1">
-              <p className="font-semibold">⚠️ Accounting Audit Note:</p>
-              <p>
-                Voiding this receipt will generate a sequential Credit Note (CN-2026-XXXX), mark the payment record as Refunded/Rejected, restore the outstanding balance on the student's fee ledger, and post a credit note reversal entry.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => setVoidModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                disabled={!voidReasonDetails.trim()}
-                onClick={handleConfirmVoid}
-                className="flex items-center space-x-1"
-              >
-                <Ban className="h-3.5 w-3.5" />
-                <span>Confirm Void & Issue Credit Note</span>
-              </Button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
   );

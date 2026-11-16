@@ -150,23 +150,23 @@ export function matchStudentParticipant(
   // 3. Name match if email not matched or missing
   if (normalizedName) {
     if (batchId) {
-      const studentByNameInBatch = store.students.find(
+      const studentsByNameInBatch = store.students.filter(
         (s) =>
           s.batch_id === batchId &&
           (s.full_name.toLowerCase() === normalizedName ||
            normalizedName.includes(s.full_name.toLowerCase()) ||
            s.full_name.toLowerCase().includes(normalizedName))
       );
-      if (studentByNameInBatch) return studentByNameInBatch;
+      if (studentsByNameInBatch.length === 1) return studentsByNameInBatch[0];
     }
 
-    const studentByName = store.students.find(
+    const studentsByName = store.students.filter(
       (s) =>
         s.full_name.toLowerCase() === normalizedName ||
         normalizedName.includes(s.full_name.toLowerCase()) ||
         s.full_name.toLowerCase().includes(normalizedName)
     );
-    if (studentByName) return studentByName;
+    if (studentsByName.length === 1) return studentsByName[0];
   }
 
   return undefined;

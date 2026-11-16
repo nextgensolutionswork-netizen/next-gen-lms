@@ -16,7 +16,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
       description: 'Configure FBZP paying company code and bank determinators',
       course_id: store.courses[0]?.id || 'crs-fico-01',
       batch_id: store.batches[0]?.id || 'batch-01',
-      due_date: '2026-10-31T23:59',
+      due_date: '2026-12-31T23:59',
       maximum_marks: 50,
       created_by: 'usr-trainer',
     });
@@ -33,7 +33,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
       description: 'Original description',
       course_id: store.courses[0]?.id || 'crs-fico-01',
       batch_id: store.batches[0]?.id || 'batch-01',
-      due_date: '2026-10-31T23:59',
+      due_date: '2026-12-31T23:59',
       maximum_marks: 25,
       created_by: 'usr-trainer',
     });
@@ -59,7 +59,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
       description: 'Configure and test OB52 intervals',
       course_id: store.courses[0]?.id || 'crs-fico-01',
       batch_id: targetBatchId,
-      due_date: '2026-10-31T23:59',
+      due_date: '2026-12-31T23:59',
       maximum_marks: 20,
       created_by: 'usr-trainer',
     });
@@ -86,7 +86,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
       description: 'Quick check',
       course_id: store.courses[0]?.id || 'crs-fico-01',
       batch_id: targetBatchId,
-      due_date: '2026-10-31T23:59',
+      due_date: '2026-12-31T23:59',
       maximum_marks: 25,
       created_by: 'usr-trainer',
     });
@@ -116,7 +116,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
       description: 'Full ERP blueprint',
       course_id: store.courses[0]?.id || 'crs-fico-01',
       batch_id: targetBatchId,
-      due_date: '2026-10-31T23:59',
+      due_date: '2026-12-31T23:59',
       maximum_marks: 40,
       created_by: 'usr-trainer',
     });
@@ -148,7 +148,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
       description: 'Will be deleted',
       course_id: store.courses[0]?.id || 'crs-fico-01',
       batch_id: targetBatchId,
-      due_date: '2026-10-31T23:59',
+      due_date: '2026-12-31T23:59',
       maximum_marks: 10,
       created_by: 'usr-trainer',
     });
@@ -183,7 +183,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
         description: 'No title test',
         course_id: store.courses[0]?.id || 'crs-fico-01',
         batch_id: store.batches[0]?.id || 'batch-01',
-        due_date: '2026-10-31T23:59',
+        due_date: '2026-12-31T23:59',
         maximum_marks: 100,
         created_by: 'usr-trainer',
       })
@@ -196,7 +196,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
         description: 'Missing course test',
         course_id: '',
         batch_id: store.batches[0]?.id || 'batch-01',
-        due_date: '2026-10-31T23:59',
+        due_date: '2026-12-31T23:59',
         maximum_marks: 100,
         created_by: 'usr-trainer',
       })
@@ -209,7 +209,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
         description: 'Non-existent course test',
         course_id: 'crs-nonexistent-999',
         batch_id: store.batches[0]?.id || 'batch-01',
-        due_date: '2026-10-31T23:59',
+        due_date: '2026-12-31T23:59',
         maximum_marks: 100,
         created_by: 'usr-trainer',
       })
@@ -222,7 +222,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
         description: 'Missing batch test',
         course_id: store.courses[0]?.id || 'crs-fico-01',
         batch_id: '',
-        due_date: '2026-10-31T23:59',
+        due_date: '2026-12-31T23:59',
         maximum_marks: 100,
         created_by: 'usr-trainer',
       })
@@ -235,7 +235,7 @@ describe('Homework & Assignments Desk - Comprehensive Test Suite', () => {
         description: 'Non-existent batch test',
         course_id: store.courses[0]?.id || 'crs-fico-01',
         batch_id: 'batch-nonexistent-999',
-        due_date: '2026-10-31T23:59',
+        due_date: '2026-12-31T23:59',
         maximum_marks: 100,
         created_by: 'usr-trainer',
       })

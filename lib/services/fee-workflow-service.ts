@@ -1821,8 +1821,9 @@ export class FeeWorkflowService {
   public voidReceipt(
     receiptId: string,
     accountantUserId: string,
-    reason: string
-  ): { receipt: Receipt; creditNoteNumber: string } {
+    reason: string,
+    amountToReverse?: number
+  ): { receipt: Receipt; creditNoteNumber: string; reversedAmount: number } {
     if (!reason || !reason.trim()) {
       throw new Error('A mandatory reason is required to void an official receipt and issue a Credit Note.');
     }
@@ -1840,8 +1841,27 @@ export class FeeWorkflowService {
     const receipt = (store.receipts || []).find((r) => r.id === receiptId || r.receipt_number === receiptId);
     if (!receipt) throw new Error(`Receipt with ID ${receiptId} not found.`);
 
-    if (receipt.status === 'Void') {
-      throw new Error('This receipt has already been voided.');
+    const originalAmount = receipt.original_amount ?? receipt.payment_amount;
+    const previouslyReversed = receipt.reversed_amount ?? 0;
+    const remainingReversible = Number((originalAmount - previouslyReversed).toFixed(2));
+
+    if (remainingReversible <= 0 || receipt.status === 'Void') {
+      throw new Error('This receipt has already been fully reversed / voided.');
+    }
+
+    let reverseAmount: number;
+    if (amountToReverse !== undefined && amountToReverse !== null) {
+      if (!Number.isFinite(amountToReverse) || amountToReverse <= 0) {
+        throw new Error('Amount to reverse must be greater than zero.');
+      }
+      if (amountToReverse > remainingReversible) {
+        throw new Error(
+          `Amount to reverse (₹${amountToReverse}) cannot exceed remaining reversible balance (₹${remainingReversible}).`
+        );
+      }
+      reverseAmount = Number(amountToReverse.toFixed(2));
+    } else {
+      reverseAmount = remainingReversible;
     }
 
     const now = new Date().toISOString();
@@ -1858,28 +1878,48 @@ export class FeeWorkflowService {
     }
     const creditNoteNumber = `${cnPrefix}${String(maxCnSeq + 1).padStart(4, '0')}`;
 
-    receipt.status = 'Void';
+    const newReversedTotal = Number((previouslyReversed + reverseAmount).toFixed(2));
+    const isFullReversal = newReversedTotal >= originalAmount;
+
+    receipt.original_amount = originalAmount;
+    receipt.reversed_amount = newReversedTotal;
+    receipt.status = isFullReversal ? 'Void' : 'Partially Reversed';
     receipt.void_at = now;
     receipt.void_by = accountantName;
     receipt.void_reason = reason.trim();
     receipt.credit_note_number = creditNoteNumber;
+
+    if (!receipt.reversals) receipt.reversals = [];
+    receipt.reversals.push({
+      id: `rev-${Date.now()}`,
+      credit_note_number: creditNoteNumber,
+      amount: reverseAmount,
+      reason: reason.trim(),
+      reversed_by: accountantUserId,
+      reversed_by_name: accountantName,
+      reversed_at: now,
+    });
 
     // 1. Mark associated payment as Voided / Failed and sync dual status (B07)
     const studentPayment = (store.studentPayments || []).find(
       (sp) => sp.id === receipt.payment_id || sp.receipt_number === receipt.receipt_number
     );
     if (studentPayment) {
-      studentPayment.status = 'Voided';
-      studentPayment.verification_status = 'Rejected';
-      studentPayment.notes = `Voided / Reversed via Credit Note ${creditNoteNumber}: ${reason}`;
+      if (isFullReversal) {
+        studentPayment.status = 'Voided';
+        studentPayment.verification_status = 'Rejected';
+      }
+      studentPayment.notes = `Reversed ₹${reverseAmount} via Credit Note ${creditNoteNumber}: ${reason}`;
     }
 
     const legacyPayment = (store.payments || []).find(
       (p) => p.id === receipt.payment_id || p.receipt_number === receipt.receipt_number
     );
     if (legacyPayment) {
-      legacyPayment.status = 'Refunded';
-      legacyPayment.notes = `Voided / Reversed via Credit Note ${creditNoteNumber}: ${reason}`;
+      if (isFullReversal) {
+        legacyPayment.status = 'Refunded';
+      }
+      legacyPayment.notes = `Reversed ₹${reverseAmount} via Credit Note ${creditNoteNumber}: ${reason}`;
     }
 
     // 2. Reverse balances on StudentFee & StudentFeeAccount
@@ -1888,23 +1928,24 @@ export class FeeWorkflowService {
       : (store.studentFees || []).find((f) => f.student_id === receipt.student_id);
 
     if (fee) {
-      fee.paid_amount = Math.max(0, Number((fee.paid_amount - receipt.payment_amount).toFixed(2)));
+      fee.paid_amount = Math.max(0, Number((fee.paid_amount - reverseAmount).toFixed(2)));
       fee.outstanding_amount = Number((fee.final_payable - fee.paid_amount).toFixed(2));
       fee.updated_at = now;
     }
 
     const feeAccount = (store.feeAccounts || []).find((fa) => fa.student_id === receipt.student_id);
     if (feeAccount) {
-      feeAccount.paid_amount = Math.max(0, Number((feeAccount.paid_amount - receipt.payment_amount).toFixed(2)));
-      feeAccount.outstanding_amount = Number((feeAccount.net_payable - feeAccount.paid_amount).toFixed(2));
+      const netPayable = feeAccount.net_payable ?? (feeAccount.paid_amount + feeAccount.outstanding_amount);
+      feeAccount.paid_amount = Math.max(0, Number((feeAccount.paid_amount - reverseAmount).toFixed(2)));
+      feeAccount.outstanding_amount = Number((netPayable - feeAccount.paid_amount).toFixed(2));
       feeAccount.status = feeAccount.paid_amount === 0 ? 'Unpaid' : 'Partially Paid';
       feeAccount.updated_at = now;
     }
 
     const student = (store.students || []).find((s) => s.id === receipt.student_id);
     if (student) {
-      student.paid_amount = Math.max(0, Number(((student.paid_amount || 0) - receipt.payment_amount).toFixed(2)));
-      student.outstanding_amount = Number(((student.outstanding_amount || 0) + receipt.payment_amount).toFixed(2));
+      student.paid_amount = Math.max(0, Number(((student.paid_amount || 0) - reverseAmount).toFixed(2)));
+      student.outstanding_amount = Number(((student.outstanding_amount || 0) + reverseAmount).toFixed(2));
       student.updated_at = now;
     }
 
@@ -1919,7 +1960,7 @@ export class FeeWorkflowService {
             (fee && (i.fee_account_id === fee.id || (i as any).student_fee_id === fee.id)))
       );
       if (targetInst) {
-        targetInst.paid_amount = Math.max(0, Number(((targetInst.paid_amount || 0) - receipt.payment_amount).toFixed(2)));
+        targetInst.paid_amount = Math.max(0, Number(((targetInst.paid_amount || 0) - reverseAmount).toFixed(2)));
         targetInst.status = targetInst.paid_amount >= targetInst.amount ? 'Paid' : targetInst.paid_amount > 0 ? 'Partial' : 'Pending';
         if (targetInst.status !== 'Paid') {
           targetInst.paid_date = undefined;
@@ -1935,9 +1976,9 @@ export class FeeWorkflowService {
       fee_category: fee?.fee_category || 'Tuition Fee',
       reference_type: 'Credit Note',
       reference_id: creditNoteNumber,
-      debit: receipt.payment_amount,
+      debit: reverseAmount,
       credit: 0,
-      description: `Credit Note ${creditNoteNumber} issued for voided receipt ${receipt.receipt_number}: ${reason}`,
+      description: `Credit Note ${creditNoteNumber} issued for ${isFullReversal ? 'voided' : 'partially reversed'} receipt ${receipt.receipt_number} (Reversed: ₹${reverseAmount}): ${reason}`,
       recorded_by: accountantUserId,
     });
 
@@ -1961,7 +2002,7 @@ export class FeeWorkflowService {
     store.reconcileDualLedgers();
     store.persist();
 
-    return { receipt, creditNoteNumber };
+    return { receipt, creditNoteNumber, reversedAmount: reverseAmount };
   }
 }
 

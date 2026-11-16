@@ -17,6 +17,7 @@ import {
 } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { validateAssignmentDeadline, getInstituteTimezone } from '@/lib/utils/assignment-date';
 
 // --- Courses, Modules & Lessons ---
 export async function getCourses(): Promise<Course[]> {
@@ -945,10 +946,13 @@ export async function createClassSession(
         existing.trainer_id ||
         store.batches.find((b) => b.id === existing.batch_id)?.trainer_id;
       const isSameTrainer =
-        (trainerId && existingTrainerId && existingTrainerId === trainerId) ||
-        (trainer?.full_name &&
-          existing.trainer_name &&
-          trainer.full_name.trim().toLowerCase() === existing.trainer_name.trim().toLowerCase());
+        (trainerId && existingTrainerId)
+          ? existingTrainerId === trainerId
+          : Boolean(
+              trainer?.full_name &&
+              existing.trainer_name &&
+              trainer.full_name.trim().toLowerCase() === existing.trainer_name.trim().toLowerCase()
+            );
 
       if (isSameTrainer) {
         throw new Error(
@@ -1095,10 +1099,13 @@ export async function updateClassSession(
         store.batches.find((b) => b.id === existing.batch_id)?.trainer_id;
       const trainer = updatedTrainerId ? store.users.find((u) => u.id === updatedTrainerId) : undefined;
       const isSameTrainer =
-        (updatedTrainerId && existingTrainerId && existingTrainerId === updatedTrainerId) ||
-        (trainer?.full_name &&
-          existing.trainer_name &&
-          trainer.full_name.trim().toLowerCase() === existing.trainer_name.trim().toLowerCase());
+        (updatedTrainerId && existingTrainerId)
+          ? existingTrainerId === updatedTrainerId
+          : Boolean(
+              trainer?.full_name &&
+              existing.trainer_name &&
+              trainer.full_name.trim().toLowerCase() === existing.trainer_name.trim().toLowerCase()
+            );
 
       if (isSameTrainer) {
         throw new Error(
@@ -1298,7 +1305,14 @@ export async function getAssignments(batchId?: string): Promise<Assignment[]> {
   return [...store.assignments];
 }
 
-export async function createAssignment(data: Omit<Assignment, 'id' | 'submissions_count' | 'created_at'>): Promise<Assignment> {
+export async function createAssignment(
+  data: Omit<Assignment, 'id' | 'submissions_count' | 'created_at'>,
+  options?: {
+    allowPastDeadline?: boolean;
+    referenceDate?: Date;
+    timeZone?: string;
+  }
+): Promise<Assignment> {
   if (!data.title?.trim()) {
     throw new Error('Assignment title is required.');
   }
@@ -1316,6 +1330,18 @@ export async function createAssignment(data: Omit<Assignment, 'id' | 'submission
   if (!batch) {
     throw new Error(`Batch not found: ${data.batch_id}`);
   }
+
+  // Validate deadline according to authoritative institute timezone and publication policy
+  const timeZone = options?.timeZone || getInstituteTimezone();
+  const deadlineValidation = validateAssignmentDeadline(data.due_date, {
+    allowPastDeadline: options?.allowPastDeadline,
+    referenceDate: options?.referenceDate,
+    timeZone,
+  });
+  if (!deadlineValidation.isValid) {
+    throw new Error(deadlineValidation.error || 'A valid submission deadline is required.');
+  }
+
   const maxMarks = typeof data.maximum_marks === 'number' && data.maximum_marks > 0 ? data.maximum_marks : 100;
 
   const asg: Assignment = {
@@ -1356,10 +1382,28 @@ export async function createAssignment(data: Omit<Assignment, 'id' | 'submission
 
 export async function updateAssignment(
   assignmentId: string,
-  data: Partial<Omit<Assignment, 'id' | 'created_at'>>
+  data: Partial<Omit<Assignment, 'id' | 'created_at'>>,
+  options?: {
+    allowPastDeadline?: boolean;
+    referenceDate?: Date;
+    timeZone?: string;
+  }
 ): Promise<Assignment> {
   const asg = store.assignments.find((a) => a.id === assignmentId);
   if (!asg) throw new Error(`Assignment not found: ${assignmentId}`);
+
+  // Only validate deadline if it is being modified to a new value
+  if (data.due_date !== undefined && data.due_date !== asg.due_date) {
+    const timeZone = options?.timeZone || getInstituteTimezone();
+    const deadlineValidation = validateAssignmentDeadline(data.due_date, {
+      allowPastDeadline: options?.allowPastDeadline,
+      referenceDate: options?.referenceDate,
+      timeZone,
+    });
+    if (!deadlineValidation.isValid) {
+      throw new Error(deadlineValidation.error || 'A valid submission deadline is required.');
+    }
+  }
 
   Object.assign(asg, data);
   store.persist();

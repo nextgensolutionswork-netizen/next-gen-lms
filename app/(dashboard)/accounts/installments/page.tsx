@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function RetiredInstallmentsPage() {
-  redirect('/accounts/fees');
+export default function InstallmentsRedirectPage() {
+  redirect('/accounts/dues');
 }

@@ -46,34 +46,77 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
     doc.on('error', reject);
     try {
       const money = (amount: number) => 'INR ' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      doc.fillColor('#0A6ED1').font('Helvetica-Bold').fontSize(20).text(instituteName || 'Fee Receipt');
-      doc.fillColor('#475569').font('Helvetica').fontSize(10);
-      if (receipt.institute_address) doc.text(receipt.institute_address);
-      if (receipt.institute_phone) doc.text(receipt.institute_phone);
+      
+      // 1. Company Logo & Branding Header
+      doc.roundedRect(45, 45, 40, 26, 4).fill('#0A6ED1');
+      doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11).text('ERP', 45, 52, { width: 40, align: 'center' });
+
+      doc.fillColor('#0A6ED1').font('Helvetica-Bold').fontSize(18).text(instituteName || 'Next-Gen ERP Solutions', 95, 45);
+      doc.fillColor('#475569').font('Helvetica').fontSize(9.5);
+      if (receipt.institute_address) doc.text(receipt.institute_address, 95, 66);
+      if (receipt.institute_phone) doc.text('Phone: ' + receipt.institute_phone, 95, 78);
+      
+      doc.y = 100;
       doc.moveDown();
-      doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(16).text('OFFICIAL FEE RECEIPT');
-      doc.font('Helvetica').fontSize(10).text('Receipt: ' + receipt.receipt_number);
-      doc.text('Payment date: ' + formatDate(receipt.payment_date)).moveDown();
+      doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(15).text('OFFICIAL FEE RECEIPT');
+      doc.font('Helvetica').fontSize(9.5).text('Receipt: ' + receipt.receipt_number);
+      doc.text('Payment date: ' + formatDate(receipt.payment_date));
+
+      // 2. Place of Supply
+      const placeOfSupply = receipt.place_of_supply || (receipt.supply_type === 'INTER_STATE' ? 'Inter-State' : 'Telangana (State Code: 36)');
+      doc.text('Place of supply: ' + placeOfSupply).moveDown();
+
       if (receipt.status === 'Void') {
         doc.fillColor('#BE123C').font('Helvetica-Bold').text('VOID / CANCELLED');
         doc.font('Helvetica').text('Credit note: ' + (receipt.credit_note_number || ''));
+        if (receipt.reversed_amount) {
+          doc.text('Reversal amount: ' + money(receipt.reversed_amount));
+        }
+        doc.text('Reason: ' + (receipt.void_reason || '')).moveDown();
+      } else if (receipt.status === 'Partially Reversed') {
+        doc.fillColor('#D97706').font('Helvetica-Bold').text('PARTIALLY REVERSED');
+        doc.font('Helvetica').text('Credit note: ' + (receipt.credit_note_number || ''));
+        if (receipt.reversed_amount) {
+          doc.text('Reversed amount: ' + money(receipt.reversed_amount));
+          doc.text('Net effective collection: ' + money(paymentAmount - receipt.reversed_amount));
+        }
         doc.text('Reason: ' + (receipt.void_reason || '')).moveDown();
       }
+
       doc.fillColor('#0F172A').font('Helvetica-Bold').text(receipt.student_name);
       doc.font('Helvetica').text('Admission: ' + receipt.admission_number);
       doc.text('Course: ' + receipt.course_name);
       if (receipt.student_email) doc.text(receipt.student_email);
       doc.moveDown().text('Payment mode: ' + receipt.payment_mode);
-      doc.text('Transaction reference: ' + (receipt.transaction_reference || '-')).moveDown(2);
-      doc.font('Helvetica-Bold').fontSize(14).text('Amount received: ' + money(paymentAmount));
-      doc.font('Helvetica').fontSize(10).text(amountToWordsINR(paymentAmount)).moveDown();
-      doc.font('Helvetica-Bold').text('Remaining balance: ' + (remainingBalance === null ? 'Not recorded on this receipt' : money(remainingBalance))).moveDown(2);
+      doc.text('Transaction reference: ' + (receipt.transaction_reference || '-')).moveDown(1.5);
+
+      doc.font('Helvetica-Bold').fontSize(13).text('Amount received: ' + money(paymentAmount));
+      doc.font('Helvetica').fontSize(9.5).text(amountToWordsINR(paymentAmount)).moveDown();
+
+      doc.font('Helvetica-Bold').text('Remaining balance: ' + (remainingBalance === null ? 'Not recorded on this receipt' : money(remainingBalance)));
+
+      // 3. Due Date (when an outstanding balance remains)
+      if (remainingBalance !== null && remainingBalance > 0) {
+        const dueDate = receipt.due_date ? formatDate(receipt.due_date) : 'Due per scheduled installment plan';
+        doc.font('Helvetica-Bold').fillColor('#B45309').text('Remaining fee due date: ' + dueDate);
+        doc.fillColor('#0F172A');
+      }
+      doc.moveDown(1.5);
+
       doc.font('Helvetica').text('Authorized by: ' + receipt.authorized_by);
       doc.text('Generated: ' + formatDateTime(receipt.created_at)).moveDown();
+
       const qrY = doc.y;
-      doc.image(qr, 45, qrY, { width: 75, height: 75 });
-      doc.fontSize(9).text('Scan to view this receipt in the student ledger.', 135, qrY + 18, { width: 350 });
-      doc.fillColor('#64748B').text('This receipt records the payment credited to the student account.', 45, qrY + 100, { width: 500 });
+      doc.image(qr, 45, qrY, { width: 70, height: 70 });
+      doc.fontSize(8.5).text('Scan to view this receipt in the student ledger.', 125, qrY + 16, { width: 350 });
+      doc.fillColor('#64748B').text('This receipt records the payment credited to the student account.', 45, qrY + 85, { width: 500 });
+
+      // 4. Terms & Conditions
+      const termsAndConditions = receipt.terms_and_conditions ||
+        '1. Fees once paid are non-refundable and subject to institutional policies.\n2. This is a computer-generated official receipt and requires no physical signature.\n3. All disputes are subject to local judicial jurisdiction.';
+      doc.fillColor('#334155').font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS:', 45, qrY + 110);
+      doc.fillColor('#64748B').font('Helvetica').fontSize(7.5).text(termsAndConditions, 45, qrY + 122, { width: 505 });
+
       doc.end();
     } catch (error) { reject(error); }
   });

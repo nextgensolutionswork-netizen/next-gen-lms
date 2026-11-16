@@ -37,6 +37,12 @@ import {
 import { canAccessCourse } from '@/lib/auth/rbac';
 import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { exportAssignmentSubmissionsZip, downloadZip, ZipFileInput } from '@/lib/utils/zip-export';
+import {
+  getInstituteTimezone,
+  formatDeadlineToInput,
+  formatDeadlineToDisplay,
+  validateAssignmentDeadline,
+} from '@/lib/utils/assignment-date';
 
 export default function AssignmentsPage() {
   const { user, role, hasPermission } = useAuth();
@@ -87,14 +93,36 @@ export default function AssignmentsPage() {
   const [selectedSub, setSelectedSub] = React.useState<AssignmentSubmission | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const instituteTimezone = getInstituteTimezone();
+
   // New Assignment form state
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [courseId, setCourseId] = React.useState(store.courses[0]?.id || '');
   const [batchId, setBatchId] = React.useState(store.batches[0]?.id || '');
-  const [dueDate, setDueDate] = React.useState('2026-03-30T23:59');
+  const [dueDate, setDueDate] = React.useState('');
   const [maxMarks, setMaxMarks] = React.useState(100);
   const [assignmentFileUrl, setAssignmentFileUrl] = React.useState('');
+
+  const resetAddForm = React.useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setCourseId(store.courses[0]?.id || '');
+    setBatchId(store.batches[0]?.id || '');
+    setDueDate('');
+    setMaxMarks(100);
+    setAssignmentFileUrl('');
+  }, []);
+
+  const openAddModal = React.useCallback(() => {
+    resetAddForm();
+    setIsAddModal(true);
+  }, [resetAddForm]);
+
+  const closeAddModal = React.useCallback(() => {
+    resetAddForm();
+    setIsAddModal(false);
+  }, [resetAddForm]);
 
   // Keep courseId and batchId synced when store data hydrates
   React.useEffect(() => {
@@ -152,10 +180,23 @@ export default function AssignmentsPage() {
       setStatusMessage({ type: 'error', text: 'Please select a target batch before creating an assignment.' });
       return;
     }
-    if (!dueDate) {
+    if (!dueDate || !dueDate.trim()) {
       setStatusMessage({ type: 'error', text: 'Submission due date is required.' });
       return;
     }
+
+    const deadlineValidation = validateAssignmentDeadline(dueDate, {
+      referenceDate: new Date(),
+      timeZone: instituteTimezone,
+    });
+    if (!deadlineValidation.isValid) {
+      setStatusMessage({
+        type: 'error',
+        text: deadlineValidation.error || 'Assignment deadline must be set to a future date and time.',
+      });
+      return;
+    }
+
     if (!maxMarks || maxMarks <= 0) {
       setStatusMessage({ type: 'error', text: 'Maximum marks must be greater than zero.' });
       return;
@@ -176,10 +217,7 @@ export default function AssignmentsPage() {
           store.users.find((u) => u.role === 'trainer')?.id ||
           'usr-trainer',
       });
-      setIsAddModal(false);
-      setTitle('');
-      setDescription('');
-      setAssignmentFileUrl('');
+      closeAddModal();
       setStatusMessage({ type: 'success', text: `Assignment "${title}" published successfully.` });
       refreshList();
     } catch (err: any) {
@@ -191,7 +229,7 @@ export default function AssignmentsPage() {
     setActiveAssignment(asg);
     setEditTitle(asg.title);
     setEditDescription(asg.description || '');
-    setEditDueDate(asg.due_date);
+    setEditDueDate(formatDeadlineToInput(asg.due_date, instituteTimezone));
     setEditMaxMarks(asg.maximum_marks);
     setEditFileUrl(asg.attachment_url || '');
     setIsEditModal(true);
@@ -200,14 +238,48 @@ export default function AssignmentsPage() {
   const handleUpdateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeAssignment) return;
-    try {
-      await updateAssignment(activeAssignment.id, {
-        title: editTitle.trim(),
-        description: editDescription.trim(),
-        due_date: editDueDate,
-        maximum_marks: Number(editMaxMarks) || 100,
-        attachment_url: editFileUrl || undefined,
+
+    if (!editTitle.trim()) {
+      setStatusMessage({ type: 'error', text: 'Assignment title is required.' });
+      return;
+    }
+    if (!editDueDate || !editDueDate.trim()) {
+      setStatusMessage({ type: 'error', text: 'Submission due date is required.' });
+      return;
+    }
+
+    const originalInputDueDate = formatDeadlineToInput(activeAssignment.due_date, instituteTimezone);
+    const isDeadlineModified = editDueDate !== originalInputDueDate;
+
+    if (isDeadlineModified) {
+      const deadlineValidation = validateAssignmentDeadline(editDueDate, {
+        referenceDate: new Date(),
+        timeZone: instituteTimezone,
       });
+      if (!deadlineValidation.isValid) {
+        setStatusMessage({
+          type: 'error',
+          text: deadlineValidation.error || 'Assignment deadline must be set to a future date and time.',
+        });
+        return;
+      }
+    }
+
+    try {
+      await updateAssignment(
+        activeAssignment.id,
+        {
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          due_date: isDeadlineModified ? editDueDate : activeAssignment.due_date,
+          maximum_marks: Number(editMaxMarks) || 100,
+          attachment_url: editFileUrl || undefined,
+        },
+        {
+          allowPastDeadline: !isDeadlineModified,
+          timeZone: instituteTimezone,
+        }
+      );
       setIsEditModal(false);
       setStatusMessage({ type: 'success', text: `Assignment "${editTitle}" updated.` });
       refreshList();
@@ -398,7 +470,7 @@ export default function AssignmentsPage() {
           <Button
             variant="sap"
             size="sm"
-            onClick={() => setIsAddModal(true)}
+            onClick={openAddModal}
             className="text-xs flex items-center space-x-1"
           >
             <Plus className="h-4 w-4" />
@@ -451,7 +523,7 @@ export default function AssignmentsPage() {
               : 'Publish your first hands-on SAP configuration task for your batches.'}
           </p>
           {canCreate && (
-            <Button variant="sap" size="sm" onClick={() => setIsAddModal(true)} className="mt-4 text-xs">
+            <Button variant="sap" size="sm" onClick={openAddModal} className="mt-4 text-xs">
               <Plus className="h-3.5 w-3.5 mr-1" /> Create Assignment
             </Button>
           )}
@@ -495,9 +567,9 @@ export default function AssignmentsPage() {
                   )}
 
                   <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-                    <span className="flex items-center space-x-1">
+                    <span className="flex items-center space-x-1" title={`Evaluated in institute timezone (${instituteTimezone})`}>
                       <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      <span>Due: {formatDate(asg.due_date)}</span>
+                      <span>Due: {formatDeadlineToDisplay(asg.due_date, instituteTimezone, false)}</span>
                     </span>
                     {!isStudent && (
                       <span className="font-bold text-slate-800">{subCount} Submissions</span>
@@ -700,7 +772,7 @@ export default function AssignmentsPage() {
       {/* Create Assignment Modal */}
       <Modal
         isOpen={isAddModal}
-        onClose={() => setIsAddModal(false)}
+        onClose={closeAddModal}
         title="Create New Assignment"
         description="Assign SAP hands-on problem statements to batches."
       >
@@ -761,23 +833,37 @@ export default function AssignmentsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Submission Due Date *"
-              type="datetime-local"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              required
-            />
-            <Input
-              label="Maximum Marks *"
-              type="number"
-              min={1}
-              max={1000}
-              value={maxMarks}
-              onChange={(e) => setMaxMarks(Number(e.target.value))}
-              required
-            />
+          <div className="grid grid-cols-2 gap-3 items-start">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Submission Due Date *
+                </label>
+                <span className="text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                  {instituteTimezone}
+                </span>
+              </div>
+              <Input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                required
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Timezone: {instituteTimezone}
+              </p>
+            </div>
+            <div>
+              <Input
+                label="Maximum Marks *"
+                type="number"
+                min={1}
+                max={1000}
+                value={maxMarks}
+                onChange={(e) => setMaxMarks(Number(e.target.value))}
+                required
+              />
+            </div>
           </div>
 
           <div>
@@ -802,7 +888,7 @@ export default function AssignmentsPage() {
           />
 
           <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModal(false)}>
+            <Button type="button" variant="outline" size="sm" onClick={closeAddModal}>
               Cancel
             </Button>
             <Button
@@ -832,23 +918,37 @@ export default function AssignmentsPage() {
             required
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Submission Due Date *"
-              type="datetime-local"
-              value={editDueDate}
-              onChange={(e) => setEditDueDate(e.target.value)}
-              required
-            />
-            <Input
-              label="Maximum Marks *"
-              type="number"
-              min={1}
-              max={1000}
-              value={editMaxMarks}
-              onChange={(e) => setEditMaxMarks(Number(e.target.value))}
-              required
-            />
+          <div className="grid grid-cols-2 gap-3 items-start">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Submission Due Date *
+                </label>
+                <span className="text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                  {instituteTimezone}
+                </span>
+              </div>
+              <Input
+                type="datetime-local"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                required
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Timezone: {instituteTimezone}
+              </p>
+            </div>
+            <div>
+              <Input
+                label="Maximum Marks *"
+                type="number"
+                min={1}
+                max={1000}
+                value={editMaxMarks}
+                onChange={(e) => setEditMaxMarks(Number(e.target.value))}
+                required
+              />
+            </div>
           </div>
 
           <div>

@@ -337,6 +337,16 @@ export function Sidebar({
                   </Link>
                 )}
 
+                {/* Student Payment Due Dates: Preserved for Counsellor and Finance staff */}
+                <Link
+                  href="/accounts/dues"
+                  className={`block px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    isActive('/accounts/dues') ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Student Payment Due Dates
+                </Link>
+
                 {/* Student Fee Ledger: Preserved for Counsellor and Finance staff */}
                 <Link
                   href="/accounts/fees"

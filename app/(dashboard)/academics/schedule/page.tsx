@@ -44,16 +44,9 @@ export default function SchedulePage() {
   const [sessions, setSessions] = React.useState<ClassSession[]>(store.classSessions);
   const [view, setView] = React.useState<'day' | 'week' | 'month' | 'all'>('month');
   const [selectedBatchFilter, setSelectedBatchFilter] = React.useState<string>('all');
-  const [selectedReferenceDate, setSelectedReferenceDate] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlDate = params.get('date');
-      if (urlDate && isValidYMD(urlDate)) {
-        return urlDate;
-      }
-    }
-    return getTodayInInstituteTimezone();
-  });
+  const [selectedReferenceDate, setSelectedReferenceDate] = React.useState(() =>
+    getTodayInInstituteTimezone()
+  );
 
   // URL search parameter synchronization for ?date=YYYY-MM-DD
   React.useEffect(() => {

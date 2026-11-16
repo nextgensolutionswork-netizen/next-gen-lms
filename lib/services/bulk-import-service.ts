@@ -200,8 +200,10 @@ export function parseCSV(rawText: string): {
 // 2. VALIDATION ENGINES
 // ==========================================
 
+import { validateEmailAddress } from '@/lib/utils/email-validation';
+
 export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  return validateEmailAddress(email).isValid;
 }
 
 export function isValidPhone(phone: string): boolean {
@@ -554,14 +556,27 @@ export function validateAttendanceRows(
     const rawStatus = (data.status || 'Present').trim();
     const durationMinutes = parseInt(data.duration_minutes || data.duration || '60', 10);
 
-    // 1. Student identification
-    const student = store.students.find(
+    // 1. Student identification: prioritize unique system identifiers
+    let student = store.students.find(
       (s) =>
         s.student_code.toLowerCase() === studentIdentifier.toLowerCase() ||
         s.id.toLowerCase() === studentIdentifier.toLowerCase() ||
-        s.email.toLowerCase() === studentIdentifier.toLowerCase() ||
-        s.full_name.toLowerCase() === studentIdentifier.toLowerCase()
+        s.email.toLowerCase() === studentIdentifier.toLowerCase()
     );
+
+    // If not matched by unique ID, check by full name with multiple-student ambiguity detection
+    if (!student && studentIdentifier) {
+      const matchingByName = store.students.filter(
+        (s) => s.full_name.toLowerCase() === studentIdentifier.toLowerCase()
+      );
+      if (matchingByName.length === 1) {
+        student = matchingByName[0];
+      } else if (matchingByName.length > 1) {
+        const msg = `Ambiguous student name "${studentIdentifier}". ${matchingByName.length} distinct students share this name. Please identify by unique student code or email.`;
+        rowErrors.push(msg);
+        errors.push({ rowNumber, field: 'student_code', message: msg, severity: 'error' });
+      }
+    }
 
     if (!studentIdentifier) {
       const msg = 'Student identifier (student_code or email) is required';

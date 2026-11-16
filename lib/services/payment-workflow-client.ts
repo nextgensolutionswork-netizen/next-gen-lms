@@ -25,6 +25,7 @@ export const paymentWorkflowClient = {
     return refreshTask;
   },
   async refreshAdmissions() { return request(undefined, '/api/admissions'); },
+  async refreshStudents() { return request(undefined, '/api/students'); },
   async refreshReceipts() { return request(undefined, '/api/fees/receipts'); },
   recordPayment(input: Parameters<typeof feeWorkflowService.recordPayment>[0], _userId?: string, _role?: string): Promise<StudentPaymentRecord> {
     const signature = JSON.stringify(input);
@@ -44,8 +45,8 @@ export const paymentWorkflowClient = {
   async rejectPayment(paymentId: string, _userId: string, reason: string) {
     return (await request({ action: 'reject', paymentId, reason })).payment as StudentPaymentRecord;
   },
-  async voidReceipt(receiptId: string, reason: string) {
-    return (await request({ action: 'void_receipt', receiptId, reason })).result;
+  async voidReceipt(receiptId: string, reason: string, amount?: number) {
+    return (await request({ action: 'void_receipt', receiptId, reason, amount })).result;
   },
   async createAdmission(input: CreateAdmissionInput) {
     const signature = JSON.stringify({ email: input.email, course_id: input.course_id, date: input.admission_date, phone: input.phone });

@@ -20,12 +20,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { Modal } from '@/components/ui/modal';
+import { Input } from '@/components/ui/input';
 import { store } from '@/lib/services/data-store';
 import { StudentFeeAccount } from '@/types';
 import { formatINR, exportToCSV } from '@/lib/utils/formatters';
 import { exportFeeLedgerToExcel } from '@/lib/utils/excel-export';
 import { useAuth } from '@/components/providers/auth-provider';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { adjustDiscontinuedStudentFee } from '@/lib/services/finance-service';
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') {
@@ -45,6 +48,9 @@ export default function StudentFeesPage() {
     role === 'admin' ||
     role === 'super_admin';
 
+  const canManageDiscontinuation =
+    role === 'accountant' || role === 'admin' || role === 'super_admin';
+
   const [feeAccounts, setFeeAccounts] = React.useState<StudentFeeAccount[]>(() => {
     store.reconcileDualLedgers();
     return store.feeAccounts || [];
@@ -52,6 +58,22 @@ export default function StudentFeesPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('All');
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('search');
+      if (q) setSearch(q);
+    }
+  }, []);
+
+  // Discontinued Student Adjustment Modal State
+  const [selectedFeeForDiscontinue, setSelectedFeeForDiscontinue] = React.useState<StudentFeeAccount | null>(null);
+  const [isDiscontinueModalOpen, setIsDiscontinueModalOpen] = React.useState(false);
+  const [discontinueReason, setDiscontinueReason] = React.useState('');
+  const [discontinueAmount, setDiscontinueAmount] = React.useState<number>(0);
+  const [discontinueError, setDiscontinueError] = React.useState<string | null>(null);
+  const [discontinueSuccess, setDiscontinueSuccess] = React.useState<string | null>(null);
 
   const refreshList = React.useCallback(() => {
     store.reconcileDualLedgers();
@@ -70,6 +92,37 @@ export default function StudentFeesPage() {
     }
     setFeeAccounts(list);
   }, [search, statusFilter]);
+
+  const handleOpenDiscontinue = (fa: StudentFeeAccount) => {
+    setSelectedFeeForDiscontinue(fa);
+    setDiscontinueAmount(safeAmount(fa.outstanding_amount));
+    setDiscontinueReason('');
+    setDiscontinueError(null);
+    setIsDiscontinueModalOpen(true);
+  };
+
+  const handleConfirmDiscontinue = () => {
+    if (!selectedFeeForDiscontinue || !user) return;
+    setDiscontinueError(null);
+    try {
+      adjustDiscontinuedStudentFee({
+        fee_account_id: selectedFeeForDiscontinue.id,
+        reason: discontinueReason,
+        adjusted_amount: discontinueAmount,
+        approved_by_user_id: user.id,
+      });
+      setDiscontinueSuccess(
+        `Outstanding balance for ${selectedFeeForDiscontinue.student_name} adjusted by ${formatINR(discontinueAmount)}. Account marked as Discontinued / Adjusted.`
+      );
+      setIsDiscontinueModalOpen(false);
+      setSelectedFeeForDiscontinue(null);
+      setDiscontinueReason('');
+      refreshList();
+      setTimeout(() => setDiscontinueSuccess(null), 6000);
+    } catch (err: any) {
+      setDiscontinueError(err.message || 'Failed to adjust fee account.');
+    }
+  };
 
   React.useEffect(() => {
     setIsLoading(true);
@@ -195,6 +248,18 @@ export default function StudentFeesPage() {
         </Card>
       </div>
 
+      {discontinueSuccess && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{discontinueSuccess}</span>
+          </div>
+          <button onClick={() => setDiscontinueSuccess(null)} className="text-slate-400 hover:text-slate-600 text-xs">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <Card className="p-3 shadow-xs">
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -211,7 +276,7 @@ export default function StudentFeesPage() {
 
           <div className="flex items-center space-x-2">
             <span className="text-xs text-slate-500 font-medium">Status:</span>
-            {['All', 'Paid', 'Partially Paid', 'Unpaid', 'Overdue'].map((st) => (
+            {['All', 'Paid', 'Partially Paid', 'Unpaid', 'Overdue', 'Discontinued / Adjusted'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -278,23 +343,55 @@ export default function StudentFeesPage() {
                       <td className="px-3.5 py-2.5 font-bold text-emerald-600 whitespace-nowrap">{formatINR(safeAmount(fa.paid_amount))}</td>
                       <td className="px-3.5 py-2.5 font-bold text-amber-600 whitespace-nowrap">{formatINR(safeAmount(fa.outstanding_amount))}</td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
-                        <Badge variant={fa.status === 'Paid' ? 'success' : 'warning'} className="whitespace-nowrap font-medium text-[11px]">{fa.status}</Badge>
+                        <Badge
+                          variant={
+                            fa.status === 'Paid'
+                              ? 'success'
+                              : fa.status === 'Discontinued / Adjusted'
+                              ? 'outline'
+                              : 'warning'
+                          }
+                          className={`whitespace-nowrap font-medium text-[11px] ${
+                            fa.status === 'Discontinued / Adjusted' ? 'border-amber-400 bg-amber-50 text-amber-800' : ''
+                          }`}
+                        >
+                          {fa.status}
+                        </Badge>
                       </td>
                       <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                        {safeAmount(fa.outstanding_amount) > 0 ? (
-                          <Link
-                            href={`/accounts/payments?studentId=${encodeURIComponent(fa.student_id)}&student_id=${encodeURIComponent(fa.student_id)}&student_name=${encodeURIComponent(fa.student_name || '')}&feeAccountId=${encodeURIComponent(fa.id)}&fee_id=${encodeURIComponent(fa.id)}&amount=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&amount_due=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&course_name=${encodeURIComponent(fa.course_name || '')}`}
-                          >
-                            <Button variant="sap" size="sm" className="h-7 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white whitespace-nowrap shadow-xs">
-                              Collect
-                            </Button>
-                          </Link>
-                        ) : (
-                          <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end space-x-1">
-                            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                            <span>Cleared</span>
-                          </span>
-                        )}
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {safeAmount(fa.outstanding_amount) > 0 ? (
+                            <>
+                              <Link
+                                href={`/accounts/payments?studentId=${encodeURIComponent(fa.student_id)}&student_id=${encodeURIComponent(fa.student_id)}&student_name=${encodeURIComponent(fa.student_name || '')}&feeAccountId=${encodeURIComponent(fa.id)}&fee_id=${encodeURIComponent(fa.id)}&amount=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&amount_due=${encodeURIComponent(safeAmount(fa.outstanding_amount))}&course_name=${encodeURIComponent(fa.course_name || '')}`}
+                              >
+                                <Button variant="sap" size="sm" className="h-7 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white whitespace-nowrap shadow-xs">
+                                  Collect
+                                </Button>
+                              </Link>
+                              {canManageDiscontinuation && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenDiscontinue(fa)}
+                                  className="h-7 px-2 text-xs font-semibold text-amber-700 hover:text-amber-900 border-amber-300 hover:bg-amber-50"
+                                  title="Clear outstanding fee for discontinued student"
+                                >
+                                  Discontinue
+                                </Button>
+                              )}
+                            </>
+                          ) : fa.status === 'Discontinued / Adjusted' ? (
+                            <span className="text-[11px] text-amber-700 font-semibold flex items-center justify-end space-x-1" title={fa.discontinuation_record?.reason}>
+                              <span>Adjusted ({formatINR(fa.discontinuation_record?.adjusted_amount || 0)})</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end space-x-1">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                              <span>Cleared</span>
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -304,6 +401,92 @@ export default function StudentFeesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Discontinue Student Fee Adjustment Modal */}
+      {selectedFeeForDiscontinue && (
+        <Modal
+          isOpen={isDiscontinueModalOpen}
+          onClose={() => setIsDiscontinueModalOpen(false)}
+          title="Discontinued Student — Clear Outstanding Fee"
+          description={`Record an authorized write-off/adjustment for ${selectedFeeForDiscontinue.student_name} (${selectedFeeForDiscontinue.course_name}).`}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white p-2 rounded border border-amber-100">
+                  <span className="text-[10px] text-slate-500 font-medium block">Total Net Fee</span>
+                  <span className="font-bold text-slate-800 text-sm">{formatINR(safeAmount(selectedFeeForDiscontinue.net_payable))}</span>
+                </div>
+                <div className="bg-white p-2 rounded border border-amber-100">
+                  <span className="text-[10px] text-slate-500 font-medium block">Amount Collected</span>
+                  <span className="font-bold text-emerald-600 text-sm">{formatINR(safeAmount(selectedFeeForDiscontinue.paid_amount))}</span>
+                </div>
+                <div className="bg-white p-2 rounded border border-amber-100">
+                  <span className="text-[10px] text-slate-500 font-medium block">Current Outstanding</span>
+                  <span className="font-bold text-amber-700 text-sm">{formatINR(safeAmount(selectedFeeForDiscontinue.outstanding_amount))}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-1">
+                <strong>Accounting Rule:</strong> Adjusting this balance creates an auditable write-off entry in the student financial ledger. Previously received payments are preserved and will not be altered.
+              </p>
+            </div>
+
+            <div>
+              <Input
+                label="Adjustment / Write-Off Amount (₹) *"
+                type="number"
+                value={discontinueAmount}
+                onChange={(e) => setDiscontinueAmount(Number(e.target.value))}
+                min={1}
+                max={safeAmount(selectedFeeForDiscontinue.outstanding_amount)}
+                required
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">Maximum adjustable: {formatINR(safeAmount(selectedFeeForDiscontinue.outstanding_amount))}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Discontinuation Reason & Approving Notes (Mandatory) *
+              </label>
+              <textarea
+                rows={3}
+                value={discontinueReason}
+                onChange={(e) => setDiscontinueReason(e.target.value)}
+                placeholder="e.g. Student discontinued after Module 1 due to medical relocation. Balance waived per Dean approval."
+                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                required
+              />
+            </div>
+
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-[11px] text-slate-600">
+              <span>Approving Officer: <strong>{user?.full_name || user?.email}</strong> ({role})</span>
+              <span>Timestamp: <strong>{new Date().toLocaleDateString('en-IN')}</strong></span>
+            </div>
+
+            {discontinueError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center space-x-1.5">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{discontinueError}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsDiscontinueModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="sap"
+                size="sm"
+                onClick={handleConfirmDiscontinue}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+              >
+                Approve & Clear Balance
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

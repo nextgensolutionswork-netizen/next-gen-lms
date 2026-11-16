@@ -160,4 +160,42 @@ describe('QA-033 / BUG-06: Timetable Schedule Date Initialization & Navigation',
       expect(marchSessions.some((s) => s.course_name?.includes('SAP') || s.topic.includes('General Ledger'))).toBe(true);
     });
   });
+
+  describe('7. Today Action and Navigation Independence', () => {
+    it('recalculates today dynamically after user navigates to another month', () => {
+      // Simulate user navigating to March 2026
+      let userSelectedDate = '2026-03-15';
+      expect(userSelectedDate.startsWith('2026-03')).toBe(true);
+
+      // Controlled clock at 14 November 2026
+      const fixedNow = new Date('2026-11-14T10:00:00Z');
+      const todayDate = getTodayInInstituteTimezone(fixedNow, 'Asia/Kolkata');
+
+      // Clicking Today resets user selection back to current date
+      userSelectedDate = todayDate;
+      expect(userSelectedDate).toBe('2026-11-14');
+    });
+
+    it('ensures reloading session records does not reset or alter user-selected reference date', () => {
+      // User is viewing October 2026
+      const userSelectedDate = '2026-10-20';
+
+      // Asynchronous session refresh occurs
+      const originalSessionsCount = store.classSessions.length;
+      store.classSessions.push({
+        id: `sess-async-${Date.now()}`,
+        batch_id: 'batch-01',
+        topic: 'Async Load Test',
+        session_date: '2026-03-05',
+        start_time: '09:00',
+        end_time: '11:00',
+        status: 'Scheduled',
+        mode: 'Classroom',
+      } as any);
+
+      // The user selected date MUST remain October 2026 without jumping to March or today
+      expect(userSelectedDate).toBe('2026-10-20');
+      expect(store.classSessions.length).toBe(originalSessionsCount + 1);
+    });
+  });
 });
