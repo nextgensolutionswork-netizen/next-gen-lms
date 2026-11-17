@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node scripts/patch-pdfkit.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
