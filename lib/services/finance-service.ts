@@ -15,6 +15,7 @@ import {
 import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { receiptAmounts } from './receipt-amounts';
 import { generateAndSaveReceiptPdf } from './pdf-service';
 import { dispatchMultiChannelNotification, buildReceiptEmailHtml } from './notification-service';
@@ -842,7 +843,7 @@ const ALLOWED_VENDOR_CATEGORIES = ['Hardware / Server', 'Marketing', 'Facility',
 export async function getVendors(): Promise<Vendor[]> {
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
+      const supabase = createAdminClient();
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
@@ -884,7 +885,7 @@ export async function createVendor(
 
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
+      const supabase = createAdminClient();
       let category = (vendor as any).category;
       if (!category || !ALLOWED_VENDOR_CATEGORIES.includes(category)) {
         category = 'Other';
@@ -941,7 +942,7 @@ export async function updateVendor(
 
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
+      const supabase = createAdminClient();
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       if (isUuid) {
         const updatePayload: any = {
@@ -1040,7 +1041,7 @@ export async function deleteVendor(id: string, userId?: string): Promise<boolean
 
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createClient();
+      const supabase = createAdminClient();
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       if (isUuid) {
         if (hasExpenses) {
