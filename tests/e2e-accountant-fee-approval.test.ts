@@ -87,7 +87,7 @@ beforeEach(async () => {
       city: 'Hyderabad',
       education: 'B.Tech Computer Science',
       experience_years: 1,
-      current_employment_status: 'Working Professional',
+      current_employment_status: 'Employed',
       course_id: store.courses[0].id,
       admission_date: '2026-11-17',
       course_fee: 50000,

@@ -6,6 +6,12 @@ import { amountToWordsINR } from './finance-formatters';
 import { uploadFile } from './storage-service';
 import { getReceiptFontBuffer } from '@/lib/fonts/receipt-font';
 
+// Static standard-font declarations so Webpack & @vercel/nft trace font files into serverless lambdas
+import 'pdfkit/standard-fonts/Helvetica';
+import 'pdfkit/standard-fonts/HelveticaBold';
+import 'pdfkit/standard-fonts/Courier';
+import 'pdfkit/standard-fonts/TimesRoman';
+
 export class ReceiptPdfDataError extends Error {}
 
 function receiptNumber(value: unknown): number | null {

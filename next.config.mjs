@@ -4,6 +4,9 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['lucide-react'],
+  outputFileTracingIncludes: {
+    '/**': ['./node_modules/pdfkit/js/standard-fonts/**'],
+  },
   images: {
     remotePatterns: [
       {
