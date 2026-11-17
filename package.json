@@ -29,6 +29,9 @@
     "tailwind-merge": "^2.6.0",
     "zod": "4.6.7"
   },
+  "imports": {
+    "#standard-fonts/*": "pdfkit/standard-fonts/*"
+  },
   "devDependencies": {
     "@types/node": "^20.17.19",
     "@types/react": "19.3.0",

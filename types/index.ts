@@ -704,6 +704,12 @@ export interface Receipt {
   due_date?: string;
   logo_url?: string;
 
+  // Receiving Bank Details
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
+
   // Receipt Cancellation, Reversal & Credit Note Workflow
   status?: 'Valid' | 'Void' | 'Partially Reversed';
   original_amount?: number;
@@ -787,6 +793,7 @@ export interface Vendor {
   total_paid?: number;
   is_active?: boolean;
   status?: 'Active' | 'Archived';
+  category?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -1482,6 +1489,7 @@ export interface StudentPaymentRecord {
   receipt_number?: string;
   payment_proof_url?: string;
   notes?: string;
+  our_bank_profile_id?: string;
   our_bank_name?: string;
   our_bank_account_name?: string;
   our_bank_account_id?: string;
@@ -1496,7 +1504,19 @@ export interface StudentPaymentRecord {
   verified_by_name?: string;
   verified_at?: string;
   verification_notes?: string;
-  manual_verification?: { reference?: string; amount: string; payment_date: string };
+  verified_bank_profile_id?: string;
+  verified_our_bank_name?: string;
+  verified_our_bank_account_name?: string;
+  verified_our_bank_account_id?: string;
+  verified_our_upi_details?: string;
+  bank_account_discrepancy_reason?: string;
+  manual_verification?: {
+    reference?: string;
+    amount: string;
+    payment_date: string;
+    receiving_bank_profile_id?: string;
+    bank_account_discrepancy_reason?: string;
+  };
 
   updated_at?: string;
   updated_by?: string;

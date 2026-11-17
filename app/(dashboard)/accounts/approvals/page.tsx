@@ -38,6 +38,12 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
+import { BankAccountSearchableDropdown } from '@/components/ui/bank-account-searchable-dropdown';
+import {
+  getAuthorizedBankAccounts,
+  findOriginalReceivingAccount,
+  maskSensitiveAccountNumber,
+} from '@/lib/utils/bank-autofill';
 import {
   StudentFee,
   FeeApprovalStatus,
@@ -46,6 +52,7 @@ import {
   UserProfile,
   StudentPaymentRecord,
   PaymentMethod,
+  AuthorizedBankAccount,
 } from '@/types';
 import { formatINR } from '@/lib/utils/formatters';
 import { feeCourseName } from '@/lib/utils/fee-course';
@@ -109,6 +116,29 @@ export default function FeeApprovalsPage() {
   const [verificationErrors, setVerificationErrors] = React.useState<Record<string, string>>({});
   const [verificationBusy, setVerificationBusy] = React.useState(false);
   const [paymentRejectionReason, setPaymentRejectionReason] = React.useState('');
+
+  // Accountant Payment Verification - Bank Details State
+  const [selectedVerifiedBankAccountId, setSelectedVerifiedBankAccountId] = React.useState<string>('');
+  const [verifiedBankName, setVerifiedBankName] = React.useState<string>('');
+  const [verifiedBankAccountName, setVerifiedBankAccountName] = React.useState<string>('');
+  const [verifiedBankAccountId, setVerifiedBankAccountId] = React.useState<string>('');
+  const [verifiedUpiDetails, setVerifiedUpiDetails] = React.useState<string>('');
+  const [bankDiscrepancyReason, setBankDiscrepancyReason] = React.useState<string>('');
+
+  const authorizedBankAccounts = React.useMemo(() => {
+    return getAuthorizedBankAccounts(role, { includePending: false });
+  }, [role]);
+
+  const originalReceivingAccount = React.useMemo(() => {
+    if (!selectedPayment) return undefined;
+    return findOriginalReceivingAccount(selectedPayment, authorizedBankAccounts);
+  }, [selectedPayment, authorizedBankAccounts]);
+
+  const isBankDiscrepancy = React.useMemo(() => {
+    if (!selectedPayment || selectedPayment.payment_mode === 'Cash') return false;
+    if (!originalReceivingAccount) return false;
+    return selectedVerifiedBankAccountId !== '' && selectedVerifiedBankAccountId !== originalReceivingAccount.id;
+  }, [selectedPayment, originalReceivingAccount, selectedVerifiedBankAccountId]);
 
   // Sales Payment Update Modal state
   const [paymentUpdateModalOpen, setPaymentUpdateModalOpen] = React.useState(false);
@@ -374,14 +404,47 @@ export default function FeeApprovalsPage() {
     setActionError(null);
     setVerificationBusy(true);
     setVerificationErrors({});
+
+    // Client-side pre-validation for Receiving Bank Account
+    const localErrors: Record<string, string> = {};
+    if (selectedPayment.payment_mode !== 'Cash') {
+      if (!selectedVerifiedBankAccountId) {
+        localErrors.receiving_bank_profile_id = 'Receiving bank account is required for non-cash payment verification.';
+      } else if (isBankDiscrepancy && !bankDiscrepancyReason.trim()) {
+        localErrors.bank_account_discrepancy_reason =
+          'Discrepancy explanation is required when the verified receiving bank account differs from the original payment record.';
+      }
+    }
+    if (Object.keys(localErrors).length > 0) {
+      setVerificationErrors(localErrors);
+      setVerificationBusy(false);
+      return;
+    }
+
     try {
-      await paymentWorkflowClient.verifyPayment(selectedPayment.id, user.id, paymentVerificationNotes, { ...manualVerification, reference: selectedPayment.payment_mode === 'Cash' ? undefined : manualVerification.reference });
+      await paymentWorkflowClient.verifyPayment(
+        selectedPayment.id,
+        user.id,
+        paymentVerificationNotes,
+        {
+          ...manualVerification,
+          reference: selectedPayment.payment_mode === 'Cash' ? undefined : manualVerification.reference,
+          receiving_bank_profile_id: selectedVerifiedBankAccountId || undefined,
+          bank_account_discrepancy_reason: isBankDiscrepancy ? bankDiscrepancyReason.trim() : undefined,
+        }
+      );
       store.reconcileDualLedgers();
       store.persist();
       setActionSuccess(`Payment of ${formatINR(selectedPayment.amount_paid)} for ${selectedPayment.student_name} verified & credited! Official payment receipt generated.`);
       setPaymentVerifyModalOpen(false);
       setSelectedPayment(null);
       setPaymentVerificationNotes('');
+      setSelectedVerifiedBankAccountId('');
+      setVerifiedBankName('');
+      setVerifiedBankAccountName('');
+      setVerifiedBankAccountId('');
+      setVerifiedUpiDetails('');
+      setBankDiscrepancyReason('');
       loadData();
     } catch (err: any) {
       setVerificationErrors(err.fieldErrors || { general: err.message || 'Failed to verify payment.' });
@@ -1632,6 +1695,36 @@ export default function FeeApprovalsPage() {
                                         setActionError(null);
                                         setManualVerification({ reference: '', amount: '', payment_date: '' });
                                         setVerificationErrors({});
+                                        const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts);
+                                        if (origAccount) {
+                                          setSelectedVerifiedBankAccountId(origAccount.id);
+                                          setVerifiedBankName(origAccount.bank_name);
+                                          setVerifiedBankAccountName(origAccount.account_holder_name);
+                                          setVerifiedBankAccountId(origAccount.account_number);
+                                          setVerifiedUpiDetails(origAccount.upi_id || '');
+                                        } else if (p.payment_mode !== 'Cash') {
+                                          const defaultAcc = authorizedBankAccounts[0];
+                                          if (defaultAcc) {
+                                            setSelectedVerifiedBankAccountId(defaultAcc.id);
+                                            setVerifiedBankName(defaultAcc.bank_name);
+                                            setVerifiedBankAccountName(defaultAcc.account_holder_name);
+                                            setVerifiedBankAccountId(defaultAcc.account_number);
+                                            setVerifiedUpiDetails(defaultAcc.upi_id || '');
+                                          } else {
+                                            setSelectedVerifiedBankAccountId('');
+                                            setVerifiedBankName('');
+                                            setVerifiedBankAccountName('');
+                                            setVerifiedBankAccountId('');
+                                            setVerifiedUpiDetails('');
+                                          }
+                                        } else {
+                                          setSelectedVerifiedBankAccountId('');
+                                          setVerifiedBankName('');
+                                          setVerifiedBankAccountName('');
+                                          setVerifiedBankAccountId('');
+                                          setVerifiedUpiDetails('');
+                                        }
+                                        setBankDiscrepancyReason('');
                                         setPaymentVerifyModalOpen(true);
                                       }}
                                       className={`text-xs px-2.5 py-1 h-7 ${
@@ -2419,6 +2512,18 @@ export default function FeeApprovalsPage() {
                 <span className="text-slate-500">Recorded By:</span>
                 <span className="text-slate-800">{selectedPayment.recorded_by_name} ({selectedPayment.recorded_by_role})</span>
               </div>
+              {selectedPayment.payment_mode !== 'Cash' && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Original Receiving Bank:</span>
+                  <span className="font-semibold text-slate-800">
+                    {originalReceivingAccount
+                      ? `${originalReceivingAccount.account_holder_name} — ${originalReceivingAccount.bank_name} (•••• ${originalReceivingAccount.account_number.replace(/\s+/g, '').slice(-4)})`
+                      : (selectedPayment.our_bank_account_name || selectedPayment.our_bank_name
+                          ? `${selectedPayment.our_bank_account_name || ''} — ${selectedPayment.our_bank_name || ''} ${selectedPayment.our_bank_account_id ? `(•••• ${selectedPayment.our_bank_account_id.replace(/\s+/g, '').slice(-4)})` : ''}`
+                          : 'Not recorded / Unassigned')}
+                  </span>
+                </div>
+              )}
               {selectedPayment.updated_at && (
                 <div className="flex justify-between">
                   <span className="text-slate-500">Last Modified:</span>
@@ -2448,6 +2553,152 @@ export default function FeeApprovalsPage() {
               {verificationErrors.general && <p role="alert" className="text-rose-700">{verificationErrors.general}</p>}
             </div>
 
+            {/* Bank Details Section */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-xs text-slate-800 block">
+                    Bank Details
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {selectedPayment.payment_mode === 'Cash'
+                      ? 'Campus desk cash collection (bank account optional)'
+                      : 'Authoritative institutional receiving account for reconciliation'}
+                  </span>
+                </div>
+                {originalReceivingAccount && (
+                  <span className="text-[10px] bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded font-mono">
+                    Original: {originalReceivingAccount.bank_name} (•••• {originalReceivingAccount.account_number.replace(/\s+/g, '').slice(-4)})
+                  </span>
+                )}
+              </div>
+
+              {/* 1. Receiving Bank Account Selector */}
+              <div>
+                <label htmlFor="verify-bank-account-selector" className="block text-slate-700 font-medium mb-1">
+                  Receiving Bank Account Selector {selectedPayment.payment_mode !== 'Cash' && <span className="text-rose-500">*</span>}
+                </label>
+                <BankAccountSearchableDropdown
+                  id="verify-bank-account-selector"
+                  accounts={authorizedBankAccounts}
+                  selectedId={selectedVerifiedBankAccountId}
+                  mode="fee-collection"
+                  allowCustom={false}
+                  placeholder="Search & select authorized receiving bank account..."
+                  disabled={verificationBusy}
+                  onSelect={(acc) => {
+                    if (acc === 'custom') return;
+                    setSelectedVerifiedBankAccountId(acc.id);
+                    setVerifiedBankName(acc.bank_name);
+                    setVerifiedBankAccountName(acc.account_holder_name);
+                    setVerifiedBankAccountId(acc.account_number);
+                    setVerifiedUpiDetails(acc.upi_id || '');
+                    setVerificationErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.receiving_bank_profile_id;
+                      return copy;
+                    });
+                  }}
+                />
+                {verificationErrors.receiving_bank_profile_id && (
+                  <p role="alert" className="text-rose-700 text-xs mt-1">
+                    {verificationErrors.receiving_bank_profile_id}
+                  </p>
+                )}
+              </div>
+
+              {/* 2-5: Our Bank Name, Our Bank Account Name, Our Bank Account ID (Masked), Our UPI Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label htmlFor="verify-our-bank-name" className="block text-slate-700 font-medium mb-1">Our Bank Name</label>
+                  <input
+                    id="verify-our-bank-name"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={verifiedBankName}
+                    placeholder="Auto-populated upon account selection"
+                    className="w-full text-xs p-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 cursor-not-allowed font-medium"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="verify-our-bank-account-name" className="block text-slate-700 font-medium mb-1">Our Bank Account Name</label>
+                  <input
+                    id="verify-our-bank-account-name"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={verifiedBankAccountName}
+                    placeholder="Auto-populated upon account selection"
+                    className="w-full text-xs p-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 cursor-not-allowed font-medium"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="verify-our-bank-account-id" className="block text-slate-700 font-medium mb-1">Our Bank Account ID</label>
+                  <input
+                    id="verify-our-bank-account-id"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={verifiedBankAccountId ? maskSensitiveAccountNumber(verifiedBankAccountId) : ''}
+                    placeholder="Auto-populated (masked)"
+                    className="w-full text-xs p-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 font-mono cursor-not-allowed font-medium"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="verify-our-upi-details" className="block text-slate-700 font-medium mb-1">Our UPI Details</label>
+                  <input
+                    id="verify-our-upi-details"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={verifiedUpiDetails || (selectedVerifiedBankAccountId ? 'N/A' : '')}
+                    placeholder="Auto-populated when available"
+                    className="w-full text-xs p-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 font-mono cursor-not-allowed font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Discrepancy Alert & Mandatory Explanation */}
+              {isBankDiscrepancy && (
+                <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 space-y-1.5 mt-2">
+                  <div className="flex items-center space-x-1.5 text-xs font-semibold text-amber-800">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                    <span>Receiving Bank Account Discrepancy Detected</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700">
+                    The verified receiving account ({verifiedBankName}) differs from the original payment record ({originalReceivingAccount?.bank_name || 'Original Record'}). Enter the mandatory reconciliation explanation.
+                  </p>
+                  <div>
+                    <label htmlFor="verify-bank-discrepancy-reason" className="block text-slate-700 font-medium mb-1">
+                      Discrepancy Explanation / Rationale <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      id="verify-bank-discrepancy-reason"
+                      rows={2}
+                      required
+                      value={bankDiscrepancyReason}
+                      onChange={(e) => {
+                        setBankDiscrepancyReason(e.target.value);
+                        setVerificationErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.bank_account_discrepancy_reason;
+                          return copy;
+                        });
+                      }}
+                      placeholder="e.g. Student deposited directly into ICICI Tuition account instead of primary HDFC account..."
+                      className="w-full text-xs p-2 border border-amber-300 rounded-lg bg-white"
+                    />
+                    {verificationErrors.bank_account_discrepancy_reason && (
+                      <p role="alert" className="text-rose-700 text-xs mt-1">
+                        {verificationErrors.bank_account_discrepancy_reason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div>
               <label className="block text-slate-700 font-medium mb-1">
                 Accountant Verification Notes / Bank Statement Ref (Optional)
@@ -2462,7 +2713,20 @@ export default function FeeApprovalsPage() {
             </div>
 
             <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => setPaymentVerifyModalOpen(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPaymentVerifyModalOpen(false);
+                  setSelectedPayment(null);
+                  setSelectedVerifiedBankAccountId('');
+                  setVerifiedBankName('');
+                  setVerifiedBankAccountName('');
+                  setVerifiedBankAccountId('');
+                  setVerifiedUpiDetails('');
+                  setBankDiscrepancyReason('');
+                }}
+              >
                 Cancel
               </Button>
               <Button

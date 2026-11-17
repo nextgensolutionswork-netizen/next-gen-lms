@@ -4,6 +4,7 @@ import { Receipt, Certificate } from '@/types';
 import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { amountToWordsINR } from './finance-formatters';
 import { uploadFile } from './storage-service';
+import { getReceiptFontBuffer } from '@/lib/fonts/receipt-font';
 
 export class ReceiptPdfDataError extends Error {}
 
@@ -35,11 +36,15 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
   const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com'}/accounts/receipts/${encodeURIComponent(receipt.id)}`;
   const qr = await QRCode.toBuffer(verificationUrl, { width: 160, margin: 1 });
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 45, info: {
-      Title: `Fee Receipt - ${receipt.receipt_number}`,
-      ...(instituteName ? { Author: instituteName } : {}),
-      Subject: `Payment receipt for ${receipt.student_name}`,
-    } });
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 45,
+      info: {
+        Title: `Fee Receipt - ${receipt.receipt_number}`,
+        ...(instituteName ? { Author: instituteName } : {}),
+        Subject: `Payment receipt for ${receipt.student_name}`,
+      },
+    });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -61,6 +66,8 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(15).text('OFFICIAL FEE RECEIPT');
       doc.font('Helvetica').fontSize(9.5).text('Receipt: ' + receipt.receipt_number);
       doc.text('Payment date: ' + formatDate(receipt.payment_date));
+      doc.fillColor('#15803D').font('Helvetica-Bold').text('Verification Status: Verified / Official');
+      doc.fillColor('#475569').font('Helvetica');
 
       // 2. Place of Supply
       const placeOfSupply = receipt.place_of_supply || (receipt.supply_type === 'INTER_STATE' ? 'Inter-State' : 'Telangana (State Code: 36)');

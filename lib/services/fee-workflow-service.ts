@@ -1,5 +1,6 @@
 import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
 import { validateManualPaymentVerification, type ManualPaymentVerification } from './manual-payment-verification';
+import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
 import { store } from './data-store';
 import { assertSameTenant, isAccountsUser, tenantId } from '@/lib/auth/tenant';
 import { paymentAudit, paymentNotification } from './payment-events';
@@ -911,6 +912,7 @@ export class FeeWorkflowService {
       payment_proof_url?: string;
       notes?: string;
       installment_id?: string;
+      our_bank_profile_id?: string;
       our_bank_name?: string;
       our_bank_account_name?: string;
       our_bank_account_id?: string;
@@ -1010,6 +1012,7 @@ export class FeeWorkflowService {
       bank_upi_reference: input.bank_upi_reference,
       payment_proof_url: input.payment_proof_url,
       notes: input.notes,
+      our_bank_profile_id: input.our_bank_profile_id,
       our_bank_name: input.our_bank_name,
       our_bank_account_name: input.our_bank_account_name,
       our_bank_account_id: input.our_bank_account_id,
@@ -1048,6 +1051,7 @@ export class FeeWorkflowService {
       payment_proof_url?: string;
       notes?: string;
       installment_id?: string;
+      our_bank_profile_id?: string;
       our_bank_name?: string;
       our_bank_account_name?: string;
       our_bank_account_id?: string;
@@ -1115,6 +1119,21 @@ export class FeeWorkflowService {
     }
     if (updates.installment_id !== undefined) {
       payment.installment_id = updates.installment_id;
+    }
+    if (updates.our_bank_profile_id !== undefined) {
+      payment.our_bank_profile_id = updates.our_bank_profile_id;
+    }
+    if (updates.our_bank_name !== undefined) {
+      payment.our_bank_name = updates.our_bank_name;
+    }
+    if (updates.our_bank_account_name !== undefined) {
+      payment.our_bank_account_name = updates.our_bank_account_name;
+    }
+    if (updates.our_bank_account_id !== undefined) {
+      payment.our_bank_account_id = updates.our_bank_account_id;
+    }
+    if (updates.our_upi_details !== undefined) {
+      payment.our_upi_details = updates.our_upi_details;
     }
 
     if (payment.payment_mode === 'Cash') Object.assign(payment, normalizePaymentFields(payment));
@@ -1217,6 +1236,21 @@ export class FeeWorkflowService {
     payment.verified_at = now;
     payment.verification_notes = verificationNotes;
     payment.manual_verification = enteredVerification;
+
+    if (enteredVerification.receiving_bank_profile_id) {
+      payment.verified_bank_profile_id = enteredVerification.receiving_bank_profile_id;
+      const authorizedAccounts = getAuthorizedBankAccounts(undefined, { includePending: false });
+      const matchedAccount = authorizedAccounts.find((a) => a.id === enteredVerification.receiving_bank_profile_id);
+      if (matchedAccount) {
+        payment.verified_our_bank_name = matchedAccount.bank_name;
+        payment.verified_our_bank_account_name = matchedAccount.account_holder_name;
+        payment.verified_our_bank_account_id = matchedAccount.account_number;
+        payment.verified_our_upi_details = matchedAccount.upi_id;
+      }
+    }
+    if (enteredVerification.bank_account_discrepancy_reason) {
+      payment.bank_account_discrepancy_reason = enteredVerification.bank_account_discrepancy_reason;
+    }
 
     this.finalizeVerifiedPayment(payment, fee, accountantUserId, accountantName);
     paymentAudit('PAYMENT_APPROVED', payment, accountantUser, before);
@@ -1436,6 +1470,10 @@ export class FeeWorkflowService {
       payment_mode: payment.payment_mode,
       transaction_reference: payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference,
       payment_date: payment.payment_date,
+      our_bank_name: payment.verified_our_bank_name || payment.our_bank_name,
+      our_bank_account_name: payment.verified_our_bank_account_name || payment.our_bank_account_name,
+      our_bank_account_id: payment.verified_our_bank_account_id || payment.our_bank_account_id,
+      our_upi_details: payment.verified_our_upi_details || payment.our_upi_details,
       remaining_balance: fee.outstanding_amount,
       authorized_by: verifierName,
       institute_name: store.settings?.institute_name || 'Next-Gen ERP Solutions',
@@ -1486,6 +1524,10 @@ export class FeeWorkflowService {
         payment_date: payment.payment_date,
         payment_mode: payment.payment_mode,
         transaction_reference: payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference,
+        our_bank_name: payment.verified_our_bank_name || payment.our_bank_name,
+        our_bank_account_name: payment.verified_our_bank_account_name || payment.our_bank_account_name,
+        our_bank_account_id: payment.verified_our_bank_account_id || payment.our_bank_account_id,
+        our_upi_details: payment.verified_our_upi_details || payment.our_upi_details,
         status: 'Success',
         collected_by: payment.recorded_by,
         collected_by_name: payment.recorded_by_name,
@@ -1498,6 +1540,10 @@ export class FeeWorkflowService {
         amount: payment.amount_paid, receipt_number: receiptNumber, status: 'Success',
         payment_mode: payment.payment_mode, payment_date: payment.payment_date,
         transaction_reference: payment.payment_mode === 'Cash' ? null : payment.transaction_reference || payment.bank_upi_reference,
+        our_bank_name: payment.verified_our_bank_name || payment.our_bank_name,
+        our_bank_account_name: payment.verified_our_bank_account_name || payment.our_bank_account_name,
+        our_bank_account_id: payment.verified_our_bank_account_id || payment.our_bank_account_id,
+        our_upi_details: payment.verified_our_upi_details || payment.our_upi_details,
         notes: payment.notes,
       });
     }

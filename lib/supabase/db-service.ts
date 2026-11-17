@@ -301,14 +301,21 @@ export async function dbCreateLead(lead: Lead): Promise<void> {
 
 export async function dbRecordAuditLog(log: AuditLog): Promise<void> {
   const db = getDb();
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(log.user_id || '');
+  const userEmail = log.user_id?.includes('@') ? log.user_id : `${log.user_id || 'system'}@lms.internal`;
   await db.from('audit_logs').insert({
-    user_id: log.user_id,
-    user_name: log.user_name,
-    user_role: log.user_role,
+    id: crypto.randomUUID(),
+    user_id: isUUID ? log.user_id : null,
+    user_email: userEmail,
     action: log.action,
     module: log.module,
     record_id: log.record_id,
-    old_value: log.old_value,
-    new_value: log.new_value,
+    payload: {
+      user_name: log.user_name,
+      user_role: log.user_role,
+      old_value: log.old_value,
+      new_value: log.new_value,
+    },
+    created_at: new Date().toISOString(),
   });
 }

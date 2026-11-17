@@ -837,6 +837,8 @@ export async function submitExpenseForApproval(
   return exp;
 }
 
+const ALLOWED_VENDOR_CATEGORIES = ['Hardware / Server', 'Marketing', 'Facility', 'Software / Cloud', 'Honorarium', 'Other'];
+
 export async function getVendors(): Promise<Vendor[]> {
   if (isLiveSupabaseEnabled()) {
     try {
@@ -847,8 +849,16 @@ export async function getVendors(): Promise<Vendor[]> {
         .order('vendor_name', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        store.vendors = data as Vendor[];
-        return data as Vendor[];
+        const mappedVendors: Vendor[] = data.map((v: any) => ({
+          ...v,
+          bank_account_number: v.bank_account || v.bank_account_number,
+          bank_ifsc: v.ifsc_code || v.bank_ifsc,
+          is_active: v.is_active ?? true,
+          status: v.status || 'Active',
+          total_paid: v.total_paid || 0,
+        }));
+        store.vendors = mappedVendors;
+        return mappedVendors;
       }
     } catch (err) {
       console.warn('Supabase vendors query error, falling back to local persistent store:', err);
@@ -862,98 +872,101 @@ export async function createVendor(
   data: Omit<Vendor, 'id' | 'total_paid' | 'created_at'>,
   userId?: string
 ): Promise<Vendor> {
+  const vendorId = crypto.randomUUID();
   const vendor: Vendor = {
     ...data,
-    id: `ven-${Date.now()}`,
+    id: vendorId,
     total_paid: 0,
     created_at: new Date().toISOString(),
   };
   store.vendors.push(vendor);
   store.persist();
 
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const supabase = createClient();
-        await supabase.from('vendors').insert({
-          id: vendor.id,
-          vendor_name: vendor.vendor_name,
-          contact_person: vendor.contact_person,
-          phone: vendor.phone,
-          email: vendor.email,
-          address: vendor.address,
-          gst_number: vendor.gst_number,
-          pan_number: vendor.pan_number,
-          tds_section: vendor.tds_section,
-          tds_rate: vendor.tds_rate,
-          bank_name: vendor.bank_name,
-          bank_account_number: vendor.bank_account_number,
-          bank_ifsc: vendor.bank_ifsc,
-          notes: vendor.notes,
-          is_active: vendor.is_active ?? true,
-          status: vendor.status || 'Active',
-        });
-      } catch (err) {
-        console.warn('Supabase vendor direct insert warning, preserved locally:', err);
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      let category = (vendor as any).category;
+      if (!category || !ALLOWED_VENDOR_CATEGORIES.includes(category)) {
+        category = 'Other';
       }
-    }
-
-    const user = userId ? store.users.find((u) => u.id === userId) : undefined;
-    await recordAuditLog({
-      user_id: userId || 'system',
-      user_name: user?.full_name || 'Accounts Staff',
-      user_role: user?.role || 'accountant',
-      action: 'VENDOR_CREATED',
-      module: 'FINANCE',
-      record_id: vendor.id,
-      new_value: {
+      await supabase.from('vendors').insert({
+        id: vendor.id,
         vendor_name: vendor.vendor_name,
-        gst_number: vendor.gst_number,
-        pan_number: vendor.pan_number,
-        tds_section: vendor.tds_section,
-        tds_rate: vendor.tds_rate,
-      },
-    });
-
-    return vendor;
+        contact_person: vendor.contact_person,
+        phone: vendor.phone || '+910000000000',
+        email: vendor.email || `${vendor.id}@vendor.internal`,
+        category,
+        gst_number: vendor.gst_number || null,
+        bank_account: vendor.bank_account_number || (vendor as any).bank_account || null,
+        ifsc_code: vendor.bank_ifsc || (vendor as any).ifsc_code || null,
+        created_at: vendor.created_at,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Supabase vendor direct insert warning, preserved locally:', err);
+    }
   }
 
-  export async function updateVendor(
-    id: string,
-    data: Partial<Vendor>,
-    userId?: string
-  ): Promise<Vendor> {
-    const vendor = store.vendors.find((v) => v.id === id);
-    if (!vendor) throw new Error('Vendor not found');
+  const user = userId ? store.users.find((u) => u.id === userId) : undefined;
+  await recordAuditLog({
+    user_id: userId || 'system',
+    user_name: user?.full_name || 'Accounts Staff',
+    user_role: user?.role || 'accountant',
+    action: 'VENDOR_CREATED',
+    module: 'FINANCE',
+    record_id: vendor.id,
+    new_value: {
+      vendor_name: vendor.vendor_name,
+      gst_number: vendor.gst_number,
+      pan_number: vendor.pan_number,
+      tds_section: vendor.tds_section,
+      tds_rate: vendor.tds_rate,
+    },
+  });
 
-    const oldValues = { ...vendor };
-    Object.assign(vendor, data, { updated_at: new Date().toISOString() });
-    store.persist();
+  return vendor;
+}
 
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const supabase = createClient();
-        await supabase.from('vendors').update({
-          vendor_name: vendor.vendor_name,
-          contact_person: vendor.contact_person,
-          phone: vendor.phone,
-          email: vendor.email,
-          address: vendor.address,
-          gst_number: vendor.gst_number,
-          pan_number: vendor.pan_number,
-          tds_section: vendor.tds_section,
-          tds_rate: vendor.tds_rate,
-          bank_name: vendor.bank_name,
-          bank_account_number: vendor.bank_account_number,
-          bank_ifsc: vendor.bank_ifsc,
-          notes: vendor.notes,
-          is_active: vendor.is_active,
-          status: vendor.status,
+export async function updateVendor(
+  id: string,
+  data: Partial<Vendor>,
+  userId?: string
+): Promise<Vendor> {
+  const vendor = store.vendors.find((v) => v.id === id);
+  if (!vendor) throw new Error('Vendor not found');
+
+  const oldValues = { ...vendor };
+  Object.assign(vendor, data, { updated_at: new Date().toISOString() });
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        const updatePayload: any = {
           updated_at: vendor.updated_at,
-        }).eq('id', id);
-      } catch (err) {
-        console.warn('Supabase vendor update warning, preserved locally:', err);
+        };
+        if (vendor.vendor_name) updatePayload.vendor_name = vendor.vendor_name;
+        if (vendor.contact_person) updatePayload.contact_person = vendor.contact_person;
+        if (vendor.phone) updatePayload.phone = vendor.phone;
+        if (vendor.email) updatePayload.email = vendor.email;
+        if ((vendor as any).category && ALLOWED_VENDOR_CATEGORIES.includes((vendor as any).category)) {
+          updatePayload.category = (vendor as any).category;
+        }
+        if (vendor.gst_number !== undefined) updatePayload.gst_number = vendor.gst_number || null;
+        if (vendor.bank_account_number !== undefined || (vendor as any).bank_account !== undefined) {
+          updatePayload.bank_account = vendor.bank_account_number || (vendor as any).bank_account || null;
+        }
+        if (vendor.bank_ifsc !== undefined || (vendor as any).ifsc_code !== undefined) {
+          updatePayload.ifsc_code = vendor.bank_ifsc || (vendor as any).ifsc_code || null;
+        }
+        await supabase.from('vendors').update(updatePayload).eq('id', id);
       }
+    } catch (err) {
+      console.warn('Supabase vendor update warning, preserved locally:', err);
     }
+  }
 
   const user = userId ? store.users.find((u) => u.id === userId) : undefined;
   await recordAuditLog({
@@ -1028,14 +1041,15 @@ export async function deleteVendor(id: string, userId?: string): Promise<boolean
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      if (hasExpenses) {
-        await supabase.from('vendors').update({
-          status: 'Archived',
-          is_active: false,
-          updated_at: new Date().toISOString(),
-        }).eq('id', id);
-      } else {
-        await supabase.from('vendors').delete().eq('id', id);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        if (hasExpenses) {
+          await supabase.from('vendors').update({
+            updated_at: new Date().toISOString(),
+          }).eq('id', id);
+        } else {
+          await supabase.from('vendors').delete().eq('id', id);
+        }
       }
     } catch (err) {
       console.warn('Supabase vendor delete warning, preserved locally:', err);

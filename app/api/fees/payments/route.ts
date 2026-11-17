@@ -21,11 +21,27 @@ const details = z.object({
   payment_proof_url: z.string().max(4096).refine((v) => !v || v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach valid payment proof').optional(),
   notes: z.string().max(2000).optional(),
   installment_id: z.string().trim().max(200).optional(),
+  our_bank_profile_id: z.string().trim().max(200).optional(),
+  our_bank_name: z.string().trim().max(200).optional(),
+  our_bank_account_name: z.string().trim().max(200).optional(),
+  our_bank_account_id: z.string().trim().max(200).optional(),
+  our_upi_details: z.string().trim().max(200).optional(),
 });
 const command = z.discriminatedUnion('action', [
   z.object({ action: z.literal('record'), input: details.extend({ fee_id: z.string().min(1), student_id: z.string().optional(), enrollment_id: z.string().optional(), idempotency_key: z.string().min(1).max(200) }) }),
   z.object({ action: z.literal('update'), paymentId: z.string(), input: details }),
-  z.object({ action: z.literal('approve'), paymentId: z.string(), notes: z.string().max(2000).optional(), verification: z.object({ reference: z.string().max(200).optional(), amount: z.string().max(100), payment_date: z.string().max(40) }).optional() }),
+  z.object({
+    action: z.literal('approve'),
+    paymentId: z.string(),
+    notes: z.string().max(2000).optional(),
+    verification: z.object({
+      reference: z.string().max(200).optional(),
+      amount: z.string().max(100),
+      payment_date: z.string().max(40),
+      receiving_bank_profile_id: z.string().max(200).optional(),
+      bank_account_discrepancy_reason: z.string().max(2000).optional(),
+    }).optional(),
+  }),
   z.object({ action: z.literal('reject'), paymentId: z.string(), reason: z.string().trim().min(1).max(2000) }),
   z.object({ action: z.literal('void_receipt'), receiptId: z.string().min(1), reason: z.string().trim().min(1).max(2000), amount: z.number().finite().positive().optional() }),
 ]);

@@ -104,3 +104,42 @@ export function findBankAccountByHolder(
       (acc.authorized_signatory && acc.authorized_signatory.toLowerCase().includes(q))
   );
 }
+
+/**
+ * Resolves the authoritative institutional receiving bank account for a payment record.
+ * Checks our_bank_profile_id first, then falls back to account number or holder & bank name match.
+ */
+export function findOriginalReceivingAccount(
+  payment?: {
+    our_bank_profile_id?: string;
+    our_bank_account_id?: string;
+    our_bank_name?: string;
+    our_bank_account_name?: string;
+  } | null,
+  accountsList?: AuthorizedBankAccount[]
+): AuthorizedBankAccount | undefined {
+  if (!payment) return undefined;
+  const accounts = accountsList || getAuthorizedBankAccounts(undefined, { includePending: true, includeArchived: true });
+
+  if (payment.our_bank_profile_id) {
+    const found = accounts.find((a) => a.id === payment.our_bank_profile_id);
+    if (found) return found;
+  }
+
+  if (payment.our_bank_account_id) {
+    const cleanNum = payment.our_bank_account_id.replace(/\s+/g, '');
+    const found = accounts.find((a) => a.account_number.replace(/\s+/g, '') === cleanNum);
+    if (found) return found;
+  }
+
+  if (payment.our_bank_name && payment.our_bank_account_name) {
+    const bName = payment.our_bank_name.trim().toLowerCase();
+    const hName = payment.our_bank_account_name.trim().toLowerCase();
+    const found = accounts.find(
+      (a) => a.bank_name.trim().toLowerCase() === bName && a.account_holder_name.trim().toLowerCase() === hName
+    );
+    if (found) return found;
+  }
+
+  return undefined;
+}

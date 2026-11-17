@@ -15,6 +15,7 @@ export interface BankAccountSearchableDropdownProps {
   className?: string;
   title?: string;
   id?: string;
+  allowCustom?: boolean;
 }
 
 export function BankAccountSearchableDropdown({
@@ -27,6 +28,7 @@ export function BankAccountSearchableDropdown({
   className = '',
   title = 'Select Authorized Bank Account Preset',
   id: customId,
+  allowCustom = true,
 }: BankAccountSearchableDropdownProps) {
   const generatedId = useId();
   const dropdownId = customId || generatedId;
@@ -159,7 +161,7 @@ export function BankAccountSearchableDropdown({
             {formatBankAccountPresetLabel(acc)}
           </option>
         ))}
-        <option value="custom">Custom Bank Account</option>
+        {allowCustom && <option value="custom">Custom Bank Account</option>}
       </select>
 
       {/* Main Trigger Button */}
@@ -252,31 +254,33 @@ export function BankAccountSearchableDropdown({
           {/* Scrollable Account Options List */}
           <div className="max-h-60 sm:max-h-64 overflow-y-auto overscroll-contain divide-y divide-slate-100">
             {/* Custom Bank Account Option (Accessible at top) */}
-            <div
-              role="option"
-              aria-selected={selectedId === 'custom'}
-              onClick={handleSelectCustom}
-              className={`p-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition-colors hover:bg-slate-50 ${
-                selectedId === 'custom' ? 'bg-blue-50/70 border-l-4 border-l-blue-600' : ''
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 border border-indigo-100">
-                  <Edit3 className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="font-semibold text-slate-900 text-xs">
-                    Custom Bank Account
+            {allowCustom && (
+              <div
+                role="option"
+                aria-selected={selectedId === 'custom'}
+                onClick={handleSelectCustom}
+                className={`p-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition-colors hover:bg-slate-50 ${
+                  selectedId === 'custom' ? 'bg-blue-50/70 border-l-4 border-l-blue-600' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 border border-indigo-100">
+                    <Edit3 className="w-3.5 h-3.5" />
                   </div>
-                  <div className="text-[10px] text-slate-500">
-                    Enter bank, holder name & account number manually
+                  <div>
+                    <div className="font-semibold text-slate-900 text-xs">
+                      Custom Bank Account
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      Enter bank, holder name & account number manually
+                    </div>
                   </div>
                 </div>
+                {selectedId === 'custom' && (
+                  <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                )}
               </div>
-              {selectedId === 'custom' && (
-                <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
-              )}
-            </div>
+            )}
 
             {/* List of Filtered Reference Accounts */}
             {filteredAccounts.map((acc) => {
@@ -352,13 +356,15 @@ export function BankAccountSearchableDropdown({
                 <p className="text-xs text-slate-500">
                   No bank accounts match <span className="font-semibold text-slate-700">"{searchQuery}"</span>
                 </p>
-                <button
-                  type="button"
-                  onClick={handleSelectCustom}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline"
-                >
-                  Use Custom Bank Account instead
-                </button>
+                {allowCustom && (
+                  <button
+                    type="button"
+                    onClick={handleSelectCustom}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Use Custom Bank Account instead
+                  </button>
+                )}
               </div>
             )}
           </div>

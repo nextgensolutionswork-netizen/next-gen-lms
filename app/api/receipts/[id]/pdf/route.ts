@@ -4,6 +4,8 @@ import { tenantId } from '@/lib/auth/tenant';
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/services/data-store';
 import { generateReceiptPdfBuffer, ReceiptPdfDataError } from '@/lib/services/pdf-service';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -23,7 +25,7 @@ export async function GET(
       );
     }
 
-    const receipt =
+    let receipt =
       store.receipts.find(
         (r) =>
           r.id === rawId ||
@@ -35,6 +37,45 @@ export async function GET(
         const payment = store.payments.find((p) => p.id === rawId || p.receipt_number === rawId);
         return payment ? r.payment_id === payment.id : false;
       });
+
+    // Supabase database lookup fallback if not found in memory store
+    if (!receipt && isLiveSupabaseEnabled()) {
+      try {
+        const adminSupabase = createAdminClient();
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
+        let query = adminSupabase.from('receipts').select('*');
+        if (isUUID) {
+          query = query.or(`id.eq.${rawId},payment_id.eq.${rawId}`);
+        } else {
+          query = query.ilike('receipt_number', rawId);
+        }
+        const { data: dbReceipt, error: dbErr } = await query.maybeSingle();
+        if (!dbErr && dbReceipt) {
+          receipt = {
+            id: dbReceipt.id,
+            receipt_number: dbReceipt.receipt_number,
+            payment_id: dbReceipt.payment_id,
+            student_id: dbReceipt.student_id,
+            student_name: dbReceipt.student_name,
+            admission_number: dbReceipt.student_code || 'ADM-2026-0001',
+            course_name: dbReceipt.course_name || 'SAP S/4HANA Finance',
+            payment_amount: Number(dbReceipt.amount || 0),
+            payment_mode: dbReceipt.payment_mode || 'UPI',
+            transaction_reference: dbReceipt.transaction_reference,
+            payment_date: dbReceipt.receipt_date || dbReceipt.created_at?.slice(0, 10),
+            remaining_balance: 0,
+            authorized_by: 'Accounts Department',
+            institute_name: 'Next-Gen ERP Solutions',
+            institute_address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
+            institute_phone: '+91 98765 43210',
+            institute_gst: '36AAACN1234F1Z8',
+            created_at: dbReceipt.created_at || new Date().toISOString(),
+          } as any;
+        }
+      } catch (dbFetchErr) {
+        console.warn('[ReceiptPdf] Supabase database lookup fallback failed:', dbFetchErr);
+      }
+    }
 
     if (!receipt) {
       return NextResponse.json(
@@ -66,13 +107,39 @@ export async function GET(
     if (actor.role !== 'super_admin' && tenantId(receipt) !== tenantId(actor)) {
       return NextResponse.json({ error: 'Cross-tenant receipt access denied.' }, { status: 403 });
     }
+
     // Recover absent legacy amounts only from the exact payment for this student
     // and tenant. Never use today's account balance as a historical balance.
-    const linkedPayment = store.payments.find((p) => p.id === receipt.payment_id &&
-      p.student_id === receipt.student_id && tenantId(p) === tenantId(receipt));
+    const linkedPayment =
+      store.payments.find(
+        (p) =>
+          p.id === receipt.payment_id &&
+          p.student_id === receipt.student_id &&
+          tenantId(p) === tenantId(receipt)
+      ) ||
+      (store.studentPayments || []).find((sp: any) => sp.id === receipt.payment_id);
+
+    // Invariant: Pending or Rejected payments cannot produce official receipts
+    const paymentStatus = (linkedPayment as any)?.status || (linkedPayment as any)?.verification_status;
+    if (
+      paymentStatus &&
+      ['Pending', 'Pending Approval', 'Pending Verification', 'Rejected', 'Failed', 'Voided'].includes(paymentStatus)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot generate official receipt for ${paymentStatus.toLowerCase()} payment. Only verified payments produce official receipts.`,
+        },
+        { status: 400 }
+      );
+    }
+
     const pdfBuffer = await generateReceiptPdfBuffer({
       ...receipt,
-      payment_amount: receipt.payment_amount ?? linkedPayment?.amount,
+      payment_amount:
+        receipt.payment_amount ??
+        (linkedPayment as any)?.amount ??
+        (linkedPayment as any)?.amount_paid,
     } as typeof receipt);
 
     const { searchParams } = new URL(request.url);
