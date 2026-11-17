@@ -2,6 +2,22 @@ import { store } from './data-store';
 import { AuditLog } from '@/types';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createBrowserClient } from '@supabase/supabase-js';
+import { resolveSupabaseKey } from '@/lib/supabase/client';
+
+function getAuditSupabaseClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey && !serviceKey.includes('mock') && !serviceKey.includes('placeholder')) {
+    return createAdminClient();
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock-sap-lms.supabase.co';
+  const anonKey = resolveSupabaseKey(
+    url,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  return createBrowserClient(url, anonKey);
+}
 
 export async function getAuditLogs(): Promise<AuditLog[]> {
   if (typeof window !== 'undefined') {
@@ -84,7 +100,7 @@ export async function recordAuditLog(
 
   if (isLiveSupabaseEnabled()) {
     try {
-      const supabase = createAdminClient();
+      const supabase = getAuditSupabaseClient();
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(log.user_id || '');
       const user = (store.users || []).find((u) => u.id === log.user_id);
       const userEmail = user?.email || (log.user_id?.includes('@') ? log.user_id : `${log.user_id || 'system'}@lms.internal`);

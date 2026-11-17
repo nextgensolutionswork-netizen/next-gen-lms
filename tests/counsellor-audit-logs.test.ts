@@ -205,4 +205,61 @@ describe('BUG-CO-001: Audit Telemetry Ingestion (POST /api/audit-logs)', () => {
     const res = await GET(req);
     expect(res.status).toBe(403);
   });
+
+  it('rejects with HTTP 500 when simulated audit write failure is active and does not falsely claim success', async () => {
+    const req = createMockAuthRequest(
+      'http://localhost:3000/api/audit-logs',
+      'POST',
+      'counsellor',
+      {
+        action: 'LEAD_STAGE_UPDATED',
+        module: 'CRM',
+        record_id: 'lead-fail-sim-01',
+        simulate_failure: true,
+      }
+    );
+
+    const res = await POST(req);
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toContain('Database audit persistence failed');
+
+    // Confirm not stored locally
+    const found = (store.auditLogs || []).find((l) => l.record_id === 'lead-fail-sim-01');
+    expect(found).toBeUndefined();
+  });
+
+  it('prevents duplicate audit records on retry with identical idempotency key or payload', async () => {
+    const idemKey = `idem-audit-${Date.now()}`;
+    const payload = {
+      idempotency_key: idemKey,
+      action: 'LEAD_STAGE_UPDATED',
+      module: 'CRM',
+      record_id: 'lead-idem-01',
+      old_value: { stage: 'New' },
+      new_value: { stage: 'Contacted' },
+    };
+
+    const req1 = createMockAuthRequest('http://localhost:3000/api/audit-logs', 'POST', 'counsellor', payload);
+    const res1 = await POST(req1);
+    expect(res1.status).toBe(201);
+    const json1 = await res1.json();
+    expect(json1.success).toBe(true);
+
+    const initialCount = store.auditLogs.filter((l) => l.record_id === 'lead-idem-01').length;
+    expect(initialCount).toBe(1);
+
+    // Second identical submission (Retry)
+    const req2 = createMockAuthRequest('http://localhost:3000/api/audit-logs', 'POST', 'counsellor', payload);
+    const res2 = await POST(req2);
+    expect(res2.status).toBe(200);
+    const json2 = await res2.json();
+    expect(json2.success).toBe(true);
+    expect(json2.deduplicated).toBe(true);
+
+    // Verify count did not increase
+    const finalCount = store.auditLogs.filter((l) => l.record_id === 'lead-idem-01').length;
+    expect(finalCount).toBe(1);
+  });
 });

@@ -5,10 +5,26 @@ import { store } from '@/lib/services/data-store';
 import { authenticateApiRequest } from '@/lib/auth/server-session';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createBrowserClient } from '@supabase/supabase-js';
+import { resolveSupabaseKey } from '@/lib/supabase/client';
 import { tenantId } from '@/lib/auth/tenant';
 import { AuditLog, UserRole } from '@/types';
 
 export const dynamic = 'force-dynamic';
+
+function getAuditLogSupabaseClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey && !serviceKey.includes('mock') && !serviceKey.includes('placeholder')) {
+    return createAdminClient();
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock-sap-lms.supabase.co';
+  const anonKey = resolveSupabaseKey(
+    url,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  return createBrowserClient(url, anonKey);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,6 +81,9 @@ export async function GET(req: NextRequest) {
  * - record_id / entity_id
  */
 const AuditLogInputSchema = z.object({
+  id: z.string().trim().optional(),
+  idempotency_key: z.string().trim().optional(),
+  simulate_failure: z.boolean().optional(),
   action: z.string().trim().min(1, 'action or event_type is required').max(120).optional(),
   event_type: z.string().trim().min(1).max(120).optional(),
   module: z.string().trim().min(1, 'module or entity_type is required').max(120).optional(),
@@ -176,7 +195,52 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Construct Server-Authoritative Audit Record
+    // 4. Durability Simulation Hook: Reject if failure simulation is active
+    const simulateFailure = req.headers.get('x-simulate-audit-failure') === 'true' || input.simulate_failure === true;
+    if (simulateFailure) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Database audit persistence failed: Simulated audit-write failure.',
+        },
+        { status: 500 }
+      );
+    }
+
+    // 5. Deduplication / Retry Protection
+    const idempotencyKey = input.idempotency_key || input.id;
+    const existingLog = (store.auditLogs || []).find((l: any) => {
+      if (idempotencyKey && (l.id === idempotencyKey || l.metadata?.idempotency_key === idempotencyKey || l.idempotency_key === idempotencyKey)) {
+        return true;
+      }
+      if (
+        l.action === action &&
+        l.module === moduleName &&
+        l.record_id === recordId &&
+        l.user_id === actor.id
+      ) {
+        const timeDiff = Math.abs(Date.now() - new Date(l.created_at).getTime());
+        if (timeDiff < 5 * 60 * 1000) {
+          const lNew = JSON.stringify(l.new_value ?? '');
+          const inNew = JSON.stringify(input.new_value ?? input.details ?? input.payload ?? input.notes ?? '');
+          if (lNew === inNew) return true;
+        }
+      }
+      return false;
+    });
+
+    if (existingLog) {
+      return NextResponse.json(
+        {
+          success: true,
+          log: existingLog,
+          deduplicated: true,
+        },
+        { status: 200 }
+      );
+    }
+
+    // 6. Construct Server-Authoritative Audit Record
     const oldValue = input.old_value !== undefined ? input.old_value : null;
     const newValue =
       input.new_value !== undefined
@@ -189,8 +253,25 @@ export async function POST(req: NextRequest) {
         ? { notes: input.notes }
         : null;
 
-    const auditEntry: AuditLog = {
-      id: `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    const isActorUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.id);
+    let resolvedActorUuid: string | null = isActorUuid ? actor.id : null;
+    if (!resolvedActorUuid) {
+      const matched = (store.users || []).find(
+        (u) => u.id === actor.id || (u.email && u.email.toLowerCase() === actor.email?.toLowerCase())
+      );
+      if (matched?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matched.id)) {
+        resolvedActorUuid = matched.id;
+      }
+    }
+
+    const auditEntryId = input.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.id)
+      ? input.id
+      : `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const auditEntry: AuditLog & { idempotency_key?: string; metadata?: any } = {
+      id: auditEntryId,
+      idempotency_key: idempotencyKey,
+      metadata: input.metadata || (idempotencyKey ? { idempotency_key: idempotencyKey } : null),
       tenant_id: actorTenant,
       user_id: actor.id,
       user_name: actor.full_name || actor.email || 'Staff Member',
@@ -204,39 +285,48 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // 5. Store Locally with Atomic Disk Flush
-    store.auditLogs.unshift(auditEntry);
-    store.persist();
-
-    // 6. Persist to PostgreSQL audit_logs if Supabase is Live
+    // 7. Persist to PostgreSQL audit_logs if Supabase is Live (Authoritative Database Write)
     if (isLiveSupabaseEnabled()) {
       try {
-        const supabase = createAdminClient();
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actor.id);
-        const logUuid = crypto.randomUUID();
+        const supabase = getAuditLogSupabaseClient();
+        const logUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auditEntry.id)
+          ? auditEntry.id
+          : crypto.randomUUID();
 
-        await supabase.from('audit_logs').insert({
+        const { error: insertErr } = await supabase.from('audit_logs').insert({
           id: logUuid,
-          user_id: isUUID ? actor.id : null,
+          user_id: resolvedActorUuid,
           user_email: actor.email || `${actor.id}@lms.internal`,
           module: moduleName,
           action,
           record_id: recordId,
           payload: {
             tenant_id: actorTenant,
+            actor_id: actor.id,
             user_name: auditEntry.user_name,
             user_role: auditEntry.user_role,
             old_value: oldValue,
             new_value: newValue,
-            metadata: input.metadata || null,
+            metadata: input.metadata || (idempotencyKey ? { idempotency_key: idempotencyKey } : null),
           },
           ip_address: auditEntry.ip_address,
           created_at: auditEntry.created_at,
         });
 
-        // If CRM lead stage or interaction followup, mirror into lead_followups if recordId is valid UUID
+        if (insertErr) {
+          console.error('[AuditLogs API] Supabase PostgreSQL insert failed:', insertErr);
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Database audit persistence failed: ${insertErr.message || 'Supabase write error'}`,
+            },
+            { status: 500 }
+          );
+        }
+
+        // Mirror CRM lead followup if recordId is valid UUID
         const isRecordUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recordId);
-        if (moduleName.toUpperCase() === 'CRM' && isRecordUUID && isUUID) {
+        if (moduleName.toUpperCase() === 'CRM' && isRecordUUID && resolvedActorUuid) {
           const notesText =
             typeof newValue?.notes === 'string'
               ? newValue.notes
@@ -250,7 +340,7 @@ export async function POST(req: NextRequest) {
             await supabase.from('lead_followups').insert({
               id: crypto.randomUUID(),
               lead_id: recordId,
-              counsellor_id: actor.id,
+              counsellor_id: resolvedActorUuid,
               stage_before: stageBefore,
               stage_after: stageAfter,
               notes: notesText,
@@ -262,9 +352,20 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (dbErr: any) {
-        console.warn('[AuditLogs API] Supabase PostgreSQL insert warning, preserved locally:', dbErr?.message);
+        console.error('[AuditLogs API] Supabase PostgreSQL write exception:', dbErr);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Database audit persistence exception: ${dbErr?.message || 'Database unavailable'}`,
+          },
+          { status: 500 }
+        );
       }
     }
+
+    // 8. Store Locally with Atomic Disk Flush (Only after DB persistence succeeds)
+    store.auditLogs.unshift(auditEntry);
+    store.persistSync();
 
     return NextResponse.json(
       {
