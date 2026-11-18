@@ -4,6 +4,7 @@ import { middleware } from '@/middleware';
 import { store } from '@/lib/services/data-store';
 import { generateAuthCookieSignatureSync } from '@/lib/security/auth-cookie';
 import { ROLE_PERMISSIONS } from '@/lib/auth/rbac';
+import { PlacementEnrollment } from '@/types';
 import {
   getJobOpenings,
   getJobApplications,
@@ -160,8 +161,9 @@ describe('Role 6: Placement Coordinator — Comprehensive RBAC & Domain Integrit
       const jobs = await getJobOpenings();
       const targetJob = jobs[0];
       if (targetJob) {
-        const updated = await updateJobOpeningStatus(targetJob.id, 'Closed', placementUser.id);
-        expect(updated.status).toBe('Closed');
+        const updated = await updateJobOpeningStatus(targetJob.id, 'Closed');
+        expect(updated).not.toBeNull();
+        expect(updated?.status).toBe('Closed');
       }
     });
   });
@@ -179,30 +181,56 @@ describe('Role 6: Placement Coordinator — Comprehensive RBAC & Domain Integrit
         // Ensure student has a valid placement enrollment
         let enrollment = store.placementEnrollments.find((e) => e.student_id === student.id);
         if (!enrollment) {
-          enrollment = {
+          const newEnrollment: PlacementEnrollment = {
             id: `pe-${Date.now()}`,
             student_id: student.id,
             student_name: student.full_name,
+            admission_number: student.admission_number || 'ADM-2026-0001',
+            student_code: student.student_code || 'STU-001',
+            email: student.email || 'student@example.com',
+            mobile_number: student.phone || '+91 98765 43210',
+            whatsapp_number: student.phone || '+91 98765 43210',
             course_id: student.course_id || 'crs-fico-01',
+            course_name: student.course_name || 'SAP FICO',
+            sap_module: 'SAP FICO',
             batch_id: student.batch_id || 'bch-fico-01',
             enrollment_status: 'Enrollment Approved',
             is_placement_eligible: true,
-            registered_at: new Date().toISOString(),
-            mandatory_documents: [],
-            eligibility_snapshot: {
-              attendance_percentage: 95,
-              course_progress_percentage: 100,
-              mock_interview_score: 85,
-              assessments_cleared: true,
-              fees_cleared: true,
-              resume_approved: true,
-              documents_verified: true,
-              is_eligible: true,
-              disqualification_reasons: [],
+            current_status: 'Fresher',
+            employment_status: 'Fresher',
+            highest_qualification: 'B.Tech',
+            degree: 'B.Tech',
+            specialization: 'CSE',
+            college_university: 'University',
+            graduation_year: 2024,
+            percentage_or_cgpa: '8.0',
+            preferred_job_roles: ['SAP Consultant'],
+            preferred_locations: ['Hyderabad'],
+            preferred_work_mode: 'Hybrid',
+            willing_to_relocate: true,
+            immediate_joiner: true,
+            resume_status: 'Reviewed & Approved',
+            documents: [],
+            declaration: {
+              terms_version: '1.0',
+              accepted_by: student.id,
+              accepted_by_name: student.full_name,
+              accepted_at: new Date().toISOString(),
+              confirmed_information_correct: true,
+              understands_no_guarantee: true,
+              agrees_attend_scheduled_interviews: true,
+              agrees_inform_external_offer: true,
+              authorizes_resume_sharing: true,
+              understands_sensitive_docs_policy: true,
+              agrees_keep_profile_updated: true,
             },
-            notes: 'Test enrollment',
+            enrollment_date: new Date().toISOString(),
+            internal_notes: ['Test enrollment'],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
-          store.placementEnrollments.push(enrollment);
+          store.placementEnrollments.push(newEnrollment);
+          enrollment = newEnrollment;
         } else {
           enrollment.enrollment_status = 'Enrollment Approved';
           enrollment.is_placement_eligible = true;

@@ -135,8 +135,9 @@ describe('Role 6: Placement Coordinator — Complete 80-Scenario Matrix', () => 
     it('SC-PL-07: Placement Coordinator can search candidate profiles by name', async () => {
       const profiles = await getPlacementProfiles();
       const first = profiles[0];
-      if (first) {
-        const matches = profiles.filter((p) => p.student_name.toLowerCase().includes(first.student_name.toLowerCase()));
+      if (first && first.student_name) {
+        const firstLower = first.student_name.toLowerCase();
+        const matches = profiles.filter((p) => (p.student_name || '').toLowerCase().includes(firstLower));
         expect(matches.length).toBeGreaterThanOrEqual(1);
       }
     });
@@ -552,6 +553,10 @@ describe('Role 6: Placement Coordinator — Complete 80-Scenario Matrix', () => 
           student_id: testStuId,
           sap_module: 'SAP FICO',
           declaration: {
+            terms_version: '1.0',
+            accepted_by: testStuId,
+            accepted_by_name: 'Test Student',
+            accepted_at: new Date().toISOString(),
             confirmed_information_correct: true,
             understands_no_guarantee: true,
             agrees_attend_scheduled_interviews: true,
@@ -718,10 +723,10 @@ describe('Role 6: Placement Coordinator — Complete 80-Scenario Matrix', () => 
     it('SC-PL-57: Placement Coordinator requests resume revisions with feedback', async () => {
       const profile = await updatePlacementProfile(
         studentId,
-        { resume_status: 'Changes Requested' },
+        { resume_status: 'Needs Improvement' },
         placementUser.id
       );
-      expect(profile.resume_status).toBe('Changes Requested');
+      expect(profile.resume_status).toBe('Needs Improvement');
     });
 
     it('SC-PL-58: Schedules technical mock interview', async () => {
@@ -801,6 +806,12 @@ describe('Role 6: Placement Coordinator — Complete 80-Scenario Matrix', () => 
         company_name: 'Oracle Financials',
         job_title: 'ERP Lead',
         description: 'Audit test job description.',
+        module: 'SAP FICO',
+        experience_required: '3-5 years',
+        location: 'Hyderabad',
+        salary_range: '12-15 LPA',
+        application_deadline: '2026-12-31',
+        status: 'Open',
       });
       const logs = (store.auditLogs || []).filter((l) => l.module === 'PLACEMENT');
       expect(logs.length).toBeGreaterThanOrEqual(1);

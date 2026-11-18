@@ -27,7 +27,7 @@ function patchFile(targetPath) {
 
   let content = fs.readFileSync(targetPath, 'utf8');
 
-  const inlinedBlock = `
+  const inlinedBlock = `/* BEGIN_INLINED_STANDARD_FONTS */
 const _INLINED_STANDARD_FONTS = ${JSON.stringify(fontData)};
 registerStdFontLoaders({
   Courier: () => _INLINED_STANDARD_FONTS['Courier'],
@@ -45,12 +45,36 @@ registerStdFontLoaders({
   'Times-Roman': () => _INLINED_STANDARD_FONTS['Times-Roman'],
   ZapfDingbats: () => _INLINED_STANDARD_FONTS['ZapfDingbats']
 });
-`;
+/* END_INLINED_STANDARD_FONTS */`;
 
-  // Pattern to replace existing registerStdFontLoaders call
-  const regex = /registerStdFontLoaders\(\s*\{[\s\S]*?\}\s*\);?/;
-  if (regex.test(content)) {
-    content = content.replace(regex, inlinedBlock);
+  const markerRegex = /\/\* BEGIN_INLINED_STANDARD_FONTS \*\/[\s\S]*?\/\* END_INLINED_STANDARD_FONTS \*\//;
+  const legacyInlinedRegex = /(?:const _INLINED_STANDARD_FONTS = [\s\S]*?;\s*)+registerStdFontLoaders\(\s*\{[\s\S]*?\}\s*\);?/;
+  const freshRegex = /registerStdFontLoaders\(\s*\{[\s\S]*?\}\s*\);?/;
+
+  let replaced = false;
+
+  if (markerRegex.test(content)) {
+    content = content.replace(markerRegex, inlinedBlock);
+    replaced = true;
+  } else if (legacyInlinedRegex.test(content)) {
+    content = content.replace(legacyInlinedRegex, inlinedBlock);
+    replaced = true;
+  } else if (freshRegex.test(content)) {
+    content = content.replace(freshRegex, inlinedBlock);
+    replaced = true;
+  }
+
+  // Safety cleanup: Ensure no duplicate _INLINED_STANDARD_FONTS declarations exist outside the block
+  const firstIndex = content.indexOf('/* BEGIN_INLINED_STANDARD_FONTS */');
+  const lastIndex = content.indexOf('/* END_INLINED_STANDARD_FONTS */');
+  if (firstIndex !== -1 && lastIndex !== -1) {
+    const beforeBlock = content.slice(0, firstIndex).replace(/const _INLINED_STANDARD_FONTS\s*=[\s\S]*?;\s*/g, '');
+    const middleBlock = content.slice(firstIndex, lastIndex + '/* END_INLINED_STANDARD_FONTS */'.length);
+    const afterBlock = content.slice(lastIndex + '/* END_INLINED_STANDARD_FONTS */'.length).replace(/const _INLINED_STANDARD_FONTS\s*=[\s\S]*?;\s*/g, '');
+    content = beforeBlock + middleBlock + afterBlock;
+  }
+
+  if (replaced) {
     fs.writeFileSync(targetPath, content, 'utf8');
     console.log(`[patch-pdfkit] Successfully inlined standard fonts into ${path.basename(targetPath)}`);
   } else {
