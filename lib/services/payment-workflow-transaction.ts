@@ -46,11 +46,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
           }
         }
         if (roster.error) {
-          if (readOnly) {
-            console.warn('[paymentTransaction] Roster query failed in readOnly mode:', roster.error.message);
-          } else {
-            throw new Error('Payment database unavailable: Could not verify the current staff roster.');
-          }
+          throw new Error('Payment database unavailable: Could not verify the current staff roster.');
         }
         if (data) {
           revision = data.revision;
@@ -83,7 +79,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         ...(roster.data || []) as UserProfile[],
       ];
       } catch (dbErr: any) {
-        if (readOnly) {
+        if (readOnly && !dbErr?.message?.includes('current staff roster')) {
           console.warn('[paymentTransaction] Database network error in readOnly mode, using in-memory store:', dbErr?.message);
         } else {
           throw dbErr;

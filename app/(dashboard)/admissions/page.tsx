@@ -37,6 +37,7 @@ import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { isLeadConverted } from '@/lib/services/crm-service';
 import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
@@ -257,6 +258,15 @@ export default function AdmissionsPage() {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      const searchQuery = params.get('search');
+      if (searchQuery) {
+        setSearch(searchQuery);
+        setStatusFilter('All');
+      }
+      const statusParam = params.get('status');
+      if (statusParam) {
+        setStatusFilter(statusParam);
+      }
       const leadId = params.get('convertLeadId');
       if (leadId) {
         const lead = store.leads.find((l) => l.id === leadId);
@@ -430,12 +440,11 @@ export default function AdmissionsPage() {
     }
 
     try {
-      const result = await createAdmissionWorkflow(
-        {
-          student_name: name,
-          phone: phoneVal.normalized || phone,
-          alternate_phone: finalAltPhone,
-          email,
+      const result = await paymentWorkflowClient.createAdmission({
+        student_name: name,
+        phone: phoneVal.normalized || phone,
+        alternate_phone: finalAltPhone,
+        email,
         photo_url: photoUrl || undefined,
         dob,
         gender,
@@ -468,9 +477,7 @@ export default function AdmissionsPage() {
         our_bank_account_name: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankAccountName : undefined,
         our_bank_account_id: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankAccountId : undefined,
         our_upi_details: collectInitialPayment && (initialPaymentMode === 'UPI' || ourUpiDetails) ? ourUpiDetails : undefined,
-      },
-      user.id
-    );
+      });
 
       setIsNewModalOpen(false);
       setAdmissionSuccessModal({
@@ -503,15 +510,10 @@ export default function AdmissionsPage() {
       setInitialPaymentProofUrl('');
       setInitialPaymentDate(actualPaymentDate());
       setInitialPaymentNotes('');
-      if (convertedLeadId) {
-        const lead = store.leads.find((l) => l.id === convertedLeadId);
-        if (lead) {
-          lead.stage = 'Converted';
-        }
-      }
-      refreshList();
+      setConvertedLeadId(undefined);
+      await refreshList();
     } catch (err: any) {
-      alert('Error registering admission: ' + (err.message || 'Unknown error'));
+      alert('Error creating admission: ' + (err.message || 'Unknown error'));
     } finally {
       setIsSubmitting(false);
     }

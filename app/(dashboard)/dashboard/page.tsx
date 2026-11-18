@@ -21,6 +21,7 @@ import {
   Plus,
   ArrowRight,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +41,12 @@ import {
   getCanonicalPaymentKey,
   unifyDualLedgerPayments,
   getRecentVerifiedCollections,
+  DashboardPeriod,
+  DateRange,
+  isDateInPeriod,
+  formatDisplayDateRange,
 } from '@/lib/utils/dashboard-metrics';
+import { CustomDateRangePicker } from '@/components/ui/custom-date-range-picker';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 
 function safeAmount(val: unknown): number {
@@ -50,21 +56,10 @@ function safeAmount(val: unknown): number {
   return Number.isFinite(num) ? num : 0;
 }
 
-function parseDateNormalized(dateStr?: string): Date | null {
-  if (!dateStr) return null;
-  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) {
-    const year = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10) - 1;
-    const day = parseInt(match[3], 10);
-    return new Date(year, month, day, 12, 0, 0);
-  }
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? null : d;
-}
-
 export default function DashboardPage() {
-  const [filterPeriod, setFilterPeriod] = React.useState<'month' | 'today' | 'week' | 'all'>('month');
+  const [filterPeriod, setFilterPeriod] = React.useState<DashboardPeriod>('month');
+  const [customDateRange, setCustomDateRange] = React.useState<DateRange | null>(null);
+  const [isCustomPickerOpen, setIsCustomPickerOpen] = React.useState<boolean>(false);
   const [filterCourse, setFilterCourse] = React.useState<string>('All');
   const [refreshTick, setRefreshTick] = React.useState(0);
 
@@ -100,35 +95,13 @@ export default function DashboardPage() {
     );
   }, [refreshTick]);
 
-  // Timezone-safe Period filtering calculation
+  // Timezone-safe Period filtering calculation using authoritative Asia/Kolkata boundary logic
   const isDateInSelectedPeriod = React.useCallback(
     (dateStr?: string) => {
       if (!dateStr) return false;
-      if (filterPeriod === 'all') return true;
-
-      const d = parseDateNormalized(dateStr);
-      if (!d) return false;
-
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-
-      if (filterPeriod === 'today') {
-        return d >= todayStart && d <= todayEnd;
-      }
-      if (filterPeriod === 'week') {
-        // Calendar week starts on Monday, matching the academic calendar.
-        const weekStart = new Date(todayStart);
-        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-        return d >= weekStart && d <= todayEnd;
-      }
-      if (filterPeriod === 'month') {
-        const monthStart = new Date(todayStart.getTime() - 29 * 86400000);
-        return d >= monthStart && d <= todayEnd;
-      }
-      return true;
+      return isDateInPeriod(dateStr, filterPeriod, customDateRange);
     },
-    [filterPeriod]
+    [filterPeriod, customDateRange]
   );
 
   // Financial collections dynamically driven by filterPeriod & filterCourse
@@ -239,6 +212,9 @@ export default function DashboardPage() {
     week: "This Week's Collections",
     month: "This Month's Collections",
     all: "Total Collections",
+    custom: customDateRange
+      ? `Collections (${formatDisplayDateRange(customDateRange.startDate, customDateRange.endDate)})`
+      : "Custom Period Collections",
   }[filterPeriod];
 
   const expensesPeriodTitle = {
@@ -246,6 +222,9 @@ export default function DashboardPage() {
     week: "Expenses This Week",
     month: "Expenses This Month",
     all: "Total Operating Expenses",
+    custom: customDateRange
+      ? `Operating Expenses (${formatDisplayDateRange(customDateRange.startDate, customDateRange.endDate)})`
+      : "Custom Period Expenses",
   }[filterPeriod];
 
   const periodLabel = {
@@ -253,6 +232,9 @@ export default function DashboardPage() {
     week: 'This Week',
     month: 'This Month',
     all: 'All Time',
+    custom: customDateRange
+      ? formatDisplayDateRange(customDateRange.startDate, customDateRange.endDate)
+      : 'Custom Range',
   }[filterPeriod];
 
   // CRM & Admission aggregates filtered by period
@@ -355,7 +337,48 @@ export default function DashboardPage() {
                 {period === 'today' ? 'Today' : period === 'week' ? 'This Week' : period === 'month' ? 'This Month' : 'All Time'}
               </button>
             ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setFilterPeriod('custom');
+                setIsCustomPickerOpen(true);
+              }}
+              className={`px-2.5 py-1 rounded font-medium transition-colors flex items-center space-x-1.5 ${
+                filterPeriod === 'custom'
+                  ? 'bg-[#0A6ED1] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Calendar className="h-3 w-3" />
+              <span>Custom</span>
+            </button>
           </div>
+
+          {filterPeriod === 'custom' && customDateRange && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-[#0A6ED1]">
+              <span>{formatDisplayDateRange(customDateRange.startDate, customDateRange.endDate)}</span>
+              <button
+                type="button"
+                onClick={() => setIsCustomPickerOpen(true)}
+                className="ml-0.5 text-[11px] underline hover:text-[#0854A0]"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomDateRange(null);
+                  setFilterPeriod('month');
+                }}
+                className="ml-0.5 text-slate-400 hover:text-slate-700 p-0.5 rounded"
+                title="Reset to This Month"
+                aria-label="Clear custom date filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
 
           <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
 
@@ -396,6 +419,8 @@ export default function DashboardPage() {
                       ? `${periodApprovedPayments.length} successful transactions this week`
                       : filterPeriod === 'month'
                       ? `${periodApprovedPayments.length} successful transactions this month`
+                      : filterPeriod === 'custom'
+                      ? `${periodApprovedPayments.length} successful transactions in selected range`
                       : `${periodApprovedPayments.length} total successful transactions`}
                   </span>
                 </div>
@@ -893,6 +918,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Custom Date Range Picker Modal */}
+      <CustomDateRangePicker
+        isOpen={isCustomPickerOpen}
+        onClose={() => setIsCustomPickerOpen(false)}
+        currentRange={customDateRange}
+        onApply={(range) => {
+          setCustomDateRange(range);
+          setFilterPeriod('custom');
+        }}
+        onClear={() => {
+          setCustomDateRange(null);
+          setFilterPeriod('month');
+        }}
+      />
     </div>
   );
 }

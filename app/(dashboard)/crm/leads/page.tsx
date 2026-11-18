@@ -39,6 +39,7 @@ import {
   isLeadConverted,
 } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 import {
   validatePhoneNumber,
@@ -685,41 +686,38 @@ export default function LeadsPage() {
 
     const actorId = user.id;
     const assignedCounsellorId = selectedLead.counsellor_id || actorId;
+    const leadFullName = selectedLead.full_name;
 
     try {
-      await createAdmissionWorkflow(
-        {
-          student_name: selectedLead.full_name,
-          phone: selectedLead.phone,
-          email: selectedLead.email,
-          dob: convertDob,
-          gender: convertGender as 'Male' | 'Female' | 'Other',
-          address: convertAddress.trim(),
-          city: convertCity.trim(),
-          education: convertEducation.trim(),
-          experience_years: Number(convertExperience) || 0,
-          current_employment_status: (['Employed', 'Unemployed', 'Student', 'Career Gap'].includes(selectedLead.current_status || '')
-            ? (selectedLead.current_status as any)
-            : 'Employed') as 'Employed' | 'Unemployed' | 'Student' | 'Career Gap',
-          course_id: course.id,
-          training_mode: selectedLead.training_preference === 'Offline' ? 'Classroom' : (selectedLead.training_preference as any),
-          batch_id: defaultBatch?.id,
-          admission_date: new Date().toISOString().slice(0, 10),
-          course_fee: Number(convertCourseFee),
-          discount: Number(discount) || 0,
-          discount_reason: discountReason || 'Sales approved discount',
-          payment_plan: 'Full Payment',
-          counsellor_id: assignedCounsellorId,
-          lead_id: selectedLead.id,
-        },
-        actorId
-      );
+      const result = await paymentWorkflowClient.createAdmission({
+        student_name: selectedLead.full_name,
+        phone: selectedLead.phone,
+        email: selectedLead.email,
+        dob: convertDob,
+        gender: convertGender as 'Male' | 'Female' | 'Other',
+        address: convertAddress.trim(),
+        city: convertCity.trim(),
+        education: convertEducation.trim(),
+        experience_years: Number(convertExperience) || 0,
+        current_employment_status: (['Employed', 'Unemployed', 'Student', 'Career Gap'].includes(selectedLead.current_status || '')
+          ? (selectedLead.current_status as any)
+          : 'Employed') as 'Employed' | 'Unemployed' | 'Student' | 'Career Gap',
+        course_id: course.id,
+        training_mode: selectedLead.training_preference === 'Offline' ? 'Classroom' : (selectedLead.training_preference as any),
+        batch_id: defaultBatch?.id,
+        admission_date: new Date().toISOString().slice(0, 10),
+        course_fee: Number(convertCourseFee),
+        discount: Number(discount) || 0,
+        discount_reason: discountReason || 'Sales approved discount',
+        payment_plan: 'Full Payment',
+        counsellor_id: assignedCounsellorId,
+        lead_id: selectedLead.id,
+      });
 
-      selectedLead.stage = 'Converted';
       setIsConvertModalOpen(false);
       setSelectedLead(null);
       await refreshLeads();
-      alert(`Lead ${selectedLead.full_name} converted to confirmed admission successfully!`);
+      alert(`Lead ${leadFullName} converted to confirmed admission (${result?.admission?.admission_number || 'Confirmed'}) successfully!`);
     } catch (err: any) {
       alert('Error converting lead: ' + (err.message || 'Unknown error'));
     } finally {
@@ -1083,7 +1081,7 @@ export default function LeadsPage() {
                               </Button>
                             )}
                             {isConverted ? (
-                              matchingAdmission && (
+                              matchingAdmission?.admission_number && (
                                 <Button
                                   variant="outline"
                                   size="sm"

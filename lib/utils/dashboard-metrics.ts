@@ -1,4 +1,5 @@
 import { Payment } from '@/types';
+import { getTodayInInstituteTimezone, isValidYMD, getInstituteTimezone } from '@/lib/utils/schedule-date';
 
 export const UNASSIGNED_COURSE = '__unassigned__';
 
@@ -506,4 +507,213 @@ export function getRecentVerifiedCollections<T extends {
       return (b.id || '').localeCompare(a.id || '');
     })
     .slice(0, limit);
+}
+
+export type DashboardPeriod = 'today' | 'week' | 'month' | 'all' | 'custom';
+
+export interface DateRange {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+}
+
+/**
+ * Converts a raw date string (ISO timestamp or date-only string) into
+ * a standard YYYY-MM-DD calendar date in the institute's business timezone (Asia/Kolkata).
+ *
+ * Rules:
+ * 1. Date-only strings ('YYYY-MM-DD') are preserved as that explicit calendar date.
+ * 2. ISO/UTC timestamps ('2026-11-17T19:30:00.000Z') are evaluated in Asia/Kolkata (+05:30),
+ *    correctly crossing over midnight when applicable.
+ * 3. Invalid date inputs return null.
+ */
+export function getDateInInstituteTimezone(
+  dateStr?: string | null,
+  timeZone: string = getInstituteTimezone()
+): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  // Pure date-only string: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return isValidYMD(trimmed) ? trimmed : null;
+  }
+
+  const parsed = new Date(trimmed);
+  if (isNaN(parsed.getTime())) return null;
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(parsed);
+  } catch {
+    return parsed.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Validates a custom date range.
+ * Rules:
+ * 1. Both From Date and To Date must be provided.
+ * 2. Both must be valid calendar dates formatted as YYYY-MM-DD.
+ * 3. From Date cannot be later than To Date.
+ */
+export function validateDateRange(
+  startDate?: string | null,
+  endDate?: string | null
+): { isValid: boolean; error?: string } {
+  if (!startDate && !endDate) {
+    return { isValid: false, error: 'Both From Date and To Date are required.' };
+  }
+  if (!startDate) {
+    return { isValid: false, error: 'From Date is required.' };
+  }
+  if (!endDate) {
+    return { isValid: false, error: 'To Date is required.' };
+  }
+  if (!isValidYMD(startDate)) {
+    return { isValid: false, error: 'From Date must be a valid calendar date in YYYY-MM-DD format.' };
+  }
+  if (!isValidYMD(endDate)) {
+    return { isValid: false, error: 'To Date must be a valid calendar date in YYYY-MM-DD format.' };
+  }
+  if (startDate > endDate) {
+    return { isValid: false, error: 'From Date cannot be later than To Date.' };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Derives start and end date boundaries for a given DashboardPeriod in Asia/Kolkata.
+ */
+export function getPeriodDateBoundaries(
+  period: DashboardPeriod,
+  customRange?: DateRange | null,
+  referenceDate: Date = new Date(),
+  timeZone: string = getInstituteTimezone()
+): { startDate?: string; endDate?: string } {
+  if (period === 'all') {
+    return {};
+  }
+  if (period === 'custom') {
+    if (customRange?.startDate && customRange?.endDate) {
+      return { startDate: customRange.startDate, endDate: customRange.endDate };
+    }
+    return {};
+  }
+
+  const todayStr = getTodayInInstituteTimezone(referenceDate, timeZone);
+  const [y, m, d] = todayStr.split('-').map(Number);
+
+  if (period === 'today') {
+    return { startDate: todayStr, endDate: todayStr };
+  }
+
+  if (period === 'week') {
+    // Academic calendar week starts on Monday
+    const todayDate = new Date(y, m - 1, d, 12, 0, 0);
+    const dayOfWeek = todayDate.getDay(); // 0 is Sunday, 1 is Monday, ...
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const mondayDate = new Date(y, m - 1, d - diffToMonday, 12, 0, 0);
+    const my = mondayDate.getFullYear();
+    const mm = String(mondayDate.getMonth() + 1).padStart(2, '0');
+    const md = String(mondayDate.getDate()).padStart(2, '0');
+    return { startDate: `${my}-${mm}-${md}`, endDate: todayStr };
+  }
+
+  if (period === 'month') {
+    // Current month 1st day up to today (or rolling 30 days)
+    const firstOfMonth = `${y}-${String(m).padStart(2, '0')}-01`;
+    return { startDate: firstOfMonth, endDate: todayStr };
+  }
+
+  return {};
+}
+
+/**
+ * Evaluates whether an event date string falls within the selected dashboard period.
+ * Supports:
+ * - 'all': all dates match.
+ * - 'today': matches current calendar day in Asia/Kolkata.
+ * - 'week': matches current calendar week starting Monday up to today.
+ * - 'month': matches current calendar month (from 1st of month) or rolling 30-day window.
+ * - 'custom': matches customRange.startDate <= dateKey <= customRange.endDate (inclusive boundaries).
+ */
+export function isDateInPeriod(
+  dateStr?: string | null,
+  period: DashboardPeriod = 'month',
+  customRange?: DateRange | null,
+  referenceDate: Date = new Date(),
+  timeZone: string = getInstituteTimezone()
+): boolean {
+  if (period === 'all') return true;
+  if (!dateStr) return false;
+
+  const dateKey = getDateInInstituteTimezone(dateStr, timeZone);
+  if (!dateKey) return false;
+
+  if (period === 'custom') {
+    if (!customRange?.startDate || !customRange?.endDate) return false;
+    return dateKey >= customRange.startDate && dateKey <= customRange.endDate;
+  }
+
+  const boundaries = getPeriodDateBoundaries(period, customRange, referenceDate, timeZone);
+  if (!boundaries.startDate || !boundaries.endDate) return true;
+
+  if (period === 'month') {
+    const todayStr = getTodayInInstituteTimezone(referenceDate, timeZone);
+    const [y, m, d] = todayStr.split('-').map(Number);
+    const firstOfMonth = `${y}-${String(m).padStart(2, '0')}-01`;
+    const thirtyDaysAgo = new Date(y, m - 1, d - 29, 12, 0, 0);
+    const tY = thirtyDaysAgo.getFullYear();
+    const tM = String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0');
+    const tD = String(thirtyDaysAgo.getDate()).padStart(2, '0');
+    const thirtyDaysKey = `${tY}-${tM}-${tD}`;
+    // Include if in current month OR within rolling 30 days up to today
+    const effectiveStart = firstOfMonth < thirtyDaysKey ? firstOfMonth : thirtyDaysKey;
+    return dateKey >= effectiveStart && dateKey <= todayStr;
+  }
+
+  return dateKey >= boundaries.startDate && dateKey <= boundaries.endDate;
+}
+
+/**
+ * Formats a start and end date into a user-friendly label for display.
+ * Examples:
+ * - Same day: '15 Nov 2026'
+ * - Multi-day (same year): '10 Nov – 16 Nov 2026'
+ * - Cross-month (same year): '25 Oct – 5 Nov 2026'
+ * - Cross-year: '20 Dec 2025 – 15 Jan 2026'
+ */
+export function formatDisplayDateRange(startDate?: string, endDate?: string): string {
+  if (!startDate || !endDate) return '';
+  if (!isValidYMD(startDate) || !isValidYMD(endDate)) return `${startDate} – ${endDate}`;
+
+  const [sy, sm, sd] = startDate.split('-').map(Number);
+  const [ey, em, ed] = endDate.split('-').map(Number);
+
+  if (startDate === endDate) {
+    const d = new Date(sy, sm - 1, sd, 12, 0, 0);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  const sObj = new Date(sy, sm - 1, sd, 12, 0, 0);
+  const eObj = new Date(ey, em - 1, ed, 12, 0, 0);
+
+  const startFormatted = sObj.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: sy === ey ? undefined : 'numeric',
+  });
+  const endFormatted = eObj.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  return `${startFormatted} – ${endFormatted}`;
 }

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiRequest } from '@/lib/auth/server-session';
-import { getJobOpenings, createJobOpening } from '@/lib/services/placement-service';
+import {
+  getJobOpenings,
+  createJobOpening,
+  updateJobOpening,
+  updateJobOpeningStatus,
+  deleteJobOpening,
+} from '@/lib/services/placement-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,6 +88,92 @@ export async function POST(request: NextRequest) {
         success: false,
         error: err.message || 'Failed to create job opening',
       },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = await authenticateApiRequest(request, {
+      allowedRoles: ['super_admin', 'admin', 'placement_coordinator'],
+    });
+
+    if (auth.errorResponse) {
+      return auth.errorResponse;
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { id, status, ...updates } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Job opening id is required' },
+        { status: 400 }
+      );
+    }
+
+    let updatedJob = null;
+    if (status && Object.keys(updates).length === 0) {
+      updatedJob = await updateJobOpeningStatus(id, status);
+    } else {
+      updatedJob = await updateJobOpening(id, { ...updates, ...(status ? { status } : {}) });
+    }
+
+    if (!updatedJob) {
+      return NextResponse.json(
+        { success: false, error: 'Job opening not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      job: updatedJob,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err.message || 'Failed to update job opening' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await authenticateApiRequest(request, {
+      allowedRoles: ['super_admin', 'admin', 'placement_coordinator'],
+    });
+
+    if (auth.errorResponse) {
+      return auth.errorResponse;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Job opening id is required' },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await deleteJobOpening(id);
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: 'Job opening not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Job opening successfully deleted',
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err.message || 'Failed to delete job opening' },
       { status: 500 }
     );
   }

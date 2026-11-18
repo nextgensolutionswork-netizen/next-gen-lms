@@ -11,7 +11,7 @@ export function getLeadAdmission(lead: Lead, admissions?: Admission[]): Admissio
     (a) =>
       a.lead_id === lead.id ||
       (a as any).lead_id === lead.id ||
-      (lead.notes && a.admission_number && lead.notes.includes(a.admission_number)) ||
+      (lead.notes && a.admission_number && lead.notes.includes(a.admission_number) && (!lead.email || !a.email || a.email.toLowerCase() === lead.email.toLowerCase())) ||
       (a.email && lead.email && a.email.toLowerCase() === lead.email.toLowerCase() && a.course_id === lead.interested_course_id)
   );
 }

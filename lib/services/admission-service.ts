@@ -51,6 +51,25 @@ export function getNextStudentSequence(year = new Date().getFullYear()): number 
   return nextSeq;
 }
 
+export function getNextAdmissionSequence(year = new Date().getFullYear()): number {
+  const prefix = `ADM-${year}-`;
+  let maxSeq = 0;
+  for (const a of store.admissions || []) {
+    const num = a.admission_number;
+    if (num && num.startsWith(prefix)) {
+      const val = parseInt(num.slice(prefix.length), 10);
+      if (Number.isFinite(val) && val > maxSeq) maxSeq = val;
+    }
+  }
+  if ((store as any).highestAdmissionSequence && typeof (store as any).highestAdmissionSequence[year] === 'number') {
+    maxSeq = Math.max(maxSeq, (store as any).highestAdmissionSequence[year]);
+  }
+  const nextSeq = maxSeq + 1;
+  if (!(store as any).highestAdmissionSequence) (store as any).highestAdmissionSequence = {};
+  (store as any).highestAdmissionSequence[year] = nextSeq;
+  return nextSeq;
+}
+
 export async function getAdmissions(): Promise<Admission[]> {
   if (typeof window !== 'undefined') {
     const { paymentWorkflowClient } = await import('./payment-workflow-client');
@@ -211,14 +230,11 @@ export async function createAdmissionWorkflow(
 }> {
   if (typeof window !== 'undefined') {
     const { paymentWorkflowClient } = await import('./payment-workflow-client');
-    try {
-      const serverResult = await paymentWorkflowClient.createAdmission(input);
-      if (serverResult && serverResult.admission) {
-        return serverResult;
-      }
-    } catch (err: any) {
-      console.warn('paymentWorkflowClient.createAdmission failed, falling back to local admission workflow:', err);
+    const serverResult = await paymentWorkflowClient.createAdmission(input);
+    if (!serverResult || !serverResult.admission) {
+      throw new Error('Server admission creation returned invalid response.');
     }
+    return serverResult;
   }
   const performingUser =
     store.users.find((u) => u.id === performedByUserId || u.email === performedByUserId) ||
@@ -246,7 +262,8 @@ export async function createAdmissionWorkflow(
         tenantId(a) === admissionTenant &&
         (a.lead_id === input.lead_id ||
           (a as any).lead_id === input.lead_id ||
-          (store.leads.find((l) => l.id === input.lead_id)?.notes?.includes(a.admission_number)))
+          (store.leads.find((l) => l.id === input.lead_id)?.notes?.includes(a.admission_number) &&
+            (!a.email || !input.email || a.email.toLowerCase() === input.email.toLowerCase())))
     );
     if (existingAdmissionForLead) {
       const existingStudent = store.students.find((s) => s.id === existingAdmissionForLead.student_id);
@@ -366,8 +383,30 @@ export async function createAdmissionWorkflow(
     }
   }
 
-  const sequence = store.admissions.length + 1;
-  const admission_number = generateAdmissionNumber(sequence);
+  let admission_number: string;
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createAdminClient();
+      const currentYear = new Date().getFullYear();
+      const { data, error } = await supabase.rpc('allocate_admission_number', {
+        p_tenant: admissionTenant,
+        p_year: currentYear,
+      });
+      if (error || !data) {
+        throw new Error(`Failed to allocate atomic admission number: ${error?.message || 'Empty response'}`);
+      }
+      admission_number = data;
+    } catch (allocErr) {
+      if (transactional) {
+        throw allocErr;
+      }
+      const sequence = getNextAdmissionSequence();
+      admission_number = generateAdmissionNumber(sequence);
+    }
+  } else {
+    const sequence = getNextAdmissionSequence();
+    admission_number = generateAdmissionNumber(sequence);
+  }
   const studentSequence = getNextStudentSequence();
   const studentUniqueId = generateStudentUniqueId(studentSequence);
 
@@ -428,10 +467,11 @@ export async function createAdmissionWorkflow(
   const stateVal = input.state || (input.city?.toLowerCase().includes('pune') || input.city?.toLowerCase().includes('mumbai') ? 'Maharashtra' : input.city?.toLowerCase().includes('bengaluru') || input.city?.toLowerCase().includes('bangalore') ? 'Karnataka' : 'Telangana');
   const stateCodeVal = input.state_code || (stateVal === 'Maharashtra' ? '27' : stateVal === 'Karnataka' ? '29' : '36');
 
-  // 1. Create Admission Record
+  // 1. Create Admission Record with RFC-4122 UUID
+  const newAdmissionId = crypto.randomUUID();
   const newAdmission: Admission = {
     tenant_id: admissionTenant,
-    id: `adm-${Date.now()}`,
+    id: newAdmissionId,
     admission_number,
     student_unique_id: studentUniqueId,
     lead_id: input.lead_id,
@@ -478,8 +518,8 @@ export async function createAdmissionWorkflow(
 
   store.admissions.unshift(newAdmission);
 
-  // 2. Automatically Create Student User Profile & Portal Account
-  const studentUserId = `usr-stu-${Date.now()}`;
+  // 2. Automatically Create Student User Profile & Portal Account with RFC-4122 UUID
+  const studentUserId = crypto.randomUUID();
   store.users.push({
     tenant_id: admissionTenant,
     id: studentUserId,
@@ -492,12 +532,13 @@ export async function createAdmissionWorkflow(
     updated_at: new Date().toISOString(),
   });
 
-  // 3. Automatically Create Student Record
+  // 3. Automatically Create Student Record with RFC-4122 UUID
+  const newStudentId = crypto.randomUUID();
   const studentCode = `STU-${course?.course_code?.slice(4, 8) || 'GEN'}-${String(store.students.length + 1).padStart(3, '0')}`;
   const newStudent: Student = {
     onboarding_required: true,
     tenant_id: admissionTenant,
-    id: `stu-${Date.now()}`,
+    id: newStudentId,
     user_id: studentUserId,
     admission_id: newAdmission.id,
     student_code: studentCode,
@@ -537,10 +578,11 @@ export async function createAdmissionWorkflow(
   newAdmission.student_id = newStudent.id;
   store.students.unshift(newStudent);
 
-  // 4. Automatically Create Student Fee Ledger
+  // 4. Automatically Create Student Fee Ledger with RFC-4122 UUID
+  const newFeeAccountId = crypto.randomUUID();
   const newFeeAccount: StudentFeeAccount = {
     tenant_id: admissionTenant,
-    id: `fa-${Date.now()}`,
+    id: newFeeAccountId,
     student_id: newStudent.id,
     student_name: newStudent.full_name,
     admission_id: newAdmission.id,
@@ -576,11 +618,12 @@ export async function createAdmissionWorkflow(
 
   const numInstallments = 0;
 
+  const newStudentFeeId = crypto.randomUUID();
   const newStudentFee: StudentFee = {
     enrollment_id: newAdmission.id,
     fee_account_id: newFeeAccount.id,
     tenant_id: admissionTenant,
-    id: `fee-${newFeeAccount.id}`,
+    id: newStudentFeeId,
     student_id: newStudent.id,
     student_name: newStudent.full_name,
     student_code: newStudent.student_code || newStudent.id,
@@ -637,10 +680,10 @@ export async function createAdmissionWorkflow(
       ? feeWorkflowService.generateInstallmentsForFee(newStudentFee, newFeeAccount.id)
       : [];
 
-  // 5c. Post Initial Entry to Student Financial Ledger (Fee Raised)
+  // 5c. Post Initial Entry to Student Financial Ledger (Fee Raised) with RFC-4122 UUID
   if (!store.studentFinancialLedgers) store.studentFinancialLedgers = [];
   store.studentFinancialLedgers.push({
-    id: `sfl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    id: crypto.randomUUID(),
     student_id: newStudent.id,
     entry_date: input.admission_date,
     entry_type: 'Fee Raised',
@@ -655,10 +698,10 @@ export async function createAdmissionWorkflow(
     created_at: nowStr,
   });
 
-  // 5d. Record Approval History
+  // 5d. Record Approval History with RFC-4122 UUID
   if (!store.feeApprovalHistories) store.feeApprovalHistories = [];
   store.feeApprovalHistories.push({
-    id: `fah-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    id: crypto.randomUUID(),
     fee_id: newStudentFee.id,
     student_id: newStudent.id,
     action: 'Approved',
@@ -728,7 +771,7 @@ export async function createAdmissionWorkflow(
       const supabase = createClient();
 
     // 1. Direct insert to admissions table
-    await supabase.from('admissions').insert({
+    const { error: admErr } = await supabase.from('admissions').insert({
       id: newAdmission.id,
       admission_number: newAdmission.admission_number,
       student_name: newAdmission.student_name,
@@ -754,9 +797,12 @@ export async function createAdmissionWorkflow(
       counsellor_id: newAdmission.counsellor_id,
       status: newAdmission.status,
     });
+    if (admErr) {
+      throw new Error(`Failed to persist admission in database: ${admErr.message}`);
+    }
 
     // 2. Direct insert to students table
-    await supabase.from('students').insert({
+    const { error: stuErr } = await supabase.from('students').insert({
       id: newStudent.id,
       user_id: newStudent.user_id,
       admission_id: newAdmission.id,
@@ -778,6 +824,9 @@ export async function createAdmissionWorkflow(
       course_progress: newStudent.course_progress,
       placement_status: newStudent.placement_status,
     });
+    if (stuErr) {
+      throw new Error(`Failed to persist student in database: ${stuErr.message}`);
+    }
 
     // 3. Direct insert to student_fee_accounts table
     await supabase.from('student_fee_accounts').insert({
@@ -795,7 +844,7 @@ export async function createAdmissionWorkflow(
       status: newFeeAccount.status,
     });
 
-    // 5. Direct update to leads table if converted
+    // 4. Direct update to leads table if converted ONLY after admission succeeded
     if (input.lead_id) {
       await supabase
         .from('leads')

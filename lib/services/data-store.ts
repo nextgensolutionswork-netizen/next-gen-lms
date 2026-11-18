@@ -508,11 +508,12 @@ class InstituteDataStore {
       );
 
       if (!student) {
-        const studentId = adm.student_id || `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const studentId = adm.student_id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
+        const studentUserId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `usr-stu-${studentId}`;
         student = {
           tenant_id: adm.tenant_id || 'default',
           id: studentId,
-          user_id: `usr-stu-${studentId}`,
+          user_id: studentUserId,
           admission_id: adm.id,
           student_code: `STU-${course?.course_code?.slice(4, 8) || 'GEN'}-${String(this.students.length + 1).padStart(3, '0')}`,
           student_unique_id: adm.student_unique_id,
