@@ -21,6 +21,10 @@ export interface UserProfile {
   status?: string;
   branch_id?: string;
   assigned_course_ids?: string[];
+  permissions?: Permission[];
+  can_assign_admissions?: boolean;
+  can_act_as_counsellor?: boolean;
+  admissions_assignment?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -1356,6 +1360,10 @@ export interface FeeCategoryItem {
 }
 
 export interface StudentFee {
+  /** Original invoice snapshot; carried unchanged through approved revisions. */
+  invoice_number?: string;
+  invoice_date?: string;
+  invoice_approved_amount?: number;
   enrollment_id?: string;
   tenant_id?: string;
   id: string;

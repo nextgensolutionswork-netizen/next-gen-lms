@@ -40,6 +40,8 @@ import {
 } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { getEligibleAdmissionsCounsellors } from '@/lib/services/counsellor-service';
+import { tenantId } from '@/lib/auth/tenant';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 import {
   validatePhoneNumber,
@@ -91,10 +93,9 @@ export default function LeadsPage() {
   const [isBulkProcessing, setIsBulkProcessing] = React.useState(false);
 
   const availableCounsellors = React.useMemo(() => {
-    return (store.users || []).filter(
-      (u) => u.role === 'counsellor' || u.role === 'admin' || u.role === 'super_admin'
-    );
-  }, []);
+    const currentTenant = (user && tenantId(user)) || 'default';
+    return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
+  }, [user]);
 
   const canAccessCrm =
     hasPermission('crm:read') ||

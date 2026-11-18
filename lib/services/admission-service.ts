@@ -14,6 +14,7 @@ import {
   Receipt,
   PaymentMethod,
   Lead,
+  UserProfile,
 } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { generateAdmissionNumber, generateStudentUniqueId } from '@/lib/utils/formatters';
@@ -24,6 +25,19 @@ import { tenantId } from '@/lib/auth/tenant';
 import type { StudentPaymentRecord } from '@/types';
 import { validatePhoneNumber, validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
 import { validateEmailAddress } from '@/lib/utils/email-validation';
+import {
+  getEligibleAdmissionsCounsellors,
+  resolveCanonicalCounsellorId,
+  validateCounsellorAssignment,
+  isEligibleAdmissionsCounsellor,
+} from './counsellor-service';
+
+export {
+  getEligibleAdmissionsCounsellors,
+  resolveCanonicalCounsellorId,
+  validateCounsellorAssignment,
+  isEligibleAdmissionsCounsellor,
+};
 
 export function getNextStudentSequence(year = new Date().getFullYear()): number {
   const prefix = `NGERP-${year}-`;
@@ -458,9 +472,16 @@ export async function createAdmissionWorkflow(
   }
   const trainer = store.users.find((u) => u.id === (input.trainer_id || batch?.trainer_id));
   const fallbackCounsellor = store.users.find((u) => u.role === 'counsellor' && u.is_active && tenantId(u) === admissionTenant);
-  const counsellor = (input.counsellor_id ? store.users.find((u) => u.id === input.counsellor_id) : undefined)
-    || (performingUser.role === 'counsellor' ? performingUser : fallbackCounsellor)
-    || performingUser;
+  let counsellor: UserProfile;
+  if (input.counsellor_id) {
+    counsellor = validateCounsellorAssignment(input.counsellor_id, store.users, admissionTenant);
+  } else if (performingUser.role === 'counsellor') {
+    counsellor = validateCounsellorAssignment(performingUser.id, store.users, admissionTenant);
+  } else if (fallbackCounsellor) {
+    counsellor = validateCounsellorAssignment(fallbackCounsellor.id, store.users, admissionTenant);
+  } else {
+    counsellor = performingUser;
+  }
   const actor = performingUser;
 
   // Resolve student location
@@ -624,6 +645,9 @@ export async function createAdmissionWorkflow(
     fee_account_id: newFeeAccount.id,
     tenant_id: admissionTenant,
     id: newStudentFeeId,
+    invoice_number: `INV-${newStudentFeeId}`,
+    invoice_date: nowStr.split('T')[0],
+    invoice_approved_amount: net_payable,
     student_id: newStudent.id,
     student_name: newStudent.full_name,
     student_code: newStudent.student_code || newStudent.id,

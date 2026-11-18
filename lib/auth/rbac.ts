@@ -203,6 +203,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 
 export function isUserActive(user: UserProfile | null | undefined): user is UserProfile {
   if (!user) return false;
+  if (user.is_active === false) return false;
+  if ((user as any).status !== undefined && ((user as any).status === 'Inactive' || (user as any).status === 'Deactivated')) return false;
   if (user.is_active !== undefined) return Boolean(user.is_active);
   if ((user as any).status !== undefined) return (user as any).status === 'Active';
   return true;
@@ -225,6 +227,11 @@ export function hasPermission(user: UserProfile | UserRole | null | undefined, p
 
   if (!isUserActive(user)) {
     return false;
+  }
+
+  // If user object has explicit scoped permissions defined, evaluate against them
+  if (Array.isArray((user as any).permissions)) {
+    return (user as any).permissions.includes(permission);
   }
 
   if (user.role === 'super_admin') {
@@ -373,7 +380,7 @@ export function getSafeRedirectUrl(
       pathname === '/portal' ||
       pathname.startsWith('/portal/') ||
       pathname.startsWith('/certificate/verify') ||
-      pathname.startsWith('/accounts/receipts/');
+      pathname.startsWith('/accounts/receipts/') || pathname.startsWith('/accounts/statements/');
     return isStudentAllowed ? cleanTarget : defaultRoute;
   }
 
@@ -413,7 +420,7 @@ export function getSafeRedirectUrl(
   const counsellorPermittedAccounts = ['/accounts/fees', '/accounts/payments', '/accounts/receipts', '/accounts/dues'];
   const isCounsellorAccountsAllowed =
     safeRole === 'counsellor' &&
-    (counsellorPermittedAccounts.includes(pathname) || pathname.startsWith('/accounts/receipts/'));
+    (counsellorPermittedAccounts.includes(pathname) || pathname.startsWith('/accounts/receipts/') || pathname.startsWith('/accounts/statements/'));
 
   if (pathname.startsWith('/accounts') && !isCounsellorAccountsAllowed && !['super_admin', 'admin', 'accountant'].includes(safeRole)) {
     return defaultRoute;

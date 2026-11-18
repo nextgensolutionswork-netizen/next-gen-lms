@@ -31,6 +31,7 @@ const schema = z.object({
   our_upi_details: z.string().trim().max(200).optional(),
   idempotency_key: z.string().trim().max(200).optional(),
   payment_plan: z.string().optional(),
+  counsellor_id: z.string().optional(),
 }).passthrough();
 
 export async function GET(request: NextRequest) {

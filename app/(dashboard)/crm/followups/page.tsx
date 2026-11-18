@@ -37,6 +37,8 @@ import { store } from '@/lib/services/data-store';
 import { Lead, LeadStage } from '@/types';
 import { updateLeadStage, completeFollowup } from '@/lib/services/crm-service';
 import { formatDate } from '@/lib/utils/formatters';
+import { getEligibleAdmissionsCounsellors } from '@/lib/services/counsellor-service';
+import { tenantId } from '@/lib/auth/tenant';
 
 type UrgencyFilter = 'All' | 'Overdue' | 'Due Today' | 'Upcoming' | 'Unscheduled';
 type ViewMode = 'grid' | 'timeline' | 'calendar';
@@ -118,10 +120,9 @@ export default function FollowupsPage() {
 
   // Available sales staff for filtering
   const availableCounsellors = React.useMemo(() => {
-    return (store.users || []).filter(
-      (u) => u.role === 'counsellor' || u.role === 'admin' || u.role === 'super_admin'
-    );
-  }, []);
+    const currentTenant = (user && tenantId(user)) || 'default';
+    return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
+  }, [user]);
 
   // Filtered followups
   const filteredFollowups = React.useMemo(() => {

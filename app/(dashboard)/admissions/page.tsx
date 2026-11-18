@@ -38,6 +38,8 @@ import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { getEligibleAdmissionsCounsellors, resolveCanonicalCounsellorId } from '@/lib/services/counsellor-service';
+import { tenantId } from '@/lib/auth/tenant';
 import { isLeadConverted } from '@/lib/services/crm-service';
 import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
 import { resolveState, INDIAN_STATE_CODES } from '@/lib/services/finance-formatters';
@@ -196,15 +198,15 @@ export default function AdmissionsPage() {
   };
 
   const availableCounsellors = React.useMemo(() => {
-    return (store.users || []).filter(
-      (u) => u.is_active && (u.role === 'counsellor' || u.role === 'admin' || u.role === 'super_admin')
-    );
-  }, []);
+    const currentTenant = (user && tenantId(user)) || 'default';
+    return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
+  }, [user]);
 
   React.useEffect(() => {
     if (!counsellorId && user) {
       if (user.role === 'counsellor') {
-        setCounsellorId(user.id);
+        const canonical = resolveCanonicalCounsellorId(user.id) || user.id;
+        setCounsellorId(canonical);
       } else {
         const firstCounsellor = availableCounsellors.find((c) => c.role === 'counsellor') || availableCounsellors[0];
         if (firstCounsellor) setCounsellorId(firstCounsellor.id);
@@ -723,6 +725,7 @@ export default function AdmissionsPage() {
                               </Button>
                             </Link>
                           )}
+                          <Link className="text-blue-700 text-xs underline" href={`/accounts/statements/${encodeURIComponent(profileId)}`}>Fee statement</Link>
                           <Link href={`/students/${profileId}`}>
                             <Button
                               variant="outline"
@@ -1051,7 +1054,7 @@ export default function AdmissionsPage() {
                   <option value="" disabled>Select admissions counsellor</option>
                   {availableCounsellors.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.full_name} ({c.role === 'counsellor' ? 'Sales' : 'Admin'})
+                      {c.display_label}
                     </option>
                   ))}
                 </select>
