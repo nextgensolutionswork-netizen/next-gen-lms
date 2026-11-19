@@ -155,7 +155,7 @@ describe('Role 7: Support & Faculty Doubts Desk — Comprehensive Integrity Suit
 
     it('SC-SD-11: Rejects ticket submission when mandatory fields are missing', async () => {
       await expect(
-        createStudentDoubt({ student_id: '', title: '', description: '', category: 'General' }, 'usr-test')
+        createStudentDoubt({ student_id: '', title: '', description: '', category: 'General Query' }, 'usr-test')
       ).rejects.toThrow();
     });
 

@@ -234,7 +234,8 @@ export async function middleware(request: NextRequest) {
     const isPortalRoute = pathname === '/portal' || pathname.startsWith('/portal/');
     const isVerifyRoute = pathname.startsWith('/certificate/verify');
     const isReceiptDetail = pathname.startsWith('/accounts/receipts/') && pathname.length > '/accounts/receipts/'.length;
-    if (!isPortalRoute && !isVerifyRoute && !isReceiptDetail) {
+    const isStatementDetail = pathname.startsWith('/accounts/statements/') && pathname.length > '/accounts/statements/'.length;
+    if (!isPortalRoute && !isVerifyRoute && !isReceiptDetail && !isStatementDetail) {
       return createRedirect('/portal');
     }
   }
@@ -299,14 +300,14 @@ export async function middleware(request: NextRequest) {
   // 15. Financial workspace boundary: Deny-by-default for all /accounts/* routes (NG-03)
   if (isAuthenticated && (pathname === '/accounts' || pathname.startsWith('/accounts/'))) {
     const isSensitiveDesk = ['/accounts/approvals', '/accounts/expenses', '/accounts/vendors', '/accounts/reports'].some((p) => pathname.startsWith(p));
-    const isOperationalDesk = ['/accounts/fees', '/accounts/payments', '/accounts/installments', '/accounts/receipts', '/accounts/dues'].some((p) => pathname.startsWith(p));
+    const isOperationalDesk = ['/accounts/fees', '/accounts/payments', '/accounts/installments', '/accounts/receipts', '/accounts/dues', '/accounts/statements/'].some((p) => pathname.startsWith(p));
 
     let isAllowed = false;
     if (userRole === 'super_admin' || userRole === 'admin' || userRole === 'accountant') {
       isAllowed = true;
     } else if (userRole === 'counsellor' && isOperationalDesk && !isSensitiveDesk) {
       isAllowed = true;
-    } else if (userRole === 'student' && pathname.startsWith('/accounts/receipts/') && pathname.length > '/accounts/receipts/'.length) {
+    } else if (userRole === 'student' && ['/accounts/receipts/', '/accounts/statements/'].some(p => pathname.startsWith(p) && pathname.length > p.length)) {
       isAllowed = true;
     }
 

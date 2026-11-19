@@ -173,6 +173,8 @@ export async function GET(
         studentFees,
         payments,
         studentPayments,
+        receipts,
+        studentLedger,
       });
 
       student.total_fee = authFin.totalPayable;

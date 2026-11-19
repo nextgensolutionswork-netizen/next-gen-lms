@@ -375,7 +375,7 @@ export default function ReceiptsListPage() {
                             <ExternalLink className="h-2.5 w-2.5 text-slate-400 opacity-60" />
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">{r.admission_number}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">{r.admission_number}<Link className="block text-blue-700 underline" href={`/accounts/statements/${encodeURIComponent(r.student_id)}`}>Fee statement</Link></td>
                         <td className="px-4 py-3 text-slate-600 truncate max-w-[150px]" title={r.course_name}>
                           {r.course_name}
                         </td>

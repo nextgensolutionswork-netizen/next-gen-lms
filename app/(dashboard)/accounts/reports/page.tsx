@@ -92,6 +92,7 @@ export default function FinanceReportsPage() {
         studentFees: store.studentFees || [],
         feeAccounts: store.feeAccounts || [],
         receipts: store.receipts || [],
+        refunds: store.studentRefunds || [],
       }
     );
   }, [refreshTick]);

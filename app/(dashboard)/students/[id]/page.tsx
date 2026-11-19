@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { StudentFeeStatement } from '@/components/accounts/student-fee-statement';
 import { useParams } from 'next/navigation';
 import {
   User,
@@ -130,6 +131,8 @@ export default function StudentDetailsPage() {
       studentFees: data.studentFees || [],
       payments: data.payments || [],
       studentPayments: data.studentPayments || [],
+      receipts: data.receipts || [],
+      studentLedger: data.studentLedger || [],
     });
   }, [data]);
 
@@ -1707,6 +1710,7 @@ export default function StudentDetailsPage() {
       {/* Tab: Centralized Finance & Ledger */}
       {activeTab === 'finance' && (
         <div className="space-y-6">
+          <StudentFeeStatement studentId={student.id} />
           {/* Financial Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <Card className="border-l-4 border-l-blue-500 shadow-xs">

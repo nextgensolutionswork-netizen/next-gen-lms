@@ -725,6 +725,7 @@ export default function PaymentsPage() {
                           </td>
 
                           <td className="px-4 py-3 text-right font-mono text-blue-600 font-semibold">
+                            <Link className="block text-xs underline" href={`/accounts/statements/${encodeURIComponent(p.student_id)}`}>Fee statement</Link>
                             {p.receipt_number ? (() => {
                               const matchingReceipt = (store.receipts || []).find(
                                 (r) => r.receipt_number === p.receipt_number || r.payment_id === p.id

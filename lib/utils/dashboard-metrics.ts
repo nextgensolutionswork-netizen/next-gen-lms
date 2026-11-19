@@ -88,6 +88,7 @@ export function unifyDualLedgerPayments(
     studentFees?: readonly any[];
     feeAccounts?: readonly any[];
     receipts?: readonly any[];
+    refunds?: readonly any[];
   } = {}
 ): UnifiedPaymentRecord[] {
   const map = new Map<string, UnifiedPaymentRecord>();
@@ -263,7 +264,15 @@ export function unifyDualLedgerPayments(
     map.set(key, unifiedRecord);
   }
 
-  return Array.from(map.values());
+  return Array.from(map.values()).map(payment => {
+    const receipt = context.receipts?.find(r => r.receipt_number === payment.receipt_number);
+    const refunded = [...new Map((context.refunds || []).filter(r => r.status === 'Processed' &&
+      (r.payment_id === payment.raw_id || r.payment_id === payment.id || (r.receipt_number && r.receipt_number === payment.receipt_number)))
+      .map(r => [r.id, r])).values()].reduce((sum, r) => sum + Number(r.refund_amount || 0), 0);
+    if (!receipt?.reversed_amount && !refunded) return payment;
+    const amount = Math.max(0, Number(((receipt?.original_amount ?? receipt?.payment_amount ?? payment.amount) - (receipt?.reversed_amount || 0) - refunded).toFixed(2)));
+    return { ...payment, amount, amount_paid: amount };
+  });
 }
 
 export function courseBucket(courseId: string | undefined, courseIds: ReadonlySet<string>): string {

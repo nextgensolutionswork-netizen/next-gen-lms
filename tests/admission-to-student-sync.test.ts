@@ -113,6 +113,10 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
         id: 'usr-admin-test',
         role: 'admin',
       };
+      const counsellor = store.users.find((u) => u.role === 'counsellor' && u.is_active) || {
+        id: '44444444-4444-4444-4444-444444444444',
+        role: 'counsellor',
+      };
 
       const result = await createAdmissionWorkflow(
         {
@@ -132,7 +136,7 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
           discount_reason: 'Corporate referral',
           payment_plan: 'Full Payment',
           admission_date: '2026-11-14',
-          counsellor_id: adminUser.id,
+          counsellor_id: counsellor.id,
           lead_id: leadId,
         },
         adminUser.id,
@@ -161,6 +165,11 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
         role: 'admin',
       };
 
+      const counsellor = store.users.find((u) => u.role === 'counsellor' && u.is_active) || {
+        id: '44444444-4444-4444-4444-444444444444',
+        role: 'counsellor',
+      };
+
       const directResult = await createAdmissionWorkflow(
         {
           student_name: 'Direct Admission Candidate',
@@ -178,7 +187,7 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
           discount: 0,
           payment_plan: 'Full Payment',
           admission_date: '2026-11-14',
-          counsellor_id: adminUser.id,
+          counsellor_id: counsellor.id,
         },
         adminUser.id,
         true
@@ -200,6 +209,10 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
       const leadId = `lead-idempotent-${Date.now()}`;
       const course = store.courses[0];
       const adminUser = store.users.find((u) => u.role === 'admin') || { id: 'usr-admin-test', role: 'admin' };
+      const counsellor = store.users.find((u) => u.role === 'counsellor' && u.is_active) || {
+        id: '44444444-4444-4444-4444-444444444444',
+        role: 'counsellor',
+      };
 
       const admissionInput = {
         student_name: 'Idempotency Check Student',
@@ -217,7 +230,7 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
         discount: 0,
         payment_plan: 'Full Payment' as const,
         admission_date: '2026-11-14',
-        counsellor_id: adminUser.id,
+        counsellor_id: counsellor.id,
         lead_id: leadId,
         idempotency_key: `key-${leadId}`,
       };

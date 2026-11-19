@@ -1,4 +1,4 @@
-import { isPaymentApproved } from './dashboard-metrics';
+import { isPaymentApproved, unifyDualLedgerPayments } from './dashboard-metrics';
 
 export interface AuthoritativeStudentFinancials {
   totalPayable: number;
@@ -20,6 +20,8 @@ export function calculateAuthoritativeStudentFinancials(data: {
   studentFees?: any[];
   payments?: any[];
   studentPayments?: any[];
+  receipts?: any[];
+  studentLedger?: any[];
 }): AuthoritativeStudentFinancials {
   const {
     student,
@@ -68,48 +70,22 @@ export function calculateAuthoritativeStudentFinancials(data: {
     totalPayable = Number(student.total_fee);
   }
 
-  // 2. Authoritative Verified Payments (Deduplicated by receipt_number / transaction reference / id)
-  const processedKeys = new Set<string>();
-  let verifiedPaidTotal = 0;
+  // Standalone posted adjustments do not rewrite the original approved fee.
+  const standaloneAdjustments = (data.studentLedger || []).filter(e =>
+    ['Fee Adjustment', 'Fee Waiver', 'Discount Approved', 'Debit Note'].includes(e.entry_type)
+    && !studentFees.some(f => f.id === e.reference_id));
+  totalPayable += [...new Map(standaloneAdjustments.map(e => [e.id, e])).values()]
+    .reduce((sum, e) => sum + (Number(e.debit) || 0) - (Number(e.credit) || 0), 0);
 
-  const allPayments = [
-    ...(payments || []).map((p: any) => ({
-      ...p,
-      amount: Number(p.amount ?? p.amount_paid ?? 0),
-    })),
-    ...(studentPayments || []).map((sp: any) => ({
-      ...sp,
-      amount: Number(sp.amount_paid ?? sp.amount ?? 0),
-    })),
-  ];
-
-  for (const p of allPayments) {
-    if (!p || !isPaymentApproved(p)) continue;
-    const key =
-      p.receipt_number ||
-      p.transaction_reference ||
-      p.bank_upi_reference ||
-      p.id?.replace(/^pay-|^spr-/, '');
-    if (key && processedKeys.has(key)) continue;
-    if (key) processedKeys.add(key);
-
-    verifiedPaidTotal += Number(p.amount) || 0;
-  }
-
-  // Fallback to approved fee paid_amount if no raw payment list was provided
-  let paidAmount = 0;
-  if (processedKeys.size > 0) {
-    paidAmount = verifiedPaidTotal;
-  } else if (approvedFees.length > 0) {
-    paidAmount = approvedFees.reduce(
-      (sum: number, f: any) => sum + (Number(f.paid_amount) || 0),
-      0
-    );
-  } else if (feeAccount && Number(feeAccount.paid_amount) > 0) {
-    paidAmount = Number(feeAccount.paid_amount);
-  } else if (student && Number(student.paid_amount) > 0) {
-    paidAmount = Number(student.paid_amount);
-  }
+  // Explicit empty/pending/reversed payment lists override cached paid totals.
+  const hasPaymentRecords = data.payments !== undefined || data.studentPayments !== undefined;
+  const canonical = unifyDualLedgerPayments(payments, studentPayments, { receipts: data.receipts });
+  const refunds = [...new Map((data.studentLedger || []).filter(e => e.entry_type === 'Refund Processed').map(e => [e.reference_id, e])).values()]
+    .reduce((sum, e) => sum + Number(e.debit || 0) - Number(e.credit || 0), 0);
+  const verifiedPaidTotal = Math.max(0, canonical.filter(isPaymentApproved).reduce((sum, p) => sum + p.amount, 0) - refunds);
+  const paidAmount = hasPaymentRecords ? Number(verifiedPaidTotal.toFixed(2))
+    : approvedFees.length > 0 ? approvedFees.reduce((sum, f) => sum + (Number(f.paid_amount) || 0), 0)
+    : Number(feeAccount?.paid_amount ?? student?.paid_amount ?? 0);
 
   // 3. Authoritative Outstanding Due
   const outstandingDue = Math.max(0, totalPayable - paidAmount);

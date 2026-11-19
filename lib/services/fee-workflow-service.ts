@@ -355,6 +355,9 @@ export class FeeWorkflowService {
     fee.approved_discount = fee.discount_amount;
     fee.approved_tax = fee.tax_gst_amount;
     fee.approved_total = fee.final_payable;
+    fee.invoice_number ??= `INV-${fee.id}`;
+    fee.invoice_date ??= now.split('T')[0];
+    fee.invoice_approved_amount ??= fee.final_payable;
     fee.approval_notes = notes || 'Approved by Finance';
     fee.is_payable = true;
     fee.updated_at = now;
@@ -814,6 +817,9 @@ export class FeeWorkflowService {
     const newVersionFee: StudentFee = {
       ...originalFee,
       ...revision.proposed_changes,
+      invoice_number: originalFee.invoice_number,
+      invoice_date: originalFee.invoice_date,
+      invoice_approved_amount: originalFee.invoice_approved_amount,
       id: `fee-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       version: originalFee.version + 1,
       parent_fee_id: originalFee.id,

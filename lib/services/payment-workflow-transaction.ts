@@ -25,7 +25,7 @@ export function onTransactionCommit(task: () => Promise<void>): void {
  * All financial effects, receipts, audits and in-app notifications commit in one row update.
  * A stale writer fails with 409; no partial ledger changes or external effects escape.
  */
-export function paymentTransaction<T>(actor: UserProfile, operation: () => Promise<T> | T, readOnly = false): Promise<T> {
+export function paymentTransaction<T>(actor: UserProfile, operation: () => Promise<T> | T, readOnly = false, requireFresh = false): Promise<T> {
   const run = transactionQueue.then(async () => {
     const live = isLiveSupabaseEnabled();
     const tenant = tenantId(actor);
@@ -39,7 +39,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         ]);
         const { data, error } = state;
         if (error) {
-          if (readOnly) {
+          if (readOnly && !requireFresh) {
             console.warn('[paymentTransaction] Database query failed in readOnly mode:', error.message);
           } else {
             throw new Error(`Payment database unavailable: ${error.message}`);
@@ -79,7 +79,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         ...(roster.data || []) as UserProfile[],
       ];
       } catch (dbErr: any) {
-        if (readOnly && !dbErr?.message?.includes('current staff roster')) {
+        if (readOnly && !requireFresh && !dbErr?.message?.includes('current staff roster')) {
           console.warn('[paymentTransaction] Database network error in readOnly mode, using in-memory store:', dbErr?.message);
         } else {
           throw dbErr;

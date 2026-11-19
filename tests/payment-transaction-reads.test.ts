@@ -13,6 +13,14 @@ import type { UserProfile } from '@/types';
 const actor = { id: 'reader', tenant_id: 'read-test', role: 'accountant', is_active: true } as UserProfile;
 afterEach(() => vi.restoreAllMocks());
 
+it('fails closed for fresh financial statements when committed state cannot be read', async () => {
+  mocks.query.mockImplementation((table) => Promise.resolve(table === 'profiles'
+    ? { data: [actor], error: null } : { data: null, error: { message: 'offline' } }));
+  const operation = vi.fn();
+  await expect(paymentTransaction(actor, operation, true, true)).rejects.toThrow('Payment database unavailable');
+  expect(operation).not.toHaveBeenCalled();
+});
+
 it('starts snapshot and current roster reads together while preserving tenant filters', async () => {
   let finishState!: (value: unknown) => void;
   const state = new Promise((resolve) => { finishState = resolve; });

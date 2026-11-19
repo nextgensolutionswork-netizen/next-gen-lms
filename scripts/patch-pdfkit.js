@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const BEGIN_MARKER = '/* BEGIN_INLINED_STANDARD_FONTS */';
+const END_MARKER = '/* END_INLINED_STANDARD_FONTS */';
+
 function patchFile(targetPath) {
   if (!fs.existsSync(targetPath)) {
     console.log(`[patch-pdfkit] Target not found: ${targetPath}`);
@@ -27,7 +30,7 @@ function patchFile(targetPath) {
 
   let content = fs.readFileSync(targetPath, 'utf8');
 
-  const inlinedBlock = `
+  const inlinedBlock = `${BEGIN_MARKER}
 const _INLINED_STANDARD_FONTS = ${JSON.stringify(fontData)};
 registerStdFontLoaders({
   Courier: () => _INLINED_STANDARD_FONTS['Courier'],
@@ -45,17 +48,38 @@ registerStdFontLoaders({
   'Times-Roman': () => _INLINED_STANDARD_FONTS['Times-Roman'],
   ZapfDingbats: () => _INLINED_STANDARD_FONTS['ZapfDingbats']
 });
-`;
+${END_MARKER}`;
 
-  // Pattern to replace existing registerStdFontLoaders call
-  const regex = /registerStdFontLoaders\(\s*\{[\s\S]*?\}\s*\);?/;
-  if (regex.test(content)) {
-    content = content.replace(regex, inlinedBlock);
-    fs.writeFileSync(targetPath, content, 'utf8');
-    console.log(`[patch-pdfkit] Successfully inlined standard fonts into ${path.basename(targetPath)}`);
+  const markedRegex = /\/\* BEGIN_INLINED_STANDARD_FONTS \*\/[\s\S]*?\/\* END_INLINED_STANDARD_FONTS \*\//;
+  const legacyLoaderRegex = /registerStdFontLoaders\(\s*\{[\s\S]*?\}\s*\);?/;
+
+  // Check if already cleanly patched with exact inlinedBlock
+  if (content.includes(BEGIN_MARKER) && content.includes(END_MARKER)) {
+    const declMatches = content.match(/const _INLINED_STANDARD_FONTS/g) || [];
+    const loaderMatches = content.match(/registerStdFontLoaders\(/g) || [];
+    if (declMatches.length === 1 && loaderMatches.length >= 1 && content.includes("Helvetica: () => _INLINED_STANDARD_FONTS['Helvetica']")) {
+      console.log(`[patch-pdfkit] Already cleanly patched: ${path.basename(targetPath)}`);
+      return;
+    }
+    content = content.replace(markedRegex, inlinedBlock);
+  } else if (legacyLoaderRegex.test(content)) {
+    content = content.replace(legacyLoaderRegex, inlinedBlock);
   } else {
-    console.log(`[patch-pdfkit] registerStdFontLoaders block not found in ${path.basename(targetPath)}`);
+    console.warn(`[patch-pdfkit] Warning: neither marked block nor registerStdFontLoaders found in ${path.basename(targetPath)}`);
+    return;
   }
+
+  // Clean up any extraneous duplicate declarations that might have existed outside the marked block
+  const declCount = (content.match(/const _INLINED_STANDARD_FONTS/g) || []).length;
+  if (declCount > 1) {
+    const parts = content.split(BEGIN_MARKER);
+    const before = parts[0].replace(/const _INLINED_STANDARD_FONTS\s*=\s*\{[\s\S]*?\};?\s*/g, '');
+    const rest = parts.slice(1).join(BEGIN_MARKER);
+    content = before + BEGIN_MARKER + rest;
+  }
+
+  fs.writeFileSync(targetPath, content, 'utf8');
+  console.log(`[patch-pdfkit] Successfully inlined standard fonts into ${path.basename(targetPath)}`);
 }
 
 const baseDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js');
