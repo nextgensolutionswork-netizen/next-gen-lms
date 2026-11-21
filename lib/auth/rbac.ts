@@ -1,6 +1,9 @@
 import { tenantId } from '@/lib/auth/tenant';
 import { Permission, UserRole, UserProfile, OnboardingCase } from '@/types';
 import { store } from '@/lib/services/data-store';
+import { matchesBatchId, matchesTrainerId } from '@/lib/services/academics-service';
+
+export { matchesTrainerId };
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   super_admin: [
@@ -447,12 +450,16 @@ export function canAccessBatch(user: any, batchId: string): boolean {
   if (!user || !batchId) return false;
   if (user.role === 'super_admin' || user.role === 'admin') return true;
   if (user.role === 'trainer') {
-    const batch = store.batches.find((b) => b.id === batchId);
-    return batch?.trainer_id === user.id;
+    const batch = store.batches.find((b) => b.id === batchId || matchesBatchId(b.id, batchId));
+    if (!batch) return false;
+    return (
+      matchesTrainerId(batch.trainer_id, user.id) ||
+      (batch.trainer_name && user.full_name && batch.trainer_name.toLowerCase().includes(user.full_name.toLowerCase()))
+    );
   }
   if (user.role === 'student') {
     const student = store.students.find((s) => s.user_id === user.id || s.email === user.email);
-    return student?.batch_id === batchId;
+    return student ? matchesBatchId(student.batch_id, batchId) : false;
   }
   return false;
 }

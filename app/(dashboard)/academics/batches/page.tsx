@@ -32,6 +32,8 @@ import {
   transferStudentBatch,
   getStudentsForBatch,
   getBatches,
+  matchesBatchId,
+  matchesTrainerId,
 } from '@/lib/services/academics-service';
 import { canAccessBatch } from '@/lib/auth/rbac';
 import { formatDate } from '@/lib/utils/formatters';
@@ -82,7 +84,9 @@ export default function BatchesPage() {
 
   // Filter batches visible to current user
   const visibleBatches = React.useMemo(() => {
-    return batches.filter((b) => canAccessBatch(user, b.id) || b.trainer_id === user?.id);
+    return batches.filter(
+      (b) => canAccessBatch(user, b.id) || matchesTrainerId(b.trainer_id, user?.id)
+    );
   }, [batches, user]);
 
   // New Batch form state
@@ -165,11 +169,15 @@ export default function BatchesPage() {
   // Transferable students: if trainer, restrict to students in cohorts assigned to this trainer
   const transferableStudents = React.useMemo(() => {
     if (isTrainer) {
-      const myBatchIds = new Set(batches.filter((b) => b.trainer_id === user?.id).map((b) => b.id));
-      return store.students.filter((s) => s.batch_id && myBatchIds.has(s.batch_id));
+      const myBatches = batches.filter(
+        (b) => canAccessBatch(user, b.id) || matchesTrainerId(b.trainer_id, user?.id)
+      );
+      return store.students.filter((s) =>
+        myBatches.some((b) => matchesBatchId(s.batch_id, b.id))
+      );
     }
     return store.students;
-  }, [batches, isTrainer, user?.id]);
+  }, [batches, isTrainer, user]);
 
   // Find currently selected student in transfer modal to exclude their current batch
   const selectedStudent = React.useMemo(() => {
@@ -178,12 +186,14 @@ export default function BatchesPage() {
 
   // Destination batches: exclude the student's current batch, and restrict to trainer cohorts if trainer
   const destinationBatches = React.useMemo(() => {
-    let list = batches.filter((b) => b.id !== selectedStudent?.batch_id);
+    let list = batches.filter((b) => !matchesBatchId(selectedStudent?.batch_id, b.id));
     if (isTrainer) {
-      list = list.filter((b) => b.trainer_id === user?.id);
+      list = list.filter(
+        (b) => canAccessBatch(user, b.id) || matchesTrainerId(b.trainer_id, user?.id)
+      );
     }
     return list;
-  }, [batches, selectedStudent, isTrainer, user?.id]);
+  }, [batches, selectedStudent, isTrainer, user]);
 
   // Synchronize student selection with available transferable students
   React.useEffect(() => {
@@ -616,60 +626,6 @@ export default function BatchesPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Batch Roster Modal */}
-      <Modal
-        isOpen={isRosterModal}
-        onClose={() => setIsRosterModal(false)}
-        title={`Batch Roster: ${activeBatch?.batch_name || ''}`}
-        description={`Current Enrollment: ${rosterStudents.length} / ${activeBatch?.maximum_capacity || 0} students`}
-      >
-        <div className="space-y-4">
-          {rosterStudents.length === 0 ? (
-            <p className="text-xs text-slate-400 italic py-6 text-center">
-              No students are currently enrolled in this batch.
-            </p>
-          ) : (
-            <div className="max-h-80 overflow-y-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
-                  <tr>
-                    <th className="p-2.5">Student</th>
-                    <th className="p-2.5">Code</th>
-                    <th className="p-2.5">Phone</th>
-                    <th className="p-2.5">Attendance</th>
-                    <th className="p-2.5">Fee Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rosterStudents.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-semibold text-slate-800">{s.full_name}</td>
-                      <td className="p-2.5 font-mono text-[11px] text-slate-600">{s.student_code}</td>
-                      <td className="p-2.5 text-slate-600">{s.phone}</td>
-                      <td className="p-2.5">
-                        <span className={`font-semibold ${s.attendance_percentage >= 80 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                          {s.attendance_percentage}%
-                        </span>
-                      </td>
-                      <td className="p-2.5">
-                        <Badge variant={s.outstanding_amount === 0 ? 'success' : 'outline'}>
-                          {s.outstanding_amount === 0 ? 'Paid' : `Due ₹${s.outstanding_amount.toLocaleString()}`}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <div className="flex justify-end pt-2 border-t border-slate-100">
-            <Button variant="outline" size="sm" onClick={() => setIsRosterModal(false)} className="text-xs">
-              Close
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* New Batch Modal */}
       <Modal

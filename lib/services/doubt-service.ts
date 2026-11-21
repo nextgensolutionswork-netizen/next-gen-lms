@@ -3,6 +3,7 @@ import { StudentDoubt, DoubtMessage, DoubtStatus, DoubtPriority, DoubtCategory, 
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { publishRealtimeEvent } from './realtime-service';
+import { resolveCanonicalBatchUuid, isUuid, matchesBatchId } from './academics-service';
 import {
   dispatchMultiChannelNotification,
   buildDoubtReplyEmailHtml,
@@ -24,9 +25,8 @@ export async function getDoubts(filters?: {
         .select('*, messages:doubt_messages(*)')
         .order('updated_at', { ascending: false });
 
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (filters?.student_id) {
-        if (isUuid.test(filters.student_id)) {
+        if (isUuid(filters.student_id)) {
           query = query.eq('student_id', filters.student_id);
         } else {
           return store.doubts.filter((d) => d.student_id === filters.student_id);
@@ -36,7 +36,12 @@ export async function getDoubts(filters?: {
         query = query.eq('assigned_to_id', filters.assigned_to_id);
       }
       if (filters?.batch_id && filters.batch_id !== 'All') {
-        query = query.eq('batch_id', filters.batch_id);
+        const canonicalBatchUuid = resolveCanonicalBatchUuid(filters.batch_id);
+        if (canonicalBatchUuid) {
+          query = query.eq('batch_id', canonicalBatchUuid);
+        } else if (isUuid(filters.batch_id)) {
+          query = query.eq('batch_id', filters.batch_id);
+        }
       }
       if (filters?.status && filters.status !== 'All') {
         query = query.eq('status', filters.status);
@@ -70,9 +75,9 @@ export async function getDoubts(filters?: {
 
   if (filters?.batch_id && filters.batch_id !== 'All') {
     list = list.filter((d) => {
-      if (d.batch_id === filters.batch_id) return true;
+      if (matchesBatchId(d.batch_id, filters.batch_id!)) return true;
       const student = store.students.find((s) => s.id === d.student_id);
-      return student?.batch_id === filters.batch_id;
+      return student ? matchesBatchId(student.batch_id, filters.batch_id!) : false;
     });
   }
 

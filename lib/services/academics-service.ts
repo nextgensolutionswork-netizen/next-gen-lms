@@ -368,18 +368,100 @@ export async function updateVideoProgress(
 
 const EXCLUDED_BATCH_STATUSES = new Set(['cancelled', 'dropped', 'inactive', 'suspended', 'completed']);
 
-const BATCH_ID_ALIASES: Record<string, string[]> = {
-  'batch-fico-01': ['b1000000-0000-0000-0000-000000000001'],
-  'b1000000-0000-0000-0000-000000000001': ['batch-fico-01'],
-  'batch-mm-01': ['b1000000-0000-0000-0000-000000000002'],
-  'b1000000-0000-0000-0000-000000000002': ['batch-mm-01'],
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(val: string | null | undefined): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return UUID_REGEX.test(val.trim());
+}
+
+export const CANONICAL_BATCH_UUID_MAP: Record<string, string> = {
+  // FICO Cohort
+  'b1000000-0000-0000-0000-000000000001': 'b1000000-0000-0000-0000-000000000001',
+  'batch-fico-01': 'b1000000-0000-0000-0000-000000000001',
+  'bch-fico-01': 'b1000000-0000-0000-0000-000000000001',
+  'btc-fico-01': 'b1000000-0000-0000-0000-000000000001',
+  'B-2026-FICO-01': 'b1000000-0000-0000-0000-000000000001',
+  'b-2026-fico-01': 'b1000000-0000-0000-0000-000000000001',
+  'B-FICO-2601': 'b1000000-0000-0000-0000-000000000001',
+  'b-fico-2601': 'b1000000-0000-0000-0000-000000000001',
+
+  // MM Cohort
+  'b1000000-0000-0000-0000-000000000002': 'b1000000-0000-0000-0000-000000000002',
+  'batch-mm-01': 'b1000000-0000-0000-0000-000000000002',
+  'bch-mm-01': 'b1000000-0000-0000-0000-000000000002',
+  'btc-mm-01': 'b1000000-0000-0000-0000-000000000002',
+  'B-2026-MM-01': 'b1000000-0000-0000-0000-000000000002',
+  'b-2026-mm-01': 'b1000000-0000-0000-0000-000000000002',
+  'B-MM-2601': 'b1000000-0000-0000-0000-000000000002',
+  'b-mm-2601': 'b1000000-0000-0000-0000-000000000002',
 };
+
+export function resolveCanonicalBatchUuid(batchId: string | null | undefined): string | undefined {
+  if (!batchId || typeof batchId !== 'string') return undefined;
+  const trimmed = batchId.trim();
+  if (CANONICAL_BATCH_UUID_MAP[trimmed]) {
+    return CANONICAL_BATCH_UUID_MAP[trimmed];
+  }
+  if (isUuid(trimmed)) {
+    return trimmed;
+  }
+  const matching = store.batches.find(
+    (b) =>
+      b.id.toLowerCase() === trimmed.toLowerCase() ||
+      b.batch_code?.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (matching && isUuid(matching.id)) {
+    return matching.id;
+  }
+  return undefined;
+}
+
+export const BATCH_ID_ALIASES: Record<string, string[]> = {
+  'batch-fico-01': ['b1000000-0000-0000-0000-000000000001', 'B-2026-FICO-01', 'B-FICO-2601', 'bch-fico-01', 'btc-fico-01'],
+  'b1000000-0000-0000-0000-000000000001': ['batch-fico-01', 'B-2026-FICO-01', 'B-FICO-2601', 'bch-fico-01', 'btc-fico-01'],
+  'B-2026-FICO-01': ['b1000000-0000-0000-0000-000000000001', 'batch-fico-01', 'B-FICO-2601'],
+  'B-FICO-2601': ['b1000000-0000-0000-0000-000000000001', 'batch-fico-01', 'B-2026-FICO-01'],
+
+  'batch-mm-01': ['b1000000-0000-0000-0000-000000000002', 'B-2026-MM-01', 'B-MM-2601', 'bch-mm-01', 'btc-mm-01'],
+  'b1000000-0000-0000-0000-000000000002': ['batch-mm-01', 'B-2026-MM-01', 'B-MM-2601', 'bch-mm-01', 'btc-mm-01'],
+  'B-2026-MM-01': ['b1000000-0000-0000-0000-000000000002', 'batch-mm-01', 'B-MM-2601'],
+  'B-MM-2601': ['b1000000-0000-0000-0000-000000000002', 'batch-mm-01', 'B-2026-MM-01'],
+};
+
+export const CANONICAL_TRAINER_MAP: Record<string, string> = {
+  'usr-trainer-fico': '55555555-5555-5555-5555-555555555551',
+  '55555555-5555-5555-5555-555555555551': '55555555-5555-5555-5555-555555555551',
+  'usr-trainer-mm': '55555555-5555-5555-5555-555555555552',
+  '55555555-5555-5555-5555-555555555552': '55555555-5555-5555-5555-555555555552',
+};
+
+export function matchesTrainerId(
+  trainerA: string | undefined | null,
+  trainerB: string | undefined | null
+): boolean {
+  if (!trainerA || !trainerB) return false;
+  if (trainerA === trainerB) return true;
+  const canonicalA = CANONICAL_TRAINER_MAP[trainerA] || trainerA;
+  const canonicalB = CANONICAL_TRAINER_MAP[trainerB] || trainerB;
+  return canonicalA === canonicalB;
+}
 
 export function matchesBatchId(studentBatchId: string | undefined, targetBatchId: string): boolean {
   if (!studentBatchId || !targetBatchId) return false;
   if (studentBatchId === targetBatchId) return true;
+
+  const canonicalStudent = resolveCanonicalBatchUuid(studentBatchId);
+  const canonicalTarget = resolveCanonicalBatchUuid(targetBatchId);
+  if (canonicalStudent && canonicalTarget && canonicalStudent === canonicalTarget) {
+    return true;
+  }
+
   const aliases = BATCH_ID_ALIASES[targetBatchId];
   if (aliases && aliases.includes(studentBatchId)) return true;
+  const reverseAliases = BATCH_ID_ALIASES[studentBatchId];
+  if (reverseAliases && reverseAliases.includes(targetBatchId)) return true;
+
   return false;
 }
 
@@ -471,6 +553,30 @@ async function fetchAllRemoteStudents(
   let from = 0;
   let hasMore = true;
 
+  // Resolve ONLY valid UUIDs to filter on remote Supabase PostgreSQL
+  let validUuids: string[] = [];
+  if (batchId) {
+    const candidates = [batchId, ...(batchAliases || [])];
+    const resolvedSet = new Set<string>();
+    for (const c of candidates) {
+      if (isUuid(c)) {
+        resolvedSet.add(c.toLowerCase());
+      } else {
+        const canonical = resolveCanonicalBatchUuid(c);
+        if (canonical && isUuid(canonical)) {
+          resolvedSet.add(canonical.toLowerCase());
+        }
+      }
+    }
+    validUuids = Array.from(resolvedSet);
+
+    // If batchId was provided but cannot resolve to any valid UUID in the remote database,
+    // do NOT query Postgres with an invalid string syntax. Return empty list safely.
+    if (validUuids.length === 0) {
+      return [];
+    }
+  }
+
   while (hasMore) {
     let query = supabase
       .from('students')
@@ -478,12 +584,10 @@ async function fetchAllRemoteStudents(
       .order('created_at', { ascending: false })
       .range(from, from + pageSize - 1);
 
-    if (batchId) {
-      if (batchAliases && batchAliases.length > 0) {
-        query = query.in('batch_id', [batchId, ...batchAliases]);
-      } else {
-        query = query.eq('batch_id', batchId);
-      }
+    if (validUuids.length === 1) {
+      query = query.eq('batch_id', validUuids[0]);
+    } else if (validUuids.length > 1) {
+      query = query.in('batch_id', validUuids);
     }
 
     const { data, error } = await query;
@@ -708,8 +812,12 @@ export async function getStudentsForBatch(batchId: string): Promise<Student[]> {
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
+      const canonicalUuid = resolveCanonicalBatchUuid(batchId);
       const alias = BATCH_ID_ALIASES[batchId]?.[0];
-      const aliases = alias ? [alias] : [];
+      const aliases = [
+        ...(alias ? [alias] : []),
+        ...(canonicalUuid ? [canonicalUuid] : []),
+      ];
       const remoteStudents = await fetchAllRemoteStudents(supabase, batchId, aliases);
       // Authoritative remote dataset: filter qualifying active trainees directly from remote records
       return filterActiveEnrolledStudents(remoteStudents, batchId, store.admissions);
@@ -779,8 +887,8 @@ export async function transferStudentBatch(
   // Trainers can only transfer students between batches assigned to their own profile.
   // Cross-trainer transfers require administrator authorization.
   if (actor.role === 'trainer') {
-    const isTrainerSource = fromBatch ? fromBatch.trainer_id === actor.id : true;
-    const isTrainerTarget = toBatch.trainer_id === actor.id;
+    const isTrainerSource = fromBatch ? matchesTrainerId(fromBatch.trainer_id, actor.id) : true;
+    const isTrainerTarget = matchesTrainerId(toBatch.trainer_id, actor.id);
 
     if (!isTrainerSource || !isTrainerTarget) {
       throw new Error(
@@ -816,19 +924,23 @@ export async function transferStudentBatch(
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
+      const canonicalTo = resolveCanonicalBatchUuid(toBatch.id) || toBatch.id;
+      const canonicalFrom = fromBatch?.id ? (resolveCanonicalBatchUuid(fromBatch.id) || fromBatch.id) : null;
       await supabase.from('batch_transfer_audits').insert({
         id: auditEntry.id,
         student_id: auditEntry.student_id,
-        from_batch_id: fromBatch?.id,
-        to_batch_id: toBatch.id,
+        from_batch_id: isUuid(canonicalFrom) ? canonicalFrom : null,
+        to_batch_id: isUuid(canonicalTo) ? canonicalTo : null,
         reason,
         transferred_by: transferredByUserId,
         transferred_at: auditEntry.transferred_at,
       });
-      await supabase.from('students').update({
-        batch_id: toBatch.id,
-        updated_at: student.updated_at,
-      }).eq('id', student.id);
+      if (isUuid(canonicalTo)) {
+        await supabase.from('students').update({
+          batch_id: canonicalTo,
+          updated_at: student.updated_at,
+        }).eq('id', student.id);
+      }
     } catch (err) {
       console.warn('Supabase batch transfer direct query warning, preserved locally:', err);
     }
@@ -855,7 +967,14 @@ export async function getClassSessions(batchId?: string): Promise<ClassSession[]
       const supabase = createClient();
       let query = supabase.from('class_sessions').select('*').order('session_date', { ascending: true });
       if (batchId) {
-        query = query.eq('batch_id', batchId);
+        const canonicalUuid = resolveCanonicalBatchUuid(batchId);
+        if (canonicalUuid) {
+          query = query.eq('batch_id', canonicalUuid);
+        } else if (isUuid(batchId)) {
+          query = query.eq('batch_id', batchId);
+        } else {
+          return [];
+        }
       }
       const { data, error } = await query;
       if (!error && data && data.length > 0) {
@@ -868,7 +987,7 @@ export async function getClassSessions(batchId?: string): Promise<ClassSession[]
 
   let list = [...store.classSessions];
   if (batchId) {
-    list = list.filter((s) => s.batch_id === batchId);
+    list = list.filter((s) => matchesBatchId(s.batch_id, batchId));
   }
   return list.sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime());
 }

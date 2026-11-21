@@ -593,10 +593,12 @@ class InstituteDataStore {
     if (!this.batches || !this.students) return;
     const EXCLUDED_STATUSES = new Set(['cancelled', 'dropped', 'inactive', 'suspended', 'completed']);
     const BATCH_ALIASES: Record<string, string[]> = {
-      'batch-mm-01': ['b1000000-0000-0000-0000-000000000002', 'B-2026-MM-01'],
-      'b1000000-0000-0000-0000-000000000002': ['batch-mm-01', 'B-2026-MM-01'],
-      'batch-fico-01': ['b1000000-0000-0000-0000-000000000001', 'B-2026-FICO-01'],
-      'b1000000-0000-0000-0000-000000000001': ['batch-fico-01', 'B-2026-FICO-01'],
+      'batch-mm-01': ['b1000000-0000-0000-0000-000000000002', 'B-2026-MM-01', 'B-MM-2601', 'bch-mm-01', 'btc-mm-01'],
+      'b1000000-0000-0000-0000-000000000002': ['batch-mm-01', 'B-2026-MM-01', 'B-MM-2601', 'bch-mm-01', 'btc-mm-01'],
+      'B-2026-MM-01': ['b1000000-0000-0000-0000-000000000002', 'batch-mm-01', 'B-MM-2601'],
+      'batch-fico-01': ['b1000000-0000-0000-0000-000000000001', 'B-2026-FICO-01', 'B-FICO-2601', 'bch-fico-01', 'btc-fico-01'],
+      'b1000000-0000-0000-0000-000000000001': ['batch-fico-01', 'B-2026-FICO-01', 'B-FICO-2601', 'bch-fico-01', 'btc-fico-01'],
+      'B-2026-FICO-01': ['b1000000-0000-0000-0000-000000000001', 'batch-fico-01', 'B-FICO-2601'],
     };
 
     for (const batch of this.batches) {
