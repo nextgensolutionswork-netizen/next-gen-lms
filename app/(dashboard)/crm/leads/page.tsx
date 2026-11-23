@@ -42,7 +42,11 @@ import {
 } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
-import { getEligibleAdmissionsCounsellors } from '@/lib/services/counsellor-service';
+import {
+  getEligibleAdmissionsCounsellors,
+  fetchAuthoritativeCounsellors,
+  EligibleCounsellorOption,
+} from '@/lib/services/counsellor-service';
 import { tenantId } from '@/lib/auth/tenant';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 import {
@@ -114,10 +118,34 @@ export default function LeadsPage() {
   const [bulkStage, setBulkStage] = React.useState<LeadStage>('Follow-up');
   const [isBulkProcessing, setIsBulkProcessing] = React.useState(false);
 
+  const [authoritativeCounsellors, setAuthoritativeCounsellors] = React.useState<EligibleCounsellorOption[]>([]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function syncCounsellors() {
+      try {
+        const currentTenant = (user && tenantId(user)) || 'default';
+        const data = await fetchAuthoritativeCounsellors(currentTenant);
+        if (isMounted && data && data.length > 0) {
+          setAuthoritativeCounsellors(data);
+        }
+      } catch (err) {
+        console.warn('[CRM Leads] Failed to load authoritative counsellors:', err);
+      }
+    }
+    syncCounsellors();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   const availableCounsellors = React.useMemo(() => {
+    if (authoritativeCounsellors.length > 0) {
+      return authoritativeCounsellors;
+    }
     const currentTenant = (user && tenantId(user)) || 'default';
     return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
-  }, [user]);
+  }, [authoritativeCounsellors, user]);
 
   const canAccessCrm =
     hasPermission('crm:read') ||

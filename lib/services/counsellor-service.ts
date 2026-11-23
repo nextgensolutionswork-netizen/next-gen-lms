@@ -198,3 +198,58 @@ export function validateCounsellorAssignment(
 
   return { ...counsellor, id: canonicalId };
 }
+
+/**
+ * Checks whether a candidate record is a legacy demonstration account
+ * absent from the authoritative production database.
+ */
+export function isStaleDemoCounsellor(c: { id?: string; email?: string; full_name?: string }): boolean {
+  if (!c) return false;
+  const email = (c.email || '').toLowerCase().trim();
+  const id = (c.id || '').trim();
+  const name = (c.full_name || '').toLowerCase().trim();
+
+  return (
+    id === 'usr-counsellor' ||
+    id === 'usr-counsellor-01' ||
+    id === '44444444-4444-4444-4444-444444444444' ||
+    email === 'counsellor@next-generpsolutions.com' ||
+    email === 'counsellor@lms.internal' ||
+    (name.includes('ananya') && name.includes('desai'))
+  );
+}
+
+/**
+ * Loads authoritative admissions counsellors from the server API or store fallback.
+ */
+export async function fetchAuthoritativeCounsellors(tenant = 'default'): Promise<EligibleCounsellorOption[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/counsellors?tenant=${encodeURIComponent(tenant)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.counsellors)) {
+          return data.counsellors.filter((c: any) => !isStaleDemoCounsellor(c));
+        }
+      }
+    } catch (err) {
+      console.warn('[counsellor-service] fetchAuthoritativeCounsellors failed, falling back to local store:', err);
+    }
+  }
+
+  // Server-side / fallback: load from store
+  try {
+    const { store } = await import('@/lib/services/data-store');
+    if (store) {
+      store.reconcileAuthoritativeStaffProfiles();
+      const allEligible = getEligibleAdmissionsCounsellors(store.users || [], tenant);
+      // Remove stale demo-only accounts absent from authoritative database (profiles)
+      return allEligible.filter((c) => !isStaleDemoCounsellor(c));
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}

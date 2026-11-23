@@ -60,6 +60,7 @@ import {
 class InstituteDataStore {
   constructor() {
     this.hydrateFromDisk();
+    this.reconcileAuthoritativeStaffProfiles();
     this.reconcileAuthoritativeCourses();
     this.reconcileAdmissionsAndStudents();
     this.reconcileDualLedgers();
@@ -99,6 +100,7 @@ class InstituteDataStore {
             .filter((u) => !existingEmails.has(u.email.toLowerCase()))
             .map((u) => (existingIds.has(u.id) ? { ...u, id: `${u.id}-seed` } : u));
           this.users = [...mappedUsers, ...missingSeedUsers];
+          this.reconcileAuthoritativeStaffProfiles();
         }
         if (snapshot.admissions?.length) {
           const existingAdmIds = new Set(snapshot.admissions.map((a: any) => a.id));
@@ -789,6 +791,61 @@ class InstituteDataStore {
       updated_at: '2026-01-01T00:00:00Z',
     },
     {
+      id: '8fac380f-cc47-4209-9a13-e85153529dd1',
+      email: 'vineethaa.myerp@gmail.com',
+      full_name: 'Vineethaa',
+      role: 'counsellor',
+      phone: '+91 90000 00001',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: '2983a160-0764-40c5-ab50-a41cff9f0c68',
+      email: 'nextgen.radhika@gmail.com',
+      full_name: 'Radhika',
+      role: 'counsellor',
+      phone: '+91 90000 00002',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: '3f5ba75a-ba23-4612-be74-e075a7d81f9b',
+      email: 'sandhya.erphub@gmail.com',
+      full_name: 'Sandhya',
+      role: 'counsellor',
+      phone: '+91 90000 00003',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: '987c67ef-388c-4467-90d6-4c4635398ed7',
+      email: 'amulya.sapficobhub@gmail.com',
+      full_name: 'Amulya',
+      role: 'counsellor',
+      phone: '+91 90000 00004',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: 'fc148d96-cf7c-4189-a0ba-b99eb5826d15',
+      email: 'mohanreddyc.erp@gmail.com',
+      full_name: 'Mohan Reddy',
+      role: 'counsellor',
+      phone: '+91 90000 00005',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T11:56:43.485Z',
+      updated_at: '2026-11-23T11:56:43.485Z',
+    },
+    {
       id: 'usr-trainer-fico',
       email: 'vikram.fico@next-generpsolutions.com',
       full_name: 'Vikram Rao (SAP FICO Lead)',
@@ -1078,6 +1135,87 @@ class InstituteDataStore {
         existing.status = auth.status;
         existing.category = auth.category;
         existing.duration_weeks = auth.duration_weeks;
+      }
+    }
+  }
+
+  public static readonly AUTHORITATIVE_SALES_STAFF: UserProfile[] = [
+    {
+      id: '8fac380f-cc47-4209-9a13-e85153529dd1',
+      email: 'vineethaa.myerp@gmail.com',
+      full_name: 'Vineethaa',
+      role: 'counsellor',
+      phone: '+91 90000 00001',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: '2983a160-0764-40c5-ab50-a41cff9f0c68',
+      email: 'nextgen.radhika@gmail.com',
+      full_name: 'Radhika',
+      role: 'counsellor',
+      phone: '+91 90000 00002',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: '3f5ba75a-ba23-4612-be74-e075a7d81f9b',
+      email: 'sandhya.erphub@gmail.com',
+      full_name: 'Sandhya',
+      role: 'counsellor',
+      phone: '+91 90000 00003',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: '987c67ef-388c-4467-90d6-4c4635398ed7',
+      email: 'amulya.sapficobhub@gmail.com',
+      full_name: 'Amulya',
+      role: 'counsellor',
+      phone: '+91 90000 00004',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T12:01:15.863Z',
+      updated_at: '2026-11-23T12:01:15.863Z',
+    },
+    {
+      id: 'fc148d96-cf7c-4189-a0ba-b99eb5826d15',
+      email: 'mohanreddyc.erp@gmail.com',
+      full_name: 'Mohan Reddy',
+      role: 'counsellor',
+      phone: '+91 90000 00005',
+      is_active: true,
+      tenant_id: 'default',
+      created_at: '2026-11-23T11:56:43.485Z',
+      updated_at: '2026-11-23T11:56:43.485Z',
+    },
+  ];
+
+  public reconcileAuthoritativeStaffProfiles(): void {
+    if (!this.users) this.users = [];
+
+    // Ensure the 5 authoritative sales staff profiles exist
+    for (const staff of InstituteDataStore.AUTHORITATIVE_SALES_STAFF) {
+      const existing = this.users.find(
+        (u) =>
+          u.id === staff.id ||
+          (u.email && u.email.trim().toLowerCase() === staff.email.trim().toLowerCase())
+      );
+      if (existing) {
+        existing.id = staff.id;
+        existing.full_name = staff.full_name;
+        existing.email = staff.email;
+        existing.role = staff.role;
+        existing.is_active = true;
+        existing.tenant_id = staff.tenant_id || 'default';
+      } else {
+        this.users.push({ ...staff });
       }
     }
   }

@@ -39,7 +39,12 @@ import { Admission, AdmissionStatus, PaymentMethod, Receipt, Course } from '@/ty
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
 import { getCourses } from '@/lib/services/academics-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
-import { getEligibleAdmissionsCounsellors, resolveCanonicalCounsellorId } from '@/lib/services/counsellor-service';
+import {
+  getEligibleAdmissionsCounsellors,
+  resolveCanonicalCounsellorId,
+  fetchAuthoritativeCounsellors,
+  EligibleCounsellorOption,
+} from '@/lib/services/counsellor-service';
 import { tenantId } from '@/lib/auth/tenant';
 import { isLeadConverted } from '@/lib/services/crm-service';
 import { formatINR, formatDate, exportToCSV, maskBankAccountId } from '@/lib/utils/formatters';
@@ -86,13 +91,18 @@ export default function AdmissionsPage() {
     role === 'super_admin' ||
     hasPermission('admissions:read');
 
+  const [authoritativeCounsellors, setAuthoritativeCounsellors] = React.useState<EligibleCounsellorOption[]>([]);
+
   const counsellorMap = React.useMemo(() => {
     const map = new Map<string, { full_name: string; role: string }>();
     (store.users || []).forEach((u) => {
       map.set(u.id, { full_name: u.full_name, role: u.role });
     });
+    authoritativeCounsellors.forEach((c) => {
+      map.set(c.id, { full_name: c.full_name, role: c.role });
+    });
     return map;
-  }, [store.users]);
+  }, [store.users, authoritativeCounsellors]);
 
   const handleExportCSV = () => {
     const exportData = admissions.map((adm) => ({
@@ -242,19 +252,46 @@ export default function AdmissionsPage() {
     setPhotoError('');
   };
 
+  React.useEffect(() => {
+    let isMounted = true;
+    async function syncCounsellors() {
+      try {
+        const currentTenant = (user && tenantId(user)) || 'default';
+        const data = await fetchAuthoritativeCounsellors(currentTenant);
+        if (isMounted && data && data.length > 0) {
+          setAuthoritativeCounsellors(data);
+        }
+      } catch (err) {
+        console.warn('[Admissions] Failed to load authoritative counsellors:', err);
+      }
+    }
+    syncCounsellors();
+    return () => {
+      isMounted = false;
+    };
+  }, [user, isNewModalOpen]);
+
   const availableCounsellors = React.useMemo(() => {
+    if (authoritativeCounsellors.length > 0) {
+      return authoritativeCounsellors;
+    }
     const currentTenant = (user && tenantId(user)) || 'default';
     return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
-  }, [user]);
+  }, [authoritativeCounsellors, user]);
 
   React.useEffect(() => {
     if (!counsellorId && user) {
       if (user.role === 'counsellor') {
         const canonical = resolveCanonicalCounsellorId(user.id) || user.id;
         setCounsellorId(canonical);
+        const match = availableCounsellors.find((c) => c.id === canonical || c.id === user.id);
+        if (match) setCounsellorName(match.full_name);
       } else {
         const firstCounsellor = availableCounsellors.find((c) => c.role === 'counsellor') || availableCounsellors[0];
-        if (firstCounsellor) setCounsellorId(firstCounsellor.id);
+        if (firstCounsellor) {
+          setCounsellorId(firstCounsellor.id);
+          setCounsellorName(firstCounsellor.full_name);
+        }
       }
     }
   }, [user, availableCounsellors, counsellorId]);
