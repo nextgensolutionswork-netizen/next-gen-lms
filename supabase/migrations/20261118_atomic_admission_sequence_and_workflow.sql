@@ -172,7 +172,7 @@ $$;
 REVOKE ALL ON FUNCTION public.allocate_admission_number(text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.allocate_admission_number(text, integer) TO service_role, postgres;
 
--- 4. Atomic Fee Workflow Commit with Strict Cross-Tenant Lead Isolation
+-- 4. Atomic Fee Workflow Commit with Differential CRM Lead Synchronization
 CREATE OR REPLACE FUNCTION public.commit_fee_workflow(p_tenant text, p_revision bigint, p_snapshot jsonb)
 RETURNS bigint
 LANGUAGE plpgsql
@@ -186,6 +186,7 @@ DECLARE
   enabled boolean;
   r_lead record;
   v_lead_tenant text;
+  v_prev_snapshot jsonb;
 BEGIN
   IF p_tenant IS NULL OR p_tenant = '' THEN
     p_tenant := 'default';
@@ -218,7 +219,20 @@ BEGIN
     RAISE EXCEPTION 'Admission number already exists in another tenant fee workflow' USING ERRCODE = '23505';
   END IF;
 
-  -- 3. Compare-and-swap update on fee_workflow_state
+  -- 3. Capture previous snapshot for differential change detection
+  IF p_revision > 0 THEN
+    SELECT snapshot INTO v_prev_snapshot
+    FROM public.fee_workflow_state
+    WHERE tenant_id = p_tenant AND revision = p_revision;
+
+    IF v_prev_snapshot IS NULL THEN
+      RAISE EXCEPTION 'Conflict: workflow revision changed' USING ERRCODE = '40001';
+    END IF;
+  ELSE
+    v_prev_snapshot := '{}'::jsonb;
+  END IF;
+
+  -- 4. Compare-and-swap update on fee_workflow_state
   IF p_revision = 0 THEN
     INSERT INTO public.fee_workflow_state(tenant_id, revision, snapshot)
       VALUES (p_tenant, 1, p_snapshot) ON CONFLICT DO NOTHING
@@ -236,7 +250,7 @@ BEGIN
     RAISE EXCEPTION 'Conflict: workflow revision changed' USING ERRCODE = '40001'; 
   END IF;
 
-  -- 4. Maintain student_lms_access gates
+  -- 5. Maintain student_lms_access gates
   FOR student IN SELECT value FROM jsonb_array_elements(COALESCE(p_snapshot->'students', '[]'::jsonb)) LOOP
     IF student->>'onboarding_required' = 'true' AND student->>'user_id' IS NOT NULL THEN
       SELECT value INTO case_record FROM jsonb_array_elements(COALESCE(p_snapshot->'onboardingCases', '[]'::jsonb))
@@ -252,16 +266,36 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 5. Atomically synchronize converted CRM Leads with strict cross-tenant validation
+  -- 6. Atomically synchronize ONLY new or changed CRM Lead conversions
+  -- Differential comparison prevents missing historical test leads from blocking unrelated
+  -- accountant approvals, receipt generations, or ledger modifications.
   FOR r_lead IN
+    WITH incoming_admissions AS (
+      SELECT 
+        COALESCE(elem->>'id', elem->>'admission_number') AS adm_key,
+        (elem->>'lead_id')::uuid AS lead_id,
+        elem->>'admission_number' AS admission_number
+      FROM jsonb_array_elements(COALESCE(p_snapshot->'admissions', '[]'::jsonb)) AS elem
+      WHERE (elem->>'lead_id') IS NOT NULL 
+        AND (elem->>'lead_id') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    ),
+    previous_admissions AS (
+      SELECT 
+        COALESCE(elem->>'id', elem->>'admission_number') AS adm_key,
+        elem->>'lead_id' AS lead_id
+      FROM jsonb_array_elements(COALESCE(v_prev_snapshot->'admissions', '[]'::jsonb)) AS elem
+      WHERE COALESCE(elem->>'id', elem->>'admission_number') IS NOT NULL
+    )
     SELECT 
-      (elem->>'lead_id')::uuid AS lead_id,
-      elem->>'admission_number' AS admission_number
-    FROM jsonb_array_elements(COALESCE(p_snapshot->'admissions', '[]'::jsonb)) AS elem
-    WHERE (elem->>'lead_id') IS NOT NULL 
-      AND (elem->>'lead_id') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      inc.adm_key,
+      inc.lead_id,
+      inc.admission_number
+    FROM incoming_admissions inc
+    LEFT JOIN previous_admissions prev ON inc.adm_key = prev.adm_key
+    WHERE prev.adm_key IS NULL -- Brand new admission submitted
+       OR prev.lead_id IS DISTINCT FROM inc.lead_id::text -- Existing admission changed lead reference
   LOOP
-    -- Verify lead existence
+    -- Verify lead existence for newly submitted conversions
     SELECT tenant_id INTO v_lead_tenant 
     FROM public.leads 
     WHERE id = r_lead.lead_id;

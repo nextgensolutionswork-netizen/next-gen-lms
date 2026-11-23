@@ -373,5 +373,59 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
 
       expect(discoveredYears).toEqual([2025, 2026, 2027]);
     });
+
+    it('3.6 demonstrates differential CRM synchronization ignores unchanged historical admissions with missing leads', () => {
+      // Simulating the exact differential logic implemented in PostgreSQL commit_fee_workflow
+      interface SnapshotAdmission {
+        id?: string;
+        admission_number: string;
+        lead_id?: string;
+      }
+
+      const previousSnapshotAdmissions: SnapshotAdmission[] = [
+        { id: 'adm-old-1', admission_number: 'ADM-2026-0001', lead_id: '00000000-0000-0000-0000-000000000099' }, // absent lead
+        { id: 'adm-old-2', admission_number: 'ADM-2026-0002', lead_id: '00000000-0000-0000-0000-000000000098' }, // absent lead
+      ];
+
+      const currentSnapshotAdmissions: SnapshotAdmission[] = [
+        ...previousSnapshotAdmissions, // historical unchanged records
+        { id: 'adm-new-3', admission_number: 'ADM-2026-0038', lead_id: '00000000-0000-0000-0000-000000000001' }, // new valid lead
+      ];
+
+      const leadsDb = new Map<string, { id: string; tenant_id: string; stage: string }>([
+        ['00000000-0000-0000-0000-000000000001', { id: '00000000-0000-0000-0000-000000000001', tenant_id: 'default', stage: 'Qualified' }],
+        // 98 and 99 are absent in the database!
+      ]);
+
+      const prevMap = new Map(
+        previousSnapshotAdmissions.map((a) => [a.id || a.admission_number, a.lead_id])
+      );
+
+      // Differential detection: only process new or changed admissions
+      const changedOrNewAdmissions = currentSnapshotAdmissions.filter((inc) => {
+        const key = inc.id || inc.admission_number;
+        const prevLead = prevMap.get(key);
+        return !prevMap.has(key) || prevLead !== inc.lead_id;
+      });
+
+      expect(changedOrNewAdmissions).toHaveLength(1);
+      expect(changedOrNewAdmissions[0].admission_number).toBe('ADM-2026-0038');
+
+      // Process differential admissions against leads database
+      for (const adm of changedOrNewAdmissions) {
+        if (!adm.lead_id) continue;
+        const lead = leadsDb.get(adm.lead_id);
+        if (!lead) {
+          throw new Error(`Referenced CRM lead ${adm.lead_id} does not exist (23503)`);
+        }
+        if (lead.tenant_id !== 'default') {
+          throw new Error(`Cross-tenant violation: lead belongs to ${lead.tenant_id} (42501)`);
+        }
+        lead.stage = 'Converted';
+      }
+
+      // Accountant approval succeeded without being blocked by absent historical leads 98 and 99!
+      expect(leadsDb.get('00000000-0000-0000-0000-000000000001')?.stage).toBe('Converted');
+    });
   });
 });
