@@ -25,9 +25,15 @@ ALTER TABLE public.admission_sequences ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.admission_sequences FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.admission_sequences TO service_role, postgres;
 
--- Ensure leads table has tenant_id for cross-tenant isolation
+-- Ensure leads, admissions, and students tables have tenant_id for tenant boundary isolation
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS tenant_id text DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS leads_tenant_idx ON public.leads(tenant_id);
+
+ALTER TABLE public.admissions ADD COLUMN IF NOT EXISTS tenant_id text DEFAULT 'default';
+CREATE INDEX IF NOT EXISTS admissions_tenant_idx ON public.admissions(tenant_id);
+
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS tenant_id text DEFAULT 'default';
+CREATE INDEX IF NOT EXISTS students_tenant_idx ON public.students(tenant_id);
 
 -- 2. Dynamically calculate and seed existing sequences across all applicable years and tenants
 DO $$
@@ -35,19 +41,29 @@ DECLARE
   r_year record;
   r_tenant record;
   v_max_seq integer := 0;
+  v_student_seq integer := 0;
   v_snap_seq integer := 0;
   v_lead_seq integer := 0;
 BEGIN
-  -- Discover all active years across admissions, fee_workflow_state, leads notes, and current year
+  -- Discover all active years across admissions, students, fee_workflow_state, leads notes, and current year
   FOR r_year IN (
     SELECT DISTINCT yr FROM (
       SELECT (SUBSTRING(admission_number FROM 'ADM-([0-9]{4})-[0-9]+'))::integer AS yr
       FROM public.admissions
       WHERE admission_number ~ '^ADM-[0-9]{4}-[0-9]+'
       UNION
+      SELECT (SUBSTRING(admission_number FROM 'ADM-([0-9]{4})-[0-9]+'))::integer AS yr
+      FROM public.students
+      WHERE admission_number ~ '^ADM-[0-9]{4}-[0-9]+'
+      UNION
       SELECT (SUBSTRING(elem->>'admission_number' FROM 'ADM-([0-9]{4})-[0-9]+'))::integer AS yr
       FROM public.fee_workflow_state fws,
            jsonb_array_elements(COALESCE(fws.snapshot->'admissions', '[]'::jsonb)) AS elem
+      WHERE elem->>'admission_number' ~ '^ADM-[0-9]{4}-[0-9]+'
+      UNION
+      SELECT (SUBSTRING(elem->>'admission_number' FROM 'ADM-([0-9]{4})-[0-9]+'))::integer AS yr
+      FROM public.fee_workflow_state fws,
+           jsonb_array_elements(COALESCE(fws.snapshot->'students', '[]'::jsonb)) AS elem
       WHERE elem->>'admission_number' ~ '^ADM-[0-9]{4}-[0-9]+'
       UNION
       SELECT (SUBSTRING(notes FROM 'ADM-([0-9]{4})-[0-9]+'))::integer AS yr
@@ -78,7 +94,7 @@ BEGIN
         EXECUTE format(
           'SELECT COALESCE(MAX(SUBSTRING(admission_number FROM ''ADM-[0-9]+-([0-9]+)'')::integer), 0)
            FROM public.admissions
-           WHERE tenant_id = %L AND admission_number LIKE %L',
+           WHERE COALESCE(tenant_id, ''default'') = %L AND admission_number LIKE %L',
           r_tenant.tenant_id, 'ADM-' || r_year.yr || '-%'
         ) INTO v_max_seq;
       ELSE
@@ -88,13 +104,38 @@ BEGIN
         WHERE admission_number LIKE 'ADM-' || r_year.yr || '-%';
       END IF;
 
-      -- Max sequence from fee_workflow_state snapshot for this tenant and year
+      -- Max sequence from students table for this tenant and year
+      v_student_seq := 0;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'students' AND column_name = 'tenant_id'
+      ) THEN
+        EXECUTE format(
+          'SELECT COALESCE(MAX(SUBSTRING(admission_number FROM ''ADM-[0-9]+-([0-9]+)'')::integer), 0)
+           FROM public.students
+           WHERE COALESCE(tenant_id, ''default'') = %L AND admission_number LIKE %L',
+          r_tenant.tenant_id, 'ADM-' || r_year.yr || '-%'
+        ) INTO v_student_seq;
+      ELSE
+        SELECT COALESCE(MAX(SUBSTRING(admission_number FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
+        INTO v_student_seq
+        FROM public.students
+        WHERE admission_number LIKE 'ADM-' || r_year.yr || '-%';
+      END IF;
+
+      -- Max sequence from fee_workflow_state snapshot for this tenant and year (both admissions and students arrays)
       SELECT COALESCE(MAX(SUBSTRING(elem->>'admission_number' FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
       INTO v_snap_seq
-      FROM public.fee_workflow_state fws,
-           jsonb_array_elements(COALESCE(fws.snapshot->'admissions', '[]'::jsonb)) AS elem
-      WHERE fws.tenant_id = r_tenant.tenant_id
-        AND elem->>'admission_number' LIKE 'ADM-' || r_year.yr || '-%';
+      FROM (
+        SELECT elem FROM public.fee_workflow_state fws,
+             jsonb_array_elements(COALESCE(fws.snapshot->'admissions', '[]'::jsonb)) AS elem
+        WHERE fws.tenant_id = r_tenant.tenant_id
+        UNION ALL
+        SELECT elem FROM public.fee_workflow_state fws,
+             jsonb_array_elements(COALESCE(fws.snapshot->'students', '[]'::jsonb)) AS elem
+        WHERE fws.tenant_id = r_tenant.tenant_id
+      ) snap_elems
+      WHERE elem->>'admission_number' LIKE 'ADM-' || r_year.yr || '-%';
 
       -- For 'default' tenant, also include conversion references from leads notes
       IF r_tenant.tenant_id = 'default' THEN
@@ -103,9 +144,9 @@ BEGIN
         FROM public.leads
         WHERE notes LIKE '%ADM-' || r_year.yr || '-%';
 
-        v_max_seq := GREATEST(v_max_seq, v_snap_seq, v_lead_seq);
+        v_max_seq := GREATEST(v_max_seq, v_student_seq, v_snap_seq, v_lead_seq);
       ELSE
-        v_max_seq := GREATEST(v_max_seq, v_snap_seq);
+        v_max_seq := GREATEST(v_max_seq, v_student_seq, v_snap_seq);
       END IF;
 
       INSERT INTO public.admission_sequences (tenant_id, year, last_sequence, updated_at)
@@ -145,8 +186,8 @@ BEGIN
   ON CONFLICT (tenant_id, year) DO NOTHING;
 
   -- Increment sequence and verify candidate number against global unique constraints.
-  -- If candidate number is already taken anywhere (admissions table or fee_workflow_state snapshots),
-  -- loop forward to the next available sequence.
+  -- Checks admissions table, students table, and all fee_workflow_state snapshots (admissions & students).
+  -- If candidate number is occupied anywhere, loops forward to the next available sequence.
   LOOP
     UPDATE public.admission_sequences
     SET last_sequence = last_sequence + 1,
@@ -159,8 +200,14 @@ BEGIN
     EXIT WHEN NOT EXISTS (
       SELECT 1 FROM public.admissions WHERE admission_number = v_adm_num
       UNION
+      SELECT 1 FROM public.students WHERE admission_number = v_adm_num
+      UNION
       SELECT 1 FROM public.fee_workflow_state fws,
         jsonb_array_elements(COALESCE(fws.snapshot->'admissions', '[]'::jsonb)) AS elem
+      WHERE elem->>'admission_number' = v_adm_num
+      UNION
+      SELECT 1 FROM public.fee_workflow_state fws,
+        jsonb_array_elements(COALESCE(fws.snapshot->'students', '[]'::jsonb)) AS elem
       WHERE elem->>'admission_number' = v_adm_num
     );
   END LOOP;
@@ -185,6 +232,7 @@ DECLARE
   case_record jsonb;
   enabled boolean;
   r_lead record;
+  r_malformed record;
   v_lead_tenant text;
   v_prev_snapshot jsonb;
 BEGIN
@@ -219,7 +267,22 @@ BEGIN
     RAISE EXCEPTION 'Admission number already exists in another tenant fee workflow' USING ERRCODE = '23505';
   END IF;
 
-  -- 3. Capture previous snapshot for differential change detection
+  -- 3. Explicitly validate format of non-empty lead IDs across incoming admissions
+  FOR r_malformed IN
+    SELECT 
+      COALESCE(elem->>'id', elem->>'admission_number', 'unknown') AS adm_key,
+      elem->>'lead_id' AS lead_id
+    FROM jsonb_array_elements(COALESCE(p_snapshot->'admissions', '[]'::jsonb)) AS elem
+    WHERE elem->>'lead_id' IS NOT NULL 
+      AND TRIM(elem->>'lead_id') <> ''
+      AND elem->>'lead_id' !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  LOOP
+    RAISE EXCEPTION 'Malformed lead_id "%" for admission "%": must be a valid RFC-4122 UUID', 
+      r_malformed.lead_id, r_malformed.adm_key
+      USING ERRCODE = '22P02';
+  END LOOP;
+
+  -- 4. Capture previous snapshot for differential change detection
   IF p_revision > 0 THEN
     SELECT snapshot INTO v_prev_snapshot
     FROM public.fee_workflow_state
@@ -232,7 +295,7 @@ BEGIN
     v_prev_snapshot := '{}'::jsonb;
   END IF;
 
-  -- 4. Compare-and-swap update on fee_workflow_state
+  -- 5. Compare-and-swap update on fee_workflow_state
   IF p_revision = 0 THEN
     INSERT INTO public.fee_workflow_state(tenant_id, revision, snapshot)
       VALUES (p_tenant, 1, p_snapshot) ON CONFLICT DO NOTHING
@@ -250,7 +313,7 @@ BEGIN
     RAISE EXCEPTION 'Conflict: workflow revision changed' USING ERRCODE = '40001'; 
   END IF;
 
-  -- 5. Maintain student_lms_access gates
+  -- 6. Maintain student_lms_access gates
   FOR student IN SELECT value FROM jsonb_array_elements(COALESCE(p_snapshot->'students', '[]'::jsonb)) LOOP
     IF student->>'onboarding_required' = 'true' AND student->>'user_id' IS NOT NULL THEN
       SELECT value INTO case_record FROM jsonb_array_elements(COALESCE(p_snapshot->'onboardingCases', '[]'::jsonb))
@@ -266,9 +329,13 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 6. Atomically synchronize ONLY new or changed CRM Lead conversions
-  -- Differential comparison prevents missing historical test leads from blocking unrelated
-  -- accountant approvals, receipt generations, or ledger modifications.
+  -- 7. Atomically synchronize ONLY new or changed CRM Lead conversions
+  -- Differential comparison checks:
+  --   a) New admission added with lead_id
+  --   b) Existing admission with changed lead_id
+  --   c) Existing admission with changed admission_number
+  -- Historical unchanged admissions referencing missing leads are skipped,
+  -- ensuring Accountant workflow updates are never blocked.
   FOR r_lead IN
     WITH incoming_admissions AS (
       SELECT 
@@ -276,26 +343,30 @@ BEGIN
         (elem->>'lead_id')::uuid AS lead_id,
         elem->>'admission_number' AS admission_number
       FROM jsonb_array_elements(COALESCE(p_snapshot->'admissions', '[]'::jsonb)) AS elem
-      WHERE (elem->>'lead_id') IS NOT NULL 
-        AND (elem->>'lead_id') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      WHERE elem->>'lead_id' IS NOT NULL 
+        AND TRIM(elem->>'lead_id') <> ''
     ),
     previous_admissions AS (
       SELECT 
         COALESCE(elem->>'id', elem->>'admission_number') AS adm_key,
-        elem->>'lead_id' AS lead_id
+        elem->>'lead_id' AS lead_id,
+        elem->>'admission_number' AS admission_number
       FROM jsonb_array_elements(COALESCE(v_prev_snapshot->'admissions', '[]'::jsonb)) AS elem
       WHERE COALESCE(elem->>'id', elem->>'admission_number') IS NOT NULL
     )
     SELECT 
       inc.adm_key,
       inc.lead_id,
-      inc.admission_number
+      inc.admission_number,
+      prev.admission_number AS prev_admission_number,
+      (prev.adm_key IS NOT NULL AND prev.admission_number IS DISTINCT FROM inc.admission_number) AS is_number_changed
     FROM incoming_admissions inc
     LEFT JOIN previous_admissions prev ON inc.adm_key = prev.adm_key
     WHERE prev.adm_key IS NULL -- Brand new admission submitted
        OR prev.lead_id IS DISTINCT FROM inc.lead_id::text -- Existing admission changed lead reference
+       OR prev.admission_number IS DISTINCT FROM inc.admission_number -- Existing admission changed admission number
   LOOP
-    -- Verify lead existence for newly submitted conversions
+    -- Verify lead existence for newly submitted or changed conversions
     SELECT tenant_id INTO v_lead_tenant 
     FROM public.leads 
     WHERE id = r_lead.lead_id;
@@ -312,13 +383,17 @@ BEGIN
         USING ERRCODE = '42501';
     END IF;
 
-    -- Update lead stage and notes atomically
+    -- Update lead stage and notes atomically, preserving historical audit notes
     UPDATE public.leads
     SET 
       stage = 'Converted',
       notes = CASE 
-        WHEN notes IS NULL OR notes = '' THEN 'Converted to Admission: ' || r_lead.admission_number
-        WHEN notes NOT LIKE '%' || r_lead.admission_number || '%' THEN notes || E'\n' || 'Converted to Admission: ' || r_lead.admission_number
+        WHEN notes IS NULL OR TRIM(notes) = '' THEN 
+          'Converted to Admission: ' || r_lead.admission_number
+        WHEN r_lead.is_number_changed THEN
+          notes || E'\n' || 'Admission Number Updated: ' || COALESCE(r_lead.prev_admission_number, 'None') || ' -> ' || r_lead.admission_number
+        WHEN notes NOT LIKE '%' || r_lead.admission_number || '%' THEN 
+          notes || E'\n' || 'Converted to Admission: ' || r_lead.admission_number
         ELSE notes
       END,
       updated_at = now()

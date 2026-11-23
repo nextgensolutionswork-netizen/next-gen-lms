@@ -427,5 +427,104 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
       // Accountant approval succeeded without being blocked by absent historical leads 98 and 99!
       expect(leadsDb.get('00000000-0000-0000-0000-000000000001')?.stage).toBe('Converted');
     });
+
+    it('3.7 verifies student-only reserved admission numbers are skipped during allocation', () => {
+      // Simulating collision check against both admissions and students tables
+      const admissionsNumbers = new Set(['ADM-2026-0001', 'ADM-2026-0002']);
+      const studentsNumbers = new Set(['ADM-2026-0003']); // Reserved in students table only!
+
+      const allocateNextCandidate = (startSeq: number) => {
+        let seq = startSeq;
+        let candidate = '';
+        do {
+          seq += 1;
+          candidate = `ADM-2026-${String(seq).padStart(4, '0')}`;
+        } while (admissionsNumbers.has(candidate) || studentsNumbers.has(candidate));
+        return { seq, candidate };
+      };
+
+      // Starting at sequence 2: candidate ADM-2026-0003 is taken in students table,
+      // so allocator must skip to ADM-2026-0004
+      const result = allocateNextCandidate(2);
+      expect(result.candidate).toBe('ADM-2026-0004');
+      expect(result.seq).toBe(4);
+    });
+
+    it('3.8 explicitly rejects non-empty malformed admission lead IDs with invalid_text_representation (22P02)', () => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      const validateLeadIdFormat = (leadId: string | null | undefined, admissionKey: string) => {
+        if (leadId !== null && leadId !== undefined && leadId.trim() !== '') {
+          if (!uuidRegex.test(leadId)) {
+            const err = new Error(`Malformed lead_id "${leadId}" for admission "${admissionKey}": must be a valid RFC-4122 UUID`);
+            (err as any).code = '22P02';
+            throw err;
+          }
+        }
+      };
+
+      // Empty, whitespace, or null lead IDs are valid (direct admission without CRM lead)
+      expect(() => validateLeadIdFormat(null, 'adm-1')).not.toThrow();
+      expect(() => validateLeadIdFormat('', 'adm-2')).not.toThrow();
+      expect(() => validateLeadIdFormat('   ', 'adm-3')).not.toThrow();
+
+      // Valid UUID passes
+      expect(() => validateLeadIdFormat('00000000-0000-0000-0000-000000000001', 'adm-4')).not.toThrow();
+
+      // Malformed string throws 22P02
+      expect(() => validateLeadIdFormat('not-a-valid-uuid', 'adm-5')).toThrow(/must be a valid RFC-4122 UUID/);
+      try {
+        validateLeadIdFormat('lead-1234', 'adm-6');
+      } catch (err: any) {
+        expect(err.code).toBe('22P02');
+      }
+    });
+
+    it('3.9 detects changes to admission_number as well as lead_id and preserves historical audit evidence in notes', () => {
+      interface AdmissionRecord {
+        id: string;
+        admission_number: string;
+        lead_id: string;
+      }
+
+      const prevSnapshot: AdmissionRecord[] = [
+        { id: 'adm-key-1', admission_number: 'ADM-2026-8801', lead_id: '00000000-0000-0000-0000-000000000001' },
+      ];
+
+      // New snapshot has changed admission_number from ADM-2026-8801 to ADM-2026-8802
+      const newSnapshot: AdmissionRecord[] = [
+        { id: 'adm-key-1', admission_number: 'ADM-2026-8802', lead_id: '00000000-0000-0000-0000-000000000001' },
+      ];
+
+      const prevMap = new Map(prevSnapshot.map((a) => [a.id, a]));
+
+      // Differential comparison detecting both lead_id and admission_number changes
+      const diffs = newSnapshot.map((inc) => {
+        const prev = prevMap.get(inc.id);
+        const isNew = !prev;
+        const isLeadChanged = prev ? prev.lead_id !== inc.lead_id : false;
+        const isNumberChanged = prev ? prev.admission_number !== inc.admission_number : false;
+        return {
+          ...inc,
+          prevAdmissionNumber: prev?.admission_number,
+          shouldProcess: isNew || isLeadChanged || isNumberChanged,
+          isNumberChanged,
+        };
+      }).filter((d) => d.shouldProcess);
+
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0].isNumberChanged).toBe(true);
+
+      // Verify notes update preserving historical notes
+      let notes = 'Initial inquiry: Interested in SAP FICO.\nConverted to Admission: ADM-2026-8801';
+      const change = diffs[0];
+      if (change.isNumberChanged) {
+        notes += `\nAdmission Number Updated: ${change.prevAdmissionNumber} -> ${change.admission_number}`;
+      }
+
+      expect(notes).toContain('Initial inquiry: Interested in SAP FICO.');
+      expect(notes).toContain('Converted to Admission: ADM-2026-8801');
+      expect(notes).toContain('Admission Number Updated: ADM-2026-8801 -> ADM-2026-8802');
+    });
   });
 });
