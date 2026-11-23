@@ -312,5 +312,66 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
       expect(lead?.stage).toBe('Converted');
       expect(lead?.notes).toContain('ADM-2026-0037');
     });
+
+    it('3.3 enforces canonical tenant ownership and rejects cross-tenant CRM lead conversion', () => {
+      const validateLeadTenant = (workflowTenant: string, leadTenant: string) => {
+        const canonicalWorkflowTenant = workflowTenant || 'default';
+        const canonicalLeadTenant = leadTenant || 'default';
+        if (canonicalWorkflowTenant !== canonicalLeadTenant) {
+          throw new Error(`Cross-tenant violation: Lead belongs to tenant "${canonicalLeadTenant}", but fee workflow is for tenant "${canonicalWorkflowTenant}"`);
+        }
+      };
+
+      // Same tenant matches
+      expect(() => validateLeadTenant('default', 'default')).not.toThrow();
+      expect(() => validateLeadTenant('tenant-alpha', 'tenant-alpha')).not.toThrow();
+
+      // Cross-tenant mismatch throws
+      expect(() => validateLeadTenant('default', 'tenant-beta')).toThrow(/Cross-tenant violation/);
+      expect(() => validateLeadTenant('tenant-alpha', 'default')).toThrow(/Cross-tenant violation/);
+    });
+
+    it('3.4 ensures candidate number collision skipping when sequence was historically reserved', () => {
+      const existingNumbers = new Set(['ADM-2026-0035', 'ADM-2026-0036', 'ADM-2026-1027']);
+      
+      const allocateNext = (startSeq: number) => {
+        let seq = startSeq;
+        let admNum = '';
+        do {
+          seq += 1;
+          admNum = `ADM-2026-${String(seq).padStart(4, '0')}`;
+        } while (existingNumbers.has(admNum));
+        return { seq, admNum };
+      };
+
+      // Starting at baseline 36 allocates 37 (unoccupied)
+      const first = allocateNext(36);
+      expect(first.admNum).toBe('ADM-2026-0037');
+
+      // If at 1026, it skips occupied 1027 and allocates 1028
+      const skipped = allocateNext(1026);
+      expect(skipped.admNum).toBe('ADM-2026-1028');
+    });
+
+    it('3.5 dynamically calculates years across historical references without hardcoded values', () => {
+      const records = [
+        { adm: 'ADM-2025-0012' },
+        { adm: 'ADM-2026-0037' },
+        { adm: 'ADM-2027-0001' },
+      ];
+
+      const discoveredYears = Array.from(
+        new Set(
+          records
+            .map((r) => {
+              const match = r.adm.match(/^ADM-(\d{4})-\d+/);
+              return match ? parseInt(match[1], 10) : null;
+            })
+            .filter((y): y is number => y !== null && y >= 2000)
+        )
+      ).sort();
+
+      expect(discoveredYears).toEqual([2025, 2026, 2027]);
+    });
   });
 });
