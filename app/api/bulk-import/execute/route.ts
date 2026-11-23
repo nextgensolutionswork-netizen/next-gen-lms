@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const result = await executeBulkImport(entityType, csvContent, userId, userName, {
       skipInvalidRows,
-    });
+    }, auth.user);
 
     if (!result.success) {
       return NextResponse.json(

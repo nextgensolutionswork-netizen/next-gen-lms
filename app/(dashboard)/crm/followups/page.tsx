@@ -1,4 +1,6 @@
 'use client';
+import { getLeads } from '@/lib/services/crm-service';
+import { cachedLeads } from '@/lib/services/lead-cache';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -45,7 +47,8 @@ type ViewMode = 'grid' | 'timeline' | 'calendar';
 
 export default function FollowupsPage() {
   const { user, role, hasPermission } = useAuth();
-  const [allLeads, setAllLeads] = React.useState<Lead[]>(store.leads || []);
+  const [snapshot, setSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
+  const allLeads = snapshot.owner === user?.id ? snapshot.rows : [];
   const [search, setSearch] = React.useState('');
   const [urgencyFilter, setUrgencyFilter] = React.useState<UrgencyFilter>('All');
   const [stageFilter, setStageFilter] = React.useState<'All' | 'Follow-up' | 'Demo Scheduled'>('All');
@@ -66,6 +69,7 @@ export default function FollowupsPage() {
 
   // Call History Timeline Modal
   const [historyModalLead, setHistoryModalLead] = React.useState<Lead | null>(null);
+  React.useEffect(() => { setSelectedLead(null); setHistoryModalLead(null); setSelectedCalendarDay(null); }, [user?.id]);
   const [quickNote, setQuickNote] = React.useState('');
   const [isAddingNote, setIsAddingNote] = React.useState(false);
 
@@ -82,9 +86,10 @@ export default function FollowupsPage() {
     return 'upcoming';
   }, [todayStr]);
 
-  const refreshLeads = () => {
-    setAllLeads([...(store.leads || [])]);
-  };
+  const refreshLeads = React.useCallback(async () => {
+    try { setSnapshot({ owner: user?.id, rows: await getLeads() }); } catch { setSnapshot({ owner: user?.id, rows: [] }); }
+  }, [user?.id]);
+  React.useEffect(() => { setSnapshot({ owner: user?.id, rows: [] }); void refreshLeads(); }, [refreshLeads]);
 
   // Base list of leads in follow-up pipeline
   const activeFollowups = React.useMemo(() => {
@@ -270,7 +275,7 @@ export default function FollowupsPage() {
       refreshLeads();
       setSelectedLead(null);
       if (selectedCalendarDay) {
-        const updatedLeads = (store.leads || []).filter(
+        const updatedLeads = (cachedLeads(user?.id) || []).filter(
           (l) => l.follow_up_date && l.follow_up_date.slice(0, 10) === selectedCalendarDay.dateStr
         );
         setSelectedCalendarDay({ ...selectedCalendarDay, leads: updatedLeads });
@@ -301,7 +306,7 @@ export default function FollowupsPage() {
 
       setQuickNote('');
       refreshLeads();
-      const updated = (store.leads || []).find((l) => l.id === historyModalLead.id);
+      const updated = (cachedLeads(user?.id) || []).find((l) => l.id === historyModalLead.id);
       if (updated) setHistoryModalLead(updated);
     } catch (err: any) {
       alert('Failed to save note: ' + (err.message || 'Unknown error'));
@@ -382,7 +387,7 @@ export default function FollowupsPage() {
 
   const canAccessCrm =
     hasPermission('crm:read') ||
-    role === 'counsellor' ||
+    (role === 'counsellor' || role === 'counsellor_lead') ||
     role === 'admin' ||
     role === 'super_admin';
 

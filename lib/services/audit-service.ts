@@ -33,9 +33,8 @@ export async function getAuditLogs(): Promise<AuditLog[]> {
         console.warn('Unauthorized audit trail access blocked by server RBAC.');
         return [];
       }
-    } catch (err) {
-      console.warn('Client audit-logs API fetch error, fallback to local store:', err);
-    }
+    } catch { return []; }
+    return [];
   }
 
   if (isLiveSupabaseEnabled()) {
@@ -55,7 +54,7 @@ export async function getAuditLogs(): Promise<AuditLog[]> {
     }
   }
 
-  return [...(store.auditLogs || [])].sort(
+  return [...(store.auditLogs || [])].filter(l => l.module?.toUpperCase() !== 'CRM').sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 }

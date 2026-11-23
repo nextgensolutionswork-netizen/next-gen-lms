@@ -1,5 +1,10 @@
+import { cacheLeads, cachedLeads, leadCacheToken } from './lead-cache';
 import { store } from './data-store';
-import { Lead, LeadFollowup, LeadStage, Admission } from '@/types';
+import { Lead, LeadStage, Admission, UserProfile } from '@/types';
+import { assertLeadAccess, leadScope, canAccessLead, requireCrmActor } from '@/lib/auth/lead-access';
+import { leadFields } from './lead-input';
+import { authorizedLead, resolveLeadScope, scopeLeadQuery, validateLeadAssignment, teamCreators } from './lead-security';
+import { matchesCourseId } from '@/lib/services/academics-service';
 
 /**
  * Finds the authoritative admission linked to a lead, if one exists.
@@ -12,7 +17,7 @@ export function getLeadAdmission(lead: Lead, admissions?: Admission[]): Admissio
       a.lead_id === lead.id ||
       (a as any).lead_id === lead.id ||
       (lead.notes && a.admission_number && lead.notes.includes(a.admission_number) && (!lead.email || !a.email || a.email.toLowerCase() === lead.email.toLowerCase())) ||
-      (a.email && lead.email && a.email.toLowerCase() === lead.email.toLowerCase() && a.course_id === lead.interested_course_id)
+      (a.email && lead.email && a.email.toLowerCase() === lead.email.toLowerCase() && (a.course_id === lead.interested_course_id || matchesCourseId(a.course_id, lead.interested_course_id)))
   );
 }
 
@@ -52,104 +57,83 @@ import { CreateAdmissionInput } from './admission-service';
 import { validatePhoneNumber, findDuplicateLeadByPhone, normalizePhoneForStorage, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
 import { validateEmailAddress } from '@/lib/utils/email-validation';
 
-export async function getLeads(filters?: {
-  stage?: LeadStage | 'All';
-  counsellor_id?: string;
-  course_id?: string;
-  search?: string;
-}): Promise<Lead[]> {
+export interface LeadFilters {
+  stage?: LeadStage | 'All'; counsellor_id?: string; course_id?: string; search?: string;
+  created_by?: string; from?: string; to?: string; team_id?: string; training_preference?: string; lead_source?: string;
+}
+
+export async function getLeads(filters: LeadFilters = {}, actor?: UserProfile): Promise<Lead[]> {
   if (typeof window !== 'undefined') {
+    const token = leadCacheToken();
+    const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => Boolean(v)) as [string, string][]);
     try {
-      const params = new URLSearchParams();
-      if (filters?.stage && filters.stage !== 'All') params.set('stage', filters.stage);
-      if (filters?.search) params.set('search', filters.search);
-      const res = await fetch(`/api/crm/leads?${params.toString()}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.leads)) {
-          const reconciled = reconcileLeadsWithAdmissions(json.leads);
-          store.leads = reconciled;
-          return reconciled;
-        }
-      }
-    } catch (err) {
-      console.warn('GET /api/crm/leads fetch error, using local fallback:', err);
-    }
+      const response = await fetch('/api/crm/leads?' + params, { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Lead access denied.');
+      cacheLeads(result.leads, token);
+      store.leads = result.leads;
+      return result.leads;
+    } catch (error) { if (token === leadCacheToken()) { cacheLeads([], token); store.leads = []; } throw error; }
   }
-
+  requireCrmActor(actor);
+  const scope = await resolveLeadScope(actor);
+  const teamIds = filters.team_id ? await teamCreators(filters.team_id, scope) : null;
+  let leads: Lead[];
   if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = typeof window === 'undefined' ? createAdminClient() : createClient();
-      let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
-
-      if (filters?.stage && filters.stage !== 'All') {
-        query = query.eq('stage', filters.stage);
-      }
-      if (filters?.counsellor_id) {
-        query = query.eq('counsellor_id', filters.counsellor_id);
-      }
-      if (filters?.course_id) {
-        query = query.eq('interested_course_id', filters.course_id);
-      }
-
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        const reconciled = reconcileLeadsWithAdmissions(data as Lead[]);
-        store.leads = reconciled;
-        return reconciled;
-      }
-    } catch (err) {
-      console.warn('Supabase leads query error, falling back to local persistent store:', err);
+    leads = [];
+    const db = createAdminClient();
+    for (let offset = 0; ; offset += 1000) {
+      const result = await scopeLeadQuery(db.from('leads').select('*'), scope).order('created_at', { ascending: false }).order('id').range(offset, offset + 999);
+      if (result.error) throw new Error('CRM query unavailable.');
+      leads.push(...(result.data || []));
+      if (!result.data || result.data.length < 1000) break;
     }
-  }
-
-  let list = reconcileLeadsWithAdmissions([...store.leads]);
-
-  if (filters?.stage && filters.stage !== 'All') {
-    list = list.filter((l) => l.stage === filters.stage);
-  }
-  if (filters?.counsellor_id) {
-    list = list.filter((l) => l.counsellor_id === filters.counsellor_id);
-  }
-  if (filters?.course_id) {
-    list = list.filter((l) => l.interested_course_id === filters.course_id);
-  }
-  if (filters?.search) {
-    const s = filters.search.toLowerCase();
-    list = list.filter(
-      (l) =>
-        l.full_name.toLowerCase().includes(s) ||
-        l.email.toLowerCase().includes(s) ||
-        l.phone.includes(s) ||
-        l.lead_code.toLowerCase().includes(s)
-    );
-  }
-
-  return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } else leads = store.leads.filter(l => canAccessLead(scope, l));
+  leads = reconcileLeadsWithAdmissions(leads.map(l => ({ ...l })), store.admissions.filter(a => (a.tenant_id || 'default') === scope.actor.tenant_id));
+  return leads.filter(l => (!teamIds || Boolean(l.created_by && teamIds.includes(l.created_by))) && (!filters.stage || filters.stage === 'All' || l.stage === filters.stage)
+    && (!filters.training_preference || l.training_preference === filters.training_preference)
+    && (!filters.lead_source || l.lead_source === filters.lead_source)
+    && (!filters.counsellor_id || l.counsellor_id === filters.counsellor_id)
+    && (!filters.created_by || l.created_by === filters.created_by)
+    && (!filters.course_id || l.interested_course_id === filters.course_id)
+    && (!filters.from || l.created_at.slice(0, 10) >= filters.from)
+    && (!filters.to || l.created_at.slice(0, 10) <= filters.to)
+    && (!filters.search || [l.full_name, l.email, l.phone, l.lead_code].some(v => (v || '').toLowerCase().includes(filters.search!.toLowerCase()))))
+    .map(l => ({ ...l })).sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-export async function getLeadById(id: string): Promise<Lead | undefined> {
-  if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.from('leads').select('*').eq('id', id).maybeSingle();
-      if (!error && data) {
-        return data as Lead;
-      }
-    } catch (err) {
-      console.warn('Supabase getLeadById error, checking local store:', err);
-    }
-  }
-
-  return store.leads.find((l) => l.id === id);
+export async function getLeadById(id: string, actor?: UserProfile): Promise<Lead | undefined> {
+  if (typeof window !== 'undefined') return (await getLeads()).find(l => l.id === id);
+  requireCrmActor(actor);
+  return authorizedLead(id, actor);
 }
+
+// In-flight mutex for concurrent lead creation deduplication
+const inFlightLeadCreations = new Map<string, Promise<Lead>>();
 
 export async function createLead(
   data: Omit<Lead, 'id' | 'lead_code' | 'created_at' | 'updated_at'> & {
     rejectOnDuplicate?: boolean;
     allowDuplicate?: boolean;
-  }
+    idempotency_key?: string;
+    external_lead_id?: string;
+  },
+  actor?: UserProfile
 ): Promise<Lead> {
+  if (typeof window === 'undefined') {
+    if (!actor) {
+      // In internal background or test executions, fall back to active admin profile if present
+      const fallback = (store.users || []).find((u) => ['super_admin', 'admin'].includes(u.role) && u.is_active);
+      if (fallback) actor = fallback;
+    }
+    requireCrmActor(actor);
+    actor = (await resolveLeadScope(actor)).actor;
+    if (data.created_by !== undefined && data.created_by !== actor.id) throw new Error('Forbidden: Cannot impersonate a creator.');
+    if (data.tenant_id !== undefined && data.tenant_id !== actor.tenant_id) throw new Error('Forbidden: Tenant mismatch.');
+    data = leadFields.parse(data);
+    await validateLeadAssignment(data.counsellor_id, actor);
+    data = { ...data, created_by: actor.id, tenant_id: actor.tenant_id };
+  }
   // 1. Mobile number validation based on country code
   const country_code = data.country_code || '+91';
   const phoneValidation = validatePhoneNumber(country_code, data.phone, 'Mobile number');
@@ -183,72 +167,158 @@ export async function createLead(
     normalizedEmail = emailValidation.normalized;
   }
 
-  // 4. Duplicate mobile number check
-  const duplicate = findDuplicateLeadByPhone(
-    store.leads || [],
-    normalizedPhone,
-    country_code,
-    undefined,
-    data.tenant_id
-  );
-  if (duplicate && data.rejectOnDuplicate) {
-    throw new Error(
-      `A lead with this mobile number already exists: ${duplicate.lead_code} (${duplicate.full_name}).`
-    );
+  const targetTenant = data.tenant_id || actor?.tenant_id || 'default';
+  const targetDigits = getCanonicalPhoneDigits(country_code, data.phone);
+  const lockKey = `${targetTenant}:${targetDigits || data.phone}:${data.idempotency_key || data.external_lead_id || ''}`;
+
+  if (!data.allowDuplicate && inFlightLeadCreations.has(lockKey)) {
+    try {
+      const concurrentResult = await inFlightLeadCreations.get(lockKey)!;
+      return concurrentResult;
+    } catch {
+      // Proceed if previous concurrent attempt threw
+    }
   }
 
-  const payload: typeof data = {
-    ...data,
-    country_code,
-    phone: normalizedPhone,
-    whatsapp_country_code,
-    whatsapp_number,
-    email: normalizedEmail || data.email,
-  };
+  const creationPromise = (async (): Promise<Lead> => {
+    // 4. Duplicate mobile number check across the entire tenant
+    const allTenantLeads = typeof window === 'undefined'
+      ? (isLiveSupabaseEnabled()
+          ? ((await createAdminClient().from('leads').select('*').eq('tenant_id', targetTenant)).data || store.leads)
+          : store.leads)
+      : (cachedLeads() || store.leads);
 
-  if (typeof window !== 'undefined') {
-    const response = await fetch('/api/crm/leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json();
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || 'Failed to create lead');
+    let duplicate = !data.allowDuplicate
+      ? findDuplicateLeadByPhone(
+          allTenantLeads,
+          normalizedPhone,
+          country_code,
+          undefined,
+          targetTenant
+        )
+      : undefined;
+
+    if (!duplicate && !data.allowDuplicate && (data.external_lead_id || data.idempotency_key)) {
+      duplicate = allTenantLeads.find((l: any) =>
+        l.tenant_id === targetTenant &&
+        ((data.external_lead_id && l.external_lead_id === data.external_lead_id) ||
+         (data.idempotency_key && l.idempotency_key === data.idempotency_key))
+      );
     }
-    const createdLead: Lead = result.lead;
+
+    if (duplicate && data.rejectOnDuplicate) {
+      throw new Error(
+        `A lead with this mobile number already exists: ${duplicate.lead_code} (${duplicate.full_name}).`
+      );
+    }
+
+    store.reconcileAuthoritativeCourses();
+    const course = (store.courses || []).find((c) => c.id === data.interested_course_id || matchesCourseId(c.id, data.interested_course_id));
+    const counsellor = (store.users || []).find((u) => u.id === data.counsellor_id);
+
+    if (duplicate && !data.allowDuplicate) {
+      // If a lead already exists, do not create another lead automatically.
+      // Preserve: Lead ownership, assigned counsellor, follow-up history, pipeline stage, notes, and enrollment relationships.
+      const dupNotice = `[Duplicate Inquiry: matches ${duplicate.lead_code} (${duplicate.full_name})]`;
+      const newNotes = data.notes ? `${dupNotice} ${data.notes}` : dupNotice;
+
+      // Append to existing lead's notes if not already present
+      if (data.notes && !duplicate.notes?.includes(data.notes)) {
+        duplicate.notes = duplicate.notes ? `${duplicate.notes}\n${newNotes}` : newNotes;
+      } else if (!duplicate.notes?.includes(dupNotice)) {
+        duplicate.notes = duplicate.notes ? `${duplicate.notes}\n${dupNotice}` : dupNotice;
+      }
+
+      // Update existing lead information only when appropriate, without overwriting valid CRM data
+      if (!duplicate.email && normalizedEmail) duplicate.email = normalizedEmail;
+      if (!duplicate.whatsapp_number && whatsapp_number) {
+        duplicate.whatsapp_number = whatsapp_number;
+        duplicate.whatsapp_country_code = whatsapp_country_code;
+      }
+      if (!duplicate.interested_course_id && data.interested_course_id) {
+        duplicate.interested_course_id = data.interested_course_id;
+        duplicate.interested_course_name = course?.course_name;
+      }
+      duplicate.updated_at = new Date().toISOString();
+
+      if (isLiveSupabaseEnabled()) {
+        try {
+          const supabase = createAdminClient();
+          await supabase.from('leads').update({
+            notes: duplicate.notes,
+            email: duplicate.email,
+            whatsapp_number: duplicate.whatsapp_number,
+            whatsapp_country_code: duplicate.whatsapp_country_code,
+            updated_at: duplicate.updated_at,
+          }).eq('id', duplicate.id);
+        } catch (err: any) {
+          console.warn('[crm-service] Failed to update existing lead notes on duplicate prevention:', err);
+        }
+      }
+
+      store.persist();
+
+      await recordAuditLog({
+        user_id: actor?.id || duplicate.counsellor_id || 'system',
+        user_name: actor?.full_name || duplicate.counsellor_name || 'System / Integration',
+        user_role: actor?.role || 'admin',
+        action: 'DUPLICATE_LEAD_DETECTED',
+        module: 'CRM',
+        record_id: duplicate.id,
+        old_value: { lead_code: duplicate.lead_code, stage: duplicate.stage, counsellor_id: duplicate.counsellor_id },
+        new_value: { incoming_source: data.lead_source, duplicate_action: 'preserved_existing', incoming_phone: normalizedPhone },
+      });
+
+      return { ...duplicate, is_duplicate_prevented: true } as Lead;
+    }
+
+    const payload: typeof data = {
+      ...data,
+      country_code,
+      phone: normalizedPhone,
+      whatsapp_country_code,
+      whatsapp_number,
+      email: normalizedEmail || data.email,
+    };
+
+    if (typeof window !== 'undefined') {
+      const token = leadCacheToken();
+      const response = await fetch('/api/crm/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create lead');
+      }
+      const createdLead: Lead = result.lead;
+      cacheLeads([...cachedLeads(), createdLead], token);
+      store.leads = [...cachedLeads()];
+      if (!store.leads.some((l) => l.id === createdLead.id)) {
+        store.leads.unshift(createdLead);
+      }
+      cacheLeads(store.leads, token);
+      return createdLead;
+    }
+
     store.leads = store.leads || [];
-    if (!store.leads.some((l) => l.id === createdLead.id)) {
-      store.leads.unshift(createdLead);
-    }
-    return createdLead;
-  }
+    const id = globalThis.crypto.randomUUID();
+    const lead_code = `LD-${new Date().getFullYear()}-${id}`;
 
-  store.leads = store.leads || [];
-  const id = globalThis.crypto.randomUUID();
-  const lead_code = `LD-${new Date().getFullYear()}-${id}`;
-  const course = (store.courses || []).find((c) => c.id === payload.interested_course_id);
-  const counsellor = (store.users || []).find((u) => u.id === payload.counsellor_id);
+    const isUUID = (str?: string | null) =>
+      Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
-  const isUUID = (str?: string | null) =>
-    Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
-
-  let finalNotes = payload.notes || '';
-  if (duplicate && !data.rejectOnDuplicate) {
-    const dupNotice = `[Duplicate Inquiry: matches ${duplicate.lead_code} (${duplicate.full_name})]`;
-    finalNotes = finalNotes ? `${dupNotice} ${finalNotes}` : dupNotice;
-  }
-
-  const newLead: Lead = {
-    ...payload,
-    id,
-    lead_code,
-    notes: finalNotes,
-    interested_course_name: course?.course_name,
-    counsellor_name: counsellor?.full_name,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+    const newLead: Lead = {
+      ...payload,
+      id,
+      lead_code,
+      notes: payload.notes || '',
+      interested_course_name: course?.course_name,
+      counsellor_name: counsellor?.full_name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
   if (isLiveSupabaseEnabled()) {
     try {
@@ -256,6 +326,8 @@ export async function createLead(
       for (let attempt = 0; attempt < 3; attempt++) {
         const insertPayload: Record<string, any> = {
           id: newLead.id,
+          created_by: actor!.id,
+          tenant_id: actor!.tenant_id,
           lead_code: newLead.lead_code,
           full_name: newLead.full_name,
           phone: newLead.phone,
@@ -304,9 +376,9 @@ export async function createLead(
   store.persist();
 
   await recordAuditLog({
-    user_id: data.counsellor_id || 'system',
-    user_name: counsellor?.full_name || 'System',
-    user_role: 'counsellor',
+    user_id: actor!.id,
+    user_name: actor!.full_name,
+    user_role: actor!.role,
     action: 'LEAD_CREATED',
     module: 'CRM',
     record_id: newLead.id,
@@ -322,7 +394,15 @@ export async function createLead(
     },
   });
 
-  return newLead;
+    return newLead;
+  })();
+
+  inFlightLeadCreations.set(lockKey, creationPromise);
+  try {
+    return await creationPromise;
+  } finally {
+    inFlightLeadCreations.delete(lockKey);
+  }
 }
 
 /**
@@ -334,9 +414,11 @@ export async function updateLeadDetails(
   updates: Partial<Omit<Lead, 'id' | 'lead_code' | 'created_at'>> & {
     rejectOnDuplicate?: boolean;
   },
-  actorId: string
+  actorId: string,
+  actor?: UserProfile
 ): Promise<Lead> {
   if (typeof window !== 'undefined') {
+    const token = leadCacheToken();
     const response = await fetch('/api/crm/leads', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -347,16 +429,17 @@ export async function updateLeadDetails(
       throw new Error(result.error || 'Failed to update lead');
     }
     const updatedLead: Lead = result.lead;
-    store.leads = store.leads || [];
-    const idx = store.leads.findIndex((l) => l.id === leadId);
-    if (idx !== -1) {
-      store.leads[idx] = updatedLead;
-    }
+    cacheLeads(cachedLeads().map(l => l.id === leadId ? updatedLead : l), token);
+    store.leads = [...cachedLeads()];
     return updatedLead;
   }
 
-  const lead = (store.leads || []).find((l) => l.id === leadId);
-  if (!lead) throw new Error('Lead not found');
+  requireCrmActor(actor);
+  if ('created_by' in updates || 'tenant_id' in updates || 'id' in updates || 'created_at' in updates) throw new Error('Forbidden: Immutable lead fields.');
+  updates = leadFields.partial().parse(updates);
+  const lead = await authorizedLead(leadId, actor);
+  const scope = await resolveLeadScope(actor);
+  await validateLeadAssignment(updates.counsellor_id, scope.actor);
 
   const country_code = updates.country_code || lead.country_code || '+91';
   let phone = updates.phone;
@@ -368,7 +451,7 @@ export async function updateLeadDetails(
     phone = phoneVal.normalized || phone;
 
     const duplicate = findDuplicateLeadByPhone(
-      store.leads || [],
+      await getLeads({}, actor),
       phone,
       country_code,
       leadId,
@@ -420,7 +503,7 @@ export async function updateLeadDetails(
   }
   if (updates.interested_course_id !== undefined) {
     lead.interested_course_id = updates.interested_course_id;
-    const course = (store.courses || []).find((c) => c.id === updates.interested_course_id);
+    const course = (store.courses || []).find((c) => c.id === updates.interested_course_id || matchesCourseId(c.id, updates.interested_course_id));
     lead.interested_course_name = course?.course_name;
   }
   if (updates.current_status !== undefined) lead.current_status = updates.current_status;
@@ -438,12 +521,12 @@ export async function updateLeadDetails(
   if (updates.stage !== undefined) lead.stage = updates.stage;
 
   lead.updated_at = new Date().toISOString();
-  store.persist();
-
+  if (updates.follow_up_date !== undefined) lead.follow_up_date = updates.follow_up_date || undefined;
+  if (updates.demo_date !== undefined) lead.demo_date = updates.demo_date;
+  if (updates.demo_preference !== undefined) lead.demo_preference = updates.demo_preference;
   if (isLiveSupabaseEnabled()) {
-    try {
       const supabase = createAdminClient();
-      await supabase.from('leads').update({
+      const result = await scopeLeadQuery(supabase.from('leads').update({
         full_name: lead.full_name,
         phone: lead.phone,
         country_code: lead.country_code || '+91',
@@ -456,14 +539,16 @@ export async function updateLeadDetails(
         lead_source: lead.lead_source,
         counsellor_id: lead.counsellor_id,
         notes: lead.notes,
+        stage: lead.stage, follow_up_date: lead.follow_up_date || null,
+        demo_date: lead.demo_date || null, demo_preference: lead.demo_preference,
+        experience_years: lead.experience_years,
         updated_at: lead.updated_at,
-      }).eq('id', leadId);
-    } catch (err) {
-      console.warn('Supabase updateLeadDetails warning:', err);
-    }
+      }).eq('id', leadId), scope).select('id');
+      if (result.error || !result.data?.length) throw new Error('CRM update failed.');
   }
-
-  const actor = (store.users || []).find((u) => u.id === actorId);
+  const index = store.leads.findIndex(l => l.id === leadId);
+  if (index >= 0) store.leads[index] = lead;
+  store.persist();
   await recordAuditLog({
     user_id: actorId,
     user_name: actor?.full_name || 'Staff',
@@ -485,82 +570,24 @@ export async function updateLeadDetails(
   return lead;
 }
 
-export async function updateLeadStage(
-  leadId: string,
-  stage: LeadStage,
-  notes: string,
-  counsellorId: string,
-  followUpDate?: string | null
-): Promise<Lead> {
-  const lead = store.leads.find((l) => l.id === leadId);
-  if (!lead) throw new Error('Lead not found');
-
-  const oldStage = lead.stage;
-  const oldNotes = lead.notes;
-  const oldFollowUp = lead.follow_up_date;
-  const oldUpdatedAt = lead.updated_at;
-
-  lead.stage = stage;
-  lead.updated_at = new Date().toISOString();
-  if (followUpDate !== undefined) {
-    lead.follow_up_date = followUpDate ? followUpDate : undefined;
+export async function updateLeadStage(leadId: string, stage: LeadStage, notes: string, counsellorId: string, followUpDate?: string | null, actor?: UserProfile): Promise<Lead> {
+  if (typeof window !== 'undefined') {
+    const token = leadCacheToken();
+    const response = await fetch('/api/crm/leads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId, action: 'stage', stage, notes, followUpDate }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Lead update denied.');
+    cacheLeads(cachedLeads().map(l => l.id === leadId ? result.lead : l), token);
+    store.leads = [...cachedLeads()];
+    return result.lead;
   }
-  if (notes) {
-    lead.notes = `${lead.notes ? lead.notes + '\n' : ''}[${new Date().toLocaleDateString('en-IN')}] ${notes}`;
-  }
-  store.persist();
-
+  requireCrmActor(actor);
+  const current = await authorizedLead(leadId, actor);
+  const lead = await updateLeadDetails(leadId, { stage, notes: notes ? [current.notes, notes].filter(Boolean).join('\n') : current.notes,
+    ...(followUpDate !== undefined ? { follow_up_date: followUpDate || '' } : {}) }, actor.id, actor);
   if (isLiveSupabaseEnabled()) {
-    try {
-      const supabase = createClient();
-      const { error: updErr } = await supabase
-        .from('leads')
-        .update({
-          stage,
-          notes: lead.notes,
-          follow_up_date: lead.follow_up_date || null,
-          updated_at: lead.updated_at,
-        })
-        .eq('id', leadId);
-
-      if (updErr) {
-        throw new Error(`Database error updating lead: ${updErr.message}`);
-      }
-
-      // Insert audit record into lead_followups table matching migration 001
-      const { error: fErr } = await supabase.from('lead_followups').insert({
-        lead_id: leadId,
-        counsellor_id: counsellorId,
-        stage_before: oldStage,
-        stage_after: stage,
-        notes: notes || 'Stage updated',
-      });
-      if (fErr) {
-        console.warn('Lead followups insert warning:', fErr.message);
-      }
-    } catch (err: any) {
-      lead.stage = oldStage;
-      lead.notes = oldNotes;
-      lead.follow_up_date = oldFollowUp;
-      lead.updated_at = oldUpdatedAt;
-      store.persistSync();
-      throw new Error(`Failed to update lead stage in database: ${err.message}`);
-    }
+    const result = await createAdminClient().from('lead_followups').insert({ lead_id: leadId, tenant_id: actor.tenant_id, counsellor_id: actor.id, stage_before: current.stage, stage_after: stage, notes: notes || 'Stage updated', next_follow_up_date: followUpDate || null });
+    if (result.error) throw new Error('Stage saved, but follow-up history failed. Refresh before retrying.');
   }
-
-  const counsellor = store.users.find((u) => u.id === counsellorId);
-
-  await recordAuditLog({
-    user_id: counsellorId,
-    user_name: counsellor?.full_name || 'Counsellor',
-    user_role: 'counsellor',
-    action: 'LEAD_STAGE_UPDATED',
-    module: 'CRM',
-    record_id: leadId,
-    old_value: { stage: oldStage },
-    new_value: { stage, notes, follow_up_date: lead.follow_up_date },
-  });
-
   return lead;
 }
 
@@ -572,37 +599,38 @@ export async function completeFollowup(
   leadId: string,
   counsellorId: string,
   notes: string = 'Follow-up marked as completed',
-  nextStage?: LeadStage
+  nextStage?: LeadStage,
+  actor?: UserProfile
 ): Promise<Lead> {
-  const lead = store.leads.find((l) => l.id === leadId);
+  const lead = typeof window !== 'undefined' ? cachedLeads().find(l => l.id === leadId) : actor ? await authorizedLead(leadId, actor) : undefined;
   if (!lead) throw new Error('Lead not found');
 
   const resolvedStage: LeadStage =
     nextStage || (lead.stage === 'Demo Scheduled' ? 'Demo Attended' : 'Interested');
 
-  return updateLeadStage(leadId, resolvedStage, `[COMPLETED] ${notes}`, counsellorId, null);
+  return updateLeadStage(leadId, resolvedStage, `[COMPLETED] ${notes}`, counsellorId, null, actor);
 }
 
 /**
  * One-click Convert Lead to Admission workflow helper:
  * Transitions the lead stage to 'Enrolled' and prepares prefilled admission input.
  */
-export function convertLeadToAdmission(leadId: string): {
+export function convertLeadToAdmission(leadId: string, actor?: UserProfile): {
   lead: Lead;
   admissionPrefill: Partial<CreateAdmissionInput>;
 } {
-  const lead = store.leads.find((l) => l.id === leadId);
+  const lead = (typeof window !== 'undefined' ? cachedLeads() : store.leads).find((l) => l.id === leadId);
   if (!lead) throw new Error(`Lead not found: ${leadId}`);
+  if (typeof window === 'undefined') { requireCrmActor(actor); assertLeadAccess(leadScope(actor), lead); }
 
   if (isLeadConverted(lead)) {
     throw new Error("Lead " + (lead.lead_code || lead.id) + " has already been converted to an admission.");
   }
 
-  lead.stage = 'Converted';
-  lead.updated_at = new Date().toISOString();
-  store.persist();
+  // Prefill is read-only. Conversion is committed only by the admission workflow.
 
-  const course = (store.courses || []).find((c) => c.id === lead.interested_course_id) || store.courses?.[0];
+  store.reconcileAuthoritativeCourses();
+  const course = (store.courses || []).find((c) => c.id === lead.interested_course_id || matchesCourseId(c.id, lead.interested_course_id)) || store.courses?.[0];
 
   const admissionPrefill: Partial<CreateAdmissionInput> = {
     student_name: lead.full_name,
@@ -621,115 +649,14 @@ export function convertLeadToAdmission(leadId: string): {
   return { lead, admissionPrefill };
 }
 
-export async function bulkAssignLeads(
-  leadIds: string[],
-  counsellorId: string,
-  assignedByUserId: string
-): Promise<number> {
-  const counsellor = store.users.find((u) => u.id === counsellorId);
-  const counsellorName = counsellor?.full_name || 'Assigned Counsellor';
-  let count = 0;
-
-  for (const id of leadIds) {
-    const lead = store.leads.find((l) => l.id === id);
-    if (lead) {
-      lead.counsellor_id = counsellorId;
-      lead.counsellor_name = counsellorName;
-      lead.updated_at = new Date().toISOString();
-      count++;
-    }
-  }
-
-  if (count > 0) {
-    store.persist();
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const supabase = createClient();
-        await supabase
-          .from('leads')
-          .update({
-            counsellor_id: counsellorId,
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', leadIds);
-      } catch (err) {
-        console.warn('Supabase bulkAssignLeads warning:', err);
-      }
-    }
-
-    const assignedBy = store.users.find((u) => u.id === assignedByUserId);
-    await recordAuditLog({
-      user_id: assignedByUserId,
-      user_name: assignedBy?.full_name || 'Staff',
-      user_role: 'counsellor',
-      action: 'LEADS_BULK_ASSIGNED',
-      module: 'CRM',
-      record_id: leadIds.join(','),
-      new_value: { count, counsellorId, counsellorName, leadIds },
-    });
-  }
-
-  return count;
+export async function bulkAssignLeads(leadIds: string[], counsellorId: string, assignedByUserId: string, actor?: UserProfile): Promise<number> {
+  if (typeof window === 'undefined') { requireCrmActor(actor); for (const id of leadIds) await authorizedLead(id, actor); }
+  for (const id of leadIds) await updateLeadDetails(id, { counsellor_id: counsellorId }, assignedByUserId, actor);
+  return leadIds.length;
 }
 
-export async function bulkUpdateLeadStage(
-  leadIds: string[],
-  stage: LeadStage,
-  updatedByUserId: string,
-  notes?: string,
-  followUpDate?: string | null
-): Promise<number> {
-  let count = 0;
-  const now = new Date().toISOString();
-  const dateLabel = new Date().toLocaleDateString('en-IN');
-
-  for (const id of leadIds) {
-    const lead = store.leads.find((l) => l.id === id);
-    if (lead) {
-      lead.stage = stage;
-      lead.updated_at = now;
-      if (followUpDate !== undefined) {
-        lead.follow_up_date = followUpDate ? followUpDate : undefined;
-      }
-      if (notes) {
-        lead.notes = `${lead.notes ? lead.notes + '\n' : ''}[${dateLabel}] [Bulk Stage Update]: ${notes}`;
-      }
-      count++;
-    }
-  }
-
-  if (count > 0) {
-    store.persist();
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const supabase = createClient();
-        const updatePayload: Record<string, any> = {
-          stage,
-          updated_at: now,
-        };
-        if (followUpDate !== undefined) {
-          updatePayload.follow_up_date = followUpDate || null;
-        }
-        await supabase
-          .from('leads')
-          .update(updatePayload)
-          .in('id', leadIds);
-      } catch (err) {
-        console.warn('Supabase bulkUpdateLeadStage warning:', err);
-      }
-    }
-
-    const updatedBy = store.users.find((u) => u.id === updatedByUserId);
-    await recordAuditLog({
-      user_id: updatedByUserId,
-      user_name: updatedBy?.full_name || 'Staff',
-      user_role: 'counsellor',
-      action: 'LEADS_BULK_STAGE_UPDATED',
-      module: 'CRM',
-      record_id: leadIds.join(','),
-      new_value: { count, stage, leadIds, follow_up_date: followUpDate },
-    });
-  }
-
-  return count;
+export async function bulkUpdateLeadStage(leadIds: string[], stage: LeadStage, updatedByUserId: string, notes?: string, followUpDate?: string | null, actor?: UserProfile): Promise<number> {
+  if (typeof window === 'undefined') { requireCrmActor(actor); for (const id of leadIds) await authorizedLead(id, actor); }
+  for (const id of leadIds) await updateLeadStage(id, stage, notes || '', updatedByUserId, followUpDate, actor);
+  return leadIds.length;
 }

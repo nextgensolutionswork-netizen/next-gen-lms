@@ -1,4 +1,5 @@
 'use client';
+import { cachedLeads } from '@/lib/services/lead-cache';
 
 import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
@@ -27,7 +28,8 @@ import { PhoneInput } from '@/components/ui/phone-input';
 import { BulkImportModal } from '@/components/bulk-import-modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
-import { Lead, LeadStage, LeadCurrentStatus, LeadTrainingPreference, LeadSource } from '@/types';
+import { Lead, LeadStage, LeadCurrentStatus, LeadTrainingPreference, LeadSource, Course } from '@/types';
+import { getCourses } from '@/lib/services/academics-service';
 import {
   getLeads,
   createLead,
@@ -73,15 +75,35 @@ const LEAD_SOURCE_OPTIONS: LeadSource[] = [
 export default function LeadsPage() {
   const router = useRouter();
   const { user, role, hasPermission } = useAuth();
-  const [leads, setLeads] = React.useState<Lead[]>(store.leads);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [leadSnapshot, setLeadSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
+  const leads = leadSnapshot.owner === user?.id ? leadSnapshot.rows : [];
+  const [creatorFilter, setCreatorFilter] = React.useState('');
+  const [salespersonFilter, setSalespersonFilter] = React.useState('');
+  const [courseFilter, setCourseFilter] = React.useState('');
+  const [teamFilter, setTeamFilter] = React.useState('');
+  const [dateFrom, setDateFrom] = React.useState('');
+  const [dateTo, setDateTo] = React.useState('');
   const [search, setSearch] = React.useState('');
   const [selectedStage, setSelectedStage] = React.useState<string>('All');
   const [selectedTrainingMode, setSelectedTrainingMode] = React.useState<string>('All');
   const [selectedSource, setSelectedSource] = React.useState<string>('All');
+  const [summary, setSummary] = React.useState<any>(null);
+  const visibleSummary = summary?.owner === user?.id ? summary : null;
+  React.useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({ search, stage: selectedStage, training_preference: selectedTrainingMode === 'All' ? '' : selectedTrainingMode, lead_source: selectedSource === 'All' ? '' : selectedSource, created_by: creatorFilter, counsellor_id: salespersonFilter, course_id: courseFilter, team_id: teamFilter, from: dateFrom, to: dateTo });
+    fetch('/api/crm/summary?' + params, { cache: 'no-store' }).then(r => r.json()).then(data => {
+      if (active && data.success) setSummary({ ...data, owner: user?.id });
+    }).catch(() => { if (active) setSummary(null); });
+    return () => { active = false; };
+  }, [user?.id, role, leadSnapshot, creatorFilter, salespersonFilter, courseFilter, teamFilter, dateFrom, dateTo, search, selectedStage, selectedTrainingMode, selectedSource]);
+  const scopeLabel = role === 'counsellor' ? 'My' : role === 'counsellor_lead' ? 'My Team' : 'All';
+  const [isLoading, setIsLoading] = React.useState(true);
+
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
+  React.useEffect(() => { setSelectedLead(null); setSelectedLeadIds([]); setIsConvertModalOpen(false); setIsAddModalOpen(false); }, [user?.id]);
   const [isConvertModalOpen, setIsConvertModalOpen] = React.useState(false);
   const [isConverting, setIsConverting] = React.useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
@@ -99,7 +121,7 @@ export default function LeadsPage() {
 
   const canAccessCrm =
     hasPermission('crm:read') ||
-    role === 'counsellor' ||
+    (role === 'counsellor' || role === 'counsellor_lead') ||
     role === 'admin' ||
     role === 'super_admin';
   const canCreateLead =
@@ -151,9 +173,33 @@ export default function LeadsPage() {
   const [whatsappNumber, setWhatsappNumber] = React.useState('');
   const [whatsappError, setWhatsappError] = React.useState('');
 
+  const [courses, setCourses] = React.useState<Course[]>(store.courses);
+  const publishedCourses = React.useMemo(() => {
+    return (courses || store.courses || []).filter((c) => !c.status || c.status === 'Published');
+  }, [courses]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    getCourses()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setCourses(data);
+          if (!courseId && data[0]?.id) setCourseId(data[0].id);
+          if (!convertCourseId && data[0]?.id) {
+            setConvertCourseId(data[0].id);
+            setConvertCourseFee(data[0].price ?? 0);
+          }
+        }
+      })
+      .catch((err) => console.warn('[CRM] Failed to load authoritative courses:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const [email, setEmail] = React.useState('');
   const [emailError, setEmailError] = React.useState('');
-  const [courseId, setCourseId] = React.useState(store.courses?.[0]?.id || '');
+  const [courseId, setCourseId] = React.useState(courses[0]?.id || store.courses?.[0]?.id || '');
   const [counsellorId, setCounsellorId] = React.useState<string>(user?.id || '');
   const [currentStatus, setCurrentStatus] = React.useState<LeadCurrentStatus>('Working Professional');
   const [trainingPref, setTrainingPref] = React.useState<'Online' | 'Offline'>('Online');
@@ -194,9 +240,9 @@ export default function LeadsPage() {
   );
 
   // Convert to Admission state
-  const [convertCourseId, setConvertCourseId] = React.useState(store.courses?.[0]?.id || '');
+  const [convertCourseId, setConvertCourseId] = React.useState(courses[0]?.id || store.courses?.[0]?.id || '');
   const [convertBatchId, setConvertBatchId] = React.useState('');
-  const [convertCourseFee, setConvertCourseFee] = React.useState<number>(store.courses?.[0]?.price ?? 0);
+  const [convertCourseFee, setConvertCourseFee] = React.useState<number>(courses[0]?.price || store.courses?.[0]?.price || 0);
   const [convertDob, setConvertDob] = React.useState('');
   const [convertGender, setConvertGender] = React.useState<'Male' | 'Female' | 'Other' | ''>('');
   const [convertCity, setConvertCity] = React.useState('');
@@ -215,50 +261,11 @@ export default function LeadsPage() {
   const refreshLeads = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      try {
-        const fetched = await getLeads({
-          stage: selectedStage as any,
-          search: search.trim() || undefined,
-        });
-        if (Array.isArray(fetched)) {
-          let filtered = fetched;
-          if (selectedTrainingMode !== 'All') {
-            filtered = filtered.filter((l) => l.training_preference === selectedTrainingMode);
-          }
-          if (selectedSource !== 'All') {
-            filtered = filtered.filter((l) => l.lead_source === selectedSource);
-          }
-          setLeads(filtered);
-          return;
-        }
-      } catch {}
-
-      let list = [...(store.leads || [])];
-      if (selectedStage !== 'All') {
-        list = list.filter((l) => l.stage === selectedStage);
-      }
-      if (selectedTrainingMode !== 'All') {
-        list = list.filter((l) => l.training_preference === selectedTrainingMode);
-      }
-      if (selectedSource !== 'All') {
-        list = list.filter((l) => l.lead_source === selectedSource);
-      }
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        list = list.filter(
-          (l) =>
-            l.full_name?.toLowerCase().includes(q) ||
-            l.phone?.includes(q) ||
-            l.whatsapp_number?.includes(q) ||
-            l.email?.toLowerCase().includes(q) ||
-            l.lead_code?.toLowerCase().includes(q)
-        );
-      }
-      setLeads(list);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [search, selectedStage, selectedTrainingMode, selectedSource]);
+      const fetched = await getLeads({ stage: selectedStage as LeadStage, search: search.trim() || undefined, created_by: creatorFilter, counsellor_id: salespersonFilter, course_id: courseFilter, from: dateFrom, to: dateTo, team_id: teamFilter });
+      setLeadSnapshot({ owner: user?.id, rows: fetched.filter(l => (selectedTrainingMode === 'All' || l.training_preference === selectedTrainingMode)
+        && (selectedSource === 'All' || l.lead_source === selectedSource)) });
+    } catch { setLeadSnapshot({ owner: user?.id, rows: [] }); } finally { setIsLoading(false); }
+  }, [search, selectedStage, selectedTrainingMode, selectedSource, user?.id, role, creatorFilter, salespersonFilter, courseFilter, dateFrom, dateTo, teamFilter]);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -269,7 +276,7 @@ export default function LeadsPage() {
       }
       const leadId = params.get('leadId');
       if (leadId) {
-        const matched = (store.leads || []).find((l) => l.id === leadId);
+        const matched = (cachedLeads(user?.id) || []).find((l) => l.id === leadId);
         if (matched) {
           openEditModal(matched);
         }
@@ -480,7 +487,7 @@ export default function LeadsPage() {
     await updateLeadStage(selectedLead.id, nextStage, updateNotes, actorId, scheduledDate);
 
     if (nextStage === 'Demo Scheduled') {
-      const l = (store.leads || []).find((lead) => lead.id === selectedLead.id);
+      const l = (cachedLeads(user?.id) || []).find((lead) => lead.id === selectedLead.id);
       if (l) {
         l.demo_date = scheduledDate || undefined;
         l.demo_preference = true;
@@ -555,7 +562,7 @@ export default function LeadsPage() {
       alert(`Lead ${lead.full_name} has already been converted to an admission.`);
       return;
     }
-    if (!store.courses || store.courses.length === 0) {
+    if (!publishedCourses || publishedCourses.length === 0) {
       alert('No courses available in the system. Please configure courses in Academic management first before converting leads.');
       return;
     }
@@ -563,7 +570,7 @@ export default function LeadsPage() {
     const defaultEdu = lead.education || lead.current_status || '';
     setConvertEducation(defaultEdu);
     setConvertExperience(lead.experience_years ?? 0);
-    const matchedCourse = (store.courses || []).find((c) => c.id === lead.interested_course_id) || store.courses[0];
+    const matchedCourse = publishedCourses.find((c) => c.id === lead.interested_course_id) || publishedCourses[0];
     const initialCourseId = matchedCourse?.id || '';
     setConvertCourseId(initialCourseId);
     const matchedBatch = (store.batches || []).find((b) => b.course_id === initialCourseId);
@@ -651,7 +658,7 @@ export default function LeadsPage() {
       return;
     }
     setIsConverting(true);
-    const course = (store.courses || []).find((c) => c.id === convertCourseId) || store.courses?.[0];
+    const course = publishedCourses.find((c) => c.id === convertCourseId) || publishedCourses[0];
     if (!course) {
       alert('No courses available to convert lead into admission. Please configure courses first.');
       return;
@@ -769,7 +776,7 @@ export default function LeadsPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">CRM & Lead Management</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{scopeLabel} Leads</h1>
           <p className="text-xs text-slate-500 mt-1">
             Capture, track, and convert prospective student inquiries for SAP training courses.
           </p>
@@ -806,6 +813,25 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3" aria-label="Lead statistics">
+        {['total', 'new', 'followups', 'pending', 'converted', 'conversionRate'].map((key, index) => (
+          <Card key={key} className="p-3"><p className="text-xs text-slate-500">{scopeLabel} {['Leads', 'New Leads', 'Follow-ups', 'Pending Leads', 'Converted Leads', 'Conversion Rate'][index]}</p>
+            <p className="text-xl font-semibold">{visibleSummary?.metrics?.[key] ?? '—'}{key === 'conversionRate' ? '%' : ''}</p></Card>
+        ))}
+      </div>
+      {role !== 'counsellor' && visibleSummary && <details className="text-sm"><summary>Salesperson and team performance</summary>
+        <table className="w-full"><thead><tr><th>Creator</th><th>Leads</th><th>Converted</th></tr></thead><tbody>{visibleSummary.performance.map((p: any) => <tr key={p.id}><td>{p.full_name}</td><td>{p.total}</td><td>{p.converted}</td></tr>)}</tbody></table>
+      </details>}
+      <div className="flex flex-wrap gap-3 text-sm">
+        {role !== 'counsellor' && <>
+          <label className="flex items-center gap-2">Created By<select value={creatorFilter} onChange={e => setCreatorFilter(e.target.value)}><option value="">All authorized creators</option>{visibleSummary?.users?.map((u: any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label>
+          <label className="flex items-center gap-2">Salesperson<select value={salespersonFilter} onChange={e => setSalespersonFilter(e.target.value)}><option value="">All assignments</option>{visibleSummary?.users?.map((u: any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label>
+          <label className="flex items-center gap-2">Team<select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}><option value="">All authorized teams</option>{visibleSummary?.teams?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        </>}
+        <label className="flex items-center gap-2">Course<select value={courseFilter} onChange={e => setCourseFilter(e.target.value)}><option value="">All courses</option>{publishedCourses.map(c => <option key={c.id} value={c.id}>{c.course_name}</option>)}</select></label>
+        <label className="flex items-center gap-2">From<input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></label>
+        <label className="flex items-center gap-2">To<input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} /></label>
+      </div>
       {/* Filter and Search Bar */}
       <Card className="p-3">
         <div className="flex flex-col gap-3">
@@ -1130,6 +1156,7 @@ export default function LeadsPage() {
         description="Record prospective student inquiry for SAP training."
       >
         <form onSubmit={handleCreateLead} className="space-y-4 text-xs">
+          <p className="text-slate-600">Created by: {user?.full_name} (your signed-in account)</p>
           <Input
             label="Full Name *"
             placeholder="e.g. Ramesh Kumar"
@@ -1215,10 +1242,10 @@ export default function LeadsPage() {
                 onChange={(e) => setCourseId(e.target.value)}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
               >
-                {(store.courses || []).length === 0 ? (
+                {publishedCourses.length === 0 ? (
                   <option value="">No courses available</option>
                 ) : (
-                  (store.courses || []).map((c) => (
+                  publishedCourses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.course_name}
                     </option>
@@ -1616,7 +1643,7 @@ export default function LeadsPage() {
                       onChange={(e) => setEditCourseId(e.target.value)}
                       className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                     >
-                      {(store.courses || []).map((c) => (
+                      {publishedCourses.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.course_name}
                         </option>
@@ -1699,7 +1726,7 @@ export default function LeadsPage() {
                   onChange={(e) => {
                     const newCId = e.target.value;
                     setConvertCourseId(newCId);
-                    const matchedCourse = (store.courses || []).find((c) => c.id === newCId);
+                    const matchedCourse = publishedCourses.find((c) => c.id === newCId);
                     if (matchedCourse) {
                       setConvertCourseFee(matchedCourse.price);
                       const matchingBatches = (store.batches || []).filter((b) => b.course_id === newCId);
@@ -1710,7 +1737,7 @@ export default function LeadsPage() {
                   }}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
                 >
-                  {(store.courses || []).map((c) => (
+                  {publishedCourses.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.course_name} (₹{c.price.toLocaleString('en-IN')})
                     </option>
@@ -1844,7 +1871,7 @@ export default function LeadsPage() {
                 variant="sap"
                 size="sm"
                 onClick={handleConvertLead}
-                disabled={isConverting || (store.courses || []).length === 0}
+                disabled={isConverting || publishedCourses.length === 0}
               >
                 {isConverting ? 'Converting...' : 'Confirm Admission & Create Profile'}
               </Button>

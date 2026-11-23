@@ -29,7 +29,9 @@ import { Button } from '@/components/ui/button';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
-import { Payment, UpcomingPaymentDueItem } from '@/types';
+import { getLeads } from '@/lib/services/crm-service';
+import { CRM_ROLES } from '@/lib/auth/lead-access';
+import { Payment, Lead, UpcomingPaymentDueItem } from '@/types';
 import {
   courseBucket,
   paymentCourseBucket,
@@ -57,6 +59,14 @@ function safeAmount(val: unknown): number {
 }
 
 export default function DashboardPage() {
+  const { role, user } = useAuth();
+  const [leadSnapshot, setLeadSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
+  const authorizedLeads = leadSnapshot.owner === user?.id ? leadSnapshot.rows : [];
+  React.useEffect(() => {
+    let active = true;
+    if (CRM_ROLES.includes(role)) getLeads().then(rows => { if (active) setLeadSnapshot({ owner: user?.id, rows }); }).catch(() => { if (active) setLeadSnapshot({ owner: user?.id, rows: [] }); });
+    return () => { active = false; };
+  }, [user?.id, role]);
   const [filterPeriod, setFilterPeriod] = React.useState<DashboardPeriod>('month');
   const [customDateRange, setCustomDateRange] = React.useState<DateRange | null>(null);
   const [isCustomPickerOpen, setIsCustomPickerOpen] = React.useState<boolean>(false);
@@ -239,16 +249,16 @@ export default function DashboardPage() {
 
   // CRM & Admission aggregates filtered by period
   const periodLeads = React.useMemo(() => {
-    return (store.leads || []).filter((l) => isDateInSelectedPeriod(l.created_at) && matchesCourse(l.interested_course_id));
-  }, [isDateInSelectedPeriod, matchesCourse]);
+    return authorizedLeads.filter((l) => isDateInSelectedPeriod(l.created_at) && matchesCourse(l.interested_course_id));
+  }, [isDateInSelectedPeriod, matchesCourse, authorizedLeads]);
   const displayLeads = periodLeads;
   const totalLeads = displayLeads.length;
   const convertedLeads = displayLeads.filter((l) => l.stage === 'Converted').length;
   const conversionRate = formatDashboardPercentage(convertedLeads, totalLeads);
-  const upcomingDemos = (store.leads || []).filter((l) => l.stage === 'Demo Scheduled').length;
+  const upcomingDemos = authorizedLeads.filter((l) => l.stage === 'Demo Scheduled').length;
   const activeJobOpenings = (store.jobOpenings || []).filter((j) => j.status === 'Open').length;
 
-  const { role, user } = useAuth();
+
 
   // Upcoming Payment Dues state (Next 3 Days in Asia/Kolkata)
   const [upcomingDues, setUpcomingDues] = React.useState<UpcomingPaymentDueItem[]>([]);

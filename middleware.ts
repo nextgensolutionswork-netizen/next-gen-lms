@@ -248,6 +248,7 @@ export async function middleware(request: NextRequest) {
         support: '/support',
         accountant: '/accounts/fees',
         counsellor: '/crm/leads',
+        counsellor_lead: '/crm/leads',
         trainer: '/academics/courses',
         placement_coordinator: '/placement',
         onboarding_team: '/onboarding',
@@ -266,6 +267,7 @@ export async function middleware(request: NextRequest) {
           support: '/support',
           accountant: '/accounts/fees',
           counsellor: '/crm/leads',
+        counsellor_lead: '/crm/leads',
           trainer: '/academics/courses',
           placement_coordinator: '/placement',
           onboarding_team: '/onboarding',
@@ -362,6 +364,7 @@ export async function middleware(request: NextRequest) {
         {
           student: '/portal',
           counsellor: '/crm/leads',
+        counsellor_lead: '/crm/leads',
           trainer: '/academics/courses',
           placement_coordinator: '/placement',
           onboarding_team: '/onboarding',
@@ -373,7 +376,7 @@ export async function middleware(request: NextRequest) {
 
   // 16. CRM & Admissions boundary: /crm and /admissions restricted to super_admin, admin, counsellor
   if (isAuthenticated && (pathname.startsWith('/crm') || pathname.startsWith('/admissions'))) {
-    if (!['super_admin', 'admin', 'counsellor'].includes(userRole || '')) {
+    if (!['super_admin', 'admin', 'counsellor', 'counsellor_lead'].includes(userRole || '')) {
       const fallback =
         {
           student: '/portal',
@@ -395,6 +398,7 @@ export async function middleware(request: NextRequest) {
           student: '/portal',
           accountant: '/accounts/fees',
           counsellor: '/crm/leads',
+        counsellor_lead: '/crm/leads',
           trainer: '/academics/courses',
           onboarding_team: '/onboarding',
           support: '/support',

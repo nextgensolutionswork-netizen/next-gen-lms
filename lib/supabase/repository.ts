@@ -150,19 +150,36 @@ export class StudentsRepository {
 // ==========================================
 export class CoursesRepository {
   async getAll(): Promise<Course[]> {
+    store.reconcileAuthoritativeCourses();
     if (isLiveSupabaseEnabled()) {
       try {
         const db = getDb();
         const { data, error } = await db.from('courses').select('*').order('created_at', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
-        console.warn('CoursesRepository.getAll Postgres error:', err);
+        if (error) {
+          throw new Error(`CoursesRepository Postgres error: ${error.message}`);
+        }
+        if (data) return data;
+      } catch (err: any) {
+        throw new Error(`CoursesRepository database failure: ${err.message}`);
       }
     }
     return [...store.courses];
   }
 
   async getById(id: string): Promise<Course | undefined> {
+    store.reconcileAuthoritativeCourses();
+    if (isLiveSupabaseEnabled()) {
+      try {
+        const db = getDb();
+        const { data, error } = await db.from('courses').select('*').eq('id', id).maybeSingle();
+        if (error) {
+          throw new Error(`CoursesRepository Postgres error: ${error.message}`);
+        }
+        if (data) return data;
+      } catch (err: any) {
+        throw new Error(`CoursesRepository getById failure: ${err.message}`);
+      }
+    }
     return store.courses.find((c) => c.id === id);
   }
 }
@@ -317,48 +334,8 @@ export class FinanceRepository {
 // 6. CRM & LEADS REPOSITORY
 // ==========================================
 export class CRMRepository {
-  async getLeads(): Promise<Lead[]> {
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const db = getDb();
-        const { data, error } = await db.from('leads').select('*').order('created_at', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
-        console.warn('CRMRepository.getLeads Postgres error:', err);
-      }
-    }
-    return [...store.leads];
-  }
-
-  async createLead(lead: Lead): Promise<Lead> {
-    store.leads.unshift(lead);
-    store.persist();
-
-    if (isLiveSupabaseEnabled()) {
-      try {
-        const db = getDb();
-        await db.from('leads').insert({
-          id: lead.id,
-          lead_code: lead.lead_code,
-          full_name: lead.full_name,
-          phone: lead.phone,
-          email: lead.email,
-          interested_course_id: lead.interested_course_id,
-          current_status: lead.current_status,
-          experience_years: lead.experience_years,
-          training_preference: lead.training_preference,
-          lead_source: lead.lead_source,
-          campaign: lead.campaign,
-          counsellor_id: lead.counsellor_id,
-          stage: lead.stage,
-          notes: lead.notes,
-        });
-      } catch (err) {
-        console.warn('CRMRepository.createLead Postgres error:', err);
-      }
-    }
-    return lead;
-  }
+  async getLeads(actor?: import('@/types').UserProfile): Promise<Lead[]> { return (await import('@/lib/services/crm-service')).getLeads({}, actor); }
+  async createLead(lead: Lead, actor?: import('@/types').UserProfile): Promise<Lead> { return (await import('@/lib/services/crm-service')).createLead(lead, actor); }
 }
 
 // ==========================================

@@ -352,8 +352,10 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
           return { data: null, error: { message: 'Row not found', code: 'PGRST116' } };
         }
 
+        if (['leads', 'lead_followups'].includes(this.table)) return { data: null, error: res.error };
         console.warn(`Supabase query for ${this.table} returned error, evaluating fallback:`, res.error.message);
       } catch (liveErr) {
+        if (['leads', 'lead_followups'].includes(this.table)) return { data: null, error: liveErr };
         console.warn(`Supabase query for ${this.table} failed, evaluating with local RLS:`, liveErr);
       }
     }

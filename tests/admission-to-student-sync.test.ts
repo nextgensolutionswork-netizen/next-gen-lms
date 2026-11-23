@@ -61,6 +61,7 @@ function createMockAuthRequest(urlPath: string, role: UserRole, userOverrides: P
 describe('BUG-07: Admission-to-Student Data Synchronization', () => {
   beforeEach(() => {
     store.hydrateFromDisk();
+    store.users = store.users.map(u => ({ ...u, tenant_id: u.tenant_id || 'default' }));
     store.reconcileAdmissionsAndStudents();
     store.reconcileDualLedgers();
   });
@@ -118,6 +119,7 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
         role: 'counsellor',
       };
 
+      store.leads.push({ id: leadId, created_by: counsellor.id, tenant_id: 'default', lead_code: leadId, full_name: 'Fixture Lead', phone: '9876543210', email: 'fixture@local.invalid', stage: 'New', created_at: '', updated_at: '' });
       const result = await createAdmissionWorkflow(
         {
           student_name: 'Admitted Lead Student',
@@ -214,6 +216,7 @@ describe('BUG-07: Admission-to-Student Data Synchronization', () => {
         role: 'counsellor',
       };
 
+      store.leads.push({ id: leadId, created_by: counsellor.id, tenant_id: 'default', lead_code: leadId, full_name: 'Fixture Lead', phone: '9876543210', email: 'fixture@local.invalid', stage: 'New', created_at: '', updated_at: '' });
       const admissionInput = {
         student_name: 'Idempotency Check Student',
         phone: '+91 96666 55555',

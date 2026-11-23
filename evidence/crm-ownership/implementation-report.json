@@ -1,0 +1,196 @@
+{
+  "branch": "feat/created-by-lead-isolation",
+  "baseline": "4617bc2c83bebf97e1208209e32c4f2a9a53381b",
+  "localOnly": true,
+  "safety": {
+    "productionWrites": 0,
+    "stagingWrites": 0,
+    "deployments": 0,
+    "merges": 0,
+    "historicalBackfill": false,
+    "paymentApprovalLogicChanged": false
+  },
+  "sourceFiles": [
+    ".gitignore",
+    "app/(dashboard)/crm/followups/page.tsx",
+    "app/(dashboard)/crm/leads/page.tsx",
+    "app/(dashboard)/dashboard/page.tsx",
+    "app/(dashboard)/users/page.tsx",
+    "app/api/admissions/route.ts",
+    "app/api/audit-logs/route.ts",
+    "app/api/bulk-import/execute/route.ts",
+    "app/api/crm/history/route.ts",
+    "app/api/crm/leads/route.ts",
+    "app/api/crm/summary/route.ts",
+    "app/api/dashboard/metrics/route.ts",
+    "components/layout/sidebar.tsx",
+    "components/providers/auth-provider.tsx",
+    "lib/auth/lead-access.ts",
+    "lib/auth/rbac.ts",
+    "lib/services/admission-service.ts",
+    "lib/services/audit-service.ts",
+    "lib/services/bulk-import-service.ts",
+    "lib/services/counsellor-service.ts",
+    "lib/services/crm-service.ts",
+    "lib/services/data-store.ts",
+    "lib/services/lead-cache.ts",
+    "lib/services/lead-input.ts",
+    "lib/services/lead-security.ts",
+    "lib/services/payment-workflow-state.ts",
+    "lib/services/persistent-storage-adapter.ts",
+    "lib/supabase/db-service.ts",
+    "lib/supabase/db.ts",
+    "lib/supabase/repository.ts",
+    "lib/supabase/rls.ts",
+    "lib/supabase/seeder.ts",
+    "lib/supabase/sync-service.ts",
+    "lib/utils/role-labels.ts",
+    "middleware.ts",
+    "package-lock.json",
+    "package.json",
+    "scripts/crm-local-browser-check.mjs",
+    "scripts/crm-test-suite.mjs",
+    "supabase/migrations/20261123122939_created_by_lead_isolation.sql",
+    "tests/admission-concurrency-atomicity.test.ts",
+    "tests/admission-fee-due-date.test.ts",
+    "tests/admission-to-student-sync.test.ts",
+    "tests/bulk-import.test.ts",
+    "tests/counsellor-audit-logs.test.ts",
+    "tests/counsellor-role-3-regression.test.ts",
+    "tests/crm-admissions-operations.test.ts",
+    "tests/crm-conversion-admissions-consistency.test.ts",
+    "tests/crm-conversion-button.test.ts",
+    "tests/crm-created-by-security.test.ts",
+    "tests/crm-finance-enhancements.test.ts",
+    "tests/crm-lead-creation-enhancements.test.ts",
+    "tests/crm-leads-api-access.test.ts",
+    "tests/crm-ownership-migration.test.ts",
+    "tests/crm-service-role-scope.test.ts",
+    "tests/database-persistence.test.ts",
+    "tests/helpers/crm-fixtures.ts",
+    "tests/lead-code-collision.test.ts",
+    "types/index.ts"
+  ],
+  "concurrentFilesNotAuthoredOrModified": [
+    "app/api/webhooks/telecrm/route.ts"
+  ],
+  "migrations": [
+    "supabase/migrations/20261123122939_created_by_lead_isolation.sql"
+  ],
+  "rlsPolicies": [
+    "crm_teams_read",
+    "crm_members_read",
+    "leads_creator_select",
+    "leads_creator_insert",
+    "leads_creator_update",
+    "leads_management_delete",
+    "leads_creator_boundary",
+    "leads_delete_boundary",
+    "leads_anon_boundary",
+    "followups_parent_boundary",
+    "followups_select",
+    "followups_insert",
+    "followups_update",
+    "followups_delete",
+    "followups_delete_boundary",
+    "followups_anon_boundary",
+    "followups_author_boundary",
+    "crm_audit_boundary",
+    "crm_audit_read",
+    "crm_audit_anon_boundary"
+  ],
+  "databaseChanges": [
+    "Nullable historical created_by; auth.uid default for new rows; immutable creator, tenant and creation time",
+    "Tenant-scoped CRM teams and memberships with composite foreign keys",
+    "Creator/team/management authorization with existing restrictive tenant policies retained",
+    "Parent-scoped followups and CRM audit; conversion guard; protected profile authority"
+  ],
+  "backendChanges": [
+    "Authenticated creator stamping with independent counsellor_id assignment",
+    "Fresh protected-profile lookup and tenant plus creator predicates for privileged queries and writes",
+    "Scoped list, search, exports, summary, dashboard, history, followups, demos, conversion and imports",
+    "Fail-closed database/API errors; no shared lead snapshot fallback or legacy snapshot upsert"
+  ],
+  "frontendChanges": [
+    "My Leads / My Team Leads / All Leads, scoped cards and performance",
+    "Creator, assignee, team, course and date filters",
+    "Readonly authenticated creator on creation",
+    "Identity-tagged cache, cleared on session transitions; stale in-flight responses rejected"
+  ],
+  "tests": {
+    "total": 633,
+    "passed": 632,
+    "failed": 1,
+    "pending": 0,
+    "failures": [
+      {
+        "file": "E:/my erp hub/next gen lms/tests/trainer-role-5-rbac-integrity.test.ts",
+        "test": "Role 5: Trainer / Faculty — Comprehensive RBAC & Academic Integrity Suite Module 3: Batch Roster Scoping denies trainer access to batch instructed by another faculty member"
+      }
+    ],
+    "requiredSecurityScenarios": {
+      "passed": 15,
+      "failed": 0
+    },
+    "isolatedPostgres": {
+      "engine": "PGlite embedded PostgreSQL with representative legacy schema and simulated auth roles",
+      "passed": 19,
+      "failed": 0,
+      "fullSupabaseStack": false
+    },
+    "browser": {
+      "passed": 11,
+      "failed": 0,
+      "checks": [
+        "authenticated creation",
+        "cross-user list",
+        "direct ID denial",
+        "cross-user edit",
+        "immutable creator",
+        "admin access",
+        "Radhika scoped dashboard totals",
+        "Radhika browser visibility and stale-cache isolation",
+        "Mohan scoped dashboard totals",
+        "Mohan browser visibility and stale-cache isolation",
+        "browser runtime errors"
+      ],
+      "storage": "isolated temporary fixture",
+      "hostedRequests": "blocked"
+    },
+    "typeScript": {
+      "exitCode": 0
+    },
+    "eslint": {
+      "errors": 0,
+      "warnings": 109
+    },
+    "diffCheck": "passed"
+  },
+  "resolvedVulnerabilities": [
+    "Assignment granting access to another creator lead",
+    "Unscoped service-role CRM reads/writes",
+    "Creator or tenant spoofing and mutation",
+    "Related-record and conversion ID tampering",
+    "Shared persisted lead fallback and stale-session browser cache exposure",
+    "Unauthorized CRM audit entries exposed through shared workflow snapshots",
+    "Self-service profile authority changes at database level"
+  ],
+  "remainingIssues": [
+    "Trainer batch access test fails identically on unchanged baseline: a matching trainer_name fallback can authorize a batch whose trainer_id belongs to someone else",
+    "Full Supabase Auth/PostgREST integration has not been executed; hosted environments were intentionally untouched",
+    "No lead attachment subsystem was found; related-record tests cover existing notes, followups, history and demos",
+    "Team memberships require explicit administrator provisioning; no automatic membership population",
+    "Lead stage and followup history writes remain separate operations; a history failure reports the partial outcome",
+    "Concurrent untracked app/api/webhooks/telecrm/route.ts appeared during final verification and was not authored or modified in this task. It chooses an administrator identity without request authentication; requires separate review before any release. Final checks do not certify concurrent changes."
+  ],
+  "productionMigrationRisks": [
+    "Reconcile actual target schema and migration ordering before applying; known staging drift exists",
+    "Historical NULL creators stay management-only; no ownership inference or automatic backfill",
+    "The immutable creator trigger also blocks ordinary service-role historical ownership changes; any future reconciliation requires a separately reviewed migration",
+    "Profile authority trigger may affect legacy direct-client role, tenant or active-state management; use authorized server administration",
+    "Coordinate migration and application rollout: new API requires created_by and team tables; never fall back to insecure legacy reads",
+    "Validate with real Supabase authenticated sessions in an isolated environment before production approval"
+  ],
+  "deploymentReadiness": "NO-GO",
+  "reason": "Local implementation ready for review; existing trainer security failure, concurrent unauthenticated TeleCRM webhook and full Supabase integration validation remain outstanding."
+}

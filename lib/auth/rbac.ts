@@ -6,6 +6,7 @@ import { matchesBatchId, matchesTrainerId } from '@/lib/services/academics-servi
 export { matchesTrainerId };
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  counsellor_lead: ['crm:read', 'crm:write', 'crm:convert', 'admissions:read', 'admissions:write', 'courses:read', 'batches:read', 'students:read'],
   super_admin: [
     'all:manage',
     'users:read',
@@ -318,6 +319,7 @@ export const DEFAULT_ROLE_ROUTES: Record<UserRole, string> = {
   admin: '/dashboard',
   accountant: '/accounts/fees',
   counsellor: '/crm/leads',
+        counsellor_lead: '/crm/leads',
   trainer: '/academics/courses',
   placement_coordinator: '/placement',
   support: '/support',
@@ -429,7 +431,7 @@ export function getSafeRedirectUrl(
     return defaultRoute;
   }
   // CRM & Admissions
-  if ((pathname.startsWith('/crm') || pathname.startsWith('/admissions')) && !['super_admin', 'admin', 'counsellor'].includes(safeRole)) {
+  if ((pathname.startsWith('/crm') || pathname.startsWith('/admissions')) && !['super_admin', 'admin', 'counsellor', 'counsellor_lead'].includes(safeRole)) {
     return defaultRoute;
   }
   // Placements
@@ -452,9 +454,11 @@ export function canAccessBatch(user: any, batchId: string): boolean {
   if (user.role === 'trainer') {
     const batch = store.batches.find((b) => b.id === batchId || matchesBatchId(b.id, batchId));
     if (!batch) return false;
-    return (
-      matchesTrainerId(batch.trainer_id, user.id) ||
-      (batch.trainer_name && user.full_name && batch.trainer_name.toLowerCase().includes(user.full_name.toLowerCase()))
+    if (batch.trainer_id) {
+      return matchesTrainerId(batch.trainer_id, user.id);
+    }
+    return Boolean(
+      batch.trainer_name && user.full_name && batch.trainer_name.toLowerCase().includes(user.full_name.toLowerCase())
     );
   }
   if (user.role === 'student') {

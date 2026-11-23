@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import crypto from 'crypto';
 import { store } from '@/lib/services/data-store';
-import { convertLeadToAdmission } from '@/lib/services/crm-service';
+import { convertLeadToAdmission } from './helpers/crm-fixtures';
 import {
   createCashfreeOrder,
   createGatewayOrder,
@@ -45,11 +45,11 @@ describe('CRM & Finance Enhancements Test Suite', () => {
   });
 
   describe('1. One-Click Lead to Admission Conversion Workflow', () => {
-    it('successfully transitions lead stage to Converted and creates prefill input', () => {
+    it('creates authorized prefill without prematurely converting', () => {
       const result = convertLeadToAdmission(mockLeadId);
 
       expect(result).toBeDefined();
-      expect(result.lead.stage).toBe('Converted');
+      expect(result.lead.stage).toBe('Interested');
       expect(result.admissionPrefill).toMatchObject({
         student_name: 'Ananya Sharma',
         email: 'ananya.sharma@example.com',
@@ -64,10 +64,10 @@ describe('CRM & Finance Enhancements Test Suite', () => {
       expect(result.admissionPrefill.course_fee).toBeGreaterThan(0);
     });
 
-    it('persists Converted stage in store', () => {
+    it('preserves lead stage until admission succeeds', () => {
       convertLeadToAdmission(mockLeadId);
       const updated = store.leads.find((l) => l.id === mockLeadId);
-      expect(updated?.stage).toBe('Converted');
+      expect(updated?.stage).toBe('Interested');
     });
 
     it('throws error for non-existent lead ID', () => {

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizedLead } from '@/lib/services/lead-security';
+import { getLeads } from '@/lib/services/crm-service';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { store } from '@/lib/services/data-store';
@@ -57,10 +59,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const allowedLeadIds = new Set((await getLeads({}, authUser)).map(l => l.id));
+    const visibleLogs = (store.auditLogs || []).filter(l => l.module?.toUpperCase() !== 'CRM' || allowedLeadIds.has(l.record_id));
     return NextResponse.json({
       success: true,
-      logs: store.auditLogs || [],
-      total: (store.auditLogs || []).length,
+      logs: visibleLogs,
+      total: visibleLogs.length,
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -208,8 +212,10 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Deduplication / Retry Protection
+    if (moduleName.toUpperCase() === 'CRM') await authorizedLead(recordId, actor);
     const idempotencyKey = input.idempotency_key || input.id;
     const existingLog = (store.auditLogs || []).find((l: any) => {
+      if (moduleName.toUpperCase() === 'CRM' && (l.record_id !== recordId || l.user_id !== actor.id || tenantId(l) !== actorTenant)) return false;
       if (idempotencyKey && (l.id === idempotencyKey || l.metadata?.idempotency_key === idempotencyKey || l.idempotency_key === idempotencyKey)) {
         return true;
       }
@@ -380,7 +386,7 @@ export async function POST(req: NextRequest) {
         success: false,
         error: err.message || 'Failed to record audit telemetry.',
       },
-      { status: 500 }
+      { status: err.message?.startsWith('Forbidden') ? 403 : err.message?.startsWith('Unauthorized') ? 401 : 500 }
     );
   }
 }

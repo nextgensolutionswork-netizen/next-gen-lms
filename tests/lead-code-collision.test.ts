@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/services/data-store';
-import { createLead } from '@/lib/services/crm-service';
+import { createLead, fixtureActor } from './helpers/crm-fixtures';
+import { resetLeadCache } from '@/lib/services/lead-cache';
 
 const mocks = vi.hoisted(() => ({ insert: vi.fn(), audit: vi.fn() }));
 vi.mock('@/lib/supabase/db', () => ({ isLiveSupabaseEnabled: () => true, createClient: vi.fn(() => { throw new Error('Fallback client must not be used'); }) }));
-vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ from: () => ({ insert: mocks.insert }) }) }));
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ from: (table: string) => {
+  const q: any = { insert: mocks.insert, select: () => q, eq: () => q, in: () => q, order: () => q, range: () => q,
+    single: () => Promise.resolve({ data: { id: 'fixture-admin', role: 'admin', tenant_id: 'default', is_active: true }, error: null }),
+    then: (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve) };
+  return q;
+} }) }));
 vi.mock('@/lib/services/audit-service', () => ({ recordAuditLog: mocks.audit }));
 
 describe('lead creation with stale or concurrent browser state', () => {
@@ -13,6 +19,7 @@ describe('lead creation with stale or concurrent browser state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.leads = [];
+    resetLeadCache('fixture-admin');
     vi.spyOn(store, 'persist').mockImplementation(() => {});
     mocks.insert.mockResolvedValue({ error: null });
   });
@@ -32,7 +39,7 @@ describe('lead creation with stale or concurrent browser state', () => {
   it('creates distinct UUID IDs and codes for simultaneous submissions with an empty cache', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2031-06-01T12:00:00Z'));
-    const leads = await Promise.all(Array.from({ length: 50 }, () => createLead(input)));
+    const leads = await Promise.all(Array.from({ length: 50 }, () => createLead({ ...input, allowDuplicate: true })));
     expect(new Set(leads.map(l => l.id)).size).toBe(50);
     expect(new Set(leads.map(l => l.lead_code)).size).toBe(50);
     expect(leads.every(l => l.lead_code.startsWith('LD-2031-'))).toBe(true);
@@ -55,6 +62,7 @@ describe('lead creation with stale or concurrent browser state', () => {
     const pending = createLead(input);
     expect(store.leads).toHaveLength(0);
     expect(store.persist).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(mocks.insert).toHaveBeenCalledTimes(1));
     finish({ error: { code: '42501', message: 'permission denied' } });
     await expect(pending).rejects.toThrow('permission denied');
     expect(store.leads).toHaveLength(0);

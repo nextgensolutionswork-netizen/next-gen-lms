@@ -1,10 +1,11 @@
+import { fixtureActor } from './helpers/crm-fixtures';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import {
   parseCSV,
   detectDelimiter,
   previewBulkImport,
-  executeBulkImport,
+  executeBulkImport as executeBulkImportService,
   generateCsvTemplate,
 } from '@/lib/services/bulk-import-service';
 import { store } from '@/lib/services/data-store';
@@ -310,3 +311,5 @@ describe('12. Excel / CSV Bulk Data Imports & CI/CD Pipeline Tests', () => {
     });
   });
 });
+
+function executeBulkImport(...args: Parameters<typeof executeBulkImportService>) { return executeBulkImportService(args[0], args[1], args[2], args[3], args[4], fixtureActor()); }

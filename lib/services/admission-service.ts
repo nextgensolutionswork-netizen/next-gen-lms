@@ -1,3 +1,4 @@
+import { authorizedLead } from './lead-security';
 import { onTransactionCommit } from './payment-workflow-transaction';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
@@ -25,6 +26,7 @@ import { tenantId } from '@/lib/auth/tenant';
 import type { StudentPaymentRecord } from '@/types';
 import { validatePhoneNumber, validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
 import { validateEmailAddress } from '@/lib/utils/email-validation';
+import { matchesCourseId } from '@/lib/services/academics-service';
 import {
   getEligibleAdmissionsCounsellors,
   resolveCanonicalCounsellorId,
@@ -212,6 +214,8 @@ export interface CreateAdmissionInput {
   discount_reason?: string;
   payment_plan: 'Full Payment' | '2 Installments' | '3 Installments' | 'Custom';
   counsellor_id?: string;
+  counsellor_name?: string;
+  training_category?: 'Normal Training' | 'Personal Training';
   lead_id?: string; // Optional: if converted from CRM
   initial_payment_amount?: number;
   collect_initial_payment?: boolean;
@@ -250,14 +254,19 @@ export async function createAdmissionWorkflow(
     }
     return serverResult;
   }
+  if (input.lead_id && !store.users.some(u => u.id === performedByUserId || u.email === performedByUserId)) {
+    throw new Error('Unauthorized: Verified lead conversion actor required.');
+  }
   const performingUser =
     store.users.find((u) => u.id === performedByUserId || u.email === performedByUserId) ||
-    store.users.find((u) => ['counsellor', 'admin', 'super_admin'].includes(u.role) && u.is_active !== false) ||
+    store.users.find((u) => ['counsellor', 'counsellor_lead', 'admin', 'super_admin'].includes(u.role) && u.is_active !== false) ||
     store.users[0];
-  if (!performingUser || !performingUser.is_active || !['counsellor', 'admin', 'super_admin'].includes(performingUser.role)) {
+  if (!performingUser || !performingUser.is_active || !['counsellor', 'counsellor_lead', 'admin', 'super_admin'].includes(performingUser.role)) {
     throw new Error('Unauthorized admission registration.');
   }
   const admissionTenant = tenantId(performingUser);
+
+  if (input.lead_id && typeof window === 'undefined') await authorizedLead(input.lead_id, performingUser);
 
   // Cross-Tenant Conversion Guard
   if (input.lead_id) {
@@ -371,7 +380,8 @@ export async function createAdmissionWorkflow(
   }
 
   // Validate Course
-  const course = store.courses.find((c) => c.id === input.course_id);
+  store.reconcileAuthoritativeCourses();
+  const course = store.courses.find((c) => c.id === input.course_id || matchesCourseId(c.id, input.course_id));
   if (!course) {
     throw new Error(`Invalid Course: Selected course "${input.course_id}" does not exist.`);
   }
@@ -514,6 +524,7 @@ export async function createAdmissionWorkflow(
     course_id: input.course_id,
     course_name: course?.course_name,
     training_mode: input.training_mode || 'Online',
+    training_category: input.training_category || 'Normal Training',
     batch_id: input.batch_id,
     batch_name: batch?.batch_name,
     trainer_id: trainer?.id,
@@ -526,7 +537,7 @@ export async function createAdmissionWorkflow(
     net_payable,
     payment_plan: 'Full Payment',
     counsellor_id: counsellor?.id,
-    counsellor_name: counsellor?.full_name,
+    counsellor_name: counsellor?.full_name || input.counsellor_name,
     our_bank_name: input.our_bank_name,
     our_bank_account_name: input.our_bank_account_name,
     our_bank_account_id: input.our_bank_account_id,

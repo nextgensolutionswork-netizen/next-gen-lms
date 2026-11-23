@@ -7,7 +7,7 @@ import {
   reconcileLeadsWithAdmissions,
   convertLeadToAdmission,
   getLeads,
-} from '@/lib/services/crm-service';
+} from './helpers/crm-fixtures';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { Course, Batch, UserProfile } from '@/types';
 
@@ -407,7 +407,7 @@ describe('CRM Conversion Button & Authoritative Admission Verification', () => {
         },
         otherTenantCounsellorId
       )
-    ).rejects.toThrow(/Unauthorized cross-tenant conversion/);
+    ).rejects.toThrow(/Forbidden: Lead access denied/);
 
     // Lead remains unconverted
     const unchangedLead = store.leads.find((l) => l.id === lead.id);

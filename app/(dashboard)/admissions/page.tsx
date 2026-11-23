@@ -35,8 +35,9 @@ import { PhoneInput } from '@/components/ui/phone-input';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
-import { Admission, AdmissionStatus, PaymentMethod, Receipt } from '@/types';
+import { Admission, AdmissionStatus, PaymentMethod, Receipt, Course } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
+import { getCourses } from '@/lib/services/academics-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { getEligibleAdmissionsCounsellors, resolveCanonicalCounsellorId } from '@/lib/services/counsellor-service';
 import { tenantId } from '@/lib/auth/tenant';
@@ -49,6 +50,12 @@ import { validateEmailAddress } from '@/lib/utils/email-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { getAuthorizedBankAccounts, formatBankAccountPresetLabel } from '@/lib/utils/bank-autofill';
 import { BankAccountSearchableDropdown } from '@/components/ui/bank-account-searchable-dropdown';
+import { CounsellorSearchableDropdown } from '@/components/ui/counsellor-searchable-dropdown';
+import {
+  TrainingCategory,
+  getStandardFeeForCourseAndTraining,
+  calculateEnrollmentFinancials,
+} from '@/lib/services/fee-config-service';
 
 export default function AdmissionsPage() {
   const router = useRouter();
@@ -79,10 +86,19 @@ export default function AdmissionsPage() {
     role === 'super_admin' ||
     hasPermission('admissions:read');
 
+  const counsellorMap = React.useMemo(() => {
+    const map = new Map<string, { full_name: string; role: string }>();
+    (store.users || []).forEach((u) => {
+      map.set(u.id, { full_name: u.full_name, role: u.role });
+    });
+    return map;
+  }, [store.users]);
+
   const handleExportCSV = () => {
     const exportData = admissions.map((adm) => ({
       'Admission Number': adm.admission_number,
       'Student Name': adm.student_name,
+      'Counsellor Name': adm.counsellor_name || counsellorMap.get(adm.counsellor_id || '')?.full_name || 'Unassigned',
       'Email': adm.email,
       'Phone': adm.phone,
       'Course Name': adm.course_name,
@@ -125,11 +141,40 @@ export default function AdmissionsPage() {
     (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
   );
 
+  const [courses, setCourses] = React.useState<Course[]>(store.courses);
+  const publishedCourses = React.useMemo(() => {
+    return (courses || store.courses || []).filter((c) => !c.status || c.status === 'Published');
+  }, [courses]);
+
   const [courseId, setCourseId] = React.useState(defaultCourseId);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function syncAuthoritativeCourses() {
+      try {
+        const data = await getCourses();
+        if (isMounted && data && data.length > 0) {
+          setCourses(data);
+          if (!courseId && data[0]?.id) {
+            setCourseId(data[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn('[Admissions] Failed to load authoritative courses:', err);
+      }
+    }
+    syncAuthoritativeCourses();
+    return () => {
+      isMounted = false;
+    };
+  }, [courseId]);
   const [trainingMode, setTrainingMode] = React.useState<'Online' | 'Offline' | 'Classroom' | 'Hybrid'>('Hybrid');
   const [batchId, setBatchId] = React.useState(defaultBatch?.id || '');
   const [batchError, setBatchError] = React.useState('');
   const [counsellorId, setCounsellorId] = React.useState('');
+  const [counsellorName, setCounsellorName] = React.useState('');
+  const [counsellorError, setCounsellorError] = React.useState('');
+  const [trainingCategory, setTrainingCategory] = React.useState<TrainingCategory>('Normal Training');
   // Requirement 4: Approved discount numeric input is empty by default when form opens
   const [discount, setDiscount] = React.useState<number | ''>('');
   const [feeDueDate, setFeeDueDate] = React.useState('');
@@ -311,8 +356,22 @@ export default function AdmissionsPage() {
     }
   }, [router]);
 
-  const selectedCourse = store.courses.find((c) => c.id === courseId) || store.courses[0];
-  const courseFee = selectedCourse?.price || 45000;
+  const selectedCourse = React.useMemo(() => {
+    return (courses || store.courses || []).find((c) => c.id === courseId);
+  }, [courses, courseId]);
+
+  const feeInfo = React.useMemo(() => {
+    return getStandardFeeForCourseAndTraining({
+      courseId,
+      trainingCategory,
+      trainingMode,
+      selectedCourse,
+      baselineFee: selectedCourse?.price ?? (selectedCourse as any)?.fee,
+      enrollmentDate: new Date().toISOString().slice(0, 10),
+    });
+  }, [courseId, trainingCategory, trainingMode, selectedCourse]);
+
+  const courseFee = feeInfo.standard_fee;
   const discountAmount = typeof discount === 'number' ? discount : 0;
   const netPayable = Math.max(0, courseFee - discountAmount);
   const isFullPayment = (collectInitialPayment && initialPaymentAmount >= netPayable) || netPayable === 0;
@@ -441,6 +500,13 @@ export default function AdmissionsPage() {
       }
     }
 
+    if (!counsellorId) {
+      setCounsellorError('Counsellor Name is mandatory for new enrollments.');
+      setIsSubmitting(false);
+      return;
+    }
+    setCounsellorError('');
+
     try {
       const result = await paymentWorkflowClient.createAdmission({
         student_name: name,
@@ -459,6 +525,7 @@ export default function AdmissionsPage() {
         current_employment_status: employmentStatus,
         course_id: courseId,
         training_mode: trainingMode,
+        training_category: trainingCategory,
         batch_id: batchId,
         admission_date: new Date().toISOString().slice(0, 10),
         fee_due_date: isFullPayment ? undefined : (feeDueDate.trim() ? feeDueDate : undefined),
@@ -466,7 +533,8 @@ export default function AdmissionsPage() {
         discount: discountAmount,
         discount_reason: discountReason,
         payment_plan: 'Full Payment',
-        counsellor_id: counsellorId || user.id,
+        counsellor_id: counsellorId,
+        counsellor_name: counsellorName || counsellorMap.get(counsellorId)?.full_name || user.full_name,
         lead_id: convertedLeadId,
         collect_initial_payment: collectInitialPayment,
         initial_payment_amount: collectInitialPayment ? initialPaymentAmount : 0,
@@ -623,6 +691,7 @@ export default function AdmissionsPage() {
                   <th className="px-3.5 py-2.5">Student</th>
                   <th className="px-3.5 py-2.5">Course</th>
                   <th className="px-3.5 py-2.5">Batch</th>
+                  <th className="px-3.5 py-2.5">Counsellor Name</th>
                   <th className="px-3.5 py-2.5">Fee Structure</th>
                   <th className="px-3.5 py-2.5">Date</th>
                   <th className="px-3.5 py-2.5">Status</th>
@@ -631,10 +700,10 @@ export default function AdmissionsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
-                  <TableSkeleton columns={7} rows={6} />
+                  <TableSkeleton columns={8} rows={6} />
                 ) : admissions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3.5 py-8 text-center text-slate-500">
+                    <td colSpan={8} className="px-3.5 py-8 text-center text-slate-500">
                       <UserCheck className="h-8 w-8 mx-auto text-slate-400 mb-2 opacity-50" />
                       <p className="font-semibold text-slate-700">No Admissions Found</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
@@ -696,6 +765,11 @@ export default function AdmissionsPage() {
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <span className="text-xs text-slate-700 font-medium">
                           {adm.batch_name || 'Assigned Batch'}
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
+                        <span className="text-xs text-slate-800 font-semibold">
+                          {adm.counsellor_name || (counsellorMap.get(adm.counsellor_id || '')?.full_name) || '—'}
                         </span>
                       </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
@@ -966,7 +1040,7 @@ export default function AdmissionsPage() {
             <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">
               Academic Course & Batch Assignment
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
                   SAP Course *
@@ -976,6 +1050,14 @@ export default function AdmissionsPage() {
                   onChange={(e) => {
                     const newCourseId = e.target.value;
                     setCourseId(newCourseId);
+                    const selected = publishedCourses.find((c) => c.id === newCourseId);
+                    if (selected) {
+                      if (selected.course_name.toUpperCase().includes('PERSONAL TRAINING')) {
+                        setTrainingCategory('Personal Training');
+                      } else if (selected.course_name.toUpperCase().includes('NORMAL TRAINING')) {
+                        setTrainingCategory('Normal Training');
+                      }
+                    }
                     const matchingBatches = (store.batches || []).filter((b) => b.course_id === newCourseId);
                     const availableBatch = matchingBatches.find(
                       (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
@@ -985,11 +1067,25 @@ export default function AdmissionsPage() {
                   }}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
                 >
-                  {(store.courses || []).map((c) => (
+                  {publishedCourses.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.course_name} (₹{c.price.toLocaleString('en-IN')})
+                      {c.course_name} (₹{(c.price ?? (c as any).fee ?? 0).toLocaleString('en-IN')})
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Training Category *
+                </label>
+                <select
+                  value={trainingCategory}
+                  onChange={(e) => setTrainingCategory(e.target.value as TrainingCategory)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+                >
+                  <option value="Normal Training">Normal Training (Batch)</option>
+                  <option value="Personal Training">Personal Training (1:1)</option>
                 </select>
               </div>
 
@@ -1042,22 +1138,18 @@ export default function AdmissionsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Admissions Sales *
-                </label>
-                <select
-                  value={counsellorId}
-                  onChange={(e) => setCounsellorId(e.target.value)}
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
+                <CounsellorSearchableDropdown
+                  counsellors={availableCounsellors}
+                  selectedId={counsellorId}
+                  onSelect={(c) => {
+                    setCounsellorId(c.id);
+                    setCounsellorName(c.full_name);
+                    setCounsellorError('');
+                  }}
                   required
-                >
-                  <option value="" disabled>Select admissions counsellor</option>
-                  {availableCounsellors.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.display_label}
-                    </option>
-                  ))}
-                </select>
+                  error={counsellorError}
+                  label="Counsellor Name *"
+                />
               </div>
             </div>
           </div>
@@ -1407,7 +1499,7 @@ export default function AdmissionsPage() {
                   </strong>
                 </p>
                 <p className="text-emerald-700 text-[11px]">
-                  Course: {admissionSuccessModal.admission.course_name} | Mode: {admissionSuccessModal.admission.training_mode}
+                  Course: {admissionSuccessModal.admission.course_name} | Mode: {admissionSuccessModal.admission.training_mode} | Counsellor Name: <strong className="font-semibold text-emerald-950">{admissionSuccessModal.admission.counsellor_name || counsellorMap.get(admissionSuccessModal.admission.counsellor_id || '')?.full_name || '—'}</strong>
                 </p>
               </div>
             </div>

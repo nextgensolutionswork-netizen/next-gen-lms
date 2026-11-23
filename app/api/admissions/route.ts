@@ -1,4 +1,5 @@
 import { normalizePaymentFields } from '@/lib/services/payment-entry-rules';
+import { authorizedLead } from '@/lib/services/lead-security';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
@@ -45,8 +46,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const actor = await authenticatePaymentRequest(request);
-    if (!['counsellor', 'admin', 'super_admin'].includes(actor.role)) throw new Error('Forbidden: Admission registration requires counsellor access.');
+    if (!['counsellor', 'counsellor_lead', 'admin', 'super_admin'].includes(actor.role)) throw new Error('Forbidden: Admission registration requires counsellor access.');
     const input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
+    if (input.lead_id) await authorizedLead(input.lead_id, actor);
     const phoneCheck = validatePhoneNumber('IN', input.phone, 'Phone number', true);
     if (!phoneCheck.isValid) {
       throw new Error(phoneCheck.error || 'Please enter a valid phone number.');
@@ -64,7 +66,12 @@ export async function POST(request: NextRequest) {
       }
     }
     const data = await paymentTransaction(actor, async () => {
-      const result = await createAdmissionWorkflow({ ...input, counsellor_id: actor.role === 'counsellor' ? actor.id : input.counsellor_id }, actor.id, true);
+      const assignedCounsellorId = (actor.role === 'counsellor' && !input.counsellor_id) ? actor.id : (input.counsellor_id || actor.id);
+      const result = await createAdmissionWorkflow({
+        ...input,
+        counsellor_id: assignedCounsellorId,
+        counsellor_name: input.counsellor_name,
+      }, actor.id, true);
       return { result, snapshot: visibleWorkflowSnapshot(actor) };
     });
     return NextResponse.json({ success: true, ...data });

@@ -8,7 +8,7 @@ import {
   createLead,
   isLeadConverted,
   getLeadAdmission,
-} from '@/lib/services/crm-service';
+} from './helpers/crm-fixtures';
 import { Course, Batch, UserProfile } from '@/types';
 
 describe('Admission Fee Due Date Validation & Institute Business Rules', () => {

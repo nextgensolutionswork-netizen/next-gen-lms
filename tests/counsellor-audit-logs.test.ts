@@ -25,7 +25,7 @@ function createMockAuthRequest(
   if (role) {
     const cookiePayload = JSON.stringify({
       id: options.userId || `usr-${role}-test`,
-      email: options.email || `${role}@next-generpsolutions.com`,
+      email: options.email || (role === 'counsellor' ? 'audit.fixture@example.invalid' : `${role}@next-generpsolutions.com`),
       role,
       tenant_id: options.tenantId || 'default',
       is_active: true,
@@ -42,6 +42,10 @@ function createMockAuthRequest(
 describe('BUG-CO-001: Audit Telemetry Ingestion (POST /api/audit-logs)', () => {
   beforeEach(() => {
     store.hydrateFromDisk();
+    const actorId = 'usr-counsellor-01';
+    store.users.unshift({ id: actorId, full_name: 'Audit fixture counsellor', email: 'audit.fixture@example.invalid', role: 'counsellor', is_active: true, tenant_id: 'default', created_at: '', updated_at: '' });
+    for (const id of ['lead-test-001','lead-test-002','lead-idem-01']) store.leads.push({ id, created_by: actorId, tenant_id: 'default', lead_code: id, full_name: 'Fixture', phone: '9876543210', email: 'fixture@local.invalid', stage: 'New', created_at: '', updated_at: '' });
+    store.persistSync();
     if (!store.auditLogs) store.auditLogs = [];
   });
 

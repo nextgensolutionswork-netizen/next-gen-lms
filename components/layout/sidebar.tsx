@@ -69,7 +69,7 @@ export function Sidebar({
   const isSuperAdmin = currentRole === 'super_admin';
   const isAdmin = isSuperAdmin || currentRole === 'admin';
   const isAccountant = isSuperAdmin || isAdmin || currentRole === 'accountant';
-  const isCounsellor = currentRole === 'counsellor';
+  const isCounsellor = currentRole === 'counsellor' || currentRole === 'counsellor_lead';
   const canAccessCrm = isAdmin || isCounsellor;
   const canAccessAccountsSection = isAccountant || isCounsellor;
   const canAccessFinancialManagement = isAccountant;

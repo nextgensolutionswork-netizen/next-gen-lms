@@ -51,7 +51,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
     store.students = [...originalStudents];
     store.feeAccounts = [...originalFeeAccounts];
     store.leads = [...originalLeads];
-    store.users = [...originalUsers];
+    store.users = [counsellorUser, adminUser, ...originalUsers.filter(u => ![counsellorUser.id, adminUser.id].includes(u.id))];
   });
 
   afterEach(() => {
@@ -116,6 +116,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
   // --------------------------------------------------------------------------
   it('Req 2: Lead stage transitions to Converted only when admission persistence succeeds', async () => {
     const testLead: Lead = {
+      created_by: counsellorUser.id,
       id: 'aaaa1111-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-TEST1',
@@ -161,6 +162,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
   // --------------------------------------------------------------------------
   it('Req 3: If admission creation fails, lead remains in its previous stage and is never marked Converted', async () => {
     const testLead: Lead = {
+      created_by: counsellorUser.id,
       id: 'bbbb1111-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-TEST2',
@@ -315,6 +317,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
   // --------------------------------------------------------------------------
   it('Req 7: Establishes bidirectional linkage between CRM lead and Admission', async () => {
     const testLead: Lead = {
+      created_by: counsellorUser.id,
       id: 'cccc1111-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-LINK1',
@@ -400,6 +403,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
   // --------------------------------------------------------------------------
   it('Req 9: Repeated conversion requests for the same lead_id return existing admission idempotently', async () => {
     const testLead: Lead = {
+      created_by: counsellorUser.id,
       id: 'dddd1111-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-IDEM1',
@@ -484,6 +488,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
   // --------------------------------------------------------------------------
   it('Req 11: Rejects cross-tenant lead conversion when lead tenant does not match actor tenant', async () => {
     const foreignLead: Lead = {
+      created_by: counsellorUser.id,
       id: 'eeee1111-2222-3333-4444-555566667777',
       tenant_id: 'tenant-secondary',
       lead_code: 'LD-2026-FOREIGN',
@@ -518,7 +523,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
 
     // counsellorUser belongs to 'default' tenant
     await expect(createAdmissionWorkflow(input, counsellorUser.id, true)).rejects.toThrow(
-      'Unauthorized cross-tenant conversion'
+      'Forbidden: Lead access denied.'
     );
   });
 
@@ -692,6 +697,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
   // --------------------------------------------------------------------------
   it('Req 17: View Admission button only displays when matching admission exists with valid admission_number', () => {
     const convertedLeadWithAdmission: Lead = {
+      created_by: counsellorUser.id,
       id: 'ffff1111-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-CONV',
@@ -724,6 +730,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
     store.admissions.push(linkedAdmission);
 
     const ghostLead: Lead = {
+      created_by: counsellorUser.id,
       id: 'ffff2222-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-GHOST',
@@ -776,6 +783,7 @@ describe('BUG-11: CRM Conversion, Admission Persistence & Student Synchronizatio
 
     // Lead A has seed note accidentally containing ADM-2026-0003, but email belongs to Candidate A
     const leadA: Lead = {
+      created_by: counsellorUser.id,
       id: 'aaaa9999-2222-3333-4444-555566667777',
       tenant_id: 'default',
       lead_code: 'LD-2026-LEADA',

@@ -60,6 +60,7 @@ import {
 class InstituteDataStore {
   constructor() {
     this.hydrateFromDisk();
+    this.reconcileAuthoritativeCourses();
     this.reconcileAdmissionsAndStudents();
     this.reconcileDualLedgers();
     this.reconcileBatchEnrollments();
@@ -109,8 +110,13 @@ class InstituteDataStore {
           const missingSeedStudents = this.students.filter((s) => !existingStudentIds.has(s.id));
           this.students = [...snapshot.students, ...missingSeedStudents];
         }
-        if (snapshot.leads?.length) this.leads = snapshot.leads;
-        if (snapshot.courses?.length) this.courses = snapshot.courses;
+        if (typeof window === 'undefined' && snapshot.leads) this.leads = snapshot.leads;
+        if (snapshot.courses?.length) {
+          const existingCodes = new Set(snapshot.courses.map((c: any) => c.course_code?.trim().toUpperCase()));
+          const missingSeedCourses = this.courses.filter((c) => !existingCodes.has(c.course_code?.trim().toUpperCase()));
+          this.courses = [...snapshot.courses, ...missingSeedCourses];
+        }
+        this.reconcileAuthoritativeCourses();
         if (snapshot.modules?.length) this.modules = snapshot.modules;
         if (snapshot.lessons?.length) this.lessons = snapshot.lessons;
         if (snapshot.lessonProgress?.length) this.lessonProgress = snapshot.lessonProgress;
@@ -181,7 +187,7 @@ class InstituteDataStore {
         }
         if (snapshot.certificates?.length) this.certificates = snapshot.certificates;
         if (snapshot.notifications?.length) this.notifications = snapshot.notifications;
-        if (snapshot.auditLogs?.length) this.auditLogs = snapshot.auditLogs;
+        if (snapshot.auditLogs?.length) this.auditLogs = typeof window === 'undefined' ? snapshot.auditLogs : snapshot.auditLogs.filter(l => l.module?.toUpperCase() !== 'CRM');
         if (snapshot.sapSystems?.length) this.sapSystems = snapshot.sapSystems;
         else if (snapshot.sapServers?.length) this.sapSystems = snapshot.sapServers;
         if (snapshot.sapAllocations?.length) this.sapAllocations = snapshot.sapAllocations;
@@ -917,7 +923,164 @@ class InstituteDataStore {
       created_at: '2026-01-05T00:00:00Z',
       updated_at: '2026-01-05T00:00:00Z',
     },
+    {
+      id: 'c1000000-0000-4000-a000-000000000101',
+      course_name: 'SAP FICO PERSONAL TRAINING',
+      course_code: 'SAP FICO 101',
+      description: '1-on-1 personalized SAP S/4HANA Finance (FICO) training with dedicated mentorship and custom scheduling.',
+      duration_weeks: 12,
+      category: 'SAP Functional',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao (SAP FICO Lead)',
+      price: 35000,
+      status: 'Published',
+      modules_count: 3,
+      lessons_count: 5,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'c1000000-0000-4000-a000-000000000102',
+      course_name: 'SAP FICO NORMAL TRAINING',
+      course_code: 'SAP FICO 102',
+      description: 'Standard cohort-based SAP S/4HANA Finance (FICO) normal batch training covering financial accounting and controlling.',
+      duration_weeks: 12,
+      category: 'SAP Functional',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao (SAP FICO Lead)',
+      price: 28000,
+      status: 'Published',
+      modules_count: 3,
+      lessons_count: 5,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'c1000000-0000-4000-a000-000000000103',
+      course_name: 'SAP MM PERSONAL TRAINING',
+      course_code: 'SAP MM 103',
+      description: '1-on-1 personalized SAP S/4HANA Materials Management (MM) training with individual mentoring and hands-on scenarios.',
+      duration_weeks: 10,
+      category: 'SAP Functional',
+      trainer_id: 'usr-trainer-mm',
+      trainer_name: 'Neha Patel (SAP MM Lead)',
+      price: 35000,
+      status: 'Published',
+      modules_count: 2,
+      lessons_count: 4,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'c1000000-0000-4000-a000-000000000104',
+      course_name: 'SAP ABAP NORMAL TRAINING',
+      course_code: 'SAP ABAP 104',
+      description: 'Standard cohort-based SAP ABAP on HANA normal batch training covering core syntax, CDS views, AMDP, and RAP.',
+      duration_weeks: 12,
+      category: 'SAP Technical',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao (SAP FICO Lead)',
+      price: 28000,
+      status: 'Published',
+      modules_count: 3,
+      lessons_count: 6,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
   ];
+
+  public static readonly AUTHORITATIVE_TRAINING_COURSES: Course[] = [
+    {
+      id: 'c1000000-0000-4000-a000-000000000101',
+      course_name: 'SAP FICO PERSONAL TRAINING',
+      course_code: 'SAP FICO 101',
+      description: '1-on-1 personalized SAP S/4HANA Finance (FICO) training with dedicated mentorship and custom scheduling.',
+      duration_weeks: 12,
+      category: 'SAP Functional',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao (SAP FICO Lead)',
+      price: 35000,
+      status: 'Published',
+      modules_count: 3,
+      lessons_count: 5,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'c1000000-0000-4000-a000-000000000102',
+      course_name: 'SAP FICO NORMAL TRAINING',
+      course_code: 'SAP FICO 102',
+      description: 'Standard cohort-based SAP S/4HANA Finance (FICO) normal batch training covering financial accounting and controlling.',
+      duration_weeks: 12,
+      category: 'SAP Functional',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao (SAP FICO Lead)',
+      price: 28000,
+      status: 'Published',
+      modules_count: 3,
+      lessons_count: 5,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'c1000000-0000-4000-a000-000000000103',
+      course_name: 'SAP MM PERSONAL TRAINING',
+      course_code: 'SAP MM 103',
+      description: '1-on-1 personalized SAP S/4HANA Materials Management (MM) training with individual mentoring and hands-on scenarios.',
+      duration_weeks: 10,
+      category: 'SAP Functional',
+      trainer_id: 'usr-trainer-mm',
+      trainer_name: 'Neha Patel (SAP MM Lead)',
+      price: 35000,
+      status: 'Published',
+      modules_count: 2,
+      lessons_count: 4,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+    {
+      id: 'c1000000-0000-4000-a000-000000000104',
+      course_name: 'SAP ABAP NORMAL TRAINING',
+      course_code: 'SAP ABAP 104',
+      description: 'Standard cohort-based SAP ABAP on HANA normal batch training covering core syntax, CDS views, AMDP, and RAP.',
+      duration_weeks: 12,
+      category: 'SAP Technical',
+      trainer_id: 'usr-trainer-fico',
+      trainer_name: 'Vikram Rao (SAP FICO Lead)',
+      price: 28000,
+      status: 'Published',
+      modules_count: 3,
+      lessons_count: 6,
+      created_at: '2026-01-10T00:00:00Z',
+      updated_at: '2026-01-10T00:00:00Z',
+    },
+  ];
+
+  public reconcileAuthoritativeCourses(): void {
+    for (const auth of InstituteDataStore.AUTHORITATIVE_TRAINING_COURSES) {
+      const codeMatch = auth.course_code.trim().toUpperCase();
+      const nameMatch = auth.course_name.trim().toLowerCase();
+      const existing = this.courses.find(
+        (c) =>
+          c.course_code?.trim().toUpperCase() === codeMatch ||
+          c.course_name?.trim().toLowerCase() === nameMatch ||
+          c.id === auth.id
+      );
+      if (!existing) {
+        this.courses.push({ ...auth });
+      } else {
+        if (!existing.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existing.id)) {
+          existing.id = auth.id;
+        }
+        existing.course_name = auth.course_name;
+        existing.course_code = auth.course_code;
+        existing.price = auth.price;
+        existing.status = auth.status;
+        existing.category = auth.category;
+        existing.duration_weeks = auth.duration_weeks;
+      }
+    }
+  }
 
   public modules: CourseModule[] = [
     {

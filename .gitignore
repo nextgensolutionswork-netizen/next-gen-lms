@@ -11,6 +11,7 @@
 /.next/
 /.next-audit/
 /.next-build-check/
+/.next-crm-local/
 /.audit-build-check/
 /out/
 

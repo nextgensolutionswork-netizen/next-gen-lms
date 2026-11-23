@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
-import { Batch, BatchTransferAudit, Student } from '@/types';
+import { Batch, BatchTransferAudit, Student, Course } from '@/types';
 import {
   createBatch,
   updateBatch,
@@ -34,6 +34,7 @@ import {
   getBatches,
   matchesBatchId,
   matchesTrainerId,
+  getCourses,
 } from '@/lib/services/academics-service';
 import { canAccessBatch } from '@/lib/auth/rbac';
 import { formatDate } from '@/lib/utils/formatters';
@@ -43,6 +44,7 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export default function BatchesPage() {
   const { user, role, hasPermission } = useAuth();
   const [batches, setBatches] = React.useState<Batch[]>(store.batches);
+  const [courses, setCourses] = React.useState<Course[]>(store.courses);
   const [transferAudits, setTransferAudits] = React.useState<BatchTransferAudit[]>(store.batchTransferAudits);
 
   // Modals
@@ -92,7 +94,7 @@ export default function BatchesPage() {
   // New Batch form state
   const [batchCode, setBatchCode] = React.useState('');
   const [batchName, setBatchName] = React.useState('');
-  const [courseId, setCourseId] = React.useState(store.courses[0]?.id || '');
+  const [courseId, setCourseId] = React.useState(courses[0]?.id || store.courses[0]?.id || '');
   const [trainerId, setTrainerId] = React.useState(
     store.users.find((u) => u.role === 'trainer')?.id || user?.id || ''
   );
@@ -104,12 +106,30 @@ export default function BatchesPage() {
   const [capacity, setCapacity] = React.useState(30);
   const [selectedDays, setSelectedDays] = React.useState<string[]>(['Mon', 'Wed', 'Fri']);
 
+  // Fetch authoritative courses and sync courseId
+  React.useEffect(() => {
+    let isMounted = true;
+    getCourses()
+      .then((authoritativeCourses) => {
+        if (isMounted && Array.isArray(authoritativeCourses) && authoritativeCourses.length > 0) {
+          setCourses(authoritativeCourses);
+          setCourseId((prev) => prev || authoritativeCourses[0].id);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch authoritative courses for batches:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Sync courseId & trainerId if store arrays change or load asynchronously
   React.useEffect(() => {
-    if (!courseId && store.courses.length > 0) {
-      setCourseId(store.courses[0].id);
+    if (!courseId && courses.length > 0) {
+      setCourseId(courses[0].id);
     }
-  }, [courseId]);
+  }, [courseId, courses]);
 
   React.useEffect(() => {
     if (!trainerId) {
@@ -657,7 +677,7 @@ export default function BatchesPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
                 Course *
               </label>
-              {store.courses.length === 0 ? (
+              {courses.length === 0 ? (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-medium">
                   No courses found. Please create a course first.
                 </div>
@@ -669,8 +689,8 @@ export default function BatchesPage() {
                   required
                 >
                   <option value="" disabled>Select a course</option>
-                  {store.courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.course_name}</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.course_name} ({c.course_code})</option>
                   ))}
                 </select>
               )}
@@ -793,7 +813,7 @@ export default function BatchesPage() {
               type="submit"
               variant="sap"
               size="sm"
-              disabled={store.courses.length === 0 || !courseId || !batchCode.trim() || !batchName.trim()}
+              disabled={courses.length === 0 || !courseId || !batchCode.trim() || !batchName.trim()}
             >
               Create Batch
             </Button>

@@ -271,29 +271,8 @@ export async function dbResolveDoubt(doubtId: string, resolvedBy: string, resolu
 // 4. CRM LEADS
 // ==========================================
 
-export async function dbGetLeads(): Promise<Lead[]> {
-  const db = getDb();
-  const { data, error } = await db.from('leads').select('*').order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-export async function dbCreateLead(lead: Lead): Promise<void> {
-  const db = getDb();
-  const { error } = await db.from('leads').insert({
-    lead_code: lead.lead_code,
-    full_name: lead.full_name,
-    phone: lead.phone,
-    email: lead.email,
-    current_status: lead.current_status,
-    experience_years: lead.experience_years,
-    training_preference: lead.training_preference,
-    lead_source: lead.lead_source,
-    stage: lead.stage,
-    notes: lead.notes,
-  });
-  if (error) throw error;
-}
+export async function dbGetLeads(): Promise<Lead[]> { return (await import('@/lib/services/crm-service')).getLeads(); }
+export async function dbCreateLead(lead: Lead): Promise<void> { await (await import('@/lib/services/crm-service')).createLead(lead); }
 
 // ==========================================
 // 5. AUDIT LOGS

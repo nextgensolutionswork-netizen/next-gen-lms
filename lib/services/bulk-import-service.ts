@@ -1,3 +1,5 @@
+import { cachedLeads } from './lead-cache';
+import { createLead } from './crm-service';
 import { store } from './data-store';
 import {
   Student,
@@ -464,7 +466,7 @@ export function validateLeadRows(
         errors.push({ rowNumber, field: 'email', message: msg, value: email, severity: 'warning' });
       } else {
         seenEmails.add(email);
-        const existingLead = store.leads.find((l) => l.email.toLowerCase() === email);
+        const existingLead = cachedLeads().find((l) => l.email.toLowerCase() === email);
         if (existingLead) {
           const msg = `Lead with email "${email}" already exists (Code: ${existingLead.lead_code})`;
           rowWarnings.push(msg);
@@ -716,7 +718,8 @@ export async function executeBulkImport(
   csvContent: string,
   userId: string = 'usr-admin',
   userName: string = 'Operations Head',
-  options: { skipInvalidRows?: boolean } = {}
+  options: { skipInvalidRows?: boolean } = {},
+  actor?: import('@/types').UserProfile
 ): Promise<BulkImportExecutionResult> {
   const preview = previewBulkImport(entityType, csvContent);
 
@@ -877,8 +880,8 @@ export async function executeBulkImport(
         updated_at: new Date().toISOString(),
       };
 
-      store.leads.unshift(newLead);
-      createdIds.push(newLead.id);
+      const saved = await createLead(newLead, actor);
+      createdIds.push(saved.id);
     }
   } else if (entityType === 'attendance') {
     for (const row of rowsToImport) {

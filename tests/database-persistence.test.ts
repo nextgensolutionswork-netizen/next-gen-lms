@@ -1,3 +1,4 @@
+import { fixtureActor } from './helpers/crm-fixtures';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import fs from 'fs';
@@ -201,6 +202,7 @@ describe('13. Data Persistence & Database Layer Tests', () => {
     });
 
     it('crmRepo creates and retrieves leads', async () => {
+      store.leads = (store.leads || []).filter((l) => l.phone !== '+91 98888 77777');
       const newLead: Lead = {
         id: `lead-repo-test-${Date.now()}`,
         lead_code: `LD-2026-TEST-${Date.now()}`,
@@ -217,11 +219,12 @@ describe('13. Data Persistence & Database Layer Tests', () => {
         updated_at: new Date().toISOString(),
       };
 
-      const created = await crmRepo.createLead(newLead);
-      expect(created.id).toBe(newLead.id);
+      const created = await crmRepo.createLead(newLead, fixtureActor());
+      expect(created.created_by).toBe(fixtureActor().id);
+      expect(created.full_name).toBe(newLead.full_name);
 
-      const allLeads = await crmRepo.getLeads();
-      expect(allLeads.some((l) => l.id === newLead.id)).toBe(true);
+      const allLeads = await crmRepo.getLeads(fixtureActor());
+      expect(allLeads.some((l) => l.id === created.id)).toBe(true);
     });
   });
 

@@ -1,3 +1,4 @@
+import { CRM_ROLES, canAccessLead, leadScope } from '@/lib/auth/lead-access';
 import { UserProfile, UserRole } from '@/types';
 import { store } from '@/lib/services/data-store';
 
@@ -216,6 +217,11 @@ export function applyRlsSelectPolicy(
   }
 
   // Super Admin bypasses all read restrictions across all tables
+  if (table === 'leads' || table === 'lead_followups') {
+    if (!user.is_active || !user.tenant_id || !CRM_ROLES.includes(user.role)) return [];
+    const scope = leadScope(user);
+    return records.filter(row => canAccessLead(scope, table === 'leads' ? row : store.leads.find(l => l.id === row.lead_id)));
+  }
   if (user.role === 'super_admin') {
     return [...records];
   }
@@ -462,6 +468,12 @@ export function checkRlsInsertPolicy(
     };
   }
 
+  if (table === 'leads' || table === 'lead_followups') {
+    const allowed = Boolean(user.is_active && user.tenant_id && CRM_ROLES.includes(user.role) &&
+      (table === 'leads' ? record.created_by === user.id && record.tenant_id === user.tenant_id :
+        record.counsellor_id === user.id && record.tenant_id === user.tenant_id && canAccessLead(leadScope(user), store.leads.find(l => l.id === record.lead_id))));
+    return { allowed, error: allowed ? undefined : 'Forbidden: CRM ownership required.' };
+  }
   if (user.role === 'super_admin') {
     return { allowed: true };
   }
@@ -589,6 +601,12 @@ export function checkRlsUpdatePolicy(
     };
   }
 
+  if (table === 'leads' || table === 'lead_followups') {
+    if (!user.is_active || !user.tenant_id || !CRM_ROLES.includes(user.role)) return { allowed: false, error: 'Forbidden: CRM membership required.' };
+    const immutable = table === 'leads' ? ['created_by', 'tenant_id', 'created_at'] : ['lead_id', 'tenant_id'];
+    if (immutable.some(key => key in updates && updates[key] !== existingRecord[key])) return { allowed: false, error: 'Forbidden: Immutable ownership.' };
+    return { allowed: canAccessLead(leadScope(user), table === 'leads' ? existingRecord : store.leads.find(l => l.id === existingRecord.lead_id)) };
+  }
   if (user.role === 'super_admin') {
     return { allowed: true };
   }

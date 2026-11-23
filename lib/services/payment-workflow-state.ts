@@ -26,6 +26,8 @@ export function visibleWorkflowSnapshot(actor: UserProfile): Partial<WorkflowSna
   const snapshot = workflowSnapshot(tenantId(actor));
   // Profiles and operational configuration are not part of a payment response.
   const { users, batches, leads, ...result } = snapshot;
+  // CRM history is served only through the parent-authorized CRM history endpoint.
+  result.auditLogs = result.auditLogs.filter(a => a.module?.toUpperCase() !== 'CRM');
   result.notifications = result.notifications.filter((n) => n.user_id === actor.id);
   if (actor.role === 'student' || actor.role === 'onboarding_team') {
     const allowed = new Set(result.students.filter((s) => actor.role === 'student' ? s.user_id === actor.id : result.onboardingCases.some((c) => c.student_id === s.id && c.assigned_staff_id === actor.id)).map((s) => s.id));

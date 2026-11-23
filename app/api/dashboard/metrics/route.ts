@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getLeads } from '@/lib/services/crm-service';
+import { CRM_ROLES } from '@/lib/auth/lead-access';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
 import { store } from '@/lib/services/data-store';
 import {
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const authorizedRoles = ['super_admin', 'admin', 'accountant', 'counsellor', 'onboarding_team'];
+    const authorizedRoles = ['super_admin', 'admin', 'accountant', 'counsellor', 'counsellor_lead', 'onboarding_team'];
     if (!authorizedRoles.includes(actor.role)) {
       return NextResponse.json(
         {
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
     const feeAccounts = filterTenant(store.feeAccounts || []);
     const expenses = filterTenant(store.expenses || []);
     const admissions = filterTenant(store.admissions || []);
-    const leads = filterTenant(store.leads || []);
+    const leads = CRM_ROLES.includes(actor.role) ? await getLeads({}, actor) : [];
 
     const courseIds = new Set(courses.map((c) => c.id));
     const matchesCourse = (cId?: string) => courseId === 'All' || courseBucket(cId, courseIds) === courseId;

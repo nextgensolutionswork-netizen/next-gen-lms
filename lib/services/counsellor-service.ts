@@ -41,7 +41,7 @@ export function isEligibleAdmissionsCounsellor(user: UserProfile | null | undefi
   }
 
   // Active counsellor accounts are always eligible
-  if (user.role === 'counsellor') {
+  if (user.role === 'counsellor' || user.role === 'counsellor_lead') {
     return true;
   }
 

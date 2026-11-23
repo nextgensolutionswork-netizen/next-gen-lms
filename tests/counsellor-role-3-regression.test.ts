@@ -61,6 +61,9 @@ function createMockAuthRequest(
 describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
   beforeEach(() => {
     store.hydrateFromDisk();
+    store.users = store.users.map(u => ({ ...u, tenant_id: u.tenant_id || 'default' }));
+    for (const id of ['lead-stage-001', 'lead-interaction-001']) store.leads.push({ id, created_by: '44444444-4444-4444-4444-444444444444', tenant_id: 'default', lead_code: 'TEST', full_name: 'Test', phone: '9876543210', email: 'test@example.com', stage: 'New', created_at: '', updated_at: '' });
+    store.persistSync();
   });
 
   // =========================================================================

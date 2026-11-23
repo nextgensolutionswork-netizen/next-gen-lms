@@ -1,5 +1,6 @@
 'use client';
 
+import { resetLeadCache } from '@/lib/services/lead-cache';
 import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UserProfile, UserRole, Permission } from '@/types';
@@ -37,6 +38,7 @@ const USER_ROLES: UserRole[] = [
   'admin',
   'accountant',
   'counsellor',
+  'counsellor_lead',
   'trainer',
   'placement_coordinator',
   'support',
@@ -229,14 +231,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (isMounted) {
             if (profile) {
-              setUser(profile);
+              resetLeadCache(profile?.id ?? null); store.leads = []; setUser(profile);
               setRole(profile.role);
               setAuthCookie(profile);
               if (typeof localStorage !== 'undefined') {
                 localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
               }
             } else {
-              setUser(null);
+              resetLeadCache(null); store.leads = []; setUser(null);
               clearAuthCookie();
             }
           }
@@ -244,10 +246,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // If no active session from Supabase, fall back to cached user or null
           const cached = getStoredUser();
           if (cached && isMounted) {
-            setUser(cached);
+            resetLeadCache(cached?.id ?? null); store.leads = []; setUser(cached);
             setRole(cached.role);
           } else if (isMounted) {
-            setUser(null);
+            resetLeadCache(null); store.leads = []; setUser(null);
             setRole('super_admin');
           }
         }
@@ -255,10 +257,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[AuthProvider] supabase.auth.getUser() error, falling back to cached session:', err);
         const cached = getStoredUser();
         if (cached && isMounted) {
-          setUser(cached);
+          resetLeadCache(cached?.id ?? null); store.leads = []; setUser(cached);
           setRole(cached.role);
         } else if (isMounted) {
-          setUser(null);
+          resetLeadCache(null); store.leads = []; setUser(null);
           clearAuthCookie();
         }
       } finally {
@@ -280,23 +282,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             void loadApplicationProfile(db, authUser).then((profile) => {
               if (!isMounted) return;
               if (profile) {
-                setUser(profile);
+                resetLeadCache(profile?.id ?? null); store.leads = []; setUser(profile);
                 setRole(profile.role);
                 setAuthCookie(profile);
               } else {
-                setUser(null);
+                resetLeadCache(null); store.leads = []; setUser(null);
                 clearAuthCookie();
               }
             }).catch((err) => {
               console.warn('[AuthProvider] Unable to load application profile:', err);
               if (isMounted) {
-                setUser(null);
+                resetLeadCache(null); store.leads = []; setUser(null);
                 clearAuthCookie();
               }
             });
           } else if (_event === 'SIGNED_OUT') {
             if (isMounted) {
-              setUser(null);
+              resetLeadCache(null); store.leads = []; setUser(null);
               setRole('super_admin');
               clearAuthCookie();
             }
@@ -360,7 +362,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (profile) {
               validateLoginPreflight(profile);
 
-              setUser(profile);
+              resetLeadCache(profile?.id ?? null); store.leads = []; setUser(profile);
               setRole(profile.role);
               await setAuthCookie(profile);
               if (typeof localStorage !== 'undefined') {
@@ -400,7 +402,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const matched = verification.user;
 
-      setUser(matched);
+      resetLeadCache(matched?.id ?? null); store.leads = []; setUser(matched);
       setRole(matched.role);
       await setAuthCookie(matched);
       if (typeof localStorage !== 'undefined') {
@@ -440,7 +442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(AUTH_COOKIE_NAME);
     }
 
-    setUser(null);
+    resetLeadCache(null); store.leads = []; setUser(null);
     setRole('super_admin');
 
     router.replace('/login');
@@ -460,7 +462,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
 
-    setUser(matched);
+    resetLeadCache(matched?.id ?? null); store.leads = []; setUser(matched);
     setRole(newRole);
     setAuthCookie(matched);
     if (typeof localStorage !== 'undefined') {

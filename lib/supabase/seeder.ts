@@ -78,22 +78,7 @@ export async function syncStoreToSupabase(): Promise<SeedSyncResult> {
     if (errSystems) errors.push(`sap_server_systems: ${errSystems.message}`);
     else syncedTables.push({ table: 'sap_server_systems', count: sysRows.length });
 
-    // 5. CRM Leads
-    const leadRows = store.leads.map((l) => ({
-      lead_code: l.lead_code,
-      full_name: l.full_name,
-      phone: l.phone,
-      email: l.email,
-      current_status: l.current_status,
-      experience_years: l.experience_years,
-      training_preference: l.training_preference,
-      lead_source: l.lead_source,
-      stage: l.stage,
-      notes: l.notes,
-    }));
-    const { error: errLeads } = await db.from('leads').upsert(leadRows, { onConflict: 'lead_code' });
-    if (errLeads) errors.push(`leads: ${errLeads.message}`);
-    else syncedTables.push({ table: 'leads', count: leadRows.length });
+    // Historical CRM records are never implicitly seeded or attributed.
 
     return {
       success: errors.length === 0,

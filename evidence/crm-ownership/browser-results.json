@@ -1,0 +1,19 @@
+{
+  "passed": 11,
+  "failed": 0,
+  "checks": [
+    "authenticated creation",
+    "cross-user list",
+    "direct ID denial",
+    "cross-user edit",
+    "immutable creator",
+    "admin access",
+    "Radhika scoped dashboard totals",
+    "Radhika browser visibility and stale-cache isolation",
+    "Mohan scoped dashboard totals",
+    "Mohan browser visibility and stale-cache isolation",
+    "browser runtime errors"
+  ],
+  "storage": "isolated temporary fixture",
+  "hostedRequests": "blocked"
+}

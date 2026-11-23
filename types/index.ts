@@ -3,6 +3,7 @@ export type UserRole =
   | 'admin'
   | 'accountant'
   | 'counsellor'
+  | 'counsellor_lead'
   | 'trainer'
   | 'placement_coordinator'
   | 'support'
@@ -115,6 +116,7 @@ export type LeadCurrentStatus =
 
 export interface Lead {
   id: string;
+  created_by?: string | null;
   tenant_id?: string;
   lead_code: string;
   full_name: string;
@@ -186,6 +188,7 @@ export interface Admission {
   course_id: string;
   course_name?: string;
   training_mode: 'Online' | 'Offline' | 'Classroom' | 'Hybrid';
+  training_category?: 'Normal Training' | 'Personal Training';
   batch_id?: string;
   batch_name?: string;
   trainer_id?: string;

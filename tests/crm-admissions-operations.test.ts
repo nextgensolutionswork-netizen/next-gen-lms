@@ -2,7 +2,7 @@ import { enteredPaymentVerification } from './payment-verification-fixture';
 import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { store } from '@/lib/services/data-store';
-import { createLead, updateLeadStage, completeFollowup, bulkAssignLeads, bulkUpdateLeadStage } from '@/lib/services/crm-service';
+import { createLead, updateLeadStage, completeFollowup, bulkAssignLeads, bulkUpdateLeadStage } from './helpers/crm-fixtures';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { getStudents, getStudentProfileFullDetails } from '@/lib/services/student-service';
 
@@ -22,6 +22,7 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
     store.users = [
       {
         id: counsellorId,
+        tenant_id: 'default',
         email: 'counsellor@lms.internal',
         full_name: 'Ananya Desai',
         role: 'counsellor',
@@ -51,6 +52,11 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
         updated_at: new Date().toISOString(),
       },
     ];
+
+    // Ensure test leads do not collide across test iterations
+    store.leads = (store.leads || []).filter(
+      (l) => !l.phone?.includes('98888 12345') && !l.phone?.includes('97777 54321') && !l.phone?.includes('90001 00001') && !l.phone?.includes('90002 00002') && !l.phone?.includes('91234 56789')
+    );
 
     // Ensure batches have available capacity for admission tests
     store.batches.forEach((b) => {
@@ -125,14 +131,12 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
         full_name: 'Bulk Candidate 1',
         phone: '+91 90001 00001',
         email: 'bulk1@example.com',
-        counsellor_id: 'usr-unassigned',
         stage: 'New',
       });
       const l2 = await createLead({
         full_name: 'Bulk Candidate 2',
         phone: '+91 90002 00002',
         email: 'bulk2@example.com',
-        counsellor_id: 'usr-unassigned',
         stage: 'New',
       });
 
@@ -142,10 +146,11 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
       expect(store.leads.find((l) => l.id === l1.id)?.counsellor_id).toBe(counsellorId);
       expect(store.leads.find((l) => l.id === l2.id)?.counsellor_id).toBe(counsellorId);
 
+      await expect(bulkUpdateLeadStage([l1.id, l2.id], 'Demo Scheduled', counsellorId)).rejects.toThrow('Forbidden');
       const stageCount = await bulkUpdateLeadStage(
         [l1.id, l2.id],
         'Demo Scheduled',
-        counsellorId,
+        'usr-admin',
         'Batch weekend demo scheduled',
         '2026-10-25T14:00:00'
       );
@@ -170,7 +175,7 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
         expect(lead.id).toBeDefined();
         expect(lead.interested_course_name).toBeUndefined();
 
-        const { admissionPrefill } = await import('@/lib/services/crm-service').then(m => m.convertLeadToAdmission(lead.id));
+        const { admissionPrefill } = await import('./helpers/crm-fixtures').then(m => m.convertLeadToAdmission(lead.id));
         expect(admissionPrefill.course_fee).toBe(0);
         expect(admissionPrefill.city).toBe('');
       } finally {

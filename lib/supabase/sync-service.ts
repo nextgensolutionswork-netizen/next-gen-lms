@@ -236,35 +236,7 @@ export async function syncLocalToPostgres(): Promise<SyncResult> {
     errors.push(`students: ${err.message}`);
   }
 
-  // 4. Leads
-  try {
-    for (const l of store.leads) {
-      const { error } = await db.from('leads').upsert({
-        id: l.id,
-        lead_code: l.lead_code,
-        full_name: l.full_name,
-        phone: l.phone,
-        email: l.email,
-        interested_course_id: l.interested_course_id,
-        current_status: l.current_status,
-        experience_years: l.experience_years,
-        training_preference: l.training_preference,
-        lead_source: l.lead_source,
-        campaign: l.campaign,
-        counsellor_id: l.counsellor_id,
-        stage: l.stage,
-        notes: l.notes,
-      });
-      if (error) {
-        errors.push(`leads (${l.id}): ${error.message}`);
-      } else {
-        totalSynced++;
-      }
-    }
-    syncedTables.push('leads');
-  } catch (err: any) {
-    errors.push(`leads: ${err.message}`);
-  }
+  // Lead mutations are persisted through the authenticated CRM API, never snapshot upserts.
 
   // 5. Attendance Records
   try {
@@ -473,21 +445,8 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
 
   try {
     // 2. Pull Leads
-    const { data: leads, error: lErr } = await db.from('leads').select('*');
-    if (lErr) {
-      errors.push(`leads pull: ${lErr.message}`);
-    } else if (leads) {
-      for (const l of leads) {
-        const idx = store.leads.findIndex((item) => item.id === l.id);
-        if (idx >= 0) {
-          store.leads[idx] = { ...store.leads[idx], ...l };
-        } else {
-          store.leads.push(l);
-        }
-        totalSynced++;
-      }
-      syncedTables.push('leads');
-    }
+    // Read through the scoped CRM API; replace, never merge, the visible snapshot.
+    if (typeof window !== 'undefined') store.leads = await (await import('@/lib/services/crm-service')).getLeads();
   } catch (err: any) {
     errors.push(`leads pull: ${err.message}`);
   }

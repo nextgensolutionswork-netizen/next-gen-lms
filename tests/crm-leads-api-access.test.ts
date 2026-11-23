@@ -20,8 +20,8 @@ it.each([{ role: 'student', tenant_id: 'default' }, { role: 'admin', tenant_id: 
   expect(mocks.create).not.toHaveBeenCalled();
 });
 it('binds a counsellor submission to the authenticated staff member', async () => {
-  mocks.auth.mockResolvedValue({ id: 'staff-1', role: 'counsellor', tenant_id: 'default' });
+  mocks.auth.mockResolvedValue({ id: 'staff-1', role: 'counsellor', tenant_id: 'default', is_active: true });
   mocks.create.mockResolvedValue({ id: 'saved' });
   expect((await POST(request())).status).toBe(200);
-  expect(mocks.create).toHaveBeenCalledWith({ full_name: 'Test', counsellor_id: 'staff-1' });
+  expect(mocks.create).toHaveBeenCalledWith({ full_name: 'Test', counsellor_id: 'staff-1' }, expect.objectContaining({ id: 'staff-1', is_active: true }));
 });

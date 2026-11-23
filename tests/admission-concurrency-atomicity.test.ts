@@ -34,7 +34,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
     store.students = [...originalStudents];
     store.feeAccounts = [...originalFeeAccounts];
     store.leads = [...originalLeads];
-    store.users = [...originalUsers];
+    store.users = [counsellorUser, ...originalUsers.filter(u => u.id !== counsellorUser.id)];
   });
 
   afterEach(() => {
@@ -42,7 +42,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
     store.students = [...originalStudents];
     store.feeAccounts = [...originalFeeAccounts];
     store.leads = [...originalLeads];
-    store.users = [...originalUsers];
+    store.users = [counsellorUser, ...originalUsers.filter(u => u.id !== counsellorUser.id)];
     vi.restoreAllMocks();
   });
 
@@ -61,6 +61,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
 
   it('2. Simultaneous concurrent admission creations allocate distinct, monotonic numbers', async () => {
     const lead1: Lead = {
+      created_by: counsellorUser.id,
       id: '11111111-2222-3333-4444-555555555551',
       tenant_id: 'default',
       lead_code: 'LEAD-2026-CONC-1',
@@ -74,6 +75,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
       updated_at: new Date().toISOString(),
     };
     const lead2: Lead = {
+      created_by: counsellorUser.id,
       id: '11111111-2222-3333-4444-555555555552',
       tenant_id: 'default',
       lead_code: 'LEAD-2026-CONC-2',
@@ -151,6 +153,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
 
   it('3. Transaction atomicity: On commit failure, rollback restores in-memory store and lead stage', async () => {
     const lead: Lead = {
+      created_by: counsellorUser.id,
       id: '22222222-3333-4444-5555-666666666666',
       tenant_id: 'default',
       lead_code: 'LEAD-2026-FAIL-1',
@@ -218,6 +221,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
 
   it('4. Idempotent re-conversion returns existing admission without incrementing sequence', async () => {
     const lead: Lead = {
+      created_by: counsellorUser.id,
       id: '33333333-4444-5555-6666-777777777777',
       tenant_id: 'default',
       lead_code: 'LEAD-2026-IDEM-1',
@@ -268,6 +272,7 @@ describe('BUG-11 Task 1 & 2: Admission Number Concurrency & Transaction Atomicit
 
   it('5. Unique RFC-4122 UUID cross-linkage across Admission -> Student -> FeeAccount', async () => {
     const lead: Lead = {
+      created_by: counsellorUser.id,
       id: '44444444-5555-6666-7777-888888888888',
       tenant_id: 'default',
       lead_code: 'LEAD-2026-UUID-1',

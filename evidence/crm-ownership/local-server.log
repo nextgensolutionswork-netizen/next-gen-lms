@@ -1,0 +1,39 @@
+▲ Next.js 16.4.6 (webpack)
+- Local:         http://localhost:3097
+- Network:       http://localhost:3097
+- Environments: .env.local
+✓ Ready in 2.3s
+✓ Running next.config.mjs took 93ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+○ Compiling /login/page ...
+ GET /login 200 in 13.0s (next.js: 10.9s, proxy.ts: 703ms, application-code: 1397ms)
+○ Compiling /api/crm/leads/route ...
+ POST /api/crm/leads 200 in 8.0s (next.js: 6.5s, proxy.ts: 91ms, application-code: 1462ms)
+ GET /api/crm/leads 200 in 169ms (next.js: 18ms, proxy.ts: 121ms, application-code: 30ms)
+ GET /api/crm/leads?leadId=11bd0567-7085-45a8-95fb-45173e1d8b63 403 in 58ms (next.js: 11ms, proxy.ts: 21ms, application-code: 25ms)
+ PATCH /api/crm/leads 403 in 62ms (next.js: 9ms, proxy.ts: 22ms, application-code: 32ms)
+ PATCH /api/crm/leads 403 in 53ms (next.js: 6ms, proxy.ts: 17ms, application-code: 30ms)
+ GET /api/crm/leads 200 in 50ms (next.js: 8ms, proxy.ts: 18ms, application-code: 24ms)
+○ Compiling /(dashboard)/crm/leads/page ...
+ GET /crm/leads 200 in 10.6s (next.js: 9.2s, proxy.ts: 34ms, application-code: 1402ms)
+ GET /api/crm/leads?stage=All 200 in 3.8s (next.js: 2.8s, proxy.ts: 117ms, application-code: 899ms)
+ GET /api/crm/leads?stage=All 200 in 3.8s (next.js: 2.8s, proxy.ts: 125ms, application-code: 901ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 3.8s (next.js: 2.8s, proxy.ts: 115ms, application-code: 903ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 3.8s (next.js: 2.8s, proxy.ts: 121ms, application-code: 907ms)
+ GET /api/workflow/notifications 200 in 3.8s (next.js: 2.8s, proxy.ts: 119ms, application-code: 908ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 54ms (next.js: 9ms, proxy.ts: 22ms, application-code: 23ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 49ms (next.js: 9ms, proxy.ts: 17ms, application-code: 24ms)
+ GET /crm/leads 200 in 2.3s (next.js: 373ms, proxy.ts: 39ms, application-code: 1903ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 170ms (next.js: 33ms, proxy.ts: 29ms, application-code: 107ms)
+ GET /api/crm/leads?stage=All 200 in 219ms (next.js: 31ms, proxy.ts: 67ms, application-code: 121ms)
+ GET /api/workflow/notifications 200 in 221ms (next.js: 53ms, proxy.ts: 71ms, application-code: 97ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 211ms (next.js: 75ms, proxy.ts: 75ms, application-code: 60ms)
+ GET /api/crm/leads?stage=All 200 in 212ms (next.js: 102ms, proxy.ts: 78ms, application-code: 32ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 85ms (next.js: 7ms, proxy.ts: 16ms, application-code: 63ms)
+ GET /api/crm/summary?search=&stage=All&training_preference=&lead_source=&created_by=&counsellor_id=&course_id=&team_id=&from=&to= 200 in 58ms (next.js: 8ms, proxy.ts: 27ms, application-code: 23ms)

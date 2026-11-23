@@ -19,8 +19,63 @@ import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { validateAssignmentDeadline, getInstituteTimezone } from '@/lib/utils/assignment-date';
 
+// --- Canonical Course UUID Mapping & Helper Functions ---
+export const CANONICAL_COURSE_UUID_MAP: Record<string, string> = {
+  // Legacy courses
+  'crs-fico-01': 'c1000000-0000-0000-0000-000000000001',
+  'c1000000-0000-0000-0000-000000000001': 'c1000000-0000-0000-0000-000000000001',
+  'crs-mm-01': 'c1000000-0000-0000-0000-000000000002',
+  'c1000000-0000-0000-0000-000000000002': 'c1000000-0000-0000-0000-000000000002',
+  'crs-sd-01': 'c1000000-0000-0000-0000-000000000003',
+  'c1000000-0000-0000-0000-000000000003': 'c1000000-0000-0000-0000-000000000003',
+  'crs-abap-01': 'c1000000-0000-0000-0000-000000000004',
+  'c1000000-0000-0000-0000-000000000004': 'c1000000-0000-0000-0000-000000000004',
+
+  // Four Authoritative Configured Training Courses
+  'c1000000-0000-4000-a000-000000000101': 'c1000000-0000-4000-a000-000000000101',
+  'SAP FICO 101': 'c1000000-0000-4000-a000-000000000101',
+  'c1000000-0000-4000-a000-000000000102': 'c1000000-0000-4000-a000-000000000102',
+  'SAP FICO 102': 'c1000000-0000-4000-a000-000000000102',
+  'c1000000-0000-4000-a000-000000000103': 'c1000000-0000-4000-a000-000000000103',
+  'SAP MM 103': 'c1000000-0000-4000-a000-000000000103',
+  'c1000000-0000-4000-a000-000000000104': 'c1000000-0000-4000-a000-000000000104',
+  'SAP ABAP 104': 'c1000000-0000-4000-a000-000000000104',
+};
+
+export function resolveCanonicalCourseUuid(courseId: string | null | undefined): string | undefined {
+  if (!courseId || typeof courseId !== 'string') return undefined;
+  const trimmed = courseId.trim();
+  if (CANONICAL_COURSE_UUID_MAP[trimmed]) {
+    return CANONICAL_COURSE_UUID_MAP[trimmed];
+  }
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed;
+  }
+  const matching = store.courses.find(
+    (c) =>
+      c.id.toLowerCase() === trimmed.toLowerCase() ||
+      c.course_code?.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (matching && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matching.id)) {
+    return matching.id;
+  }
+  return undefined;
+}
+
+export function matchesCourseId(
+  courseIdA: string | undefined | null,
+  courseIdB: string | undefined | null
+): boolean {
+  if (!courseIdA || !courseIdB) return false;
+  if (courseIdA === courseIdB) return true;
+  const canonicalA = CANONICAL_COURSE_UUID_MAP[courseIdA] || resolveCanonicalCourseUuid(courseIdA) || courseIdA;
+  const canonicalB = CANONICAL_COURSE_UUID_MAP[courseIdB] || resolveCanonicalCourseUuid(courseIdB) || courseIdB;
+  return canonicalA === canonicalB;
+}
+
 // --- Courses, Modules & Lessons ---
 export async function getCourses(): Promise<Course[]> {
+  store.reconcileAuthoritativeCourses();
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
@@ -29,71 +84,129 @@ export async function getCourses(): Promise<Course[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        store.courses = data as Course[];
-        return data as Course[];
+      if (error) {
+        throw new Error(`Failed to load courses from Supabase: ${error.message}`);
       }
-    } catch (err) {
-      console.warn('Supabase courses query error, fallback to local persistent store:', err);
+
+      if (data) {
+        const remoteCourses = data as Course[];
+        // Ensure all authoritative configured courses are present in the remote list
+        for (const auth of (store.constructor as any).AUTHORITATIVE_TRAINING_COURSES || []) {
+          const exists = remoteCourses.some(
+            (c) =>
+              c.course_code?.trim().toUpperCase() === auth.course_code.toUpperCase() ||
+              c.id === auth.id
+          );
+          if (!exists) {
+            remoteCourses.push(auth);
+          }
+        }
+        store.courses = remoteCourses;
+        return remoteCourses;
+      }
+    } catch (err: any) {
+      console.error('Authoritative courses query failed:', err.message);
+      throw new Error(`Authoritative course registry unavailable: ${err.message}`);
     }
   }
   return [...store.courses];
 }
 
 export async function getCourseById(id: string): Promise<Course | undefined> {
+  store.reconcileAuthoritativeCourses();
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
+      const canonicalId = resolveCanonicalCourseUuid(id) || id;
       const { data, error } = await supabase
         .from('courses')
         .select('*')
-        .eq('id', id)
+        .eq('id', canonicalId)
         .maybeSingle();
 
-      if (!error && data) {
-        return data as Course;
+      if (error) {
+        throw new Error(`Database error fetching course "${id}": ${error.message}`);
       }
-    } catch (err) {
-      console.warn('Supabase getCourseById error, checking local store:', err);
+      if (data) return data as Course;
+    } catch (err: any) {
+      throw new Error(`Authoritative getCourseById failed: ${err.message}`);
     }
   }
-  return store.courses.find((c) => c.id === id);
+  return store.courses.find((c) => c.id === id || matchesCourseId(c.id, id));
 }
 
-export async function createCourse(data: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<Course> {
-  const newCourse: Course = {
-    ...data,
-    id: `crs-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    modules_count: 0,
-    lessons_count: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  store.courses.unshift(newCourse);
-  store.persist();
+export async function createCourse(data: Omit<Course, 'id' | 'created_at' | 'updated_at'> & { id?: string }): Promise<Course> {
+  if (!data.course_name?.trim()) throw new Error('Course name is required.');
+  if (!data.course_code?.trim()) throw new Error('Course code is required.');
+
+  const codeNorm = data.course_code.trim().toLowerCase();
+  const nameNorm = data.course_name.trim().toLowerCase();
+
+  // Deduplication check: prevent creating duplicate courses
+  const existing = store.courses.find(
+    (c) => c.course_code.trim().toLowerCase() === codeNorm || c.course_name.trim().toLowerCase() === nameNorm
+  );
+  if (existing) {
+    throw new Error(`A course with code "${data.course_code}" or name "${data.course_name}" already exists.`);
+  }
+
+  // Generate valid RFC 4122 v4 UUID (reuse valid UUID if supplied)
+  const courseId = data.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id)
+    ? data.id
+    : globalThis.crypto.randomUUID();
+  const now = new Date().toISOString();
 
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      await supabase.from('courses').insert({
-        id: newCourse.id,
-        course_name: newCourse.course_name,
-        course_code: newCourse.course_code,
-        description: newCourse.description,
-        duration_weeks: newCourse.duration_weeks,
-        category: newCourse.category,
-        trainer_id: newCourse.trainer_id,
-        thumbnail_url: newCourse.thumbnail_url,
-        syllabus_url: newCourse.syllabus_url,
-        price: newCourse.price,
-        status: newCourse.status,
-        created_at: newCourse.created_at,
-        updated_at: newCourse.updated_at,
-      });
-    } catch (err) {
-      console.warn('Supabase createCourse direct query warning, preserved locally:', err);
+      const insertPayload = {
+        id: courseId,
+        course_name: data.course_name.trim(),
+        course_code: data.course_code.trim(),
+        description: data.description || '',
+        duration_weeks: data.duration_weeks || 10,
+        category: data.category || 'SAP Functional',
+        trainer_id: data.trainer_id || null,
+        thumbnail_url: data.thumbnail_url || null,
+        syllabus_url: data.syllabus_url || null,
+        price: data.price ?? 0,
+        status: data.status || 'Published',
+        created_at: now,
+        updated_at: now,
+      };
+
+      const { data: inserted, error } = await supabase
+        .from('courses')
+        .insert(insertPayload)
+        .select('*')
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to persist course to database: ${error.message}`);
+      }
+      if (!inserted) {
+        throw new Error('Database failed to return created course record.');
+      }
+    } catch (err: any) {
+      throw new Error(`Course creation aborted due to database persistence failure: ${err.message}`);
     }
   }
+
+  const newCourse: Course = {
+    ...data,
+    id: courseId,
+    course_name: data.course_name.trim(),
+    course_code: data.course_code.trim(),
+    price: data.price ?? 0,
+    status: data.status || 'Published',
+    modules_count: 0,
+    lessons_count: 0,
+    created_at: now,
+    updated_at: now,
+  };
+
+  store.courses.unshift(newCourse);
+  store.persist();
 
   return newCourse;
 }
@@ -102,56 +215,107 @@ export async function updateCourse(
   courseId: string,
   data: Partial<Omit<Course, 'id' | 'created_at'>>
 ): Promise<Course> {
-  const course = store.courses.find((c) => c.id === courseId);
+  const course = store.courses.find((c) => c.id === courseId || matchesCourseId(c.id, courseId));
   if (!course) throw new Error(`Course not found: ${courseId}`);
 
-  Object.assign(course, data, { updated_at: new Date().toISOString() });
-  store.persist();
+  // Validation: if course_name or course_code is updated, check duplicates
+  if (data.course_code && data.course_code.trim().toLowerCase() !== course.course_code.trim().toLowerCase()) {
+    const codeNorm = data.course_code.trim().toLowerCase();
+    const existing = store.courses.find((c) => c.id !== course.id && c.course_code.trim().toLowerCase() === codeNorm);
+    if (existing) {
+      throw new Error(`A course with code "${data.course_code}" already exists.`);
+    }
+  }
+  if (data.course_name && data.course_name.trim().toLowerCase() !== course.course_name.trim().toLowerCase()) {
+    const nameNorm = data.course_name.trim().toLowerCase();
+    const existing = store.courses.find((c) => c.id !== course.id && c.course_name.trim().toLowerCase() === nameNorm);
+    if (existing) {
+      throw new Error(`A course with name "${data.course_name}" already exists.`);
+    }
+  }
+
+  const updatedPayload = {
+    ...data,
+    course_name: data.course_name !== undefined ? data.course_name.trim() : course.course_name,
+    course_code: data.course_code !== undefined ? data.course_code.trim() : course.course_code,
+    updated_at: new Date().toISOString(),
+  };
 
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      await supabase
+      const { data: updatedRecord, error } = await supabase
         .from('courses')
         .update({
-          course_name: course.course_name,
-          course_code: course.course_code,
-          description: course.description,
-          duration_weeks: course.duration_weeks,
-          category: course.category,
-          trainer_id: course.trainer_id,
-          thumbnail_url: course.thumbnail_url,
-          syllabus_url: course.syllabus_url,
-          price: course.price,
-          status: course.status,
-          updated_at: course.updated_at,
+          course_name: updatedPayload.course_name,
+          course_code: updatedPayload.course_code,
+          description: updatedPayload.description ?? course.description,
+          duration_weeks: updatedPayload.duration_weeks ?? course.duration_weeks,
+          category: updatedPayload.category ?? course.category,
+          trainer_id: updatedPayload.trainer_id ?? course.trainer_id,
+          thumbnail_url: updatedPayload.thumbnail_url ?? course.thumbnail_url,
+          syllabus_url: updatedPayload.syllabus_url ?? course.syllabus_url,
+          price: updatedPayload.price ?? course.price,
+          status: updatedPayload.status ?? course.status,
+          updated_at: updatedPayload.updated_at,
         })
-        .eq('id', courseId);
-    } catch (err) {
-      console.warn('Supabase updateCourse direct query warning, preserved locally:', err);
+        .eq('id', course.id)
+        .select('*')
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to update course in database: ${error.message}`);
+      }
+      if (!updatedRecord) {
+        throw new Error('Database failed to return updated course record.');
+      }
+    } catch (err: any) {
+      throw new Error(`Course update aborted due to database failure: ${err.message}`);
     }
   }
+
+  Object.assign(course, updatedPayload);
+  store.persist();
+
   return course;
 }
 
 export async function deleteCourse(courseId: string): Promise<boolean> {
-  const index = store.courses.findIndex((c) => c.id === courseId);
+  const index = store.courses.findIndex((c) => c.id === courseId || matchesCourseId(c.id, courseId));
   if (index === -1) return false;
 
-  store.courses.splice(index, 1);
-  // Clean up associated modules and lessons
-  store.modules = store.modules.filter((m) => m.course_id !== courseId);
-  store.lessons = store.lessons.filter((l) => l.course_id !== courseId);
-  store.persist();
+  const targetCourse = store.courses[index];
+
+  // Preserve production data and existing course relationships (Requirement 8):
+  // Do not delete historical courses with student, admission, batch, or financial references
+  const hasAdmissions = (store.admissions || []).some((a) => matchesCourseId(a.course_id, targetCourse.id));
+  const hasStudents = (store.students || []).some((s) => matchesCourseId(s.course_id, targetCourse.id));
+  const hasBatches = (store.batches || []).some((b) => matchesCourseId(b.course_id, targetCourse.id));
+  const hasFeeAccounts = (store.feeAccounts || []).some((f) => matchesCourseId(f.course_id, targetCourse.id));
+
+  if (hasAdmissions || hasStudents || hasBatches || hasFeeAccounts) {
+    throw new Error(
+      `Cannot delete course "${targetCourse.course_name}" because it has active student, admission, batch, or financial references. Please archive the course instead to preserve data integrity.`
+    );
+  }
 
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
-      await supabase.from('courses').delete().eq('id', courseId);
-    } catch (err) {
-      console.warn('Supabase deleteCourse direct query warning, preserved locally:', err);
+      const { error } = await supabase.from('courses').delete().eq('id', targetCourse.id);
+      if (error) {
+        throw new Error(`Failed to delete course from database: ${error.message}`);
+      }
+    } catch (err: any) {
+      throw new Error(`Course deletion aborted due to database failure: ${err.message}`);
     }
   }
+
+  store.courses.splice(index, 1);
+  store.modules = store.modules.filter((m) => !matchesCourseId(m.course_id, targetCourse.id));
+  store.lessons = store.lessons.filter((l) => !matchesCourseId(l.course_id, targetCourse.id));
+  store.persist();
+
   return true;
 }
 

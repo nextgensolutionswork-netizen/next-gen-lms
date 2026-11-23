@@ -511,6 +511,7 @@ export default function UsersPage() {
               <option value="admin">{getRoleLabel('admin')}</option>
               <option value="trainer">Trainer</option>
               <option value="accountant">Accountant</option>
+              <option value="counsellor_lead">Counsellor Lead</option>
               <option value="counsellor">{getRoleLabel('counsellor')}</option>
               <option value="placement_coordinator">Placement Head</option>
               <option value="support">Academic Support</option>
@@ -786,6 +787,7 @@ export default function UsersPage() {
               <option value="trainer">Trainer (Assigned Courses Only)</option>
               <option value="support">Academic Support Mentor</option>
               <option value="accountant">Accountant (Financial Ledgers Only)</option>
+              <option value="counsellor_lead">Counsellor Lead</option>
               <option value="counsellor">{getRoleLabel('counsellor')} (CRM & Admissions)</option>
               <option value="placement_coordinator">Placement Coordinator</option>
               <option value="student">Student Account</option>
@@ -1035,6 +1037,7 @@ export default function UsersPage() {
               <option value="trainer">Trainer (Assigned Courses Only)</option>
               <option value="support">Academic Support Mentor</option>
               <option value="accountant">Accountant (Financial Ledgers Only)</option>
+              <option value="counsellor_lead">Counsellor Lead</option>
               <option value="counsellor">{getRoleLabel('counsellor')} (CRM & Admissions)</option>
               <option value="placement_coordinator">Placement Coordinator</option>
               <option value="student">Student Account</option>
