@@ -16,46 +16,71 @@ CREATE TABLE IF NOT EXISTS public.admission_sequences (
   PRIMARY KEY (tenant_id, year)
 );
 
+ALTER TABLE public.admission_sequences ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 ALTER TABLE public.admission_sequences ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.admission_sequences FROM PUBLIC, anon, authenticated;
-GRANT ALL ON TABLE public.admission_sequences TO service_role;
+GRANT ALL ON TABLE public.admission_sequences TO service_role, postgres;
 
--- 2. Seed existing sequences for default-tenant / 2026
+-- 2. Seed existing sequences dynamically from admissions, fee_workflow_state, and leads
 DO $$
 DECLARE
-  v_tenant text := 'default-tenant';
+  r_tenant record;
   v_year integer := 2026;
   v_max_seq integer := 0;
   v_snap_seq integer := 0;
   v_lead_seq integer := 0;
 BEGIN
-  -- Max from admissions table
-  SELECT COALESCE(MAX(SUBSTRING(admission_number FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
-  INTO v_max_seq
-  FROM public.admissions
-  WHERE admission_number LIKE 'ADM-' || v_year || '-%';
+  -- Identify all active tenants from admissions, fee_workflow_state, or default
+  FOR r_tenant IN (
+    SELECT DISTINCT tenant_id FROM (
+      SELECT tenant_id FROM public.fee_workflow_state
+      UNION
+      SELECT 'default' AS tenant_id
+    ) t
+    WHERE tenant_id IS NOT NULL AND tenant_id <> ''
+  ) LOOP
+    -- 1. Max sequence from admissions table (handling both with/without tenant_id column)
+    v_max_seq := 0;
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'admissions' AND column_name = 'tenant_id'
+    ) THEN
+      EXECUTE format(
+        'SELECT COALESCE(MAX(SUBSTRING(admission_number FROM ''ADM-[0-9]+-([0-9]+)'')::integer), 0)
+         FROM public.admissions
+         WHERE tenant_id = %L AND admission_number LIKE %L',
+        r_tenant.tenant_id, 'ADM-' || v_year || '-%'
+      ) INTO v_max_seq;
+    ELSE
+      SELECT COALESCE(MAX(SUBSTRING(admission_number FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
+      INTO v_max_seq
+      FROM public.admissions
+      WHERE admission_number LIKE 'ADM-' || v_year || '-%';
+    END IF;
 
-  -- Max from fee_workflow_state JSON snapshot
-  SELECT COALESCE(MAX(SUBSTRING(elem->>'admission_number' FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
-  INTO v_snap_seq
-  FROM public.fee_workflow_state fws,
-       jsonb_array_elements(COALESCE(fws.snapshot->'admissions', '[]'::jsonb)) AS elem
-  WHERE fws.tenant_id = v_tenant
-    AND elem->>'admission_number' LIKE 'ADM-' || v_year || '-%';
+    -- 2. Max sequence from fee_workflow_state JSON snapshot
+    SELECT COALESCE(MAX(SUBSTRING(elem->>'admission_number' FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
+    INTO v_snap_seq
+    FROM public.fee_workflow_state fws,
+         jsonb_array_elements(COALESCE(fws.snapshot->'admissions', '[]'::jsonb)) AS elem
+    WHERE fws.tenant_id = r_tenant.tenant_id
+      AND elem->>'admission_number' LIKE 'ADM-' || v_year || '-%';
 
-  -- Max from leads notes (historical conversion references)
-  SELECT COALESCE(MAX(SUBSTRING(notes FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
-  INTO v_lead_seq
-  FROM public.leads
-  WHERE notes LIKE '%ADM-' || v_year || '-%';
+    -- 3. Max sequence from leads notes (conversion references)
+    SELECT COALESCE(MAX(SUBSTRING(notes FROM 'ADM-[0-9]+-([0-9]+)')::integer), 0)
+    INTO v_lead_seq
+    FROM public.leads
+    WHERE notes LIKE '%ADM-' || v_year || '-%';
 
-  v_max_seq := GREATEST(v_max_seq, v_snap_seq, v_lead_seq);
+    v_max_seq := GREATEST(v_max_seq, v_snap_seq, CASE WHEN r_tenant.tenant_id = 'default' THEN v_lead_seq ELSE 0 END);
 
-  INSERT INTO public.admission_sequences (tenant_id, year, last_sequence, updated_at)
-  VALUES (v_tenant, v_year, v_max_seq, now())
-  ON CONFLICT (tenant_id, year) DO UPDATE
-    SET last_sequence = GREATEST(public.admission_sequences.last_sequence, EXCLUDED.last_sequence),
-        updated_at = now();
+    INSERT INTO public.admission_sequences (tenant_id, year, last_sequence, updated_at)
+    VALUES (r_tenant.tenant_id, v_year, v_max_seq, now())
+    ON CONFLICT (tenant_id, year) DO UPDATE
+      SET last_sequence = GREATEST(public.admission_sequences.last_sequence, EXCLUDED.last_sequence),
+          updated_at = now();
+  END LOOP;
 END $$;
 
 -- 3. Atomic Admission Number Allocation Function
@@ -70,7 +95,7 @@ DECLARE
   v_adm_num text;
 BEGIN
   IF p_tenant IS NULL OR p_tenant = '' THEN
-    p_tenant := 'default-tenant';
+    p_tenant := 'default';
   END IF;
   IF p_year IS NULL OR p_year < 2000 THEN
     p_year := EXTRACT(YEAR FROM CURRENT_DATE)::integer;
@@ -94,7 +119,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.allocate_admission_number(text, integer) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.allocate_admission_number(text, integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.allocate_admission_number(text, integer) TO service_role, postgres;
 
 -- 4. Atomic fee workflow commit including CRM lead sync and uniqueness checks
 CREATE OR REPLACE FUNCTION public.commit_fee_workflow(p_tenant text, p_revision bigint, p_snapshot jsonb)
@@ -184,7 +209,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.commit_fee_workflow(text, bigint, jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.commit_fee_workflow(text, bigint, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.commit_fee_workflow(text, bigint, jsonb) TO service_role, postgres;
 
 -- 5. Unique Index on Admissions (tenant_id, admission_number)
 DO $$
@@ -205,3 +230,6 @@ BEGIN
     END IF;
   END IF;
 END $$;
+
+-- 6. Reload PostgREST schema cache
+NOTIFY pgrst, 'reload schema';
