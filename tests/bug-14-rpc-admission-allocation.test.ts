@@ -14,9 +14,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { store } from '@/lib/services/data-store';
 import {
-  registerAdmission,
   createAdmissionWorkflow,
-  getNextAdmissionSequence,
   CreateAdmissionInput,
 } from '@/lib/services/admission-service';
 import { generateAdmissionNumber } from '@/lib/utils/formatters';
@@ -50,6 +48,32 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
     created_at: '2026-11-23T05:51:20.987Z',
     updated_at: '2026-11-23T05:51:20.987Z',
   };
+
+  /**
+   * Authoritative, strongly-typed test fixture factory to ensure complete
+   * CreateAdmissionInput conformity without schema drift.
+   */
+  function createValidAdmissionInput(overrides: Partial<CreateAdmissionInput> = {}): CreateAdmissionInput {
+    return {
+      student_name: 'Live Test Student',
+      phone: '+91 98111 22233',
+      email: 'test@gmail.com',
+      dob: '2000-01-15',
+      gender: 'Male',
+      address: '123 MG Road, Tech Park',
+      city: 'Bengaluru',
+      education: 'B.Tech',
+      experience_years: 1,
+      current_employment_status: 'Employed',
+      course_id: 'crs-fico-01',
+      admission_date: '2026-11-23',
+      course_fee: 45000,
+      discount: 0,
+      payment_plan: 'Full Payment',
+      lead_id: sampleLead.id,
+      ...overrides,
+    };
+  }
 
   beforeEach(() => {
     store.users = [counsellorUser];
@@ -134,15 +158,7 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
       vi.spyOn(adminModule, 'createAdminClient').mockReturnValue(mockSupabaseAdmin as any);
 
-      const input: CreateAdmissionInput = {
-        student_name: 'Live Test Student',
-        phone: '+91 98111 22233',
-        email: 'test@gmail.com',
-        course_id: 'crs-fico-01',
-        course_fee: 45000,
-        discount: 0,
-        lead_id: sampleLead.id,
-      };
+      const input = createValidAdmissionInput();
 
       const result = await paymentTransaction(counsellorUser, async () => {
         return createAdmissionWorkflow(input, counsellorUser.id, true);
@@ -195,15 +211,7 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
       vi.spyOn(adminModule, 'createAdminClient').mockReturnValue(mockSupabaseAdmin as any);
 
-      const input: CreateAdmissionInput = {
-        student_name: 'Live Test Student',
-        phone: '+91 98111 22233',
-        email: 'test@gmail.com',
-        course_id: 'crs-fico-01',
-        course_fee: 45000,
-        discount: 0,
-        lead_id: sampleLead.id,
-      };
+      const input = createValidAdmissionInput();
 
       await expect(
         paymentTransaction(counsellorUser, async () => {
@@ -286,15 +294,10 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
       vi.spyOn(adminModule, 'createAdminClient').mockReturnValue(mockSupabaseAdmin as any);
 
-      const input: CreateAdmissionInput = {
+      const input = createValidAdmissionInput({
         student_name: 'Verified Student',
-        phone: '+91 98111 22233',
         email: 'verified@gmail.com',
-        course_id: 'crs-fico-01',
-        course_fee: 45000,
-        discount: 0,
-        lead_id: sampleLead.id,
-      };
+      });
 
       const result = await paymentTransaction(counsellorUser, async () => {
         return createAdmissionWorkflow(input, counsellorUser.id, true);
