@@ -900,16 +900,27 @@ export default function PaymentsPage() {
                             </td>
                             <td className="px-4 py-3 text-slate-500">{p.collected_by_name || 'Accounts Staff'}</td>
                             <td className="px-4 py-3 text-right">
-                              {isVerified && targetReceiptRef ? (
-                                <Link href={`/accounts/receipts/${encodeURIComponent(targetReceiptRef)}`}>
-                                  <Button variant="outline" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
-                                    <ReceiptIcon className="h-3 w-3 text-slate-500" />
-                                    <span>View</span>
-                                  </Button>
-                                </Link>
-                              ) : (
-                                <span className="text-slate-400 text-[10px] italic">No Receipt</span>
-                              )}
+                              <div className="flex items-center justify-end space-x-2">
+                                {p.fee_account_id && (
+                                  <Link
+                                    href={`/accounts/invoices/${encodeURIComponent(p.fee_account_id)}`}
+                                    className="text-xs text-blue-700 hover:underline mr-1"
+                                    title="View Course Invoice"
+                                  >
+                                    Invoice
+                                  </Link>
+                                )}
+                                {isVerified && targetReceiptRef ? (
+                                  <Link href={`/accounts/receipts/${encodeURIComponent(targetReceiptRef)}`}>
+                                    <Button variant="outline" size="sm" className="text-xs px-2.5 py-1 flex items-center space-x-1">
+                                      <ReceiptIcon className="h-3 w-3 text-slate-500" />
+                                      <span>Receipt</span>
+                                    </Button>
+                                  </Link>
+                                ) : (
+                                  <span className="text-slate-400 text-[10px] italic">No Receipt</span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

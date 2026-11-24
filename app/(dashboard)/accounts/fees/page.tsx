@@ -359,7 +359,8 @@ export default function StudentFeesPage() {
                         </Badge>
                       </td>
                       <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end space-x-1.5">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Link className="text-blue-700 text-xs underline" href={`/accounts/invoices/${encodeURIComponent(fa.id)}`}>Invoice</Link>
                           <Link className="text-blue-700 text-xs underline" href={`/accounts/statements/${encodeURIComponent(fa.student_id)}`}>Statement</Link>
                           {safeAmount(fa.outstanding_amount) > 0 ? (
                             <>

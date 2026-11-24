@@ -270,7 +270,7 @@ export default function ReceiptsListPage() {
           <CardContent className="p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Voided / Credit Notes</p>
             <h3 className="text-2xl font-bold text-rose-600 mt-1">{voidedReceipts.length}</h3>
-            <p className="text-xs text-slate-500 mt-1">Reversed & cancelled invoices</p>
+            <p className="text-xs text-slate-500 mt-1">Reversed & voided receipts</p>
           </CardContent>
         </Card>
       </div>

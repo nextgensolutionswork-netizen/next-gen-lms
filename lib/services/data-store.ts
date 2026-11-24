@@ -57,6 +57,7 @@ import {
 } from '@/lib/constants/bank-accounts';
 import {
   OFFICIAL_INSTITUTE_ADDRESS,
+  OFFICIAL_INSTITUTE_PHONE,
   OFFICIAL_LOGO_PATH,
 } from '@/lib/constants/branding';
 
@@ -78,11 +79,14 @@ class InstituteDataStore {
       if (snapshot) {
         if (snapshot.settings) {
           this.settings = snapshot.settings;
-          if (!this.settings.address || this.settings.address.includes('Silicon Valley Towers')) {
+          if (!this.settings.address || this.settings.address.includes('Silicon Valley Towers') || this.settings.address.includes('60C, Western Hills')) {
             this.settings.address = OFFICIAL_INSTITUTE_ADDRESS;
           }
           if (!this.settings.logo_url) {
             this.settings.logo_url = OFFICIAL_LOGO_PATH;
+          }
+          if (!this.settings.phone || this.settings.phone.includes('98765 43210') || this.settings.phone.includes('81438 88401') || this.settings.phone.includes('96768 91219')) {
+            this.settings.phone = OFFICIAL_INSTITUTE_PHONE;
           }
         }
         if (snapshot.users?.length) {
@@ -164,8 +168,8 @@ class InstituteDataStore {
               remaining_balance: 20000,
               authorized_by: 'Suresh Kumar (Chief Accountant)',
               institute_name: 'Next-Gen ERP Solutions',
-              institute_address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
-              institute_phone: '+91 98765 43210',
+              institute_address: OFFICIAL_INSTITUTE_ADDRESS,
+              institute_phone: OFFICIAL_INSTITUTE_PHONE,
               institute_gst: '36AAACN1234F1Z8',
               supply_type: 'INTER_STATE',
               place_of_supply: 'Maharashtra (27)',
@@ -736,7 +740,7 @@ class InstituteDataStore {
     tagline: 'Premier SAP Training, Certification & Placement Institute',
     address: OFFICIAL_INSTITUTE_ADDRESS,
     logo_url: OFFICIAL_LOGO_PATH,
-    phone: '+91 98765 43210',
+    phone: OFFICIAL_INSTITUTE_PHONE,
     email: 'admissions@next-generpsolutions.com',
     gst_number: '36AAACN1234F1Z8',
     bank_account_name: 'Katari Charitha',
@@ -1765,8 +1769,8 @@ class InstituteDataStore {
       remaining_balance: 25000,
       authorized_by: 'Suresh Kumar (Chief Accountant)',
       institute_name: 'Next-Gen ERP Solutions',
-      institute_address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
-      institute_phone: '+91 98765 43210',
+      institute_address: OFFICIAL_INSTITUTE_ADDRESS,
+      institute_phone: OFFICIAL_INSTITUTE_PHONE,
       institute_gst: '36AAACN1234F1Z8',
       supply_type: 'INTRA_STATE',
       place_of_supply: 'Telangana (36)',
@@ -1801,8 +1805,8 @@ class InstituteDataStore {
       remaining_balance: 15000,
       authorized_by: 'Suresh Kumar (Chief Accountant)',
       institute_name: 'Next-Gen ERP Solutions',
-      institute_address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
-      institute_phone: '+91 98765 43210',
+      institute_address: OFFICIAL_INSTITUTE_ADDRESS,
+      institute_phone: OFFICIAL_INSTITUTE_PHONE,
       institute_gst: '36AAACN1234F1Z8',
       supply_type: 'INTRA_STATE',
       place_of_supply: 'Telangana (36)',
@@ -1837,8 +1841,8 @@ class InstituteDataStore {
       remaining_balance: 20000,
       authorized_by: 'Suresh Kumar (Chief Accountant)',
       institute_name: 'Next-Gen ERP Solutions',
-      institute_address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
-      institute_phone: '+91 98765 43210',
+      institute_address: OFFICIAL_INSTITUTE_ADDRESS,
+      institute_phone: OFFICIAL_INSTITUTE_PHONE,
       institute_gst: '36AAACN1234F1Z8',
       supply_type: 'INTER_STATE',
       place_of_supply: 'Maharashtra (27)',

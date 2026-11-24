@@ -13,6 +13,7 @@ import {
   OFFICIAL_INSTITUTE_PHONE,
   OFFICIAL_RECEIPT_TERMS_TEXT,
   resolveInstituteAddress,
+  resolveInstitutePhone,
   resolveReceiptTerms,
 } from '@/lib/constants/branding';
 
@@ -101,7 +102,7 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       const finalAddress = resolveInstituteAddress(receipt.institute_address);
       doc.fillColor('#475569').font('Helvetica').fontSize(8.5).text(finalAddress, textStartX, 63, { width: textWidth, lineGap: 1.5 });
 
-      const phone = receipt.institute_phone || OFFICIAL_INSTITUTE_PHONE;
+      const phone = resolveInstitutePhone(receipt.institute_phone);
       const gst = receipt.institute_gst;
       const contactLine = [phone ? 'Phone: ' + phone : '', gst ? 'GST: ' + gst : ''].filter(Boolean).join('  |  ');
       if (contactLine) {

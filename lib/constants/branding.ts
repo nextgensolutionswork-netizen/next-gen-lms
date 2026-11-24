@@ -8,7 +8,9 @@ export const OFFICIAL_INSTITUTE_NAME = 'Next-Gen ERP Solutions';
 export const OFFICIAL_INSTITUTE_ADDRESS =
   'Pillar No 707, Flat No. 502, 5th Floor, Plot No 129, PJR ARCADE Sri Sai Nagar Colony, near JNTU, opp. Sri Chaitanya Junior Kalasala, Jawaharlal Nehru Technological University, Hyderabad, Telangana 500085';
 
-export const OFFICIAL_INSTITUTE_PHONE = '+91 98765 43210';
+export const OFFICIAL_INSTITUTE_PHONE = '+91 90003 33859';
+export const OFFICIAL_INSTITUTE_PHONE_PLAIN = '9000333859';
+export const OFFICIAL_INSTITUTE_WEBSITE = 'https://www.next-generpsolutions.com';
 export const OFFICIAL_INSTITUTE_EMAIL = 'admissions@next-generpsolutions.com';
 
 // Local branding assets (PNG for PDFKit & print; WebP for modern browsers)
@@ -54,8 +56,24 @@ export function resolveReceiptTerms(customTerms?: string | null): string {
  * Resolves institute address, upgrading legacy placeholder address.
  */
 export function resolveInstituteAddress(customAddress?: string | null): string {
-  if (!customAddress || !customAddress.trim() || customAddress.includes('Silicon Valley Towers')) {
+  if (!customAddress || !customAddress.trim() || customAddress.includes('Silicon Valley Towers') || customAddress.includes('60C, Western Hills')) {
     return OFFICIAL_INSTITUTE_ADDRESS;
   }
   return customAddress;
+}
+
+/**
+ * Resolves institute contact phone number, upgrading legacy placeholder numbers.
+ */
+export function resolveInstitutePhone(customPhone?: string | null): string {
+  if (
+    !customPhone ||
+    !customPhone.trim() ||
+    customPhone.includes('98765 43210') ||
+    customPhone.includes('81438 88401') ||
+    customPhone.includes('96768 91219')
+  ) {
+    return OFFICIAL_INSTITUTE_PHONE;
+  }
+  return customPhone;
 }

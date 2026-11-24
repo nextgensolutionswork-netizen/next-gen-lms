@@ -28,6 +28,7 @@ import {
   OFFICIAL_INSTITUTE_ADDRESS,
   OFFICIAL_INSTITUTE_PHONE,
   resolveInstituteAddress,
+  resolveInstitutePhone,
   resolveReceiptTerms,
 } from '@/lib/constants/branding';
 
@@ -229,8 +230,8 @@ export default function ReceiptPrintPage() {
                 {resolveInstituteAddress(receipt.institute_address)}
               </p>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 pt-0.5">
-                {(receipt.institute_phone || OFFICIAL_INSTITUTE_PHONE) && (
-                  <span>Phone: <strong className="text-slate-700 font-medium">{receipt.institute_phone || OFFICIAL_INSTITUTE_PHONE}</strong></span>
+                {resolveInstitutePhone(receipt.institute_phone) && (
+                  <span>Phone: <strong className="text-slate-700 font-medium">{resolveInstitutePhone(receipt.institute_phone)}</strong></span>
                 )}
                 {receipt.institute_gst && (
                   <span>GSTIN: <strong className="text-slate-700 font-medium">{receipt.institute_gst}</strong></span>

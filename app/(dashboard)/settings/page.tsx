@@ -33,7 +33,9 @@ import { getAuthorizedBankAccounts, formatBankAccountPresetLabel } from '@/lib/u
 import { BankAccountSearchableDropdown } from '@/components/ui/bank-account-searchable-dropdown';
 import {
   OFFICIAL_LOGO_PATH,
+  OFFICIAL_INSTITUTE_PHONE,
   resolveInstituteAddress,
+  resolveInstitutePhone,
 } from '@/lib/constants/branding';
 
 export default function SettingsPage() {
@@ -46,7 +48,7 @@ export default function SettingsPage() {
       logo_url: base.logo_url || OFFICIAL_LOGO_PATH,
       tagline: base.tagline || 'Premier SAP Training, Certification & Placement Institute',
       address: resolveInstituteAddress(base.address),
-      phone: base.phone || '+91 98765 43210',
+      phone: resolveInstitutePhone(base.phone),
       email: base.email || 'admissions@next-generpsolutions.com',
       gst_number: base.gst_number || '36AAACN1234F1Z8',
       default_currency: base.default_currency || 'INR',
