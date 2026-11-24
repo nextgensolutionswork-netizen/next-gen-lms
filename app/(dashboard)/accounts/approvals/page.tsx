@@ -29,6 +29,7 @@ import {
   Edit3,
   ExternalLink,
   CheckCircle,
+  Phone,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +55,9 @@ import {
   PaymentMethod,
   AuthorizedBankAccount,
 } from '@/types';
-import { formatINR } from '@/lib/utils/formatters';
+import { formatINR, formatDate } from '@/lib/utils/formatters';
+import { getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
+import { resolveCanonicalCounsellorId } from '@/lib/services/counsellor-service';
 import { feeCourseName } from '@/lib/utils/fee-course';
 import { isPaymentPending, isPaymentApproved, unifyDualLedgerPayments } from '@/lib/utils/dashboard-metrics';
 
@@ -77,7 +80,7 @@ export default function FeeApprovalsPage() {
     (role === 'accountant' || role === 'admin' || role === 'super_admin');
 
   // Active Desk View: 'fee_proposals' | 'payment_approvals'
-  const [activeDesk, setActiveDesk] = React.useState<'fee_proposals' | 'payment_approvals'>('fee_proposals');
+  const [activeDesk, setActiveDesk] = React.useState<'fee_proposals' | 'payment_approvals'>('payment_approvals');
 
   const [fees, setFees] = React.useState<StudentFee[]>([]);
   const [categories, setCategories] = React.useState<FeeCategoryItem[]>([]);
@@ -365,12 +368,44 @@ export default function FeeApprovalsPage() {
       }
       if (paymentSearchQuery.trim()) {
         const q = paymentSearchQuery.toLowerCase();
+        const matchingStudent = (store.students || []).find(
+          (s) => (p.student_id && s.id === p.student_id) || (p.admission_number && s.admission_number === p.admission_number)
+        );
+        const matchingAdmission = (store.admissions || []).find(
+          (a) => (p.admission_number && a.admission_number === p.admission_number) || (p.student_id && a.student_id === p.student_id)
+        );
+
         const matchesStudent = p.student_name?.toLowerCase().includes(q) || p.admission_number?.toLowerCase().includes(q);
+        const matchesLmsId =
+          matchingStudent?.student_unique_id?.toLowerCase().includes(q) ||
+          matchingStudent?.student_code?.toLowerCase().includes(q) ||
+          matchingAdmission?.student_unique_id?.toLowerCase().includes(q);
+        const matchesPhone =
+          matchingStudent?.phone?.includes(q) ||
+          matchingAdmission?.phone?.includes(q) ||
+          (p as any).phone?.includes(q);
+        const matchesAccount =
+          p.our_bank_account_name?.toLowerCase().includes(q) ||
+          p.verified_our_bank_account_name?.toLowerCase().includes(q) ||
+          p.our_bank_name?.toLowerCase().includes(q);
+        const matchesCounsellor =
+          matchingAdmission?.counsellor_name?.toLowerCase().includes(q);
         const matchesCategory = p.fee_category?.toLowerCase().includes(q);
         const matchesTxn = p.transaction_reference?.toLowerCase().includes(q) || p.bank_upi_reference?.toLowerCase().includes(q);
         const matchesRecorded = p.recorded_by_name?.toLowerCase().includes(q) || p.updated_by_name?.toLowerCase().includes(q);
         const matchesNotes = p.notes?.toLowerCase().includes(q);
-        if (!matchesStudent && !matchesCategory && !matchesTxn && !matchesRecorded && !matchesNotes) {
+
+        if (
+          !matchesStudent &&
+          !matchesLmsId &&
+          !matchesPhone &&
+          !matchesAccount &&
+          !matchesCounsellor &&
+          !matchesCategory &&
+          !matchesTxn &&
+          !matchesRecorded &&
+          !matchesNotes
+        ) {
           return false;
         }
       }
@@ -1507,7 +1542,7 @@ export default function FeeApprovalsPage() {
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search student, LMS ID, UTR, remarks..."
+                  placeholder="Search student, LMS ID, phone, account holder, counsellor..."
                   value={paymentSearchQuery}
                   onChange={(e) => setPaymentSearchQuery(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
@@ -1516,7 +1551,7 @@ export default function FeeApprovalsPage() {
             </div>
           </Card>
 
-          {/* Payment Approvals Table */}
+          {/* Payment Approvals Table (7 Custom Columns) */}
           <Card className="shadow-xs overflow-hidden">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -1524,19 +1559,18 @@ export default function FeeApprovalsPage() {
                   <thead className="bg-slate-50 text-slate-600 uppercase border-b border-slate-100 font-semibold tracking-wider">
                     <tr>
                       <th className="px-4 py-3">Student & LMS ID</th>
-                      <th className="px-4 py-3">Fee Category</th>
+                      <th className="px-4 py-3">Phone Number</th>
                       <th className="px-4 py-3 text-right">Amount Paid</th>
-                      <th className="px-4 py-3">Mode & Date</th>
-                      <th className="px-4 py-3">Reference / UTR / Proof</th>
-                      <th className="px-4 py-3">Recorded / Updated By</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Payment Date</th>
+                      <th className="px-4 py-3">Account Holder Name</th>
+                      <th className="px-4 py-3">Counsellor Name</th>
                       <th className="px-4 py-3 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredPayments.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                        <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                           <div className="flex flex-col items-center justify-center space-y-2">
                             <CreditCard className="h-8 w-8 text-slate-300" />
                             <p className="font-medium text-slate-500">No payment records found in this category.</p>
@@ -1556,135 +1590,226 @@ export default function FeeApprovalsPage() {
                           !isPaymentApproved(p) &&
                           (p.recorded_by === user?.id || role === 'accountant' || role === 'admin' || role === 'super_admin');
 
+                        // 1. Authoritative Student & LMS ID resolution (Never confuse admission number with LMS ID)
+                        const matchingStudent = (store.students || []).find(
+                          (s) =>
+                            (p.student_id && s.id === p.student_id) ||
+                            (p.admission_number && s.admission_number === p.admission_number) ||
+                            s.admission_id === p.fee_id
+                        );
+                        const matchingAdmission = (store.admissions || []).find(
+                          (a) =>
+                            (p.admission_number && a.admission_number === p.admission_number) ||
+                            (p.student_id && (a.student_id === p.student_id || a.id === p.student_id)) ||
+                            a.id === p.fee_id
+                        );
+                        const studentName =
+                          p.student_name ||
+                          matchingStudent?.full_name ||
+                          matchingAdmission?.student_name ||
+                          'Unknown Student';
+                        const lmsId =
+                          matchingStudent?.student_unique_id ||
+                          matchingStudent?.student_code ||
+                          matchingAdmission?.student_unique_id ||
+                          (p.student_id && !p.student_id.startsWith('ADM-') ? p.student_id : null) ||
+                          (matchingStudent?.id && !matchingStudent.id.startsWith('ADM-') ? matchingStudent.id : 'N/A');
+                        const profileLink = matchingStudent?.id || p.student_id;
+
+                        // 2. Authoritative Phone Number resolution
+                        const registeredPhone =
+                          matchingStudent?.phone ||
+                          matchingAdmission?.phone ||
+                          (p as any).phone ||
+                          '';
+                        const cleanPhone = registeredPhone.trim();
+                        const displayPhone = cleanPhone
+                          ? (cleanPhone.startsWith('+') ? cleanPhone : `+91 ${cleanPhone.replace(/^0+/, '')}`)
+                          : 'Not Provided';
+
+                        // 3. Amount Paid (p.amount_paid)
+
+                        // 4. Actual Payment Date (from p.payment_date)
+                        const paymentDateStr = p.payment_date || p.created_at?.split('T')[0] || '';
+                        const formattedPaymentDate = paymentDateStr ? formatDate(paymentDateStr) : '—';
+
+                        // 5. Receiving Bank Account Holder Name (Never confuse with student name)
+                        const isApproved = isPaymentApproved(p);
+                        const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts);
+                        const defaultAccount = authorizedBankAccounts[0];
+                        let accountHolderName = 'Next-Gen ERP Solutions';
+                        let accountSub = '';
+
+                        if (p.payment_mode === 'Cash') {
+                          accountHolderName = 'Institute Cash Counter';
+                          accountSub = 'Cash Collection';
+                        } else if (isApproved && p.verified_our_bank_account_name) {
+                          accountHolderName = p.verified_our_bank_account_name;
+                          accountSub = p.verified_our_bank_name || 'Verified Receiving Account';
+                        } else if (p.our_bank_account_name) {
+                          accountHolderName = p.our_bank_account_name;
+                          accountSub = p.our_bank_name || 'Receiving Account';
+                        } else if (origAccount?.account_holder_name) {
+                          accountHolderName = origAccount.account_holder_name;
+                          accountSub = origAccount.bank_name || '';
+                        } else if (defaultAccount?.account_holder_name) {
+                          accountHolderName = defaultAccount.account_holder_name;
+                          accountSub = defaultAccount.bank_name || '';
+                        }
+
+                        // 6. Assigned Counsellor Name resolution (via canonical IDs from admission/fee)
+                        const linkedAdmission = matchingAdmission || (store.admissions || []).find(
+                          (a) =>
+                            (p.admission_number && a.admission_number === p.admission_number) ||
+                            (p.student_id && (a.student_id === p.student_id || a.id === p.student_id)) ||
+                            a.id === p.fee_id
+                        );
+                        const linkedFeeAccount = !linkedAdmission
+                          ? (store.feeAccounts || []).find(
+                              (fa) =>
+                                (p.student_id && fa.student_id === p.student_id) ||
+                                (p.admission_number && fa.admission_id === p.admission_number) ||
+                                fa.id === p.fee_id
+                            )
+                          : null;
+                        const admissionFromFa = linkedFeeAccount?.admission_id
+                          ? (store.admissions || []).find(
+                              (a) => a.id === linkedFeeAccount.admission_id || a.admission_number === linkedFeeAccount.admission_id
+                            )
+                          : null;
+                        const effectiveAdm = linkedAdmission || admissionFromFa;
+                        const rawCounsellorId = effectiveAdm?.counsellor_id;
+                        const canonicalCounsellorId = rawCounsellorId ? resolveCanonicalCounsellorId(rawCounsellorId) : undefined;
+                        const counsellorStaff = (store.users || []).find(
+                          (u) =>
+                            (rawCounsellorId && u.id === rawCounsellorId) ||
+                            (canonicalCounsellorId && u.id === canonicalCounsellorId)
+                        );
+                        const counsellorName =
+                          effectiveAdm?.counsellor_name ||
+                          counsellorStaff?.full_name ||
+                          'Unassigned';
+
                         return (
                           <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                            {/* Student */}
+                            {/* Column 1: Student & LMS ID */}
                             <td className="px-4 py-3 font-medium text-slate-900">
                               <div>
-                                <span className="font-bold text-slate-800">{p.student_name}</span>
+                                <Link
+                                  href={`/students/${profileLink}`}
+                                  className="font-bold text-slate-800 hover:text-[#0A6ED1] transition-colors block text-xs"
+                                >
+                                  {studentName}
+                                </Link>
                                 <div className="flex items-center space-x-1.5 mt-0.5 text-[11px] text-slate-500">
-                                  <span className="font-mono bg-slate-100 px-1 py-0.2 rounded text-[10px]">
-                                    {p.admission_number || p.student_id}
+                                  <span className="font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">
+                                    LMS ID: {lmsId}
                                   </span>
                                 </div>
                               </div>
                             </td>
 
-                            {/* Fee Category */}
-                            <td className="px-4 py-3">
-                              <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                {p.fee_category}
-                              </span>
-                            </td>
-
-                            {/* Amount */}
-                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 bg-slate-50/40">
-                              <span className="text-emerald-700 text-sm">{formatINR(p.amount_paid)}</span>
-                            </td>
-
-                            {/* Mode & Date */}
-                            <td className="px-4 py-3 text-slate-600">
-                              <div>
-                                <Badge variant="outline" className="text-[10px] bg-slate-50">
-                                  {p.payment_mode}
-                                </Badge>
-                                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                                  {p.payment_date || p.created_at?.split('T')[0]}
-                                </p>
-                              </div>
-                            </td>
-
-                            {/* Reference / Proof */}
-                            <td className="px-4 py-3 text-slate-600">
-                              <div>
-                                <p className="font-mono font-semibold text-slate-800 text-[11px]">
-                                  {p.transaction_reference || p.bank_upi_reference || 'N/A'}
-                                </p>
-                                {p.bank_upi_reference && p.transaction_reference && (
-                                  <p className="text-[10px] text-slate-400">{p.bank_upi_reference}</p>
-                                )}
-                                {p.payment_proof_url && (
+                            {/* Column 2: Phone Number */}
+                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="font-mono text-xs">{displayPhone}</span>
+                                {cleanPhone && (
                                   <a
-                                    href={p.payment_proof_url}
+                                    href={`https://wa.me/${getCanonicalPhoneDigits('+91', cleanPhone)}`}
                                     target="_blank"
-                                    rel="noreferrer"
-                                    className="text-[10px] text-blue-600 hover:underline flex items-center space-x-1 mt-0.5 font-medium"
+                                    rel="noopener noreferrer"
+                                    title={`Chat on WhatsApp (${displayPhone})`}
+                                    className="h-5 w-5 rounded-full bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white flex items-center justify-center transition-all shrink-0 border border-[#25D366]/30 shadow-2xs"
                                   >
-                                    <ExternalLink className="h-3 w-3" />
-                                    <span>View Slip / Proof</span>
+                                    <Phone className="h-3 w-3" />
                                   </a>
                                 )}
                               </div>
                             </td>
 
-                            {/* Recorded / Updated By */}
-                            <td className="px-4 py-3 text-slate-600">
+                            {/* Column 3: Amount Paid */}
+                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 bg-slate-50/40 whitespace-nowrap">
+                              <span className="text-emerald-700 text-sm">{formatINR(p.amount_paid)}</span>
+                            </td>
+
+                            {/* Column 4: Payment Date */}
+                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                              <div className="flex items-center space-x-1.5">
+                                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs">{formattedPaymentDate}</span>
+                              </div>
+                            </td>
+
+                            {/* Column 5: Account Holder Name */}
+                            <td className="px-4 py-3 text-slate-800">
                               <div>
-                                <p className="font-medium text-slate-800 truncate max-w-[130px]" title={p.recorded_by_name}>
-                                  {p.recorded_by_name || 'Staff'}
-                                </p>
-                                <p className="text-[10px] text-slate-400 capitalize">
-                                  ({p.recorded_by_role || 'counsellor'})
-                                </p>
-                                {p.updated_at && (
-                                  <Badge variant="outline" className="text-[9px] mt-1 bg-amber-50 text-amber-700 border-amber-200">
-                                    Updated: {p.updated_by_name?.split(' ')[0]} ({p.updated_at.split('T')[0]})
-                                  </Badge>
+                                <span className="font-semibold text-slate-900 block text-xs">
+                                  {accountHolderName}
+                                </span>
+                                {accountSub && (
+                                  <span className="text-[10px] text-slate-500 block truncate max-w-[170px]" title={accountSub}>
+                                    {accountSub}
+                                  </span>
                                 )}
                               </div>
                             </td>
 
-                            {/* Status */}
-                            <td className="px-4 py-3">
-                              {isPaymentApproved(p) ? (
-                                <div>
-                                  <Badge variant="success" className="text-[10px]">
-                                    Approved & Cleared
-                                  </Badge>
-                                  {p.receipt_number && (
-                                    <p className="text-[10px] text-emerald-700 font-mono font-semibold mt-0.5">
-                                      #{p.receipt_number}
-                                    </p>
-                                  )}
+                            {/* Column 6: Counsellor Name */}
+                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                              <div className="flex items-center space-x-1.5">
+                                <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-700 font-semibold flex items-center justify-center text-[10px] shrink-0 border border-blue-200">
+                                  {counsellorName.charAt(0).toUpperCase()}
                                 </div>
-                              ) : isPaymentPending(p) ? (
-                                <div>
-                                  <Badge variant="warning" className="text-[10px]">
-                                    Pending Approval
-                                  </Badge>
-                                  {isOwn && (
-                                    <p className="text-[9px] text-amber-700 font-semibold mt-0.5">
-                                      (Your Entry)
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <Badge variant="destructive" className="text-[10px]">
-                                  Rejected
-                                </Badge>
-                              )}
+                                <span className="font-medium text-xs text-slate-800">{counsellorName}</span>
+                              </div>
                             </td>
 
-                            {/* Actions */}
-                            <td className="px-4 py-3 text-center">
+                            {/* Column 7: Actions — Update & Approve */}
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
                               <div className="flex items-center justify-center space-x-1.5">
-                                {!isPaymentApproved(p) && (
-                                  <>
-                                    {/* Sales Update Action */}
-                                    {canCounsellorEdit && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleOpenUpdatePaymentModal(p)}
-                                        className="text-xs px-2 py-1 h-7 text-blue-700 border-blue-300 hover:bg-blue-50 flex items-center space-x-1"
-                                        title="Sales: Update payment amount, UTR reference, proof slip, or notes"
-                                      >
-                                        <Edit3 className="h-3 w-3" />
-                                        <span>Update</span>
-                                      </Button>
+                                {isPaymentApproved(p) ? (
+                                  <div className="flex items-center space-x-1.5">
+                                    <Badge variant="success" className="text-[10px]">
+                                      Approved
+                                    </Badge>
+                                    {p.receipt_number && (
+                                      <Link href="/accounts/receipts">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-xs px-2 py-1 h-7 text-emerald-700 border-emerald-300 hover:bg-emerald-50 flex items-center space-x-1"
+                                          title={`View Receipt #${p.receipt_number}`}
+                                        >
+                                          <FileText className="h-3 w-3" />
+                                          <span>Receipt</span>
+                                        </Button>
+                                      </Link>
                                     )}
+                                  </div>
+                                ) : (
+                                  <>
+                                    {/* Action 1: Update */}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={!canCounsellorEdit}
+                                      onClick={() => handleOpenUpdatePaymentModal(p)}
+                                      className={`text-xs px-2.5 py-1 h-7 flex items-center space-x-1 ${
+                                        canCounsellorEdit
+                                          ? 'text-blue-700 border-blue-300 hover:bg-blue-50'
+                                          : 'opacity-50 cursor-not-allowed text-slate-400 border-slate-200'
+                                      }`}
+                                      title={
+                                        canCounsellorEdit
+                                          ? 'Sales / Staff: Update payment amount, UTR reference, proof slip, or notes'
+                                          : 'Only authorized staff may update pending payment entries.'
+                                      }
+                                    >
+                                      <Edit3 className="h-3 w-3" />
+                                      <span>Update</span>
+                                    </Button>
 
-                                    {/* Accountant Verify & Approve Action */}
+                                    {/* Action 2: Approve */}
                                     <Button
                                       variant="sap"
                                       size="sm"
@@ -1727,48 +1852,23 @@ export default function FeeApprovalsPage() {
                                         setBankDiscrepancyReason('');
                                         setPaymentVerifyModalOpen(true);
                                       }}
-                                      className={`text-xs px-2.5 py-1 h-7 ${
+                                      className={`text-xs px-2.5 py-1 h-7 flex items-center space-x-1 ${
                                         canAccountantVerify
-                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                                           : 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-600'
                                       }`}
                                       title={
                                         isOwn && role !== 'admin' && role !== 'super_admin'
                                           ? 'Separation of duties: Payment recorder cannot verify their own payment entry.'
-                                          : 'Accountant: Verify bank credit and issue official payment receipt'
+                                          : !canAccessApprovals
+                                          ? 'Restricted to authorized Accountant / Admin users.'
+                                          : 'Accountant: Verify bank credit and approve payment entry'
                                       }
                                     >
-                                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                                      <span>Verify & Approve</span>
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      <span>Approve</span>
                                     </Button>
-
-                                    {/* Accountant Reject Action */}
-                                    {canAccountantVerify && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedPayment(p);
-                                          setPaymentRejectionReason('');
-                                          setActionError(null);
-                                          setPaymentRejectModalOpen(true);
-                                        }}
-                                        className="text-xs px-2 py-1 h-7 text-rose-600 border-rose-300 hover:bg-rose-50"
-                                        title="Reject payment entry"
-                                      >
-                                        <XCircle className="h-3 w-3 mr-1" />
-                                        <span>Reject</span>
-                                      </Button>
-                                    )}
                                   </>
-                                )}
-
-                                {p.verification_status === 'Verified' && (
-                                  <Link href={`/accounts/receipts`}>
-                                    <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
-                                      View Receipt
-                                    </Button>
-                                  </Link>
                                 )}
                               </div>
                             </td>
@@ -2712,33 +2812,52 @@ export default function FeeApprovalsPage() {
               />
             </div>
 
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   setPaymentVerifyModalOpen(false);
-                  setSelectedPayment(null);
-                  setSelectedVerifiedBankAccountId('');
-                  setVerifiedBankName('');
-                  setVerifiedBankAccountName('');
-                  setVerifiedBankAccountId('');
-                  setVerifiedUpiDetails('');
-                  setBankDiscrepancyReason('');
+                  setPaymentRejectionReason('');
+                  setActionError(null);
+                  setPaymentRejectModalOpen(true);
                 }}
+                className="text-rose-600 border-rose-300 hover:bg-rose-50 flex items-center space-x-1"
+                title="Disallow this payment entry with mandatory rationale"
               >
-                Cancel
+                <XCircle className="h-3.5 w-3.5" />
+                <span>Reject Payment...</span>
               </Button>
-              <Button
-                variant="sap"
-                size="sm"
-                disabled={verificationBusy || isOwnRecordedPayment(selectedPayment)}
-                onClick={handleVerifyPayment}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                <span>Confirm & Approve Payment</span>
-              </Button>
+
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPaymentVerifyModalOpen(false);
+                    setSelectedPayment(null);
+                    setSelectedVerifiedBankAccountId('');
+                    setVerifiedBankName('');
+                    setVerifiedBankAccountName('');
+                    setVerifiedBankAccountId('');
+                    setVerifiedUpiDetails('');
+                    setBankDiscrepancyReason('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="sap"
+                  size="sm"
+                  disabled={verificationBusy || isOwnRecordedPayment(selectedPayment)}
+                  onClick={handleVerifyPayment}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                  <span>Confirm & Approve Payment</span>
+                </Button>
+              </div>
             </div>
           </div>
         )}
