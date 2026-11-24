@@ -507,6 +507,9 @@ export async function updateLeadDetails(
     lead.counsellor_name = counsellor?.full_name;
   }
   if (updates.notes !== undefined) lead.notes = updates.notes;
+  if (updates.experience !== undefined) lead.experience = updates.experience;
+  if (updates.dob !== undefined) lead.dob = updates.dob;
+  if (updates.address !== undefined) lead.address = updates.address;
   if (updates.experience_years !== undefined) lead.experience_years = updates.experience_years;
   if (updates.education !== undefined) lead.education = updates.education;
   // NOTE: do NOT modify lead.stage unless updates.stage is explicitly provided!

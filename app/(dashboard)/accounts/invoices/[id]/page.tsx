@@ -307,20 +307,35 @@ export default function InvoiceViewPage() {
                 </div>
 
                 {/* Verified Payments Rows */}
-                {invoice.payments && invoice.payments.length > 0 ? (
-                  <div className="divide-y divide-slate-100 bg-white">
-                    {invoice.payments.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between px-4 py-2 text-slate-600">
-                        <span>Paid on {p.date}</span>
-                        <span className="font-semibold text-emerald-700">- {formatINR(p.amount)}</span>
+                {(() => {
+                  const sortedPayments = [...(invoice.payments || [])].sort(
+                    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+                  );
+                  const totalPaid = sortedPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+                  if (sortedPayments.length === 0) {
+                    return (
+                      <div className="px-4 py-2 text-slate-500 text-[11px] italic bg-white">
+                        No verified payments recorded.
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-4 py-2 text-slate-500 text-[11px] italic bg-white">
-                    No verified payments recorded.
-                  </div>
-                )}
+                    );
+                  }
+
+                  return (
+                    <div className="divide-y divide-slate-100 bg-white">
+                      {sortedPayments.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between px-4 py-2 text-slate-600">
+                          <span>Paid on {p.date}</span>
+                          <span className="font-semibold text-emerald-700">- {formatINR(p.amount)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between px-4 py-2 bg-emerald-50/60 font-semibold text-emerald-900 border-t border-emerald-100">
+                        <span>Total Paid</span>
+                        <span>{formatINR(totalPaid)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Amount Due Row */}
                 <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 font-bold border-t border-slate-200 text-slate-900">

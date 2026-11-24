@@ -320,7 +320,10 @@ export async function generateInvoicePdfBuffer(invoice: InvoiceData): Promise<Bu
       ledgerY += 20;
 
       // 2. Verified Payment Rows
-      const payments = invoice.payments || [];
+      const rawPayments = invoice.payments || [];
+      const payments = [...rawPayments].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
       if (payments.length > 0) {
         payments.forEach((p, idx) => {
           if (idx % 2 === 1) {
@@ -334,6 +337,15 @@ export async function generateInvoicePdfBuffer(invoice: InvoiceData): Promise<Bu
             .text(`₹ ${formatMoney(p.amount)}`, rightBoxX, ledgerY + 4, { width: rightBoxW - 8, align: 'right' });
           ledgerY += 18;
         });
+
+        // Explicit Total Paid Row
+        doc.save();
+        doc.rect(rightBoxX, ledgerY, rightBoxW, 18).fill('#ECFDF5');
+        doc.restore();
+        doc.fillColor('#065F46').font('Helvetica-Bold').fontSize(8.5)
+          .text('Total Paid', rightBoxX + 8, ledgerY + 4);
+        doc.text(`₹ ${formatMoney(verifiedPaymentsTotal)}`, rightBoxX, ledgerY + 4, { width: rightBoxW - 8, align: 'right' });
+        ledgerY += 18;
       } else {
         doc.fillColor('#64748B').font('Helvetica-Oblique').fontSize(8)
           .text('No verified payments recorded', rightBoxX + 8, ledgerY + 4);

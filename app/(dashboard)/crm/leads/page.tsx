@@ -29,7 +29,7 @@ import { BulkImportModal } from '@/components/bulk-import-modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { Lead, LeadStage, LeadCurrentStatus, LeadTrainingPreference, LeadSource, Course } from '@/types';
-import { getCourses } from '@/lib/services/academics-service';
+import { getCourses, createBatch } from '@/lib/services/academics-service';
 import {
   getLeads,
   createLead,
@@ -233,6 +233,10 @@ export default function LeadsPage() {
   const [trainingPref, setTrainingPref] = React.useState<'Online' | 'Offline'>('Online');
   const [source, setSource] = React.useState<LeadSource>('Website');
   const [notes, setNotes] = React.useState('');
+  const [experience, setExperience] = React.useState('');
+  const [experienceError, setExperienceError] = React.useState('');
+  const [dob, setDob] = React.useState('');
+  const [address, setAddress] = React.useState('');
 
   // --- Edit Lead / Update Stage state ---
   const [modalTab, setModalTab] = React.useState<'stage' | 'details'>('stage');
@@ -255,6 +259,9 @@ export default function LeadsPage() {
   const [editTrainingPref, setEditTrainingPref] = React.useState<'Online' | 'Offline'>('Online');
   const [editSource, setEditSource] = React.useState<LeadSource>('Website');
   const [editNotes, setEditNotes] = React.useState('');
+  const [editExperience, setEditExperience] = React.useState('');
+  const [editDob, setEditDob] = React.useState('');
+  const [editAddress, setEditAddress] = React.useState('');
 
   // Follow-up notes update state
   const [updateNotes, setUpdateNotes] = React.useState('');
@@ -279,6 +286,109 @@ export default function LeadsPage() {
   const [convertExperience, setConvertExperience] = React.useState<number>(0);
   const [discount, setDiscount] = React.useState(0);
   const [discountReason, setDiscountReason] = React.useState('');
+
+  // Inline Convert Batch Modal State
+  const [isConvertBatchModalOpen, setIsConvertBatchModalOpen] = React.useState(false);
+  const [convertBatchTimingPreset, setConvertBatchTimingPreset] = React.useState('10:00 AM');
+  const [convertBatchCustomTime, setConvertBatchCustomTime] = React.useState('10:00');
+  const [convertBatchMonth, setConvertBatchMonth] = React.useState(() => {
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return months[new Date().getMonth()];
+  });
+  const [convertBatchYear, setConvertBatchYear] = React.useState(() => String(new Date().getFullYear()).slice(-2));
+  const [convertBatchStartDate, setConvertBatchStartDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [convertBatchTrainerId, setConvertBatchTrainerId] = React.useState('');
+  const [convertBatchMode, setConvertBatchMode] = React.useState<'Online' | 'Offline'>('Online');
+  const [convertBatchCapacity, setConvertBatchCapacity] = React.useState(25);
+  const [convertBatchName, setConvertBatchName] = React.useState('10AM NOV 26');
+  const [convertBatchError, setConvertBatchError] = React.useState('');
+
+  React.useEffect(() => {
+    let timingStr = '10AM';
+    if (convertBatchTimingPreset === '09:00 AM') timingStr = '9AM';
+    else if (convertBatchTimingPreset === '10:00 AM') timingStr = '10AM';
+    else if (convertBatchTimingPreset === '11:00 AM') timingStr = '11AM';
+    else if (convertBatchTimingPreset === '12:00 PM') timingStr = '12PM';
+    else if (convertBatchCustomTime) {
+      const parts = convertBatchCustomTime.split(':');
+      const hour = parseInt(parts[0], 10);
+      if (!isNaN(hour)) {
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const h12 = hour % 12 || 12;
+        timingStr = `${h12}${ampm}`;
+      }
+    }
+    setConvertBatchName(`${timingStr} ${convertBatchMonth} ${convertBatchYear}`);
+  }, [convertBatchTimingPreset, convertBatchCustomTime, convertBatchMonth, convertBatchYear]);
+
+  const availableTrainers = React.useMemo(() => {
+    return (store.users || []).filter(
+      (u) => u.role === 'trainer' || u.role === 'support' || u.role === 'admin'
+    );
+  }, []);
+
+  const handleCreateConvertBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = convertBatchName.trim();
+    if (!trimmedName) {
+      setConvertBatchError('Batch Name is required.');
+      return;
+    }
+    if (!convertCourseId) {
+      setConvertBatchError('Please select a course first.');
+      return;
+    }
+    const exists = (store.batches || []).some(
+      (b) => b.course_id === convertCourseId && b.batch_name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (exists) {
+      setConvertBatchError(`A batch named "${trimmedName}" already exists for this course.`);
+      return;
+    }
+
+    let startTime = '10:00';
+    let endTime = '11:00';
+    if (convertBatchTimingPreset === '09:00 AM') {
+      startTime = '09:00'; endTime = '10:00';
+    } else if (convertBatchTimingPreset === '10:00 AM') {
+      startTime = '10:00'; endTime = '11:00';
+    } else if (convertBatchTimingPreset === '11:00 AM') {
+      startTime = '11:00'; endTime = '12:00';
+    } else if (convertBatchTimingPreset === '12:00 PM') {
+      startTime = '12:00'; endTime = '13:00';
+    } else if (convertBatchCustomTime) {
+      startTime = convertBatchCustomTime;
+      const parts = convertBatchCustomTime.split(':');
+      const h = (parseInt(parts[0], 10) + 1) % 24;
+      endTime = `${String(h).padStart(2, '0')}:${parts[1] || '00'}`;
+    }
+
+    const trainer = availableTrainers.find((t) => t.id === convertBatchTrainerId) || availableTrainers[0];
+    const batchCode = `BTC-${trimmedName.replace(/\s+/g, '-')}-${Date.now().toString().slice(-4)}`;
+
+    try {
+      const created = await createBatch({
+        batch_code: batchCode,
+        batch_name: trimmedName,
+        course_id: convertCourseId,
+        trainer_id: trainer?.id || 'usr-trainer',
+        training_mode: convertBatchMode === 'Offline' ? 'Classroom' : 'Online',
+        start_date: convertBatchStartDate,
+        end_date: new Date(new Date(convertBatchStartDate).getTime() + 60 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+        start_time: startTime,
+        end_time: endTime,
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        maximum_capacity: convertBatchCapacity || 25,
+        status: 'Upcoming',
+      });
+
+      setConvertBatchId(created.id);
+      setIsConvertBatchModalOpen(false);
+      setConvertBatchError('');
+    } catch (err: any) {
+      setConvertBatchError(err.message || 'Failed to create batch.');
+    }
+  };
 
   React.useEffect(() => {
     if (user?.id && !counsellorId) {
@@ -408,6 +518,14 @@ export default function LeadsPage() {
       return;
     }
 
+    if (!experience || !experience.trim()) {
+      setExperienceError('Experience is required.');
+      return;
+    }
+    setExperienceError('');
+
+    const expYears = experience === 'Fresher' ? 0 : experience === '0–2 Years' ? 1 : experience === '2–5 Years' ? 3 : 5;
+
     try {
       await createLead({
         full_name: fullName.trim(),
@@ -418,7 +536,10 @@ export default function LeadsPage() {
         email: email.trim(),
         interested_course_id: courseId,
         current_status: currentStatus,
-        experience_years: currentStatus === 'Fresher' ? 0 : 2,
+        experience: experience.trim(),
+        experience_years: expYears,
+        dob: dob.trim() || undefined,
+        address: address.trim() || undefined,
         training_preference: trainingPref,
         lead_source: source,
         counsellor_id: assignedCounsellorId,
@@ -437,6 +558,10 @@ export default function LeadsPage() {
       setWhatsappError('');
       setEmail('');
       setNotes('');
+      setExperience('');
+      setExperienceError('');
+      setDob('');
+      setAddress('');
       void refreshLeads();
     } catch (err: any) {
       alert(err?.message || 'Failed to create lead');
@@ -494,6 +619,9 @@ export default function LeadsPage() {
     );
     setEditSource((lead.lead_source as LeadSource) || 'Website');
     setEditNotes(lead.notes || '');
+    setEditExperience(lead.experience || (lead.current_status === 'Fresher' ? 'Fresher' : '0–2 Years'));
+    setEditDob(lead.dob || '');
+    setEditAddress(lead.address || '');
   };
 
   const handleUpdateStage = async () => {
@@ -573,6 +701,9 @@ export default function LeadsPage() {
           lead_source: editSource,
           counsellor_id: editCounsellorId,
           notes: editNotes,
+          experience: editExperience.trim() || undefined,
+          dob: editDob.trim() || undefined,
+          address: editAddress.trim() || undefined,
           // NOTE: stage is strictly omitted so it is NOT overwritten!
         },
         user.id
@@ -597,17 +728,22 @@ export default function LeadsPage() {
     setSelectedLead(lead);
     const defaultEdu = lead.education || lead.current_status || '';
     setConvertEducation(defaultEdu);
-    setConvertExperience(lead.experience_years ?? 0);
+    if (lead.experience) {
+      const expNum = lead.experience === 'Fresher' ? 0 : lead.experience === '0–2 Years' ? 1 : lead.experience === '2–5 Years' ? 3 : 5;
+      setConvertExperience(expNum);
+    } else {
+      setConvertExperience(lead.experience_years ?? 0);
+    }
     const matchedCourse = publishedCourses.find((c) => c.id === lead.interested_course_id) || publishedCourses[0];
     const initialCourseId = matchedCourse?.id || '';
     setConvertCourseId(initialCourseId);
     const matchedBatch = (store.batches || []).find((b) => b.course_id === initialCourseId);
     setConvertBatchId(matchedBatch?.id || '');
     setConvertCourseFee(matchedCourse?.price ?? 0);
-    setConvertDob('');
+    setConvertDob(lead.dob || '');
     setConvertGender('');
     setConvertCity('');
-    setConvertAddress('');
+    setConvertAddress(lead.address || '');
     setDiscount(0);
     setDiscountReason('');
     setIsConvertModalOpen(true);
@@ -1358,6 +1494,46 @@ export default function LeadsPage() {
             </select>
           </div>
 
+          {/* Experience Level: Mandatory with options Fresher, 0–2 Years, 2–5 Years, 5+ Years (no pre-selection) */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Experience *
+            </label>
+            <select
+              value={experience}
+              onChange={(e) => {
+                setExperience(e.target.value);
+                if (experienceError) setExperienceError('');
+              }}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
+              required
+            >
+              <option value="">Select Experience Level *</option>
+              <option value="Fresher">Fresher</option>
+              <option value="0–2 Years">0–2 Years</option>
+              <option value="2–5 Years">2–5 Years</option>
+              <option value="5+ Years">5+ Years</option>
+            </select>
+            {experienceError && (
+              <p className="text-xs text-rose-500 font-medium mt-1">{experienceError}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Date of Birth (Optional)"
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+            />
+            <Input
+              label="Residential Address (Optional)"
+              placeholder="e.g. Flat 302, Silicon Hills, Hyderabad"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
               Sales Notes / Demo Preferences
@@ -1697,6 +1873,39 @@ export default function LeadsPage() {
                   </select>
                 </div>
 
+                {/* Experience Level */}
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                    Experience
+                  </label>
+                  <select
+                    value={editExperience}
+                    onChange={(e) => setEditExperience(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
+                  >
+                    <option value="">Select Experience Level</option>
+                    <option value="Fresher">Fresher</option>
+                    <option value="0–2 Years">0–2 Years</option>
+                    <option value="2–5 Years">2–5 Years</option>
+                    <option value="5+ Years">5+ Years</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Input
+                    label="Date of Birth"
+                    type="date"
+                    value={editDob}
+                    onChange={(e) => setEditDob(e.target.value)}
+                  />
+                  <Input
+                    label="Residential Address"
+                    placeholder="e.g. Flat 302, Silicon Hills, Hyderabad"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                  />
+                </div>
+
                 <div className="p-2.5 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-800 flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" />
                   <span>
@@ -1779,22 +1988,28 @@ export default function LeadsPage() {
                 </label>
                 <select
                   value={convertBatchId}
-                  onChange={(e) => setConvertBatchId(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === '__ADD_NEW_BATCH__') {
+                      setIsConvertBatchModalOpen(true);
+                    } else {
+                      setConvertBatchId(e.target.value);
+                    }
+                  }}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
                 >
                   {(() => {
                     const courseBatches = (store.batches || []).filter((b) => b.course_id === convertCourseId);
-                    if (courseBatches.length === 0) {
-                      return <option value="">No dedicated batches (General)</option>;
-                    }
                     return (
                       <>
-                        <option value="">Select Batch (Optional)</option>
+                        <option value="">{courseBatches.length === 0 ? 'No dedicated batches (General)' : 'Select Batch (Optional)'}</option>
                         {courseBatches.map((b) => (
                           <option key={b.id} value={b.id}>
                             {b.batch_name} ({b.training_mode})
                           </option>
                         ))}
+                        <option value="__ADD_NEW_BATCH__" className="text-blue-600 font-bold">
+                          + Add New Batch
+                        </option>
                       </>
                     );
                   })()}
@@ -1905,6 +2120,199 @@ export default function LeadsPage() {
               </Button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Create New Training Batch Modal - Inline Convert Workflow */}
+      {isConvertBatchModalOpen && (
+        <Modal
+          isOpen={isConvertBatchModalOpen}
+          onClose={() => {
+            setIsConvertBatchModalOpen(false);
+            setConvertBatchError('');
+          }}
+          title="Create New Training Batch"
+          description="Add a new batch for this conversion without losing candidate information."
+        >
+          <form onSubmit={handleCreateConvertBatch} className="space-y-4 text-xs">
+            {/* Auto-matched Course */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Course (Auto-Matched)
+              </label>
+              <Input
+                value={publishedCourses.find((c) => c.id === convertCourseId)?.course_name || 'Selected Course'}
+                disabled
+                className="bg-slate-50 text-slate-700 font-medium"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Batch Timing */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Batch Timing *
+                </label>
+                <select
+                  value={convertBatchTimingPreset}
+                  onChange={(e) => setConvertBatchTimingPreset(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="09:00 AM">09:00 AM (09:00 - 10:00)</option>
+                  <option value="10:00 AM">10:00 AM (10:00 - 11:00)</option>
+                  <option value="11:00 AM">11:00 AM (11:00 - 12:00)</option>
+                  <option value="12:00 PM">12:00 PM (12:00 - 13:00)</option>
+                  <option value="Custom">Custom Timing...</option>
+                </select>
+              </div>
+
+              {/* Month */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Month *
+                </label>
+                <select
+                  value={convertBatchMonth}
+                  onChange={(e) => setConvertBatchMonth(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Year */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Year *
+                </label>
+                <select
+                  value={convertBatchYear}
+                  onChange={(e) => setConvertBatchYear(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="26">2026 (26)</option>
+                  <option value="27">2027 (27)</option>
+                  <option value="28">2028 (28)</option>
+                </select>
+              </div>
+            </div>
+
+            {convertBatchTimingPreset === 'Custom' && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Custom Start Time *
+                </label>
+                <Input
+                  type="time"
+                  value={convertBatchCustomTime}
+                  onChange={(e) => setConvertBatchCustomTime(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
+            {/* Auto-suggested Batch Name */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Batch Name (Auto-Suggested) *
+              </label>
+              <Input
+                placeholder="e.g. 10AM NOV 26"
+                value={convertBatchName}
+                onChange={(e) => {
+                  setConvertBatchName(e.target.value);
+                  if (convertBatchError) setConvertBatchError('');
+                }}
+                required
+              />
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Format: <code>[Time] [Month] [Year]</code> (e.g. 9AM NOV 26, 10AM NOV 26, 11AM DEC 26, 12PM JAN 27).
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Start Date */}
+              <Input
+                label="Start Date *"
+                type="date"
+                value={convertBatchStartDate}
+                onChange={(e) => setConvertBatchStartDate(e.target.value)}
+                required
+              />
+
+              {/* Training Mode */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Training Mode *
+                </label>
+                <select
+                  value={convertBatchMode}
+                  onChange={(e) => setConvertBatchMode(e.target.value as 'Online' | 'Offline')}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Trainer */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Assigned Trainer *
+                </label>
+                <select
+                  value={convertBatchTrainerId}
+                  onChange={(e) => setConvertBatchTrainerId(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="">Select Trainer...</option>
+                  {availableTrainers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.full_name} ({t.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Capacity */}
+              <Input
+                label="Batch Capacity *"
+                type="number"
+                min={1}
+                max={200}
+                value={convertBatchCapacity}
+                onChange={(e) => setConvertBatchCapacity(Number(e.target.value))}
+                required
+              />
+            </div>
+
+            {convertBatchError && (
+              <p className="text-xs text-rose-600 font-medium">{convertBatchError}</p>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsConvertBatchModalOpen(false);
+                  setConvertBatchError('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="sap" size="sm">
+                Create Batch
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
 

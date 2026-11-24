@@ -61,6 +61,21 @@ import {
   OFFICIAL_LOGO_PATH,
 } from '@/lib/constants/branding';
 
+// Default standard expense categories as per institutional requirements
+export const DEFAULT_EXPENSE_CATEGORIES: string[] = [
+  'Rent',
+  'Trainer Payment',
+  'Salary',
+  'Marketing',
+  'Google Ads',
+  'Meta Ads',
+  'Software Licenses',
+  'Internet Leased Line',
+  'Electricity & Lab Utilities',
+  'Office Supplies',
+  'Miscellaneous',
+];
+
 // In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
   constructor() {
@@ -194,6 +209,12 @@ class InstituteDataStore {
 
         }
         if (snapshot.expenses?.length) this.expenses = snapshot.expenses;
+        if ((snapshot as any).expense_categories?.length) {
+          const loadedCats: string[] = (snapshot as any).expense_categories;
+          const existingSet = new Set(loadedCats.map((c: string) => c.trim().toLowerCase()));
+          const missingDefaults = DEFAULT_EXPENSE_CATEGORIES.filter((c) => !existingSet.has(c.toLowerCase()));
+          this.expense_categories = [...loadedCats, ...missingDefaults];
+        }
         if (snapshot.vendors?.length) this.vendors = snapshot.vendors;
         if (snapshot.placementProfiles?.length) this.placementProfiles = snapshot.placementProfiles;
         if (snapshot.jobOpenings?.length) this.jobOpenings = snapshot.jobOpenings;
@@ -2056,6 +2077,34 @@ class InstituteDataStore {
       created_at: '2026-01-01T00:00:00Z',
     },
   ];
+
+  public expense_categories: string[] = [...DEFAULT_EXPENSE_CATEGORIES];
+
+  public getExpenseCategories(): string[] {
+    if (!this.expense_categories || this.expense_categories.length === 0) {
+      this.expense_categories = [...DEFAULT_EXPENSE_CATEGORIES];
+    }
+    return [...this.expense_categories];
+  }
+
+  public addExpenseCategory(name: string): string {
+    const trimmed = name?.trim();
+    if (!trimmed) {
+      throw new Error('Category name is required and cannot be empty.');
+    }
+    if (!this.expense_categories || this.expense_categories.length === 0) {
+      this.expense_categories = [...DEFAULT_EXPENSE_CATEGORIES];
+    }
+    const exists = this.expense_categories.some(
+      (c) => c.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      throw new Error(`Expense category "${trimmed}" already exists.`);
+    }
+    this.expense_categories.push(trimmed);
+    this.persist();
+    return trimmed;
+  }
 
   public expenses: Expense[] = [
     {

@@ -674,6 +674,137 @@ export async function approveExpense(
   return exp;
 }
 
+export async function getExpenseCategories(): Promise<string[]> {
+  return store.getExpenseCategories();
+}
+
+export async function createExpenseCategory(name: string, userId?: string): Promise<string> {
+  const newCat = store.addExpenseCategory(name);
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase.from('expense_categories').insert({
+        name: newCat,
+        created_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Supabase expense_categories insert warning, preserved locally:', err);
+    }
+  }
+
+  if (userId) {
+    const user = store.users.find((u) => u.id === userId);
+    await recordAuditLog({
+      user_id: userId,
+      user_name: user?.full_name || 'Staff',
+      user_role: user?.role || 'accountant',
+      action: 'EXPENSE_CATEGORY_CREATED',
+      module: 'FINANCE',
+      record_id: newCat,
+      new_value: { name: newCat },
+    });
+  }
+
+  return newCat;
+}
+
+export async function validateAndSettleExpense(
+  expenseId: string,
+  validatorUserId: string,
+  details: {
+    payment_mode: PaymentMethod;
+    reference: string;
+    expense_date?: string;
+    bank_account?: string;
+  }
+): Promise<Expense> {
+  const exp = store.expenses.find((e) => e.id === expenseId);
+  if (!exp) throw new Error('Expense not found');
+
+  if (exp.status !== 'Approved') {
+    throw new Error(`Invalid workflow transition: Only 'Approved' expenses can be validated and settled. Current status: ${exp.status}`);
+  }
+
+  const validator = store.users.find((u) => u.id === validatorUserId);
+  if (!validator) {
+    throw new Error('Validator user profile not found');
+  }
+
+  const allowedRoles = ['super_admin', 'admin', 'accountant'];
+  if (!allowedRoles.includes(validator.role)) {
+    throw new Error('Access Denied: Only accounts staff or administrators can validate and settle expenditures.');
+  }
+
+  if (!details.reference || !details.reference.trim()) {
+    throw new Error('Mandatory reference: Bank UTR or transaction reference is required for payment settlement.');
+  }
+
+  const prevStatus = exp.status;
+  exp.status = 'Settled';
+  exp.payment_mode = details.payment_mode;
+  exp.reference = details.reference.trim();
+  if (details.expense_date) {
+    exp.expense_date = details.expense_date;
+  }
+  exp.bank_account = details.bank_account || 'HDFC Bank - Next-Gen ERP Solutions (A/C: 50200088921)';
+  exp.settled_by = validatorUserId;
+  exp.settled_by_name = validator.full_name;
+  exp.settled_at = new Date().toISOString();
+  exp.paid_by = validatorUserId;
+  exp.paid_by_name = validator.full_name;
+  exp.validated_amount = exp.amount;
+  exp.updated_at = new Date().toISOString();
+
+  // If tagged to a vendor, update vendor total_paid
+  if (exp.vendor_id) {
+    const vendor = store.vendors.find((v) => v.id === exp.vendor_id);
+    if (vendor) {
+      vendor.total_paid = (vendor.total_paid || 0) + exp.amount;
+    }
+  }
+
+  store.persist();
+
+  if (isLiveSupabaseEnabled()) {
+    try {
+      const supabase = createClient();
+      await supabase
+        .from('expenses')
+        .update({
+          status: 'Settled',
+          payment_mode: exp.payment_mode,
+          reference: exp.reference,
+          paid_by: exp.paid_by,
+          updated_at: exp.updated_at,
+        })
+        .eq('id', expenseId);
+    } catch (err) {
+      console.warn('Supabase validateAndSettleExpense warning, preserved locally:', err);
+    }
+  }
+
+  await recordAuditLog({
+    user_id: validatorUserId,
+    user_name: validator.full_name || 'Accounts Staff',
+    user_role: validator.role || 'accountant',
+    action: 'EXPENSE_SETTLED',
+    module: 'FINANCE',
+    record_id: expenseId,
+    old_value: { status: prevStatus },
+    new_value: {
+      status: 'Settled',
+      amount: exp.amount,
+      mode: exp.payment_mode,
+      reference: exp.reference,
+      bank_account: exp.bank_account,
+      settled_by: validator.full_name,
+    },
+  });
+
+  return exp;
+}
+
 export async function markExpenseAsPaid(
   expenseId: string,
   disburserUserId: string,

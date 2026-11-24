@@ -29,8 +29,11 @@ import {
   createExpense,
   approveExpense,
   markExpenseAsPaid,
+  validateAndSettleExpense,
   rejectExpense,
   submitExpenseForApproval,
+  getExpenseCategories,
+  createExpenseCategory,
 } from '@/lib/services/finance-service';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { exportExpensesToExcel } from '@/lib/utils/excel-export';
@@ -55,10 +58,16 @@ export default function ExpensesPage() {
   const canRecordExpense = role === 'super_admin' || role === 'admin' || role === 'accountant' || hasPermission('expenses:write');
   const canDisburse = role === 'super_admin' || role === 'admin' || role === 'accountant' || hasPermission('accounts:write');
   const [expenses, setExpenses] = React.useState<Expense[]>(() => store.expenses || []);
+  const [categories, setCategories] = React.useState<string[]>(() => store.getExpenseCategories());
   const [search, setSearch] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('All');
   const [statusFilter, setStatusFilter] = React.useState('All');
   const [isAddModal, setIsAddModal] = React.useState(false);
+
+  // New Category Modal State
+  const [isAddCategoryModal, setIsAddCategoryModal] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState('');
+  const [categoryError, setCategoryError] = React.useState('');
 
   // New Expense form state - defaults strictly to Pending Approval (zero bypass)
   const [category, setCategory] = React.useState<ExpenseCategory>('Rent');
@@ -70,11 +79,15 @@ export default function ExpensesPage() {
   const [reference, setReference] = React.useState('');
   const [status, setStatus] = React.useState<ExpenseStatus>('Pending Approval');
 
-  // Disburse / Pay Modal State
-  const [disburseExpense, setDisburseExpense] = React.useState<Expense | null>(null);
-  const [disburseRef, setDisburseRef] = React.useState('');
-  const [disburseMode, setDisburseMode] = React.useState<PaymentMethod>('Bank Transfer');
-  const [disburseDate, setDisburseDate] = React.useState(new Date().toISOString().slice(0, 10));
+  // Validate Expense & Settlement Modal State
+  const [validateExpense, setValidateExpense] = React.useState<Expense | null>(null);
+  const [validateRef, setValidateRef] = React.useState('');
+  const [validateMode, setValidateMode] = React.useState<PaymentMethod>('Bank Transfer');
+  const [validateDate, setValidateDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [validateBankAccount, setValidateBankAccount] = React.useState(
+    'HDFC Bank - Next-Gen ERP Solutions (A/C: 50200088921)'
+  );
+  const [validateError, setValidateError] = React.useState('');
 
   const refreshList = React.useCallback(() => {
     let list = [...(store.expenses || [])];
@@ -82,7 +95,11 @@ export default function ExpensesPage() {
       list = list.filter((e) => e.category === categoryFilter);
     }
     if (statusFilter !== 'All') {
-      list = list.filter((e) => e.status === statusFilter);
+      if (statusFilter === 'Settled') {
+        list = list.filter((e) => e.status === 'Settled' || e.status === 'Paid');
+      } else {
+        list = list.filter((e) => e.status === statusFilter);
+      }
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -91,7 +108,8 @@ export default function ExpensesPage() {
           e.expense_code?.toLowerCase().includes(q) ||
           e.description?.toLowerCase().includes(q) ||
           e.vendor_name?.toLowerCase().includes(q) ||
-          e.reference?.toLowerCase().includes(q)
+          e.reference?.toLowerCase().includes(q) ||
+          e.category?.toLowerCase().includes(q)
       );
     }
     setExpenses(list);
@@ -205,35 +223,6 @@ export default function ExpensesPage() {
     }
   };
 
-  const handleConfirmDisbursement = async () => {
-    if (!disburseExpense) return;
-    if (!user) {
-      alert('Please log in to disburse funds.');
-      return;
-    }
-    if (!canDisburse) {
-      alert('Access Denied: Only finance personnel or administrators can disburse funds.');
-      return;
-    }
-    if (!disburseRef.trim()) {
-      alert('Mandatory Requirement: Please provide a bank UTR or payment reference number.');
-      return;
-    }
-
-    try {
-      await markExpenseAsPaid(disburseExpense.id, user.id, {
-        payment_mode: disburseMode,
-        reference: disburseRef.trim(),
-        expense_date: disburseDate,
-      });
-      setDisburseExpense(null);
-      setDisburseRef('');
-      refreshList();
-    } catch (err: any) {
-      alert(err.message || 'Failed to settle expense');
-    }
-  };
-
   const handleExportCSV = () => {
     exportToCSV('expenses_register', expenses);
   };
@@ -242,8 +231,8 @@ export default function ExpensesPage() {
     exportExpensesToExcel(expenses, 'FY 2025-26');
   };
 
-  const totalPaidExpenses = expenses
-    .filter((e) => e.status === 'Paid')
+  const totalSettledOutflows = expenses
+    .filter((e) => e.status === 'Paid' || e.status === 'Settled')
     .reduce((sum, e) => sum + safeAmount(e.amount), 0);
 
   const approvedPendingPayment = expenses
@@ -254,7 +243,7 @@ export default function ExpensesPage() {
     .filter((e) => e.status === 'Pending Approval')
     .reduce((sum, e) => sum + safeAmount(e.amount), 0);
 
-  const totalCommittedOutflows = totalPaidExpenses + approvedPendingPayment;
+  const totalCommittedOutflows = totalSettledOutflows + approvedPendingPayment;
 
   if (!canAccessExpenses) {
     return (
@@ -320,11 +309,11 @@ export default function ExpensesPage() {
         <Card className="border-l-4 border-l-emerald-600 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Settled Outflows</p>
-            <h3 className="text-2xl font-bold text-emerald-700 mt-1">{formatINR(totalPaidExpenses)}</h3>
+            <h3 className="text-2xl font-bold text-emerald-700 mt-1">{formatINR(totalSettledOutflows)}</h3>
             <p className="text-xs text-slate-500 mt-1 flex items-center justify-between">
               <span>Settled & Reconciled</span>
               <span className="font-semibold text-emerald-600">
-                {expenses.filter((e) => e.status === 'Paid').length} paid
+                {expenses.filter((e) => e.status === 'Paid' || e.status === 'Settled').length} settled
               </span>
             </p>
           </CardContent>
@@ -385,7 +374,7 @@ export default function ExpensesPage() {
           {/* Status Filter Pills */}
           <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto">
             <span className="text-xs text-slate-500 font-medium">Status:</span>
-            {['All', 'Pending Approval', 'Approved', 'Paid', 'Draft', 'Rejected'].map((st) => (
+            {['All', 'Pending Approval', 'Approved', 'Settled', 'Draft', 'Rejected'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -404,7 +393,7 @@ export default function ExpensesPage() {
         {/* Category Filter Pills */}
         <div className="flex items-center space-x-1.5 overflow-x-auto pt-2 border-t border-slate-100">
           <span className="text-xs text-slate-500 font-medium">Category:</span>
-          {['All', 'Rent', 'Trainer payment', 'Salary', 'Marketing', 'Software', 'Electricity'].map((cat) => (
+          {['All', ...categories].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
@@ -464,7 +453,7 @@ export default function ExpensesPage() {
                       <td className="px-4 py-3">
                         <Badge
                           variant={
-                            exp.status === 'Paid'
+                            exp.status === 'Paid' || exp.status === 'Settled'
                               ? 'success'
                               : exp.status === 'Approved'
                               ? 'default'
@@ -475,7 +464,7 @@ export default function ExpensesPage() {
                               : 'secondary'
                           }
                         >
-                          {exp.status}
+                          {exp.status === 'Paid' ? 'Settled' : exp.status}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -522,23 +511,25 @@ export default function ExpensesPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  setDisburseExpense(exp);
-                                  setDisburseMode(exp.payment_mode || 'Bank Transfer');
-                                  setDisburseRef(exp.reference || '');
-                                  setDisburseDate(new Date().toISOString().slice(0, 10));
+                                  setValidateExpense(exp);
+                                  setValidateMode(exp.payment_mode || 'Bank Transfer');
+                                  setValidateRef(exp.reference || '');
+                                  setValidateDate(new Date().toISOString().slice(0, 10));
+                                  setValidateBankAccount(exp.bank_account || 'HDFC Bank - Next-Gen ERP Solutions (A/C: 50200088921)');
+                                  setValidateError('');
                                 }}
                                 className="text-xs px-2.5 py-1 h-7 text-emerald-700 border-emerald-400 bg-emerald-50/50 hover:bg-emerald-100 font-bold flex items-center space-x-1"
                               >
-                                <CreditCard className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                                <span>Mark as Paid</span>
+                                <ShieldCheck className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                                <span>Validate</span>
                               </Button>
                             ) : (
-                              <span className="text-[10px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                Approved
+                              <span className="text-[10px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                Approved – Awaiting Payment
                               </span>
                             )
                           )}
-                          {exp.status === 'Paid' && (
+                          {(exp.status === 'Paid' || exp.status === 'Settled') && (
                             <div className="text-right">
                               <span className="text-[10px] text-emerald-700 font-bold flex items-center justify-end space-x-1">
                                 <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
@@ -582,20 +573,23 @@ export default function ExpensesPage() {
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as any)}
+                onChange={(e) => {
+                  if (e.target.value === '__ADD_NEW_CATEGORY__') {
+                    setIsAddCategoryModal(true);
+                  } else {
+                    setCategory(e.target.value as any);
+                  }
+                }}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
               >
-                <option value="Rent">Rent</option>
-                <option value="Trainer payment">Trainer Payment</option>
-                <option value="Salary">Salary</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Google Ads">Google Ads</option>
-                <option value="Meta Ads">Meta Ads</option>
-                <option value="Software">Software Licenses</option>
-                <option value="Internet">Internet Leased Line</option>
-                <option value="Electricity">Electricity & Lab Utilities</option>
-                <option value="Office supplies">Office Supplies</option>
-                <option value="Miscellaneous">Miscellaneous</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                <option value="__ADD_NEW_CATEGORY__" className="text-blue-600 font-bold">
+                  + Add New Category
+                </option>
               </select>
             </div>
 
@@ -697,39 +691,121 @@ export default function ExpensesPage() {
         </form>
       </Modal>
 
-      {/* Disburse / Mark as Paid Modal */}
-      {disburseExpense && (
+      {/* Add New Category Modal - Opens seamlessly without resetting parent expense form */}
+      {isAddCategoryModal && (
         <Modal
-          isOpen={!!disburseExpense}
-          onClose={() => setDisburseExpense(null)}
-          title="Mark Expense as Paid & Record Disbursement"
-          description={`Record final bank settlement and UTR reference for ${disburseExpense.expense_code} (${formatINR(
-            disburseExpense.amount
-          )}).`}
+          isOpen={isAddCategoryModal}
+          onClose={() => {
+            setIsAddCategoryModal(false);
+            setNewCategoryName('');
+            setCategoryError('');
+          }}
+          title="Add New Category"
+          description="Create a new institutional expense category for tracking operational outflows."
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const trimmed = newCategoryName.trim();
+              if (!trimmed) {
+                setCategoryError('Category Name is mandatory and cannot be empty.');
+                return;
+              }
+              const exists = categories.some(
+                (c) => c.trim().toLowerCase() === trimmed.toLowerCase()
+              );
+              if (exists) {
+                setCategoryError(`Category "${trimmed}" already exists.`);
+                return;
+              }
+              try {
+                const created = await createExpenseCategory(trimmed, user?.id);
+                const updatedCats = store.getExpenseCategories();
+                setCategories(updatedCats);
+                setCategory(created as any);
+                setIsAddCategoryModal(false);
+                setNewCategoryName('');
+                setCategoryError('');
+              } catch (err: any) {
+                setCategoryError(err.message || 'Failed to create category.');
+              }
+            }}
+            className="space-y-4 text-xs"
+          >
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Category Name *
+              </label>
+              <Input
+                placeholder="e.g. Cloud Infrastructure, Hardware AMC, Legal Retainer"
+                value={newCategoryName}
+                onChange={(e) => {
+                  setNewCategoryName(e.target.value);
+                  if (categoryError) setCategoryError('');
+                }}
+                required
+                autoFocus
+              />
+              {categoryError && (
+                <p className="text-[11px] text-rose-600 font-medium mt-1">{categoryError}</p>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsAddCategoryModal(false);
+                  setNewCategoryName('');
+                  setCategoryError('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="sap" size="sm">
+                Add
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Validate Expense & Settlement Modal */}
+      {validateExpense && (
+        <Modal
+          isOpen={!!validateExpense}
+          onClose={() => setValidateExpense(null)}
+          title="Validate Expense"
+          description="Are you sure you want to validate this expense? Once payment is confirmed and validated, the expense status will be updated to Settled."
         >
           <div className="space-y-4 text-xs">
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="font-bold text-slate-800">{disburseExpense.description}</p>
+                  <p className="font-bold text-slate-800">{validateExpense.description}</p>
                   <p className="text-slate-500 mt-0.5">
-                    Beneficiary: <strong>{disburseExpense.vendor_name || 'Direct / Internal'}</strong> · Category:{' '}
-                    <strong>{disburseExpense.category}</strong>
+                    Expense Code: <strong className="text-blue-600 font-mono">{validateExpense.expense_code}</strong> · Category:{' '}
+                    <strong>{validateExpense.category}</strong>
+                  </p>
+                  <p className="text-slate-500">
+                    Vendor / Beneficiary: <strong>{validateExpense.vendor_name || 'Direct / Internal'}</strong>
                   </p>
                 </div>
                 <Badge variant="default">Approved</Badge>
               </div>
-              <p className="text-emerald-700 font-bold text-base pt-1">{formatINR(disburseExpense.amount)}</p>
+              <p className="text-emerald-700 font-bold text-base pt-1">{formatINR(validateExpense.amount)}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Disbursement Mode *
+                  Payment Mode *
                 </label>
                 <select
-                  value={disburseMode}
-                  onChange={(e) => setDisburseMode(e.target.value as any)}
+                  value={validateMode}
+                  onChange={(e) => setValidateMode(e.target.value as any)}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                 >
                   <option value="Bank Transfer">Bank Transfer (NEFT/RTGS/IMPS)</option>
@@ -742,38 +818,88 @@ export default function ExpensesPage() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Disbursement Date *
+                  Payment Date *
                 </label>
                 <Input
                   type="date"
-                  value={disburseDate}
-                  onChange={(e) => setDisburseDate(e.target.value)}
+                  value={validateDate}
+                  onChange={(e) => setValidateDate(e.target.value)}
                   required
                 />
               </div>
             </div>
 
-            <Input
-              label="Bank UTR / Transaction Reference (Mandatory) *"
-              placeholder="e.g. UTR-HDFC-99281928 or Cheque #102918"
-              value={disburseRef}
-              onChange={(e) => setDisburseRef(e.target.value)}
-              required
-            />
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Institute Bank Account *
+              </label>
+              <select
+                value={validateBankAccount}
+                onChange={(e) => setValidateBankAccount(e.target.value)}
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
+              >
+                <option value="HDFC Bank - Next-Gen ERP Solutions (A/C: 50200088921)">
+                  HDFC Bank - Current A/C: 50200088921 (Primary Operations)
+                </option>
+                <option value="ICICI Bank - Next-Gen Institute (A/C: 00120501928)">
+                  ICICI Bank - Current A/C: 00120501928 (Vendor Settlements)
+                </option>
+                <option value="State Bank of India - Operations (A/C: 33182749102)">
+                  State Bank of India - A/C: 33182749102 (Statutory / Utilities)
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <Input
+                label="Bank UTR / Transaction Reference (Mandatory) *"
+                placeholder="e.g. UTR-HDFC-99281928, NEFT260228001 or Cheque #102918"
+                value={validateRef}
+                onChange={(e) => {
+                  setValidateRef(e.target.value);
+                  if (validateError) setValidateError('');
+                }}
+                required
+              />
+              {validateError && (
+                <p className="text-[11px] text-rose-600 font-medium mt-1">{validateError}</p>
+              )}
+            </div>
 
             <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => setDisburseExpense(null)}>
+              <Button variant="outline" size="sm" onClick={() => setValidateExpense(null)}>
                 Cancel
               </Button>
               <Button
                 variant="sap"
                 size="sm"
-                disabled={!disburseRef.trim()}
-                onClick={handleConfirmDisbursement}
+                onClick={async () => {
+                  if (!validateRef.trim()) {
+                    setValidateError('Mandatory Requirement: Please provide a bank UTR or payment reference number.');
+                    return;
+                  }
+                  if (!user) {
+                    alert('Please log in.');
+                    return;
+                  }
+                  try {
+                    await validateAndSettleExpense(validateExpense.id, user.id, {
+                      payment_mode: validateMode,
+                      reference: validateRef.trim(),
+                      expense_date: validateDate,
+                      bank_account: validateBankAccount,
+                    });
+                    setValidateExpense(null);
+                    setValidateRef('');
+                    refreshList();
+                  } catch (err: any) {
+                    setValidateError(err.message || 'Failed to validate expense.');
+                  }
+                }}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center space-x-1"
               >
-                <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                <span>Confirm & Mark as Paid</span>
+                <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                <span>Validate & Settle</span>
               </Button>
             </div>
           </div>

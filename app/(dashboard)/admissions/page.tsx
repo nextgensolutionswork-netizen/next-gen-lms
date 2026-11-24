@@ -37,7 +37,7 @@ import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt, Course } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
-import { getCourses } from '@/lib/services/academics-service';
+import { getCourses, createBatch } from '@/lib/services/academics-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import {
   getEligibleAdmissionsCounsellors,
@@ -181,6 +181,110 @@ export default function AdmissionsPage() {
   const [trainingMode, setTrainingMode] = React.useState<'Online' | 'Offline' | 'Classroom' | 'Hybrid'>('Hybrid');
   const [batchId, setBatchId] = React.useState(defaultBatch?.id || '');
   const [batchError, setBatchError] = React.useState('');
+
+  // Inline Create Batch Modal State
+  const [isAddBatchModalOpen, setIsAddBatchModalOpen] = React.useState(false);
+  const [newBatchTimingPreset, setNewBatchTimingPreset] = React.useState('10:00 AM');
+  const [newBatchCustomTime, setNewBatchCustomTime] = React.useState('10:00');
+  const [newBatchMonth, setNewBatchMonth] = React.useState(() => {
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return months[new Date().getMonth()];
+  });
+  const [newBatchYear, setNewBatchYear] = React.useState(() => String(new Date().getFullYear()).slice(-2));
+  const [newBatchStartDate, setNewBatchStartDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [newBatchTrainerId, setNewBatchTrainerId] = React.useState('');
+  const [newBatchMode, setNewBatchMode] = React.useState<'Online' | 'Offline'>('Online');
+  const [newBatchCapacity, setNewBatchCapacity] = React.useState(25);
+  const [newBatchName, setNewBatchName] = React.useState('10AM NOV 26');
+  const [newBatchError, setNewBatchError] = React.useState('');
+
+  React.useEffect(() => {
+    let timingStr = '10AM';
+    if (newBatchTimingPreset === '09:00 AM') timingStr = '9AM';
+    else if (newBatchTimingPreset === '10:00 AM') timingStr = '10AM';
+    else if (newBatchTimingPreset === '11:00 AM') timingStr = '11AM';
+    else if (newBatchTimingPreset === '12:00 PM') timingStr = '12PM';
+    else if (newBatchCustomTime) {
+      const parts = newBatchCustomTime.split(':');
+      const hour = parseInt(parts[0], 10);
+      if (!isNaN(hour)) {
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const h12 = hour % 12 || 12;
+        timingStr = `${h12}${ampm}`;
+      }
+    }
+    setNewBatchName(`${timingStr} ${newBatchMonth} ${newBatchYear}`);
+  }, [newBatchTimingPreset, newBatchCustomTime, newBatchMonth, newBatchYear]);
+
+  const availableTrainers = React.useMemo(() => {
+    return (store.users || []).filter(
+      (u) => u.role === 'trainer' || u.role === 'support' || u.role === 'admin'
+    );
+  }, []);
+
+  const handleCreateNewBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = newBatchName.trim();
+    if (!trimmedName) {
+      setNewBatchError('Batch Name is required.');
+      return;
+    }
+    if (!courseId) {
+      setNewBatchError('Please select a course first.');
+      return;
+    }
+    const exists = (store.batches || []).some(
+      (b) => b.course_id === courseId && b.batch_name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (exists) {
+      setNewBatchError(`A batch named "${trimmedName}" already exists for this course.`);
+      return;
+    }
+
+    let startTime = '10:00';
+    let endTime = '11:00';
+    if (newBatchTimingPreset === '09:00 AM') {
+      startTime = '09:00'; endTime = '10:00';
+    } else if (newBatchTimingPreset === '10:00 AM') {
+      startTime = '10:00'; endTime = '11:00';
+    } else if (newBatchTimingPreset === '11:00 AM') {
+      startTime = '11:00'; endTime = '12:00';
+    } else if (newBatchTimingPreset === '12:00 PM') {
+      startTime = '12:00'; endTime = '13:00';
+    } else if (newBatchCustomTime) {
+      startTime = newBatchCustomTime;
+      const parts = newBatchCustomTime.split(':');
+      const h = (parseInt(parts[0], 10) + 1) % 24;
+      endTime = `${String(h).padStart(2, '0')}:${parts[1] || '00'}`;
+    }
+
+    const trainer = availableTrainers.find((t) => t.id === newBatchTrainerId) || availableTrainers[0];
+    const batchCode = `BTC-${trimmedName.replace(/\s+/g, '-')}-${Date.now().toString().slice(-4)}`;
+
+    try {
+      const created = await createBatch({
+        batch_code: batchCode,
+        batch_name: trimmedName,
+        course_id: courseId,
+        trainer_id: trainer?.id || 'usr-trainer',
+        training_mode: newBatchMode === 'Offline' ? 'Classroom' : 'Online',
+        start_date: newBatchStartDate,
+        end_date: new Date(new Date(newBatchStartDate).getTime() + 60 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+        start_time: startTime,
+        end_time: endTime,
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        maximum_capacity: newBatchCapacity || 25,
+        status: 'Upcoming',
+      });
+
+      setBatchId(created.id);
+      setBatchError('');
+      setIsAddBatchModalOpen(false);
+      setNewBatchError('');
+    } catch (err: any) {
+      setNewBatchError(err.message || 'Failed to create batch.');
+    }
+  };
   const [counsellorId, setCounsellorId] = React.useState('');
   const [counsellorName, setCounsellorName] = React.useState('');
   const [counsellorError, setCounsellorError] = React.useState('');
@@ -1187,7 +1291,14 @@ export default function AdmissionsPage() {
                 </label>
                 <select
                   value={batchId}
-                  onChange={(e) => { setBatchId(e.target.value); setBatchError(''); }}
+                  onChange={(e) => {
+                    if (e.target.value === '__ADD_NEW_BATCH__') {
+                      setIsAddBatchModalOpen(true);
+                    } else {
+                      setBatchId(e.target.value);
+                      setBatchError('');
+                    }
+                  }}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                   required={courseBatches.length > 0}
                 >
@@ -1206,6 +1317,9 @@ export default function AdmissionsPage() {
                       );
                     })
                   )}
+                  <option value="__ADD_NEW_BATCH__" className="text-blue-600 font-bold">
+                    + Add New Batch
+                  </option>
                 </select>
                 {courseBatches.length > 0 && !courseBatches.some((b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)) && (
                   <p role="alert" className="mt-2 text-xs text-rose-700">All batches for this course are full. Add a batch or update its capacity in Batch Management before registering.</p>
@@ -1673,6 +1787,199 @@ export default function AdmissionsPage() {
               </Button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Create New Training Batch Modal - Preserves all admission form state */}
+      {isAddBatchModalOpen && (
+        <Modal
+          isOpen={isAddBatchModalOpen}
+          onClose={() => {
+            setIsAddBatchModalOpen(false);
+            setNewBatchError('');
+          }}
+          title="Create New Training Batch"
+          description={`Add a new batch for ${selectedCourse?.course_name || 'selected course'} without losing any student admission details.`}
+        >
+          <form onSubmit={handleCreateNewBatch} className="space-y-4 text-xs">
+            {/* Auto-matched Course */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Course (Auto-Matched)
+              </label>
+              <Input
+                value={selectedCourse?.course_name || 'SAP S/4HANA Finance'}
+                disabled
+                className="bg-slate-50 text-slate-700 font-medium"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Batch Timing */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Batch Timing *
+                </label>
+                <select
+                  value={newBatchTimingPreset}
+                  onChange={(e) => setNewBatchTimingPreset(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="09:00 AM">09:00 AM (09:00 - 10:00)</option>
+                  <option value="10:00 AM">10:00 AM (10:00 - 11:00)</option>
+                  <option value="11:00 AM">11:00 AM (11:00 - 12:00)</option>
+                  <option value="12:00 PM">12:00 PM (12:00 - 13:00)</option>
+                  <option value="Custom">Custom Timing...</option>
+                </select>
+              </div>
+
+              {/* Month */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Month *
+                </label>
+                <select
+                  value={newBatchMonth}
+                  onChange={(e) => setNewBatchMonth(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Year */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Year *
+                </label>
+                <select
+                  value={newBatchYear}
+                  onChange={(e) => setNewBatchYear(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="26">2026 (26)</option>
+                  <option value="27">2027 (27)</option>
+                  <option value="28">2028 (28)</option>
+                </select>
+              </div>
+            </div>
+
+            {newBatchTimingPreset === 'Custom' && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Custom Start Time *
+                </label>
+                <Input
+                  type="time"
+                  value={newBatchCustomTime}
+                  onChange={(e) => setNewBatchCustomTime(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
+            {/* Auto-suggested Batch Name */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                Batch Name (Auto-Suggested) *
+              </label>
+              <Input
+                placeholder="e.g. 10AM NOV 26"
+                value={newBatchName}
+                onChange={(e) => {
+                  setNewBatchName(e.target.value);
+                  if (newBatchError) setNewBatchError('');
+                }}
+                required
+              />
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Format: <code>[Time] [Month] [Year]</code> (e.g. 9AM NOV 26, 10AM NOV 26, 11AM DEC 26, 12PM JAN 27).
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Start Date */}
+              <Input
+                label="Start Date *"
+                type="date"
+                value={newBatchStartDate}
+                onChange={(e) => setNewBatchStartDate(e.target.value)}
+                required
+              />
+
+              {/* Training Mode */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Training Mode *
+                </label>
+                <select
+                  value={newBatchMode}
+                  onChange={(e) => setNewBatchMode(e.target.value as 'Online' | 'Offline')}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Trainer */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Assigned Trainer *
+                </label>
+                <select
+                  value={newBatchTrainerId}
+                  onChange={(e) => setNewBatchTrainerId(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800"
+                >
+                  <option value="">Select Trainer...</option>
+                  {availableTrainers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.full_name} ({t.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Capacity */}
+              <Input
+                label="Batch Capacity *"
+                type="number"
+                min={1}
+                max={200}
+                value={newBatchCapacity}
+                onChange={(e) => setNewBatchCapacity(Number(e.target.value))}
+                required
+              />
+            </div>
+
+            {newBatchError && (
+              <p className="text-xs text-rose-600 font-medium">{newBatchError}</p>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsAddBatchModalOpen(false);
+                  setNewBatchError('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="sap" size="sm">
+                Create Batch
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

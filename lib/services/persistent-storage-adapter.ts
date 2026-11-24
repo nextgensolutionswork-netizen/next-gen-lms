@@ -27,6 +27,7 @@ export interface InstituteDataSnapshot {
   payments: any[];
   receipts: any[];
   expenses: any[];
+  expense_categories?: string[];
   vendors: any[];
   placementProfiles: any[];
   jobOpenings: any[];
@@ -147,6 +148,7 @@ export class PersistentStorageAdapter {
       payments: state.payments || [],
       receipts: state.receipts || [],
       expenses: state.expenses || [],
+      expense_categories: (state as any).expense_categories || [],
       vendors: state.vendors || [],
       placementProfiles: state.placementProfiles || [],
       jobOpenings: state.jobOpenings || [],

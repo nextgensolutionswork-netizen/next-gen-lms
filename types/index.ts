@@ -130,6 +130,9 @@ export interface Lead {
   current_status?: LeadCurrentStatus | string;
   education?: string;
   experience_years?: number;
+  experience?: 'Fresher' | '0–2 Years' | '2–5 Years' | '5+ Years' | string;
+  dob?: string;
+  address?: string;
   training_preference?: LeadTrainingPreference;
   lead_source?: LeadSource;
   campaign?: string;
@@ -752,13 +755,15 @@ export type ExpenseCategory =
   | 'Refund'
   | 'Travel'
   | 'Maintenance'
-  | 'Miscellaneous';
+  | 'Miscellaneous'
+  | (string & {});
 
 export type ExpenseStatus =
   | 'Draft'
   | 'Pending Approval'
   | 'Approved'
   | 'Paid'
+  | 'Settled'
   | 'Rejected';
 
 export interface Expense {
@@ -777,6 +782,11 @@ export interface Expense {
   paid_by_name?: string;
   approved_by?: string;
   approved_by_name?: string;
+  settled_by?: string;
+  settled_by_name?: string;
+  settled_at?: string;
+  bank_account?: string;
+  validated_amount?: number;
   status: ExpenseStatus;
   created_at: string;
   updated_at: string;
