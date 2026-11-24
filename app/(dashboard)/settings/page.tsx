@@ -31,6 +31,10 @@ import { syncPostgresToLocal } from '@/lib/supabase/sync-service';
 import { useAuth } from '@/components/providers/auth-provider';
 import { getAuthorizedBankAccounts, formatBankAccountPresetLabel } from '@/lib/utils/bank-autofill';
 import { BankAccountSearchableDropdown } from '@/components/ui/bank-account-searchable-dropdown';
+import {
+  OFFICIAL_LOGO_PATH,
+  resolveInstituteAddress,
+} from '@/lib/constants/branding';
 
 export default function SettingsPage() {
   const { role: currentRole, hasPermission } = useAuth();
@@ -39,9 +43,9 @@ export default function SettingsPage() {
     return {
       id: base.id || 'sys-01',
       institute_name: base.institute_name || 'Next-Gen ERP Solutions',
-      logo_url: base.logo_url || '',
+      logo_url: base.logo_url || OFFICIAL_LOGO_PATH,
       tagline: base.tagline || 'Premier SAP Training, Certification & Placement Institute',
-      address: base.address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081',
+      address: resolveInstituteAddress(base.address),
       phone: base.phone || '+91 98765 43210',
       email: base.email || 'admissions@next-generpsolutions.com',
       gst_number: base.gst_number || '36AAACN1234F1Z8',

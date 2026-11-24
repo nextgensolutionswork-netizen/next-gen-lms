@@ -23,6 +23,13 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { tenantId } from '@/lib/auth/tenant';
 import { useRecordLoad } from '@/lib/hooks/use-record-load';
 import type { Receipt } from '@/types';
+import {
+  OFFICIAL_INSTITUTE_NAME,
+  OFFICIAL_INSTITUTE_ADDRESS,
+  OFFICIAL_INSTITUTE_PHONE,
+  resolveInstituteAddress,
+  resolveReceiptTerms,
+} from '@/lib/constants/branding';
 
 export default function ReceiptPrintPage() {
   const { user, role, isLoading: authLoading } = useAuth();
@@ -193,21 +200,48 @@ export default function ReceiptPrintPage() {
             {receipt.void_reason && <p className="text-xs text-amber-700 mt-1">Reason: {receipt.void_reason}</p>}
           </div>
         )}
-        <div className="flex justify-between items-start gap-6 border-b pb-6">
-          <div className="space-y-1">
-            <div className="inline-flex items-center space-x-2 bg-blue-900 text-white px-3 py-1 rounded font-bold text-xs tracking-wider uppercase mb-2">
-              <span>Next-Gen LMS</span>
-              <span className="text-blue-300">•</span>
-              <span className="text-[10px] text-blue-200 font-normal">Official Institutional Receipt</span>
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-200 pb-6">
+          <div className="flex flex-col sm:flex-row items-start gap-4 max-w-xl">
+            {/* Top-Left Company Logo */}
+            <div className="shrink-0 pt-0.5">
+              <img
+                src="/branding/nextgen-logo.webp"
+                alt="Next-Gen ERP Solutions"
+                className="h-12 w-auto object-contain"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src.endsWith('.webp')) {
+                    target.src = '/branding/nextgen-logo.png';
+                  }
+                }}
+              />
             </div>
-            <h1 className="text-2xl font-bold">{receipt.institute_name}</h1>
-            <p className="text-sm text-slate-500">{receipt.institute_address}</p>
-            <p className="text-sm text-slate-600">{receipt.institute_phone}</p>
-            <p className="text-xs text-slate-500">
-              <span className="font-semibold text-slate-700">Place of Supply:</span> {receipt.place_of_supply || 'Karnataka (29)'}
-            </p>
+            <div className="space-y-1 min-w-0">
+              <div className="inline-flex items-center space-x-1.5 bg-blue-900 text-white px-2.5 py-0.5 rounded font-bold text-[11px] tracking-wider uppercase mb-1">
+                <span>Next-Gen LMS</span>
+                <span className="text-blue-300">•</span>
+                <span className="text-[10px] text-blue-200 font-normal">Official Institutional Receipt</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
+                {receipt.institute_name || OFFICIAL_INSTITUTE_NAME}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed break-words">
+                {resolveInstituteAddress(receipt.institute_address)}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 pt-0.5">
+                {(receipt.institute_phone || OFFICIAL_INSTITUTE_PHONE) && (
+                  <span>Phone: <strong className="text-slate-700 font-medium">{receipt.institute_phone || OFFICIAL_INSTITUTE_PHONE}</strong></span>
+                )}
+                {receipt.institute_gst && (
+                  <span>GSTIN: <strong className="text-slate-700 font-medium">{receipt.institute_gst}</strong></span>
+                )}
+                <span>
+                  Place of Supply: <strong className="text-slate-700 font-medium">{receipt.place_of_supply || 'Telangana (36)'}</strong>
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="text-right space-y-1">
+          <div className="sm:text-right space-y-1 shrink-0 w-full sm:w-auto">
             <h2 className="font-bold text-blue-700 text-lg">Official Fee Receipt</h2>
             <p className="font-mono font-semibold text-slate-900">{receipt.receipt_number}</p>
             <p className="text-sm text-slate-600">Date: {formatDate(receipt.payment_date)}</p>
@@ -276,10 +310,7 @@ export default function ReceiptPrintPage() {
         <div className="border-t border-slate-200 pt-4 space-y-1.5">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Terms & Conditions</h4>
           <p className="text-[11px] text-slate-500 whitespace-pre-line leading-relaxed">
-            {receipt.terms_and_conditions || `1. All fee payments are non-refundable and non-transferable unless specified in writing by institute management.
-2. Receipts are issued subject to bank realization of cheques, UPI, and online transfers.
-3. Installment payments must be cleared on or before the due date to avoid automated late fees.
-4. Jurisdiction: Any disputes arising hereunder shall be subject to the exclusive jurisdiction of the institute's principal city.`}
+            {resolveReceiptTerms(receipt.terms_and_conditions)}
           </p>
         </div>
 

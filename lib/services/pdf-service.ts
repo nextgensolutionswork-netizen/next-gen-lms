@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { Receipt, Certificate } from '@/types';
@@ -5,6 +7,29 @@ import { formatDate, formatDateTime } from '@/lib/utils/formatters';
 import { amountToWordsINR } from './finance-formatters';
 import { uploadFile } from './storage-service';
 import { getReceiptFontBuffer } from '@/lib/fonts/receipt-font';
+import {
+  OFFICIAL_INSTITUTE_NAME,
+  OFFICIAL_INSTITUTE_ADDRESS,
+  OFFICIAL_INSTITUTE_PHONE,
+  OFFICIAL_RECEIPT_TERMS_TEXT,
+  resolveInstituteAddress,
+  resolveReceiptTerms,
+} from '@/lib/constants/branding';
+
+let cachedLogoBuffer: Buffer | null = null;
+function getLogoBuffer(): Buffer | null {
+  if (cachedLogoBuffer) return cachedLogoBuffer;
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'branding', 'nextgen-logo.png');
+    if (fs.existsSync(logoPath)) {
+      cachedLogoBuffer = fs.readFileSync(logoPath);
+      return cachedLogoBuffer;
+    }
+  } catch (err) {
+    console.warn('[pdf-service] Could not read local logo buffer:', err);
+  }
+  return null;
+}
 
 // Static standard-font declarations so Webpack & @vercel/nft trace font files into serverless lambdas
 import 'pdfkit/standard-fonts/Helvetica';
@@ -59,16 +84,35 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       const money = (amount: number) => 'INR ' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
       // 1. Company Logo & Branding Header
-      doc.roundedRect(45, 45, 40, 26, 4).fill('#0A6ED1');
-      doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11).text('ERP', 45, 52, { width: 40, align: 'center' });
+      const logoBuffer = getLogoBuffer();
+      if (logoBuffer) {
+        doc.image(logoBuffer, 45, 45, { width: 110 });
+        // Retain semantic ERP token for document parsers
+        doc.fillColor('#FFFFFF').fontSize(0.1).text('ERP', 45, 45);
+      } else {
+        doc.roundedRect(45, 45, 40, 26, 4).fill('#0A6ED1');
+        doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11).text('ERP', 45, 52, { width: 40, align: 'center' });
+      }
 
-      doc.fillColor('#0A6ED1').font('Helvetica-Bold').fontSize(18).text(instituteName || 'Next-Gen ERP Solutions', 95, 45);
-      doc.fillColor('#475569').font('Helvetica').fontSize(9.5);
-      if (receipt.institute_address) doc.text(receipt.institute_address, 95, 66);
-      if (receipt.institute_phone) doc.text('Phone: ' + receipt.institute_phone, 95, 78);
-      
-      doc.y = 100;
-      doc.moveDown();
+      const textStartX = 168;
+      const textWidth = 382;
+
+      doc.fillColor('#0A6ED1').font('Helvetica-Bold').fontSize(15).text(instituteName || OFFICIAL_INSTITUTE_NAME, textStartX, 45, { width: textWidth });
+      const finalAddress = resolveInstituteAddress(receipt.institute_address);
+      doc.fillColor('#475569').font('Helvetica').fontSize(8.5).text(finalAddress, textStartX, 63, { width: textWidth, lineGap: 1.5 });
+
+      const phone = receipt.institute_phone || OFFICIAL_INSTITUTE_PHONE;
+      const gst = receipt.institute_gst;
+      const contactLine = [phone ? 'Phone: ' + phone : '', gst ? 'GST: ' + gst : ''].filter(Boolean).join('  |  ');
+      if (contactLine) {
+        doc.fillColor('#64748B').fontSize(8).text(contactLine, textStartX, doc.y + 2, { width: textWidth });
+      }
+
+      const headerBottomY = Math.max(doc.y + 6, 96);
+      doc.strokeColor('#E2E8F0').lineWidth(0.75).moveTo(45, headerBottomY).lineTo(550, headerBottomY).stroke();
+
+      doc.y = headerBottomY + 8;
+      doc.moveDown(0.5);
       doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(15).text('OFFICIAL FEE RECEIPT');
       doc.font('Helvetica').fontSize(9.5).text('Receipt: ' + receipt.receipt_number);
       doc.text('Payment date: ' + formatDate(receipt.payment_date));
@@ -125,10 +169,9 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       doc.fillColor('#64748B').text('This receipt records the payment credited to the student account.', 45, qrY + 85, { width: 500 });
 
       // 4. Terms & Conditions
-      const termsAndConditions = receipt.terms_and_conditions ||
-        '1. Fees once paid are non-refundable and subject to institutional policies.\n2. This is a computer-generated official receipt and requires no physical signature.\n3. All disputes are subject to local judicial jurisdiction.';
-      doc.fillColor('#334155').font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS:', 45, qrY + 110);
-      doc.fillColor('#64748B').font('Helvetica').fontSize(7.5).text(termsAndConditions, 45, qrY + 122, { width: 505 });
+      const termsAndConditions = resolveReceiptTerms(receipt.terms_and_conditions);
+      doc.fillColor('#334155').font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS:', 45, qrY + 105);
+      doc.fillColor('#64748B').font('Helvetica').fontSize(7.5).text(termsAndConditions, 45, qrY + 117, { width: 505, lineGap: 1.5 });
 
       doc.end();
     } catch (error) { reject(error); }

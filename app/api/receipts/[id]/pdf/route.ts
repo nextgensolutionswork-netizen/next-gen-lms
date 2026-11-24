@@ -6,6 +6,13 @@ import { store } from '@/lib/services/data-store';
 import { generateReceiptPdfBuffer, ReceiptPdfDataError } from '@/lib/services/pdf-service';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import {
+  OFFICIAL_INSTITUTE_NAME,
+  OFFICIAL_INSTITUTE_PHONE,
+  OFFICIAL_LOGO_PATH,
+  resolveInstituteAddress,
+  resolveReceiptTerms,
+} from '@/lib/constants/branding';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -65,10 +72,12 @@ export async function GET(
             payment_date: dbReceipt.receipt_date || dbReceipt.created_at?.slice(0, 10),
             remaining_balance: 0,
             authorized_by: 'Accounts Department',
-            institute_name: 'Next-Gen ERP Solutions',
-            institute_address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
-            institute_phone: '+91 98765 43210',
-            institute_gst: '36AAACN1234F1Z8',
+            institute_name: dbReceipt.institute_name || store.settings?.institute_name || OFFICIAL_INSTITUTE_NAME,
+            institute_address: resolveInstituteAddress(dbReceipt.institute_address || store.settings?.address),
+            institute_phone: dbReceipt.institute_phone || store.settings?.phone || OFFICIAL_INSTITUTE_PHONE,
+            institute_gst: dbReceipt.institute_gst || store.settings?.gst_number || '36AAACN1234F1Z8',
+            logo_url: store.settings?.logo_url || OFFICIAL_LOGO_PATH,
+            terms_and_conditions: resolveReceiptTerms(dbReceipt.terms_and_conditions),
             created_at: dbReceipt.created_at || new Date().toISOString(),
           } as any;
         }
@@ -136,6 +145,8 @@ export async function GET(
 
     const pdfBuffer = await generateReceiptPdfBuffer({
       ...receipt,
+      institute_address: resolveInstituteAddress(receipt.institute_address || store.settings?.address),
+      terms_and_conditions: resolveReceiptTerms(receipt.terms_and_conditions),
       payment_amount:
         receipt.payment_amount ??
         (linkedPayment as any)?.amount ??

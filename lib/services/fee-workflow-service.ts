@@ -8,6 +8,12 @@ import { forwardApprovedPaymentToOnboarding } from './onboarding-service';
 import { receiptAmounts } from './receipt-amounts';
 import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
 import {
+  OFFICIAL_INSTITUTE_ADDRESS,
+  OFFICIAL_LOGO_PATH,
+  OFFICIAL_RECEIPT_TERMS_TEXT,
+  resolveInstituteAddress,
+} from '@/lib/constants/branding';
+import {
   StudentFee,
   FeeCategoryItem,
   FeeApprovalHistory,
@@ -1483,10 +1489,11 @@ export class FeeWorkflowService {
       remaining_balance: fee.outstanding_amount,
       authorized_by: verifierName,
       institute_name: store.settings?.institute_name || 'Next-Gen ERP Solutions',
-      institute_address:
-        store.settings?.address || 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad 500081',
+      institute_address: resolveInstituteAddress(store.settings?.address),
       institute_phone: store.settings?.phone || '+91 98765 43210',
-      institute_gst: '',
+      institute_gst: store.settings?.gst_number || '',
+      logo_url: store.settings?.logo_url || OFFICIAL_LOGO_PATH,
+      terms_and_conditions: OFFICIAL_RECEIPT_TERMS_TEXT,
       supply_type: receiptDetails.supply_type,
       place_of_supply: receiptDetails.place_of_supply,
       place_of_supply_code: receiptDetails.place_of_supply_code,

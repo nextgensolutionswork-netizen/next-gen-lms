@@ -55,6 +55,10 @@ import {
   isObsoleteBankPreset,
   REFERENCE_20_BANK_ACCOUNTS,
 } from '@/lib/constants/bank-accounts';
+import {
+  OFFICIAL_INSTITUTE_ADDRESS,
+  OFFICIAL_LOGO_PATH,
+} from '@/lib/constants/branding';
 
 // In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
@@ -72,7 +76,15 @@ class InstituteDataStore {
     try {
       const snapshot = persistentStorage.loadState();
       if (snapshot) {
-        if (snapshot.settings) this.settings = snapshot.settings;
+        if (snapshot.settings) {
+          this.settings = snapshot.settings;
+          if (!this.settings.address || this.settings.address.includes('Silicon Valley Towers')) {
+            this.settings.address = OFFICIAL_INSTITUTE_ADDRESS;
+          }
+          if (!this.settings.logo_url) {
+            this.settings.logo_url = OFFICIAL_LOGO_PATH;
+          }
+        }
         if (snapshot.users?.length) {
           const mappedUsers = snapshot.users.map((u: any) =>
             u.id === 'usr-counsellor' || (u.role === 'counsellor' && u.email?.toLowerCase() === 'counsellor@next-generpsolutions.com')
@@ -722,7 +734,8 @@ class InstituteDataStore {
     id: 'sys-01',
     institute_name: 'Next-Gen ERP Solutions',
     tagline: 'Premier SAP Training, Certification & Placement Institute',
-    address: 'Plot 42, Silicon Valley Towers, Hitec City, Hyderabad, Telangana 500081',
+    address: OFFICIAL_INSTITUTE_ADDRESS,
+    logo_url: OFFICIAL_LOGO_PATH,
     phone: '+91 98765 43210',
     email: 'admissions@next-generpsolutions.com',
     gst_number: '36AAACN1234F1Z8',
