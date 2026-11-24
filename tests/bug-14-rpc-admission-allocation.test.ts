@@ -45,9 +45,40 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
     stage: 'New',
     lead_source: 'Website',
     notes: '',
+    created_by: counsellorUser.id,
     created_at: '2026-11-23T05:51:20.987Z',
     updated_at: '2026-11-23T05:51:20.987Z',
   };
+
+  function createMockSupabaseAdmin(mockRpc: any) {
+    const makeQuery = (data: any) => {
+      const q: any = {
+        eq: vi.fn().mockImplementation(() => q),
+        in: vi.fn().mockImplementation(() => q),
+        maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
+        single: vi.fn().mockResolvedValue({ data, error: null }),
+      };
+      return q;
+    };
+
+    return {
+      rpc: mockRpc,
+      from: vi.fn().mockImplementation((table: string) => ({
+        select: vi.fn().mockImplementation(() => {
+          if (table === 'profiles') return makeQuery(counsellorUser);
+          if (table === 'leads') return makeQuery(sampleLead);
+          if (table === 'fee_workflow_state') {
+            return makeQuery({ revision: 154, snapshot: { admissions: [], students: [] } });
+          }
+          return makeQuery(null);
+        }),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      })),
+    };
+  }
 
   /**
    * Authoritative, strongly-typed test fixture factory to ensure complete
@@ -137,23 +168,7 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
         return Promise.resolve({ data: null, error: null });
       });
 
-      const mockSupabaseAdmin = {
-        rpc: mockRpc,
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({
-                data: { revision: 154, snapshot: { admissions: [], students: [] } },
-                error: null,
-              }),
-            }),
-          }),
-          update: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ error: null }),
-          }),
-          insert: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      };
+      const mockSupabaseAdmin = createMockSupabaseAdmin(mockRpc);
 
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
       vi.spyOn(adminModule, 'createAdminClient').mockReturnValue(mockSupabaseAdmin as any);
@@ -185,28 +200,7 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
         return Promise.resolve({ data: null, error: null });
       });
 
-      const mockSupabaseAdmin = {
-        rpc: mockRpc,
-        from: vi.fn().mockImplementation((table: string) => {
-          if (table === 'leads') {
-            return {
-              update: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: null }),
-              }),
-            };
-          }
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: { revision: 154, snapshot: { admissions: [], students: [] } },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }),
-      };
+      const mockSupabaseAdmin = createMockSupabaseAdmin(mockRpc);
 
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
       vi.spyOn(adminModule, 'createAdminClient').mockReturnValue(mockSupabaseAdmin as any);
@@ -268,28 +262,7 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
         return Promise.resolve({ data: null, error: null });
       });
 
-      const mockSupabaseAdmin = {
-        rpc: mockRpc,
-        from: vi.fn().mockImplementation((table: string) => {
-          if (table === 'leads') {
-            return {
-              update: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: null }),
-              }),
-            };
-          }
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: { revision: 154, snapshot: { admissions: [], students: [] } },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }),
-      };
+      const mockSupabaseAdmin = createMockSupabaseAdmin(mockRpc);
 
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
       vi.spyOn(adminModule, 'createAdminClient').mockReturnValue(mockSupabaseAdmin as any);
