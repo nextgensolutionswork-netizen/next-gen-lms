@@ -145,7 +145,7 @@ export function getEligibleAdmissionsCounsellors(
       // If two distinct staff members share the exact same display name, differentiate with email
       display_label = `${u.full_name} (${u.email})`;
     } else {
-      const roleBadge = u.role === 'counsellor' ? 'Sales' : 'Admin';
+      const roleBadge = (u.role === 'counsellor' || u.role === 'counsellor_lead') ? 'Sales' : 'Admin';
       // If full_name already includes title like (Senior Counsellor), avoid duplicate parentheses
       display_label = `${u.full_name} (${roleBadge})`;
     }

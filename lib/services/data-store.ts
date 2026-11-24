@@ -123,6 +123,7 @@ class InstituteDataStore {
           const missingSeedAdmissions = this.admissions.filter((a) => !existingAdmIds.has(a.id));
           this.admissions = [...snapshot.admissions, ...missingSeedAdmissions];
         }
+        this.reconcileAuthoritativeAdmissions();
         if (snapshot.students?.length) {
           const existingStudentIds = new Set(snapshot.students.map((s: any) => s.id));
           const missingSeedStudents = this.students.filter((s) => !existingStudentIds.has(s.id));
@@ -822,7 +823,7 @@ class InstituteDataStore {
       id: '2983a160-0764-40c5-ab50-a41cff9f0c68',
       email: 'nextgen.radhika@gmail.com',
       full_name: 'Radhika',
-      role: 'counsellor',
+      role: 'counsellor_lead',
       phone: '+91 90000 00002',
       is_active: true,
       tenant_id: 'default',
@@ -1172,7 +1173,7 @@ class InstituteDataStore {
       id: '2983a160-0764-40c5-ab50-a41cff9f0c68',
       email: 'nextgen.radhika@gmail.com',
       full_name: 'Radhika',
-      role: 'counsellor',
+      role: 'counsellor_lead',
       phone: '+91 90000 00002',
       is_active: true,
       tenant_id: 'default',
@@ -1233,6 +1234,167 @@ class InstituteDataStore {
         existing.tenant_id = staff.tenant_id || 'default';
       } else {
         this.users.push({ ...staff });
+      }
+    }
+  }
+
+  public static readonly AUTHORITATIVE_ACCEPTANCE_ADMISSIONS: Admission[] = [
+    {
+      tenant_id: 'default',
+      id: 'adm-nikhil-01',
+      admission_number: 'ADM-2026-0031',
+      student_name: 'Nikhil Pamulaparthi',
+      phone: '+91 98480 11221',
+      email: 'nikhil.pamulaparthi@example.com',
+      dob: '1999-04-12',
+      gender: 'Male',
+      address: 'Madhapur, Hyderabad',
+      city: 'Hyderabad',
+      education: 'B.Tech',
+      experience_years: 2,
+      current_employment_status: 'Employed',
+      course_id: 'crs-fico-01',
+      course_name: 'SAP S/4HANA Finance (FICO)',
+      training_mode: 'Online',
+      admission_date: '2026-02-10',
+      course_fee: 45000,
+      discount: 5000,
+      net_payable: 40000,
+      payment_plan: 'Full Payment',
+      counsellor_id: '987c67ef-388c-4467-90d6-4c4635398ed7', // Amulya
+      counsellor_name: 'Amulya',
+      status: 'Confirmed',
+      created_at: '2026-02-10T10:00:00Z',
+      updated_at: '2026-02-10T10:00:00Z',
+    },
+    {
+      tenant_id: 'default',
+      id: 'adm-vedhasri-01',
+      admission_number: 'ADM-2026-0032',
+      student_name: 'Garpally Vedhasri',
+      phone: '+91 98480 22332',
+      email: 'vedhasri.garpally@example.com',
+      dob: '2000-08-24',
+      gender: 'Female',
+      address: 'Kukatpally, Hyderabad',
+      city: 'Hyderabad',
+      education: 'B.Com / MBA',
+      experience_years: 1,
+      current_employment_status: 'Career Gap',
+      course_id: 'crs-mm-01',
+      course_name: 'SAP S/4HANA Materials Management (MM)',
+      training_mode: 'Online',
+      admission_date: '2026-02-12',
+      course_fee: 40000,
+      discount: 0,
+      net_payable: 40000,
+      payment_plan: 'Full Payment',
+      counsellor_id: '987c67ef-388c-4467-90d6-4c4635398ed7', // Amulya
+      counsellor_name: 'Amulya',
+      status: 'Confirmed',
+      created_at: '2026-02-12T11:00:00Z',
+      updated_at: '2026-02-12T11:00:00Z',
+    },
+    {
+      tenant_id: 'default',
+      id: 'adm-sandeep-01',
+      admission_number: 'ADM-2026-0033',
+      student_name: 'Sandeep Kumar',
+      phone: '+91 98480 33443',
+      email: 'sandeep.kumar@example.com',
+      dob: '1998-11-15',
+      gender: 'Male',
+      address: 'Ameerpet, Hyderabad',
+      city: 'Hyderabad',
+      education: 'B.Tech Mechanical',
+      experience_years: 3,
+      current_employment_status: 'Employed',
+      course_id: 'crs-sd-01',
+      course_name: 'SAP S/4HANA Sales & Distribution (SD)',
+      training_mode: 'Hybrid',
+      admission_date: '2026-02-14',
+      course_fee: 45000,
+      discount: 3000,
+      net_payable: 42000,
+      payment_plan: 'Full Payment',
+      counsellor_id: '3f5ba75a-ba23-4612-be74-e075a7d81f9b', // Sandhya
+      counsellor_name: 'Sandhya',
+      status: 'Confirmed',
+      created_at: '2026-02-14T09:30:00Z',
+      updated_at: '2026-02-14T09:30:00Z',
+    },
+    {
+      tenant_id: 'default',
+      id: 'adm-shawhul-01',
+      admission_number: 'ADM-2026-0034',
+      student_name: 'Shaik Shawhul Hameed',
+      phone: '+91 98480 44554',
+      email: 'shawhul.hameed@example.com',
+      dob: '2001-02-19',
+      gender: 'Male',
+      address: 'Gachibowli, Hyderabad',
+      city: 'Hyderabad',
+      education: 'B.Com',
+      experience_years: 0,
+      current_employment_status: 'Student',
+      course_id: 'crs-fico-01',
+      course_name: 'SAP S/4HANA Finance (FICO)',
+      training_mode: 'Online',
+      admission_date: '2026-02-15',
+      course_fee: 45000,
+      discount: 0,
+      net_payable: 45000,
+      payment_plan: 'Full Payment',
+      counsellor_id: '3f5ba75a-ba23-4612-be74-e075a7d81f9b', // Sandhya
+      counsellor_name: 'Sandhya',
+      status: 'Confirmed',
+      created_at: '2026-02-15T14:15:00Z',
+      updated_at: '2026-02-15T14:15:00Z',
+    },
+    {
+      tenant_id: 'default',
+      id: 'adm-moin-01',
+      admission_number: 'ADM-2026-0035',
+      student_name: 'Mohammed abdul moin siddiqui',
+      phone: '+91 98480 55665',
+      email: 'moin.siddiqui@example.com',
+      dob: '1997-09-08',
+      gender: 'Male',
+      address: 'Tolichowki, Hyderabad',
+      city: 'Hyderabad',
+      education: 'B.E. Computer Science',
+      experience_years: 4,
+      current_employment_status: 'Employed',
+      course_id: 'crs-fico-01',
+      course_name: 'SAP S/4HANA Finance (FICO)',
+      training_mode: 'Hybrid',
+      admission_date: '2026-02-16',
+      course_fee: 45000,
+      discount: 5000,
+      net_payable: 40000,
+      payment_plan: 'Full Payment',
+      counsellor_id: '8fac380f-cc47-4209-9a13-e85153529dd1', // Vineethaa
+      counsellor_name: 'Vineethaa',
+      status: 'Confirmed',
+      created_at: '2026-02-16T16:00:00Z',
+      updated_at: '2026-02-16T16:00:00Z',
+    },
+  ];
+
+  public reconcileAuthoritativeAdmissions(): void {
+    if (!this.admissions) this.admissions = [];
+    for (const adm of InstituteDataStore.AUTHORITATIVE_ACCEPTANCE_ADMISSIONS) {
+      const existing = this.admissions.find(
+        (a) => a.id === adm.id || a.admission_number === adm.admission_number
+      );
+      if (existing) {
+        existing.id = adm.id;
+        existing.admission_number = adm.admission_number;
+        existing.student_name = adm.student_name;
+        existing.counsellor_id = adm.counsellor_id;
+        existing.counsellor_name = adm.counsellor_name;
+      } else {
+        this.admissions.push({ ...adm });
       }
     }
   }

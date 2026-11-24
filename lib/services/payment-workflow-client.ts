@@ -3,6 +3,7 @@ import { mergeWorkflowSnapshot } from './payment-workflow-state';
 import type { CreateAdmissionInput } from './admission-service';
 import type { feeWorkflowService } from './fee-workflow-service';
 import type { StudentPaymentRecord } from '@/types';
+import { store } from './data-store';
 
 const pending = new Map<string, Promise<any>>();
 const keys = new Map<string, string>();
@@ -24,7 +25,24 @@ export const paymentWorkflowClient = {
     if (!refreshTask) refreshTask = request().finally(() => { refreshTask = undefined; });
     return refreshTask;
   },
-  async refreshAdmissions() { return request(undefined, '/api/admissions'); },
+  async refreshAdmissions() {
+    const data = await request(undefined, '/api/admissions');
+    if (data.snapshot?.admissions) {
+      store.admissions = [...data.snapshot.admissions];
+    } else if (Array.isArray(data.admissions)) {
+      store.admissions = [...data.admissions];
+    }
+    return data;
+  },
+  clearCache() {
+    store.admissions = [];
+    store.students = [];
+    store.payments = [];
+    store.feeAccounts = [];
+    store.studentFees = [];
+    store.studentPayments = [];
+    store.receipts = [];
+  },
   async refreshStudents() { return request(undefined, '/api/students'); },
   async refreshReceipts() { return request(undefined, '/api/fees/receipts'); },
   recordPayment(input: Parameters<typeof feeWorkflowService.recordPayment>[0], _userId?: string, _role?: string): Promise<StudentPaymentRecord> {

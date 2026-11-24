@@ -272,21 +272,42 @@ export default function AdmissionsPage() {
   }, [user, isNewModalOpen]);
 
   const availableCounsellors = React.useMemo(() => {
+    let list: EligibleCounsellorOption[] = [];
     if (authoritativeCounsellors.length > 0) {
-      return authoritativeCounsellors;
+      list = authoritativeCounsellors;
+    } else {
+      const currentTenant = (user && tenantId(user)) || 'default';
+      list = getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
     }
-    const currentTenant = (user && tenantId(user)) || 'default';
-    return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
+
+    if (user?.role === 'counsellor') {
+      const canonical = resolveCanonicalCounsellorId(user.id) || user.id;
+      return list.filter((c) => c.id === user.id || c.id === canonical);
+    }
+
+    if (user?.role === 'counsellor_lead') {
+      const localTeamMap: Record<string, string[]> = {
+        '2983a160-0764-40c5-ab50-a41cff9f0c68': [
+          '987c67ef-388c-4467-90d6-4c4635398ed7', // Amulya
+          '3f5ba75a-ba23-4612-be74-e075a7d81f9b', // Sandhya
+        ],
+      };
+      const teamMembers = localTeamMap[user.id] || [];
+      const allowedIds = new Set([user.id, ...teamMembers]);
+      return list.filter((c) => allowedIds.has(c.id));
+    }
+
+    return list;
   }, [authoritativeCounsellors, user]);
 
   React.useEffect(() => {
-    if (!counsellorId && user) {
+    if (user) {
       if (user.role === 'counsellor') {
         const canonical = resolveCanonicalCounsellorId(user.id) || user.id;
         setCounsellorId(canonical);
         const match = availableCounsellors.find((c) => c.id === canonical || c.id === user.id);
         if (match) setCounsellorName(match.full_name);
-      } else {
+      } else if (!counsellorId) {
         const firstCounsellor = availableCounsellors.find((c) => c.role === 'counsellor') || availableCounsellors[0];
         if (firstCounsellor) {
           setCounsellorId(firstCounsellor.id);
@@ -422,10 +443,21 @@ export default function AdmissionsPage() {
     }
   }, [isFullPayment, feeDueDate, feeDueDateError]);
 
+  // Immediate cache-clearing on user switch/logout to prevent cross-account leaks
+  React.useEffect(() => {
+    setAdmissions([]);
+    setIsLoading(true);
+    paymentWorkflowClient.clearCache();
+  }, [user?.id, user?.role]);
+
   const refreshList = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      let list = await getAdmissions();
+      let list = await getAdmissions(user || undefined);
+      if (user?.role === 'counsellor') {
+        const canonicalId = resolveCanonicalCounsellorId(user.id) || user.id;
+        list = list.filter((a) => a.counsellor_id === user.id || a.counsellor_id === canonicalId);
+      }
       if (statusFilter !== 'All') {
         list = list.filter((a) => a.status === statusFilter);
       }
@@ -449,7 +481,7 @@ export default function AdmissionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, user]);
 
   React.useEffect(() => {
     refreshList();
@@ -659,7 +691,12 @@ export default function AdmissionsPage() {
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Student Admissions</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Student Admissions</h1>
+            <Badge variant="outline" className="text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200">
+              {admissions.length} {role === 'counsellor' ? 'Assigned Records' : 'Registered Records'}
+            </Badge>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
             Confirmed student enrollments with automated fee ledger, and portal enablement.
           </p>
@@ -746,6 +783,8 @@ export default function AdmissionsPage() {
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         {search || statusFilter !== 'All'
                           ? 'Try adjusting your search query or status filter.'
+                          : role === 'counsellor'
+                          ? 'No Admissions Assigned: You currently have no student admissions assigned to your counsellor account.'
                           : 'No admissions have been registered yet. Click "New Admission" above to add one.'}
                       </p>
                     </td>
@@ -1178,6 +1217,7 @@ export default function AdmissionsPage() {
                 <CounsellorSearchableDropdown
                   counsellors={availableCounsellors}
                   selectedId={counsellorId}
+                  disabled={role === 'counsellor'}
                   onSelect={(c) => {
                     setCounsellorId(c.id);
                     setCounsellorName(c.full_name);
@@ -1185,8 +1225,13 @@ export default function AdmissionsPage() {
                   }}
                   required
                   error={counsellorError}
-                  label="Counsellor Name *"
+                  label={role === 'counsellor' ? 'Assigned Counsellor (Locked) *' : 'Counsellor Name *'}
                 />
+                {role === 'counsellor' && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Locked to your verified counsellor profile.
+                  </p>
+                )}
               </div>
             </div>
           </div>

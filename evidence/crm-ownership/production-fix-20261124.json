@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-24",
+  "project": "tgohtdzwehhjfahtgovq",
+  "authorization": "User approved production diagnosis and reviewed database fix",
+  "appliedMigrations": [
+    {
+      "version": "20261124005402",
+      "name": "created_by_lead_isolation",
+      "source": "supabase/migrations/20261123122939_created_by_lead_isolation.sql",
+      "additions": "Transaction timeouts, original-row fingerprint preservation assertion, PostgREST schema reload"
+    },
+    {
+      "version": "20261124005456",
+      "name": "fix_crm_role_helper_search_path",
+      "source": "supabase/migrations/20261124005440_fix_crm_role_helper_search_path.sql"
+    }
+  ],
+  "validation": {
+    "localSecurityTests": 46,
+    "failed": 0,
+    "productionRollbackChecks": [
+      "authenticated insert",
+      "creator read",
+      "immutable creator",
+      "cross-user read denial",
+      "cross-user update denial",
+      "service-role insert"
+    ],
+    "restSchemaCheck": 200,
+    "leadsBefore": 8,
+    "leadsAfter": 8,
+    "historicalOwnershipAssigned": 0,
+    "fingerprintBefore": "25e7bba321ab438de5d5c5ee44338958",
+    "fingerprintAfter": "25e7bba321ab438de5d5c5ee44338958"
+  },
+  "limitations": [
+    "No browser login or real lead submission performed; production database inserts were rolled back",
+    "Existing unrelated security advisories remain",
+    "Hosted migration version numbers differ from source filenames; reconcile migration history before any future bulk db push"
+  ],
+  "deploymentPerformed": false,
+  "stagingModified": false
+}

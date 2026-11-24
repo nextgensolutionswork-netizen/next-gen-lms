@@ -7,9 +7,17 @@ import { paymentTransaction } from '@/lib/services/payment-workflow-transaction'
 import { visibleWorkflowSnapshot } from '@/lib/services/payment-workflow-state';
 import { createAdmissionWorkflow, CreateAdmissionInput } from '@/lib/services/admission-service';
 import { validatePhoneNumber, validateAlternatePhoneNumber } from '@/lib/utils/phone-validation';
+import {
+  ADMISSION_READ_ROLES,
+  ADMISSION_WRITE_ROLES,
+  resolveCounsellorTeamMembers,
+  validateAdmissionRegistrationOwnership,
+} from '@/lib/auth/admission-access';
+import { store } from '@/lib/services/data-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
 const schema = z.object({
   student_name: z.string().min(1),
   phone: z.string().min(1),
@@ -19,11 +27,36 @@ const schema = z.object({
   discount: z.number().finite().nonnegative(),
   collect_initial_payment: z.boolean().optional(),
   initial_payment_amount: z.number().finite().nonnegative().optional(),
-  payment_mode: z.enum(['Cash', 'UPI', 'Card', 'Other', 'Payment Gateway', 'Credit Card', 'Debit Card', 'Net Banking', 'Bank Transfer', 'Cheque']).optional(),
-  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v, 'Invalid payment date').optional(),
+  payment_mode: z.enum([
+    'Cash',
+    'UPI',
+    'Card',
+    'Other',
+    'Payment Gateway',
+    'Credit Card',
+    'Debit Card',
+    'Net Banking',
+    'Bank Transfer',
+    'Cheque',
+  ]).optional(),
+  payment_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine(
+      (v) => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v,
+      'Invalid payment date'
+    )
+    .optional(),
   transaction_reference: z.string().trim().max(200).nullable().optional(),
   bank_upi_reference: z.string().trim().max(200).optional(),
-  payment_proof_url: z.string().max(4096).refine((v) => !v || v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach valid payment proof').optional(),
+  payment_proof_url: z
+    .string()
+    .max(4096)
+    .refine(
+      (v) => !v || v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v),
+      'Attach valid payment proof'
+    )
+    .optional(),
   alternate_phone: z.string().trim().max(50).optional(),
   photo_url: z.string().max(4096).optional(),
   our_bank_name: z.string().trim().max(200).optional(),
@@ -38,17 +71,44 @@ const schema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const actor = await authenticatePaymentRequest(request);
-    if (!['counsellor', 'admin', 'super_admin', 'onboarding_team'].includes(actor.role)) throw new Error('Forbidden: Admission access required.');
-    const snapshot = await paymentTransaction(actor, () => visibleWorkflowSnapshot(actor), true);
-    return NextResponse.json({ success: true, snapshot }, { headers: { 'Cache-Control': 'private, no-store' } });
-  } catch (error) { return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Admission access denied.' }, { status: 403 }); }
+    if (!ADMISSION_READ_ROLES.includes(actor.role as any)) {
+      throw new Error('Forbidden: Admission access required.');
+    }
+
+    const teamMembers =
+      actor.role === 'counsellor_lead' ? await resolveCounsellorTeamMembers(actor) : undefined;
+
+    const snapshot = await paymentTransaction(
+      actor,
+      () => visibleWorkflowSnapshot(actor, teamMembers),
+      true
+    );
+
+    return NextResponse.json(
+      { success: true, snapshot, admissions: snapshot.admissions || [] },
+      { headers: { 'Cache-Control': 'private, no-store' } }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Admission access denied.';
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: message.startsWith('Unauthorized') ? 401 : 403 }
+    );
+  }
 }
+
 export async function POST(request: NextRequest) {
   try {
     const actor = await authenticatePaymentRequest(request);
-    if (!['counsellor', 'counsellor_lead', 'admin', 'super_admin'].includes(actor.role)) throw new Error('Forbidden: Admission registration requires counsellor access.');
+    if (!ADMISSION_WRITE_ROLES.includes(actor.role as any)) {
+      throw new Error('Forbidden: Admission registration requires counsellor access.');
+    }
+
     const input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
-    if (input.lead_id) await authorizedLead(input.lead_id, actor);
+    if (input.lead_id) {
+      await authorizedLead(input.lead_id, actor);
+    }
+
     const phoneCheck = validatePhoneNumber('IN', input.phone, 'Phone number', true);
     if (!phoneCheck.isValid) {
       throw new Error(phoneCheck.error || 'Please enter a valid phone number.');
@@ -65,18 +125,40 @@ export async function POST(request: NextRequest) {
         throw new Error('Transaction reference is required for non-cash initial payments.');
       }
     }
+
+    // Resolve verified team members for counsellor_lead
+    const teamMembers =
+      actor.role === 'counsellor_lead' ? await resolveCounsellorTeamMembers(actor) : undefined;
+
+    // Enforce strict registration ownership: Counsellor must be assigned to themselves
+    const { counsellor_id: assignedCounsellorId, counsellor_name: assignedCounsellorName } =
+      validateAdmissionRegistrationOwnership(actor, input.counsellor_id, store.users, teamMembers);
+
     const data = await paymentTransaction(actor, async () => {
-      const assignedCounsellorId = (actor.role === 'counsellor' && !input.counsellor_id) ? actor.id : (input.counsellor_id || actor.id);
-      const result = await createAdmissionWorkflow({
-        ...input,
-        counsellor_id: assignedCounsellorId,
-        counsellor_name: input.counsellor_name,
-      }, actor.id, true);
-      return { result, snapshot: visibleWorkflowSnapshot(actor) };
+      const result = await createAdmissionWorkflow(
+        {
+          ...input,
+          counsellor_id: assignedCounsellorId,
+          counsellor_name: assignedCounsellorName,
+        },
+        actor.id,
+        true
+      );
+      return { result, snapshot: visibleWorkflowSnapshot(actor, teamMembers) };
     });
+
     return NextResponse.json({ success: true, ...data });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Admission failed.';
-    return NextResponse.json({ success: false, error: message }, { status: message.startsWith('Unauthorized') ? 401 : message.startsWith('Forbidden') ? 403 : 400 });
+    return NextResponse.json(
+      { success: false, error: message },
+      {
+        status: message.startsWith('Unauthorized')
+          ? 401
+          : message.startsWith('Forbidden')
+          ? 403
+          : 400,
+      }
+    );
   }
 }

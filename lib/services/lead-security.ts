@@ -27,7 +27,19 @@ export async function resolveLeadScope(actor: UserProfile): Promise<LeadScope> {
 }
 
 // Local-only fixtures; never hydrated from client input or exposed through an API.
-export const localTeamMembers: { tenant_id: string; leader_id: string; member_id: string }[] = [];
+export const localTeamMembers: { tenant_id: string; leader_id: string; member_id: string }[] = [
+  // Radhika (Counsellor Lead) manages Amulya and Sandhya
+  {
+    tenant_id: 'default',
+    leader_id: '2983a160-0764-40c5-ab50-a41cff9f0c68',
+    member_id: '987c67ef-388c-4467-90d6-4c4635398ed7',
+  },
+  {
+    tenant_id: 'default',
+    leader_id: '2983a160-0764-40c5-ab50-a41cff9f0c68',
+    member_id: '3f5ba75a-ba23-4612-be74-e075a7d81f9b',
+  },
+];
 
 export function scopeLeadQuery(query: any, scope: LeadScope): any {
   query = query.eq('tenant_id', scope.actor.tenant_id);

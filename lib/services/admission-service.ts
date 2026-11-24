@@ -33,6 +33,12 @@ import {
   validateCounsellorAssignment,
   isEligibleAdmissionsCounsellor,
 } from './counsellor-service';
+import {
+  canAccessAdmission,
+  resolveAdmissionScope,
+  assertAdmissionAccess,
+  validateAdmissionRegistrationOwnership,
+} from '@/lib/auth/admission-access';
 
 export {
   getEligibleAdmissionsCounsellors,
@@ -86,11 +92,18 @@ export function getNextAdmissionSequence(year = new Date().getFullYear()): numbe
   return nextSeq;
 }
 
-export async function getAdmissions(): Promise<Admission[]> {
+export async function getAdmissions(actor?: UserProfile): Promise<Admission[]> {
   if (typeof window !== 'undefined') {
     const { paymentWorkflowClient } = await import('./payment-workflow-client');
     await paymentWorkflowClient.refreshAdmissions();
-    return [...store.admissions];
+    let list = [...store.admissions].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    if (actor) {
+      const scope = await resolveAdmissionScope(actor);
+      list = list.filter((a) => canAccessAdmission(scope, a));
+    }
+    return list;
   }
   if (isLiveSupabaseEnabled()) {
     try {
@@ -103,37 +116,53 @@ export async function getAdmissions(): Promise<Admission[]> {
       if (!error && data && data.length > 0) {
         // Synchronize in-memory cache with database
         store.admissions = data as Admission[];
-        return data as Admission[];
       }
     } catch (err) {
       console.warn('Supabase admissions direct query error, falling back to local persistent store:', err);
     }
   }
 
-  return [...store.admissions].sort(
+  let list = [...store.admissions].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+
+  if (actor) {
+    const scope = await resolveAdmissionScope(actor);
+    list = list.filter((a) => canAccessAdmission(scope, a));
+  }
+
+  return list;
 }
 
-export async function getAdmissionById(id: string): Promise<Admission | undefined> {
+export async function getAdmissionById(id: string, actor?: UserProfile): Promise<Admission | undefined> {
+  let admission: Admission | undefined;
   if (isLiveSupabaseEnabled()) {
     try {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('admissions')
         .select('*')
-        .eq('id', id)
+        .or(`id.eq.${id},admission_number.ilike.${id}`)
         .maybeSingle();
 
       if (!error && data) {
-        return data as Admission;
+        admission = data as Admission;
       }
     } catch (err) {
       console.warn('Supabase getAdmissionById error, checking local persistent store:', err);
     }
   }
 
-  return store.admissions.find((a) => a.id === id);
+  if (!admission) {
+    admission = store.admissions.find((a) => a.id === id || a.admission_number === id);
+  }
+
+  if (admission && actor) {
+    const scope = await resolveAdmissionScope(actor);
+    assertAdmissionAccess(scope, admission);
+  }
+
+  return admission;
 }
 
 export interface FeeDueDateValidationResult {
@@ -483,10 +512,16 @@ export async function createAdmissionWorkflow(
   const trainer = store.users.find((u) => u.id === (input.trainer_id || batch?.trainer_id));
   const fallbackCounsellor = store.users.find((u) => u.role === 'counsellor' && u.is_active && tenantId(u) === admissionTenant);
   let counsellor: UserProfile;
-  if (input.counsellor_id) {
+  if (performingUser.role === 'counsellor' || performingUser.role === 'counsellor_lead') {
+    const ownership = validateAdmissionRegistrationOwnership(
+      performingUser,
+      input.counsellor_id,
+      store.users
+    );
+    const target = store.users.find((u) => u.id === ownership.counsellor_id) || performingUser;
+    counsellor = { ...target, id: ownership.counsellor_id, full_name: ownership.counsellor_name };
+  } else if (input.counsellor_id) {
     counsellor = validateCounsellorAssignment(input.counsellor_id, store.users, admissionTenant);
-  } else if (performingUser.role === 'counsellor') {
-    counsellor = validateCounsellorAssignment(performingUser.id, store.users, admissionTenant);
   } else if (fallbackCounsellor) {
     counsellor = validateCounsellorAssignment(fallbackCounsellor.id, store.users, admissionTenant);
   } else {
