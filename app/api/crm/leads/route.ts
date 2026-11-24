@@ -54,7 +54,16 @@ export async function POST(request: NextRequest) {
   try {
     const actor = await authorize(request);
     const body = await request.json();
-    const lead = await createLead({ ...body, ...(actor.role === 'counsellor' ? { counsellor_id: actor.id } : {}) }, actor);
+    if (body.created_by !== undefined && body.created_by !== actor.id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Cannot impersonate a creator.' }, { status: 403 });
+    }
+    if (body.tenant_id !== undefined && body.tenant_id !== actor.tenant_id) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Tenant mismatch.' }, { status: 403 });
+    }
+    const lead = await createLead({
+      ...body,
+      ...(actor.role === 'counsellor' ? { counsellor_id: actor.id } : {}),
+    }, actor);
     return NextResponse.json({ success: true, lead });
   } catch (err: any) {
     return failure(err);

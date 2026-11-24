@@ -357,14 +357,6 @@ export async function createLead(
           newLead.lead_code = `LD-${new Date().getFullYear()}-${globalThis.crypto.randomUUID()}`;
           continue;
         }
-        // Fallback if country_code / whatsapp columns don't exist yet on remote db
-        if (error.code === '42703' || error.message.includes('column')) {
-          delete insertPayload.country_code;
-          delete insertPayload.whatsapp_country_code;
-          delete insertPayload.whatsapp_number;
-          const { error: retryErr } = await supabase.from('leads').insert(insertPayload);
-          if (!retryErr) break;
-        }
         throw new Error(`Database error creating lead: ${error.message}`);
       }
     } catch (err: any) {
@@ -630,7 +622,9 @@ export function convertLeadToAdmission(leadId: string, actor?: UserProfile): {
   // Prefill is read-only. Conversion is committed only by the admission workflow.
 
   store.reconcileAuthoritativeCourses();
-  const course = (store.courses || []).find((c) => c.id === lead.interested_course_id || matchesCourseId(c.id, lead.interested_course_id)) || store.courses?.[0];
+  const course = lead.interested_course_id
+    ? (store.courses || []).find((c) => c.id === lead.interested_course_id || matchesCourseId(c.id, lead.interested_course_id))
+    : store.courses?.[0];
 
   const admissionPrefill: Partial<CreateAdmissionInput> = {
     student_name: lead.full_name,
