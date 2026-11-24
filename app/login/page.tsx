@@ -32,89 +32,6 @@ async function signCurrentAuthCookie(): Promise<string | null> {
   return null;
 }
 
-const DEMO_ACCOUNTS = [
-  {
-    role: 'super_admin' as const,
-    label: 'Super Admin',
-    name: 'Rajesh Sharma (Director)',
-    email: 'superadmin@next-generpsolutions.com',
-    password: 'AdminPass#2026',
-    route: '/dashboard',
-    badge: 'bg-blue-100 text-blue-800 border-blue-300',
-  },
-  {
-    role: 'admin' as const,
-    label: getRoleLabel('admin'),
-    name: 'Priya Nair (Operations Head)',
-    email: 'admin@next-generpsolutions.com',
-    password: 'AdminPass#2026',
-    route: '/dashboard',
-    badge: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-  },
-  {
-    role: 'accountant' as const,
-    label: 'Accountant',
-    name: 'Suresh Kumar (Chief Accountant)',
-    email: 'accounts@next-generpsolutions.com',
-    password: 'AccountsPass#2026',
-    route: '/accounts/fees',
-    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  },
-  {
-    role: 'counsellor' as const,
-    label: getRoleLabel('counsellor'),
-    name: 'Ananya Desai (Senior Sales)',
-    email: 'counsellor@next-generpsolutions.com',
-    password: 'CounsellorPass#2026',
-    route: '/crm/leads',
-    badge: 'bg-amber-100 text-amber-800 border-amber-300',
-  },
-  {
-    role: 'trainer' as const,
-    label: 'Trainer / Faculty',
-    name: 'Vikram Rao (SAP FICO Lead)',
-    email: 'vikram.fico@next-generpsolutions.com',
-    password: 'TrainerPass#2026',
-    route: '/academics/courses',
-    badge: 'bg-purple-100 text-purple-800 border-purple-300',
-  },
-  {
-    role: 'placement_coordinator' as const,
-    label: 'Placement Head',
-    name: 'Sunita Reddy (Placement Head)',
-    email: 'placement@next-generpsolutions.com',
-    password: 'PlacementPass#2026',
-    route: '/placement',
-    badge: 'bg-violet-100 text-violet-800 border-violet-300',
-  },
-  {
-    role: 'support' as const,
-    label: 'Academic Support',
-    name: 'Ananya Deshmukh (SAP Support Lead)',
-    email: 'support@next-generpsolutions.com',
-    password: 'SupportPass#2026',
-    route: '/support',
-    badge: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-  },
-  {
-    role: 'onboarding_team' as const,
-    label: 'Onboarding Team',
-    name: 'Sneha Patel (Student Onboarding Lead)',
-    email: 'onboarding@next-generpsolutions.com',
-    password: 'OnboardPass#2026',
-    route: '/onboarding',
-    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  },
-  {
-    role: 'student' as const,
-    label: 'Enrolled Student',
-    name: 'Amit Gupta (SAP Student)',
-    email: 'amit.gupta@student.next-gen.com',
-    password: 'StudentPass#2026',
-    route: '/portal',
-    badge: 'bg-teal-100 text-teal-800 border-teal-300',
-  },
-];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -133,7 +50,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [activeRole, setActiveRole] = useState<string | null>(null);
   const [targetRedirect, setTargetRedirect] = useState<string | null>(null);
 
   useEffect(() => {
@@ -232,26 +148,6 @@ export default function LoginPage() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
-  const selectAccount = (account: typeof DEMO_ACCOUNTS[0]) => {
-    setEmail(account.email);
-    setPassword(account.password);
-    setActiveRole(account.role);
-    setError('');
-  };
-
-  const directLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
-    selectAccount(account);
-    setError('');
-    setBusy(true);
-    try {
-      await login(account.email, account.password, targetRedirect || undefined);
-      await signCurrentAuthCookie();
-    } catch (err: any) {
-      setError(err?.message || 'Unable to sign in. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -336,7 +232,7 @@ export default function LoginPage() {
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-blue-400">Multi-Role Institute ERP & LMS</p>
           <h1 className="max-w-lg text-3xl font-semibold leading-tight lg:text-5xl">Build skills.<br />Create your future.</h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300">Complete enterprise training management for students, trainers, accountants, sales staff, support mentors, and administrators.</p>
-          <div className="mt-8 flex items-center gap-3 text-xs text-slate-300"><BookOpen aria-hidden="true" className="text-blue-400" size={18} />{DEMO_ACCOUNTS.length} Dedicated Role Workspaces &amp; Portals</div>
+          <div className="mt-8 flex items-center gap-3 text-xs text-slate-300"><BookOpen aria-hidden="true" className="text-blue-400" size={18} />9 Dedicated Role Workspaces &amp; Portals</div>
         </div>
         <p className="text-[11px] text-slate-500">Next-Gen ERP Solutions · SAP Training Institute</p>
       </section>
@@ -362,7 +258,7 @@ export default function LoginPage() {
                   : 'Enter and confirm your new password below.'
                 : forgotPasswordMode
                   ? 'Enter your account email and we’ll send you a fresh recovery link.'
-                  : 'Select any of the ' + DEMO_ACCOUNTS.length + ' accounts below or enter credentials manually.'}
+                  : 'Enter your email address and password to sign in securely.'}
           </p>
 
           {passwordResetComplete ? (
@@ -503,63 +399,11 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Quick Demo Fill Buttons for ALL 8 ROLES */}
-          <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">{DEMO_ACCOUNTS.length} Preset Role Accounts:</span>
-              <span className="text-[10px] text-blue-600 font-medium">Click to fill</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.role}
-                  type="button"
-                  onClick={() => selectAccount(acc)}
-                  className={`text-left p-1.5 rounded-lg border text-[11px] transition-all ${
-                    activeRole === acc.role
-                      ? 'border-blue-600 bg-blue-50 font-bold shadow-2xs'
-                      : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-900 truncate">{acc.label}</span>
-                    <span className="text-[9px] text-slate-400">{acc.route}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 truncate">{acc.email}</p>
-                </button>
-              ))}
-            </div>
-
-            {activeRole && (
-              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px]">
-                <div className="text-slate-600 truncate mr-2">
-                  <span>Ready as <strong className="text-blue-700">{DEMO_ACCOUNTS.find(a => a.role === activeRole)?.label}</strong></span>
-                  {targetRedirect && (
-                    <span className="text-[10px] text-slate-500 block truncate">
-                      Redirect: <code className="text-blue-600 font-mono text-[10px]">{getSafeRedirectUrl(activeRole, targetRedirect)}</code>
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const acc = DEMO_ACCOUNTS.find(a => a.role === activeRole);
-                    if (acc) directLogin(acc);
-                  }}
-                  className="font-bold text-blue-600 hover:text-blue-800 underline text-[11px] shrink-0"
-                >
-                  Instant 1-Click Launch &rarr;
-                </button>
-              </div>
-            )}
-          </div>
-
           <form
             method="POST"
             action="/api/auth/login"
             onSubmit={handleSubmit}
-            className="mt-4 space-y-4"
+            className="mt-6 space-y-4"
           >
             <input type="hidden" name="redirectTo" value={targetRedirect || ''} />
             <noscript>
