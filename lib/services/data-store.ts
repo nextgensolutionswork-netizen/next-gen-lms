@@ -76,6 +76,13 @@ export const DEFAULT_EXPENSE_CATEGORIES: string[] = [
   'Miscellaneous',
 ];
 
+const REMOVED_LEGACY_SEED_COURSE_IDS = new Set([
+  'crs-fico-01',
+  'crs-mm-01',
+  'crs-sd-01',
+  'crs-abap-01',
+]);
+
 function isProductionEnv(): boolean {
   if (
     process.env.NODE_ENV === 'production' ||
@@ -112,6 +119,7 @@ class InstituteDataStore {
     // TASK-01: When running in production or connected to live Supabase, business records
     // must be sourced exclusively from Supabase PostgREST queries, never from initial seed mock records.
     if (isProductionEnv() || isLiveDbEnabled()) {
+      this.courses = this.courses.filter((c) => !REMOVED_LEGACY_SEED_COURSE_IDS.has(c.id));
       this.admissions = [];
       this.students = [];
       this.batches = [];
@@ -184,6 +192,9 @@ class InstituteDataStore {
           const existingCodes = new Set(snapshot.courses.map((c: any) => c.course_code?.trim().toUpperCase()));
           const missingSeedCourses = this.courses.filter((c) => !existingCodes.has(c.course_code?.trim().toUpperCase()));
           this.courses = [...snapshot.courses, ...missingSeedCourses];
+        }
+        if (isProductionEnv() || isLiveDbEnabled()) {
+          this.courses = this.courses.filter((c) => !REMOVED_LEGACY_SEED_COURSE_IDS.has(c.id));
         }
         this.reconcileAuthoritativeCourses();
         if (snapshot.modules?.length) this.modules = snapshot.modules;
