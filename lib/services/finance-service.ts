@@ -852,6 +852,9 @@ export async function validateAndSettleExpense(
   }
 
   const prevStatus = exp.status;
+  const beforeExp = structuredClone(exp);
+  const vendor = exp.vendor_id ? store.vendors.find((v) => v.id === exp.vendor_id) : undefined;
+  const beforeVendorPaid = vendor ? vendor.total_paid : undefined;
   const settledAt = new Date().toISOString();
   const nextPaymentDate = details.expense_date || exp.expense_date;
 
@@ -900,14 +903,9 @@ export async function validateAndSettleExpense(
     exp.updated_at = settledAt;
 
     // If tagged to a vendor, update vendor total_paid
-    if (exp.vendor_id) {
-      const vendor = store.vendors.find((v) => v.id === exp.vendor_id);
-      if (vendor) {
-        vendor.total_paid = (vendor.total_paid || 0) + exp.amount;
-      }
+    if (vendor) {
+      vendor.total_paid = (vendor.total_paid || 0) + exp.amount;
     }
-
-    store.persist();
 
     await recordAuditLog({
       user_id: validatorUserId,
@@ -928,6 +926,8 @@ export async function validateAndSettleExpense(
       },
     });
 
+    store.persist();
+
     if (details.idempotency_key) {
       await idempotencyService.completeAsync(
         details.idempotency_key,
@@ -945,6 +945,18 @@ export async function validateAndSettleExpense(
 
     return exp;
   } catch (err) {
+    // Rollback in-memory mutations on any failure (including newly added keys like settled_at)
+    for (const key of Object.keys(exp)) {
+      if (!(key in beforeExp)) {
+        delete (exp as any)[key];
+      }
+    }
+    Object.assign(exp, beforeExp);
+    if (vendor && beforeVendorPaid !== undefined) {
+      vendor.total_paid = beforeVendorPaid;
+    } else if (vendor) {
+      delete vendor.total_paid;
+    }
     if (details.idempotency_key) {
       await idempotencyService.failAsync(details.idempotency_key, validatorUserId, tenant, 'expense_settle');
     }

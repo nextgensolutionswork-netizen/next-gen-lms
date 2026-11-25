@@ -1951,5 +1951,55 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       expect(report.critical_count).toBe(0);
       expect(report.passed).toBe(true);
     });
+
+    it('FIN-101: Failure injection during expense settlement rolls back expense status and vendor balance', async () => {
+      store.vendors = [
+        {
+          id: 'vnd-rollback-test',
+          vendor_name: 'Cloud Vendor QA',
+          contact_person: 'QA Contact',
+          total_paid: 5000,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any,
+      ];
+      const exp = await createExpense(
+        {
+          category: 'Software',
+          vendor_id: 'vnd-rollback-test',
+          vendor_name: 'Cloud Vendor QA',
+          description: 'Rollback injection test',
+          amount: 4000,
+          expense_date: '2026-11-25',
+          payment_mode: 'Bank Transfer',
+          status: 'Pending Approval',
+        },
+        ACCOUNTANT_ID
+      );
+      await approveExpense(exp.id, SUPER_ADMIN_ID);
+
+      const originalPersist = store.persist.bind(store);
+      store.persist = () => {
+        throw new Error('Injected persistence failure');
+      };
+
+      try {
+        await expect(
+          validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
+            payment_mode: 'Bank Transfer',
+            reference: 'UTR-ROLLBACK-101',
+            bank_account_profile_id: 'bank-acc-12',
+            idempotency_key: 'fin101-rollback',
+          })
+        ).rejects.toThrow('Injected persistence failure');
+      } finally {
+        store.persist = originalPersist;
+      }
+
+      // Expense must remain Approved and vendor total_paid must remain 5000
+      expect(exp.status).toBe('Approved');
+      expect(exp.settled_at).toBeUndefined();
+      expect(store.vendors[0].total_paid).toBe(5000);
+    });
   });
 });

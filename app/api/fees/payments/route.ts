@@ -82,20 +82,25 @@ export async function POST(request: NextRequest) {
     const body = command.parse(raw);
     const targetTenant = actor.tenant_id || 'default';
 
+    let acquiredIdemp: { key: string; actorId: string; tenant: string; scope: string } | null = null;
     if (body.action === 'record') {
       const idemp = await idempotencyService.acquireAsync(body.input.idempotency_key, actor.id, targetTenant, body.input, 'payment_record');
       if (idemp.isExisting && idemp.result) {
         return NextResponse.json(idemp.result);
       }
+      acquiredIdemp = { key: body.input.idempotency_key, actorId: actor.id, tenant: targetTenant, scope: 'payment_record' };
     } else if ((body.action === 'approve' || body.action === 'reject') && body.idempotency_key) {
       const scope = body.action === 'approve' ? 'payment_approve' : 'payment_reject';
       const idemp = await idempotencyService.acquireAsync(body.idempotency_key, actor.id, targetTenant, body, scope);
       if (idemp.isExisting && idemp.result) {
         return NextResponse.json(idemp.result);
       }
+      acquiredIdemp = { key: body.idempotency_key, actorId: actor.id, tenant: targetTenant, scope };
     }
 
-    const result = await paymentTransaction(actor, () => {
+    let result;
+    try {
+      result = await paymentTransaction(actor, () => {
       if (body.action === 'void_receipt') {
         if (!['accountant', 'admin', 'super_admin'].includes(actor.role)) {
           throw new Error('Forbidden: Only Accounts or Administrators can void receipts.');
@@ -170,6 +175,12 @@ export async function POST(request: NextRequest) {
         : feeWorkflowService.rejectPayment(body.paymentId, actor.id, body.reason);
       return { payment, snapshot: visibleWorkflowSnapshot(actor) };
     });
+    } catch (txErr) {
+      if (acquiredIdemp) {
+        await idempotencyService.failAsync(acquiredIdemp.key, acquiredIdemp.actorId, acquiredIdemp.tenant, acquiredIdemp.scope);
+      }
+      throw txErr;
+    }
 
     const responsePayload = { success: true, ...result };
     if (body.action === 'record') {

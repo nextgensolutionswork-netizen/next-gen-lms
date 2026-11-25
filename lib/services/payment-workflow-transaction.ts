@@ -56,19 +56,40 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
           // Never allow a stale JSON snapshot in fee_workflow_state to restore records that were deleted from PostgreSQL.
           if (isLiveSupabaseEnabled() || isProductionEnvironment()) {
             const [admsRes, studsRes, paysRes, rcptsRes] = await Promise.all([
-              db.from('admissions').select('id').eq('tenant_id', tenant),
-              db.from('students').select('id').eq('tenant_id', tenant),
+              db.from('admissions').select('id, course_id, status').eq('tenant_id', tenant),
+              db.from('students').select('id, total_fee, paid_amount, outstanding_amount').eq('tenant_id', tenant),
               db.from('payments').select('id, amount, status, receipt_number').eq('tenant_id', tenant),
               db.from('receipts').select('id, payment_id, receipt_number, payment_amount, status').eq('tenant_id', tenant),
             ]);
 
             if (!admsRes.error && Array.isArray(admsRes.data)) {
-              const liveAdmIds = new Set(admsRes.data.map((r: any) => r.id));
-              store.admissions = store.admissions.filter((a) => tenantId(a) !== tenant || liveAdmIds.has(a.id));
+              const liveAdmMap = new Map(admsRes.data.map((r: any) => [r.id, r]));
+              store.admissions = store.admissions
+                .filter((a) => tenantId(a) !== tenant || liveAdmMap.has(a.id))
+                .map((a) => {
+                  const row = liveAdmMap.get(a.id);
+                  if (!row) return a;
+                  return {
+                    ...a,
+                    course_id: row.course_id || a.course_id,
+                    status: row.status || a.status,
+                  };
+                });
             }
             if (!studsRes.error && Array.isArray(studsRes.data)) {
-              const liveStudIds = new Set(studsRes.data.map((r: any) => r.id));
-              store.students = store.students.filter((s) => tenantId(s) !== tenant || liveStudIds.has(s.id));
+              const liveStudMap = new Map(studsRes.data.map((r: any) => [r.id, r]));
+              store.students = store.students
+                .filter((s) => tenantId(s) !== tenant || liveStudMap.has(s.id))
+                .map((s) => {
+                  const row = liveStudMap.get(s.id);
+                  if (!row) return s;
+                  return {
+                    ...s,
+                    total_fee: typeof row.total_fee === 'number' ? row.total_fee : s.total_fee,
+                    paid_amount: typeof row.paid_amount === 'number' ? row.paid_amount : s.paid_amount,
+                    outstanding_amount: typeof row.outstanding_amount === 'number' ? row.outstanding_amount : s.outstanding_amount,
+                  };
+                });
             }
             if (!paysRes.error && Array.isArray(paysRes.data)) {
               const livePayMap = new Map(paysRes.data.map((r: any) => [r.id, r]));
