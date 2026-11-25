@@ -58,8 +58,8 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
             const [admsRes, studsRes, paysRes, rcptsRes] = await Promise.all([
               db.from('admissions').select('id').eq('tenant_id', tenant),
               db.from('students').select('id').eq('tenant_id', tenant),
-              db.from('payments').select('id').eq('tenant_id', tenant),
-              db.from('receipts').select('id').eq('tenant_id', tenant),
+              db.from('payments').select('id, amount, status, receipt_number').eq('tenant_id', tenant),
+              db.from('receipts').select('id, payment_id, receipt_number, payment_amount, status').eq('tenant_id', tenant),
             ]);
 
             if (!admsRes.error && Array.isArray(admsRes.data)) {
@@ -71,12 +71,34 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
               store.students = store.students.filter((s) => tenantId(s) !== tenant || liveStudIds.has(s.id));
             }
             if (!paysRes.error && Array.isArray(paysRes.data)) {
-              const livePayIds = new Set(paysRes.data.map((r: any) => r.id));
-              store.payments = store.payments.filter((p) => tenantId(p) !== tenant || livePayIds.has(p.id));
+              const livePayMap = new Map(paysRes.data.map((r: any) => [r.id, r]));
+              store.payments = store.payments
+                .filter((p) => tenantId(p) !== tenant || livePayMap.has(p.id))
+                .map((p) => {
+                  const row = livePayMap.get(p.id);
+                  if (!row) return p;
+                  return {
+                    ...p,
+                    amount: typeof row.amount === 'number' ? row.amount : p.amount,
+                    status: row.status || p.status,
+                    receipt_number: row.receipt_number || p.receipt_number,
+                  };
+                });
             }
             if (!rcptsRes.error && Array.isArray(rcptsRes.data)) {
-              const liveRcptIds = new Set(rcptsRes.data.map((r: any) => r.id));
-              store.receipts = store.receipts.filter((r) => tenantId(r) !== tenant || liveRcptIds.has(r.id));
+              const liveRcptMap = new Map(rcptsRes.data.map((r: any) => [r.id, r]));
+              store.receipts = store.receipts
+                .filter((r) => tenantId(r) !== tenant || liveRcptMap.has(r.id))
+                .map((r) => {
+                  const row = liveRcptMap.get(r.id);
+                  if (!row) return r;
+                  return {
+                    ...r,
+                    payment_amount: typeof row.payment_amount === 'number' ? row.payment_amount : r.payment_amount,
+                    receipt_number: row.receipt_number || r.receipt_number,
+                    status: row.status || r.status,
+                  };
+                });
             }
             const validStudentIds = new Set(store.students.filter((s) => tenantId(s) === tenant).map((s) => s.id));
             store.feeAccounts = store.feeAccounts.filter((fa) => tenantId(fa) !== tenant || validStudentIds.has(fa.student_id));

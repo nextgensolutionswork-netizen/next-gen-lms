@@ -22,6 +22,7 @@ import { dispatchMultiChannelNotification, buildReceiptEmailHtml } from './notif
 import { emitSyncEvent } from './sync-events';
 import { isPaymentApproved, isPaymentPending } from '@/lib/utils/dashboard-metrics';
 import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
+import { idempotencyService } from './idempotency-service';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -836,81 +837,119 @@ export async function validateAndSettleExpense(
     }
   }
 
-  const prevStatus = exp.status;
-  exp.status = 'Settled';
-  exp.payment_mode = details.payment_mode;
-  exp.reference = details.reference.trim();
-  if (details.expense_date) {
-    exp.expense_date = details.expense_date;
-  }
-  exp.bank_account = resolvedBankAccount;
-  if (details.bank_account_profile_id) {
-    (exp as any).bank_account_profile_id = details.bank_account_profile_id;
-  }
+  const tenant = (exp as any).tenant_id || validator.tenant_id || 'default';
   if (details.idempotency_key) {
-    (exp as any).settlement_idempotency_key = details.idempotency_key;
-  }
-  exp.settled_by = validatorUserId;
-  exp.settled_by_name = validator.full_name;
-  exp.settled_at = new Date().toISOString();
-  exp.paid_by = validatorUserId;
-  exp.paid_by_name = validator.full_name;
-  exp.validated_amount = exp.amount;
-  exp.updated_at = new Date().toISOString();
-
-  // If tagged to a vendor, update vendor total_paid
-  if (exp.vendor_id) {
-    const vendor = store.vendors.find((v) => v.id === exp.vendor_id);
-    if (vendor) {
-      vendor.total_paid = (vendor.total_paid || 0) + exp.amount;
+    const idemp = await idempotencyService.acquireAsync(
+      details.idempotency_key,
+      validatorUserId,
+      tenant,
+      { expenseId, ...details },
+      'expense_settle'
+    );
+    if (idemp.isExisting && idemp.result) {
+      return idemp.result as Expense;
     }
   }
 
-  store.persist();
+  const prevStatus = exp.status;
+  const settledAt = new Date().toISOString();
+  const nextPaymentDate = details.expense_date || exp.expense_date;
 
-  if (isLiveSupabaseEnabled()) {
-    try {
+  try {
+    if (isLiveSupabaseEnabled()) {
       const supabase = createClient();
-      await supabase
+      const { data: updatedRow, error: updateErr } = await supabase
         .from('expenses')
         .update({
           status: 'Settled',
-          payment_mode: exp.payment_mode,
-          reference: exp.reference,
-          paid_by: exp.paid_by,
-          updated_at: exp.updated_at,
+          payment_mode: details.payment_mode,
+          reference: details.reference.trim(),
+          paid_by: validatorUserId,
+          updated_at: settledAt,
         })
-        .eq('id', expenseId);
-    } catch (err) {
-      console.warn('Supabase validateAndSettleExpense warning, preserved locally:', err);
+        .eq('id', expenseId)
+        .eq('status', 'Approved')
+        .select('id')
+        .maybeSingle();
+
+      if (updateErr) {
+        throw new Error(`Expense settlement database update failed: ${updateErr.message}`);
+      }
+      if (!updatedRow) {
+        throw new Error('Conflict: Expense has already been settled or updated by another user. Please review the latest information.');
+      }
     }
+
+    exp.status = 'Settled';
+    exp.payment_mode = details.payment_mode;
+    exp.reference = details.reference.trim();
+    exp.expense_date = nextPaymentDate;
+    exp.bank_account = resolvedBankAccount;
+    if (details.bank_account_profile_id) {
+      (exp as any).bank_account_profile_id = details.bank_account_profile_id;
+    }
+    if (details.idempotency_key) {
+      (exp as any).settlement_idempotency_key = details.idempotency_key;
+    }
+    exp.settled_by = validatorUserId;
+    exp.settled_by_name = validator.full_name;
+    exp.settled_at = settledAt;
+    exp.paid_by = validatorUserId;
+    exp.paid_by_name = validator.full_name;
+    exp.validated_amount = exp.amount;
+    exp.updated_at = settledAt;
+
+    // If tagged to a vendor, update vendor total_paid
+    if (exp.vendor_id) {
+      const vendor = store.vendors.find((v) => v.id === exp.vendor_id);
+      if (vendor) {
+        vendor.total_paid = (vendor.total_paid || 0) + exp.amount;
+      }
+    }
+
+    store.persist();
+
+    await recordAuditLog({
+      user_id: validatorUserId,
+      user_name: validator.full_name || 'Accounts Staff',
+      user_role: validator.role || 'accountant',
+      action: 'EXPENSE_SETTLED',
+      module: 'FINANCE',
+      record_id: expenseId,
+      old_value: { status: prevStatus },
+      new_value: {
+        status: 'Settled',
+        amount: exp.amount,
+        mode: exp.payment_mode,
+        reference: exp.reference,
+        bank_account: exp.bank_account,
+        bank_account_profile_id: details.bank_account_profile_id,
+        settled_by: validator.full_name,
+      },
+    });
+
+    if (details.idempotency_key) {
+      await idempotencyService.completeAsync(
+        details.idempotency_key,
+        validatorUserId,
+        tenant,
+        exp,
+        'expense_settle'
+      );
+    }
+
+    emitSyncEvent('expenses', 'settled', {
+      entity_id: expenseId,
+      actor_id: validatorUserId,
+    });
+
+    return exp;
+  } catch (err) {
+    if (details.idempotency_key) {
+      await idempotencyService.failAsync(details.idempotency_key, validatorUserId, tenant, 'expense_settle');
+    }
+    throw err;
   }
-
-  await recordAuditLog({
-    user_id: validatorUserId,
-    user_name: validator.full_name || 'Accounts Staff',
-    user_role: validator.role || 'accountant',
-    action: 'EXPENSE_SETTLED',
-    module: 'FINANCE',
-    record_id: expenseId,
-    old_value: { status: prevStatus },
-    new_value: {
-      status: 'Settled',
-      amount: exp.amount,
-      mode: exp.payment_mode,
-      reference: exp.reference,
-      bank_account: exp.bank_account,
-      bank_account_profile_id: details.bank_account_profile_id,
-      settled_by: validator.full_name,
-    },
-  });
-
-  emitSyncEvent('expenses', 'settled', {
-    entity_id: expenseId,
-    actor_id: validatorUserId,
-  });
-
-  return exp;
 }
 
 export async function markExpenseAsPaid(
