@@ -1,5 +1,6 @@
 'use client';
 import { cachedLeads } from '@/lib/services/lead-cache';
+import { useDataSync } from '@/lib/hooks/use-data-sync';
 
 import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
@@ -425,6 +426,11 @@ export default function LeadsPage() {
   React.useEffect(() => {
     refreshLeads();
   }, [refreshLeads]);
+
+  useDataSync({
+    domain: 'leads',
+    onSync: refreshLeads,
+  });
 
   // Phone input handler for Create Lead
   const handlePhoneChange = (val: string) => {

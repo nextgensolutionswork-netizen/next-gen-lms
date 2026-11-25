@@ -37,6 +37,7 @@ import { Modal } from '@/components/ui/modal';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt, Course } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
+import { useDataSync } from '@/lib/hooks/use-data-sync';
 import { getCourses, createBatch } from '@/lib/services/academics-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import {
@@ -590,6 +591,11 @@ export default function AdmissionsPage() {
   React.useEffect(() => {
     refreshList();
   }, [refreshList]);
+
+  useDataSync({
+    domain: 'admissions',
+    onSync: refreshList,
+  });
 
   const handleCreateAdmission = async (e: React.FormEvent) => {
     e.preventDefault();

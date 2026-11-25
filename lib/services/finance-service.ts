@@ -19,6 +19,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { receiptAmounts } from './receipt-amounts';
 import { generateAndSaveReceiptPdf } from './pdf-service';
 import { dispatchMultiChannelNotification, buildReceiptEmailHtml } from './notification-service';
+import { emitSyncEvent } from './sync-events';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -664,6 +665,11 @@ export async function createExpense(
     new_value: { code, amount: data.amount, category: data.category },
   });
 
+  emitSyncEvent('expenses', 'created', {
+    entity_id: newExpense.id,
+    actor_id: userId,
+  });
+
   return newExpense;
 }
 
@@ -725,6 +731,11 @@ export async function approveExpense(
     module: 'FINANCE',
     record_id: expenseId,
     new_value: { status: 'Approved', amount: exp.amount },
+  });
+
+  emitSyncEvent('expenses', 'approved', {
+    entity_id: expenseId,
+    actor_id: approverUserId,
   });
 
   return exp;

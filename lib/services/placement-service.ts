@@ -12,6 +12,7 @@ import {
 } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
+import { emitSyncEvent } from './sync-events';
 
 export async function getPlacementProfiles(): Promise<PlacementProfile[]> {
   if (isLiveSupabaseEnabled()) {
@@ -449,6 +450,10 @@ export async function createJobOpening(data: Omit<JobOpening, 'id' | 'applicatio
     }
   }
 
+  emitSyncEvent('placement', 'created', {
+    entity_id: job.id,
+  });
+
   return job;
 }
 
@@ -641,6 +646,11 @@ export async function applyForJob(
       student_id: studentId,
       student_name: student?.full_name,
     },
+  });
+
+  emitSyncEvent('placement', 'updated', {
+    entity_id: application.id,
+    metadata: { student_id: studentId, job_id: jobId },
   });
 
   return application;

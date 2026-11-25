@@ -1,6 +1,8 @@
 'use client';
 
 import { resetLeadCache } from '@/lib/services/lead-cache';
+import { syncManager } from '@/lib/services/sync-manager';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UserProfile, UserRole, Permission } from '@/types';
@@ -231,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (isMounted) {
             if (profile) {
+              syncManager.setRole(profile.role);
               resetLeadCache(profile?.id ?? null); store.leads = []; setUser(profile);
               setRole(profile.role);
               setAuthCookie(profile);
@@ -442,6 +445,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(AUTH_COOKIE_NAME);
     }
 
+    syncManager.reset();
+    paymentWorkflowClient.clearCache();
     resetLeadCache(null); store.leads = []; setUser(null);
     setRole('super_admin');
 

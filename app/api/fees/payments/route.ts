@@ -9,6 +9,8 @@ import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { store } from '@/lib/services/data-store';
 import { assertSameTenant } from '@/lib/auth/tenant';
 import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
+import { idempotencyService } from '@/lib/services/idempotency-service';
+import { emitSyncEvent } from '@/lib/services/sync-events';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,6 +70,15 @@ export async function POST(request: NextRequest) {
     const raw = await request.json();
     if (raw?.input) raw.input = normalizePaymentFields(raw.input);
     const body = command.parse(raw);
+    const targetTenant = actor.tenant_id || 'default';
+
+    if (body.action === 'record') {
+      const idemp = idempotencyService.acquire(body.input.idempotency_key, actor.id, targetTenant, body.input);
+      if (idemp.isExisting && idemp.result) {
+        return NextResponse.json(idemp.result);
+      }
+    }
+
     const result = await paymentTransaction(actor, () => {
       if (body.action === 'void_receipt') {
         if (!['accountant', 'admin', 'super_admin'].includes(actor.role)) {
@@ -133,6 +144,39 @@ export async function POST(request: NextRequest) {
         : feeWorkflowService.rejectPayment(body.paymentId, actor.id, body.reason);
       return { payment, snapshot: visibleWorkflowSnapshot(actor) };
     });
-    return NextResponse.json({ success: true, ...result });
+
+    const responsePayload = { success: true, ...result };
+    if (body.action === 'record') {
+      idempotencyService.complete(body.input.idempotency_key, actor.id, targetTenant, responsePayload);
+      emitSyncEvent('payments', 'recorded', {
+        entity_id: result.payment?.id,
+        tenant_id: targetTenant,
+        actor_id: actor.id,
+      });
+    } else if (body.action === 'approve') {
+      emitSyncEvent('payments', 'approved', {
+        entity_id: body.paymentId,
+        tenant_id: targetTenant,
+        actor_id: actor.id,
+      });
+      emitSyncEvent('receipts', 'issued', {
+        tenant_id: targetTenant,
+        actor_id: actor.id,
+      });
+    } else if (body.action === 'reject') {
+      emitSyncEvent('payments', 'rejected', {
+        entity_id: body.paymentId,
+        tenant_id: targetTenant,
+        actor_id: actor.id,
+      });
+    } else if (body.action === 'void_receipt') {
+      emitSyncEvent('receipts', 'voided', {
+        entity_id: body.receiptId,
+        tenant_id: targetTenant,
+        actor_id: actor.id,
+      });
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (error) { return failure(error); }
 }

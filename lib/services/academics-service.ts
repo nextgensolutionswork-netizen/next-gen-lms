@@ -18,6 +18,7 @@ import {
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { validateAssignmentDeadline, getInstituteTimezone } from '@/lib/utils/assignment-date';
+import { emitSyncEvent } from './sync-events';
 
 // --- Canonical Course UUID Mapping & Helper Functions ---
 export const CANONICAL_COURSE_UUID_MAP: Record<string, string> = {
@@ -901,6 +902,10 @@ export async function createBatch(data: Omit<Batch, 'id' | 'current_enrolled' | 
     }
   }
 
+  emitSyncEvent('batches', 'created', {
+    entity_id: newBatch.id,
+  });
+
   return newBatch;
 }
 
@@ -946,6 +951,11 @@ export async function updateBatch(
       console.warn('Supabase updateBatch direct query warning, preserved locally:', err);
     }
   }
+
+  emitSyncEvent('batches', 'updated', {
+    entity_id: batchId,
+  });
+
   return batch;
 }
 

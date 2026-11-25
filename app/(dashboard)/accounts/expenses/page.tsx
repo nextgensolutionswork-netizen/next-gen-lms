@@ -26,6 +26,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { Expense, ExpenseCategory, ExpenseStatus, PaymentMethod } from '@/types';
 import {
+  getExpenses,
   createExpense,
   approveExpense,
   markExpenseAsPaid,
@@ -35,6 +36,7 @@ import {
   getExpenseCategories,
   createExpenseCategory,
 } from '@/lib/services/finance-service';
+import { useDataSync } from '@/lib/hooks/use-data-sync';
 import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { exportExpensesToExcel } from '@/lib/utils/excel-export';
 
@@ -118,6 +120,16 @@ export default function ExpensesPage() {
   React.useEffect(() => {
     refreshList();
   }, [refreshList]);
+
+  useDataSync({
+    domain: 'expenses',
+    onSync: async () => {
+      try {
+        await getExpenses();
+      } catch {}
+      refreshList();
+    },
+  });
 
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();

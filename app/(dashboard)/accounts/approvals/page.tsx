@@ -3,6 +3,7 @@
 import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { useDataSync } from '@/lib/hooks/use-data-sync';
 import { FileUpload } from '@/components/ui/file-upload';
 import Link from 'next/link';
 import {
@@ -296,6 +297,11 @@ export default function FeeApprovalsPage() {
     }
     return () => { active = false; clearTimeout(timer); };
   }, [loadData]);
+
+  useDataSync({
+    domain: 'payments',
+    onSync: loadData,
+  });
 
   // Sync category default fee when category changes in proposal form
   React.useEffect(() => {

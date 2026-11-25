@@ -2,6 +2,7 @@
 
 import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
+import { useDataSync } from '@/lib/hooks/use-data-sync';
 import Link from 'next/link';
 import {
   UserCheck,
@@ -198,9 +199,15 @@ export default function OnboardingPage() {
 
   React.useEffect(() => {
     loadData();
-    const timer = window.setInterval(loadData, 15000);
+    // Controlled bounded refresh managed via useDataSync
+    const timer = window.setInterval(loadData, 45000);
     return () => window.clearInterval(timer);
   }, [loadData]);
+
+  useDataSync({
+    domain: 'onboarding',
+    onSync: loadData,
+  });
 
   const openCaseDetails = async (c: OnboardingCase) => {
     setSelectedCase(c);

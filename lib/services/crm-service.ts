@@ -5,6 +5,9 @@ import { assertLeadAccess, leadScope, canAccessLead, requireCrmActor } from '@/l
 import { leadFields } from './lead-input';
 import { authorizedLead, resolveLeadScope, scopeLeadQuery, validateLeadAssignment, teamCreators } from './lead-security';
 import { matchesCourseId } from '@/lib/services/academics-service';
+import { idempotencyService } from './idempotency-service';
+import { concurrencyGuard } from './concurrency-guard';
+import { emitSyncEvent } from './sync-events';
 
 /**
  * Finds the authoritative admission linked to a lead, if one exists.
@@ -168,6 +171,12 @@ export async function createLead(
   }
 
   const targetTenant = data.tenant_id || actor?.tenant_id || 'default';
+  if (data.idempotency_key) {
+    const idemp = idempotencyService.acquire(data.idempotency_key, actor?.id || 'sys', targetTenant, data);
+    if (idemp.isExisting && idemp.result) {
+      return idemp.result;
+    }
+  }
   const targetDigits = getCanonicalPhoneDigits(country_code, data.phone);
   const lockKey = `${targetTenant}:${targetDigits || data.phone}:${data.idempotency_key || data.external_lead_id || ''}`;
 
@@ -386,12 +395,26 @@ export async function createLead(
     },
   });
 
+    if (data.idempotency_key) {
+      idempotencyService.complete(data.idempotency_key, actor?.id || 'sys', targetTenant, newLead);
+    }
+    emitSyncEvent('leads', 'created', {
+      entity_id: newLead.id,
+      tenant_id: targetTenant,
+      actor_id: actor?.id,
+    });
+
     return newLead;
   })();
 
   inFlightLeadCreations.set(lockKey, creationPromise);
   try {
     return await creationPromise;
+  } catch (err) {
+    if (data.idempotency_key) {
+      idempotencyService.fail(data.idempotency_key, actor?.id || 'sys', targetTenant);
+    }
+    throw err;
   } finally {
     inFlightLeadCreations.delete(lockKey);
   }
@@ -428,8 +451,12 @@ export async function updateLeadDetails(
 
   requireCrmActor(actor);
   if ('created_by' in updates || 'tenant_id' in updates || 'id' in updates || 'created_at' in updates) throw new Error('Forbidden: Immutable lead fields.');
+  const expectedUpdatedAt = (updates as any).expected_updated_at;
   updates = leadFields.partial().parse(updates);
   const lead = await authorizedLead(leadId, actor);
+  if (expectedUpdatedAt !== undefined) {
+    concurrencyGuard.assertVersionMatch(lead, expectedUpdatedAt);
+  }
   const scope = await resolveLeadScope(actor);
   await validateLeadAssignment(updates.counsellor_id, scope.actor);
 
@@ -562,6 +589,13 @@ export async function updateLeadDetails(
     },
   });
 
+  emitSyncEvent('leads', 'updated', {
+    entity_id: leadId,
+    tenant_id: lead.tenant_id,
+    actor_id: actorId,
+    metadata: { stage: lead.stage, counsellor_id: lead.counsellor_id },
+  });
+
   return lead;
 }
 
@@ -649,6 +683,11 @@ export function convertLeadToAdmission(leadId: string, actor?: UserProfile): {
 export async function bulkAssignLeads(leadIds: string[], counsellorId: string, assignedByUserId: string, actor?: UserProfile): Promise<number> {
   if (typeof window === 'undefined') { requireCrmActor(actor); for (const id of leadIds) await authorizedLead(id, actor); }
   for (const id of leadIds) await updateLeadDetails(id, { counsellor_id: counsellorId }, assignedByUserId, actor);
+  emitSyncEvent('leads', 'assigned', {
+    tenant_id: actor?.tenant_id,
+    actor_id: assignedByUserId,
+    metadata: { leadIds, counsellorId },
+  });
   return leadIds.length;
 }
 

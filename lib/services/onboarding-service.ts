@@ -25,6 +25,7 @@ import {
 } from './notification-service';
 import { onTransactionCommit } from './payment-workflow-transaction';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { emitSyncEvent } from './sync-events';
 
 export interface OnboardingFilters {
   search?: string;
@@ -559,6 +560,12 @@ export async function updateChecklistItem(
       console.warn('[updateChecklistItem] Could not auto-dispatch welcome notification:', notifErr);
     }
   }
+
+  emitSyncEvent('onboarding', 'updated', {
+    entity_id: caseId,
+    actor_id: performedBy.id,
+    metadata: { itemKey, completed },
+  });
 
   return caseRecord;
 }
@@ -1335,6 +1342,18 @@ export async function completeOnboardingWorkflow(
     performedBy,
     `Onboarding workflow completed and formally handed over to Academic Operations`
   );
+
+  emitSyncEvent('onboarding', 'completed', {
+    entity_id: caseRecord.id,
+    actor_id: performedBy.id,
+    metadata: { batch_id: caseRecord.batch_id, student_id: caseRecord.student_id },
+  });
+  if (caseRecord.batch_id) {
+    emitSyncEvent('batches', 'updated', {
+      entity_id: caseRecord.batch_id,
+      actor_id: performedBy.id,
+    });
+  }
 
   return caseRecord;
 }

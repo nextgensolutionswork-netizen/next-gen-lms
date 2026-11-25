@@ -14,6 +14,8 @@ import {
   validateAdmissionRegistrationOwnership,
 } from '@/lib/auth/admission-access';
 import { store } from '@/lib/services/data-store';
+import { idempotencyService } from '@/lib/services/idempotency-service';
+import { emitSyncEvent } from '@/lib/services/sync-events';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -106,6 +108,13 @@ export async function POST(request: NextRequest) {
     }
 
     const input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
+    const targetTenant = actor.tenant_id || 'default';
+    if (input.idempotency_key) {
+      const existing = idempotencyService.acquire(input.idempotency_key, actor.id, targetTenant, input);
+      if (existing.isExisting && existing.result) {
+        return NextResponse.json(existing.result);
+      }
+    }
     if (input.lead_id) {
       await authorizedLead(input.lead_id, actor);
     }
@@ -148,7 +157,23 @@ export async function POST(request: NextRequest) {
       return { result, snapshot: visibleWorkflowSnapshot(actor, teamMembers) };
     });
 
-    return NextResponse.json({ success: true, ...data });
+    const responsePayload = { success: true, ...data };
+    if (input.idempotency_key) {
+      idempotencyService.complete(input.idempotency_key, actor.id, targetTenant, responsePayload);
+    }
+
+    emitSyncEvent('admissions', 'created', {
+      entity_id: (data as any)?.result?.admission?.id,
+      tenant_id: targetTenant,
+      actor_id: actor.id,
+    });
+    emitSyncEvent('onboarding', 'created', {
+      entity_id: (data as any)?.result?.admission?.id,
+      tenant_id: targetTenant,
+      actor_id: actor.id,
+    });
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Admission failed.';
     return NextResponse.json(
@@ -158,7 +183,7 @@ export async function POST(request: NextRequest) {
           ? 401
           : message.startsWith('Forbidden')
           ? 403
-          : 400,
+          : (error as any)?.statusCode || 400,
       }
     );
   }
