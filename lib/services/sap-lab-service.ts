@@ -1,7 +1,7 @@
 import { store } from './data-store';
 import { SapServerAllocation, SapServerSystem } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import {
   getEffectiveSapAllocationStatus,
   getSystemCapacityMetrics,
@@ -23,14 +23,26 @@ export async function getSapSystems(): Promise<SapServerSystem[]> {
     try {
       const supabase = createClient();
       const { data, error } = await supabase.from('sap_server_systems').select('*');
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[sap-lab-service] Supabase sap_server_systems query error:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative sap server systems: ${error.message || error}`);
+      }
+      if (Array.isArray(data)) {
         store.sapSystems = data as SapServerSystem[];
         return data as SapServerSystem[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase sap_server_systems query error, fallback to local persistent store:', err);
     }
   }
+
+  if (isProductionEnvironment()) {
+    return [];
+  }
+
   return [...store.sapSystems];
 }
 
@@ -62,14 +74,26 @@ export async function getSapAllocations(): Promise<SapServerAllocation[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[sap-lab-service] Supabase sap_server_allocations query error:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative sap server allocations: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         store.sapAllocations = data as SapServerAllocation[];
         syncSapAllocationExpirations();
         return data as SapServerAllocation[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase sap_server_allocations query error, fallback to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   return [...store.sapAllocations].sort(

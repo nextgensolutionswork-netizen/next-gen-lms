@@ -76,6 +76,28 @@ export const DEFAULT_EXPENSE_CATEGORIES: string[] = [
   'Miscellaneous',
 ];
 
+function isProductionEnv(): boolean {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.NEXT_PUBLIC_APP_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'production'
+  ) {
+    return true;
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (url && url.includes('tgohtdzwehhjfahtgovq')) {
+    return true;
+  }
+  return false;
+}
+
+function isLiveDbEnabled(): boolean {
+  if (process.env.VITEST && typeof window === 'undefined') return false;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  return Boolean(url && key && !url.includes('mock-sap-lms') && !key.includes('mockAnonKey'));
+}
+
 // In-Memory initial seed data with durable filesystem persistence & Supabase Postgres bridge
 class InstituteDataStore {
   constructor() {
@@ -86,6 +108,23 @@ class InstituteDataStore {
     this.reconcileDualLedgers();
     this.reconcileBatchEnrollments();
     this.reconcileBankPresets();
+
+    // TASK-01: When running in production or connected to live Supabase, business records
+    // must be sourced exclusively from Supabase PostgREST queries, never from initial seed mock records.
+    if (isProductionEnv() || isLiveDbEnabled()) {
+      this.admissions = [];
+      this.students = [];
+      this.batches = [];
+      this.expenses = [];
+      this.payments = [];
+      this.receipts = [];
+      this.feeAccounts = [];
+      this.studentFees = [];
+      this.studentPayments = [];
+      this.studentFinancialLedgers = [];
+      this.onboardingCases = [];
+      this.doubts = [];
+    }
   }
 
   public hydrateFromDisk(): boolean {
@@ -133,16 +172,12 @@ class InstituteDataStore {
           this.users = [...mappedUsers, ...missingSeedUsers];
           this.reconcileAuthoritativeStaffProfiles();
         }
-        if (snapshot.admissions?.length) {
-          const existingAdmIds = new Set(snapshot.admissions.map((a: any) => a.id));
-          const missingSeedAdmissions = this.admissions.filter((a) => !existingAdmIds.has(a.id));
-          this.admissions = [...snapshot.admissions, ...missingSeedAdmissions];
+        if (Array.isArray(snapshot.admissions)) {
+          this.admissions = snapshot.admissions;
         }
         this.reconcileAuthoritativeAdmissions();
-        if (snapshot.students?.length) {
-          const existingStudentIds = new Set(snapshot.students.map((s: any) => s.id));
-          const missingSeedStudents = this.students.filter((s) => !existingStudentIds.has(s.id));
-          this.students = [...snapshot.students, ...missingSeedStudents];
+        if (Array.isArray(snapshot.students)) {
+          this.students = snapshot.students;
         }
         if (typeof window === 'undefined' && snapshot.leads) this.leads = snapshot.leads;
         if (snapshot.courses?.length) {
@@ -166,47 +201,8 @@ class InstituteDataStore {
         if (snapshot.feeAccounts?.length) this.feeAccounts = snapshot.feeAccounts;
         if (snapshot.installments?.length) this.installments = snapshot.installments;
         if (snapshot.payments?.length) this.payments = snapshot.payments;
-        if (snapshot.receipts?.length) {
+        if (Array.isArray(snapshot.receipts)) {
           this.receipts = snapshot.receipts;
-          if (!this.receipts.some((r) => r.id === 'rcpt-03')) {
-            this.receipts.push({
-              id: 'rcpt-03',
-              receipt_number: 'REC-2026-0003',
-              payment_id: 'pay-03',
-              student_id: 'stu-02',
-              student_name: 'Sneha Kulkarni',
-              admission_number: 'ADM-2026-0002',
-              course_name: 'SAP S/4HANA Materials Management (MM)',
-              payment_amount: 20000,
-              payment_mode: 'UPI',
-              transaction_reference: 'UPI/260202/882194',
-              payment_date: '2026-02-02',
-              remaining_balance: 20000,
-              authorized_by: 'Suresh Kumar (Chief Accountant)',
-              institute_name: 'Next-Gen ERP Solutions',
-              institute_address: OFFICIAL_INSTITUTE_ADDRESS,
-              institute_phone: OFFICIAL_INSTITUTE_PHONE,
-              institute_gst: '36AAACN1234F1Z8',
-              supply_type: 'INTER_STATE',
-              place_of_supply: 'Maharashtra (27)',
-              place_of_supply_code: '27',
-              sac_code: '999293',
-              taxable_amount: 16949.15,
-              cgst_rate: 0,
-              cgst_amount: 0,
-              sgst_rate: 0,
-              sgst_amount: 0,
-              igst_rate: 18,
-              igst_amount: 3050.85,
-              total_tax: 3050.85,
-              is_reverse_charge: false,
-              irn: 'b7c2d34568fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b777',
-              ack_no: '1226102948393',
-              ack_date: '2026-02-02T11:20:00Z',
-              created_at: '2026-02-02T11:20:00Z',
-            });
-          }
-
         }
         if (snapshot.expenses?.length) this.expenses = snapshot.expenses;
         if ((snapshot as any).expense_categories?.length) {

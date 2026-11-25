@@ -19,7 +19,7 @@ import {
 } from '@/types';
 import { recordAuditLog } from './audit-service';
 import { generateAdmissionNumber, generateStudentUniqueId } from '@/lib/utils/formatters';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { ensureOnboardingCaseForAdmission } from './onboarding-service';
 import { feeWorkflowService } from './fee-workflow-service';
 import { tenantId } from '@/lib/auth/tenant';
@@ -113,13 +113,23 @@ export async function getAdmissions(actor?: UserProfile): Promise<Admission[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        // Synchronize in-memory cache with database
+      if (error) {
+        console.error('[admission-service] Supabase admissions direct query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative admissions: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
+        // Synchronize in-memory cache with authoritative database (even if empty)
         store.admissions = data as Admission[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase admissions direct query error, falling back to local persistent store:', err);
     }
+  } else if (isProductionEnvironment()) {
+    store.admissions = [];
   }
 
   let list = [...store.admissions].sort(
@@ -145,15 +155,23 @@ export async function getAdmissionById(id: string, actor?: UserProfile): Promise
         .or(`id.eq.${id},admission_number.ilike.${id}`)
         .maybeSingle();
 
-      if (!error && data) {
+      if (error) {
+        console.error('[admission-service] Supabase getAdmissionById error:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative admission: ${error.message || error}`);
+      }
+
+      if (data) {
         admission = data as Admission;
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase getAdmissionById error, checking local persistent store:', err);
     }
   }
 
-  if (!admission) {
+  if (!admission && !isProductionEnvironment() && !isLiveSupabaseEnabled()) {
     admission = store.admissions.find((a) => a.id === id || a.admission_number === id);
   }
 

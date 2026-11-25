@@ -14,7 +14,7 @@ import {
 } from '@/types';
 import { generateReceiptNumber } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { receiptAmounts } from './receipt-amounts';
 import { generateAndSaveReceiptPdf } from './pdf-service';
@@ -35,13 +35,24 @@ export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[finance-service] Supabase fee accounts query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative fee accounts: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         store.feeAccounts = data as StudentFeeAccount[];
         return data as StudentFeeAccount[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase fee accounts query error, falling back to local persistent store:', err);
     }
+  }
+  if (isProductionEnvironment()) {
+    return [];
   }
   return [...store.feeAccounts];
 }
@@ -61,12 +72,21 @@ export async function getFeeAccountForStudent(studentId: string): Promise<Studen
         .eq('student_id', studentId)
         .maybeSingle();
 
-      if (!error && data) {
-        return data as StudentFeeAccount;
+      if (error) {
+        console.error('[finance-service] Supabase fee account for student query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative fee account: ${error.message || error}`);
       }
-    } catch (err) {
+
+      return data ? (data as StudentFeeAccount) : undefined;
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase fee account for student query error, checking local store:', err);
     }
+  }
+  if (isProductionEnvironment()) {
+    return undefined;
   }
   return store.feeAccounts.find((f) => f.student_id === studentId);
 }
@@ -80,13 +100,25 @@ export async function getPayments(): Promise<Payment[]> {
         .select('*')
         .order('payment_date', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[finance-service] Supabase payments query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative payments: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         store.payments = data as Payment[];
         return data as Payment[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase payments query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   return [...store.payments].sort(
@@ -103,13 +135,25 @@ export async function getReceipts(): Promise<Receipt[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[finance-service] Supabase receipts query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative receipts: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         store.receipts = data as Receipt[];
         return data as Receipt[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase receipts query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   return [...store.receipts].sort(
@@ -536,13 +580,25 @@ export async function getExpenses(): Promise<Expense[]> {
         .select('*')
         .order('expense_date', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[finance-service] Supabase expenses query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative expenses: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         store.expenses = data as Expense[];
         return data as Expense[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase expenses query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   return [...store.expenses].sort(
@@ -980,7 +1036,12 @@ export async function getVendors(): Promise<Vendor[]> {
         .select('*')
         .order('vendor_name', { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[finance-service] Supabase vendors query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative vendors: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         const mappedVendors: Vendor[] = data.map((v: any) => ({
           ...v,
           bank_account_number: v.bank_account || v.bank_account_number,
@@ -992,9 +1053,16 @@ export async function getVendors(): Promise<Vendor[]> {
         store.vendors = mappedVendors;
         return mappedVendors;
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase vendors query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   return [...store.vendors];

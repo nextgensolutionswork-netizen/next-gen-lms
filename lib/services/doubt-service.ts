@@ -1,7 +1,7 @@
 import { store } from './data-store';
 import { StudentDoubt, DoubtMessage, DoubtStatus, DoubtPriority, DoubtCategory, UserRole } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { publishRealtimeEvent } from './realtime-service';
 import { resolveCanonicalBatchUuid, isUuid, matchesBatchId } from './academics-service';
 import {
@@ -54,13 +54,24 @@ export async function getDoubts(filters?: {
       }
 
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[doubt-service] Supabase doubts direct query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative doubts: ${error.message || error}`);
+      }
+      if (Array.isArray(data)) {
         store.doubts = data as StudentDoubt[];
         return data as StudentDoubt[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase doubts direct query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   let list = [...store.doubts];

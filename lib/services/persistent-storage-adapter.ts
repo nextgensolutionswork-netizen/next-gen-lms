@@ -184,14 +184,12 @@ export class PersistentStorageAdapter {
     if (typeof window !== 'undefined') {
       try {
         if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem('next_gen_lms_store_snapshot_v1');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            return parsed;
-          }
+          // TASK-01: Evict any stale client-side store snapshot to prevent deleted records from reappearing.
+          // Supabase is the single authoritative source of truth.
+          localStorage.removeItem('next_gen_lms_store_snapshot_v1');
         }
       } catch (err) {
-        console.warn('[PersistentStorageAdapter] Could not load state from localStorage:', err);
+        console.warn('[PersistentStorageAdapter] Could not clear stale state from localStorage:', err);
       }
       return null;
     }
@@ -251,15 +249,9 @@ export class PersistentStorageAdapter {
     const payload = this.buildSnapshotPayload(state);
 
     if (typeof window !== 'undefined') {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('next_gen_lms_store_snapshot_v1', JSON.stringify(payload));
-          return true;
-        }
-      } catch (err) {
-        console.warn('[PersistentStorageAdapter] Could not save state to localStorage:', err);
-      }
-      return false;
+      // TASK-01: Never persist business entities into browser localStorage.
+      // Business records must be retrieved directly from the authoritative database.
+      return true;
     }
 
     try {

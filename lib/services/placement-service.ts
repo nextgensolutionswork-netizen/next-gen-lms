@@ -11,7 +11,7 @@ import {
   PlacementDeclaration,
 } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 
 export async function getPlacementProfiles(): Promise<PlacementProfile[]> {
   if (isLiveSupabaseEnabled()) {
@@ -37,12 +37,24 @@ export async function getPlacementProfileForStudent(studentId: string): Promise<
         .eq('student_id', studentId)
         .maybeSingle();
 
-      if (!error && data) {
+      if (error) {
+        console.error('[placement-service] Supabase getPlacementProfileForStudent error:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative placement profile: ${error.message || error}`);
+      }
+
+      if (data) {
         return data as PlacementProfile;
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase getPlacementProfileForStudent error, checking local store:', err);
     }
+  }
+
+  if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+    return undefined;
   }
 
   let profile = (store.placementProfiles || []).find((p) => p.student_id === studentId);
@@ -773,12 +785,21 @@ export async function getPlacementEnrollments(filters?: {
     try {
       const supabase = createClient();
       const { data, error } = await supabase.from('placement_enrollments').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[placement-service] Supabase placement enrollments query error:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative placement enrollments: ${error.message || error}`);
+      }
+      if (Array.isArray(data)) {
         store.placementEnrollments = data as PlacementEnrollment[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase placement enrollments query error, falling back to local persistent store:', err);
     }
+  } else if (isProductionEnvironment()) {
+    store.placementEnrollments = [];
   }
 
   let list = [...(store.placementEnrollments || [])];

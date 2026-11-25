@@ -1,4 +1,4 @@
-import { getDb, isLiveSupabaseEnabled } from './db';
+import { getDb, isLiveSupabaseEnabled, isProductionEnvironment } from './db';
 import { store } from '@/lib/services/data-store';
 
 export interface SeedSyncResult {
@@ -13,6 +13,9 @@ export interface SeedSyncResult {
  * store into live Supabase PostgreSQL tables.
  */
 export async function syncStoreToSupabase(): Promise<SeedSyncResult> {
+  if (isProductionEnvironment()) {
+    throw new Error('Database seeding/sync is strictly forbidden in the production environment');
+  }
   const db = getDb();
   const errors: string[] = [];
   const syncedTables: { table: string; count: number }[] = [];

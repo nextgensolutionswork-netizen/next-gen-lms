@@ -14,6 +14,24 @@ import {
 import { UserProfile } from '@/types';
 
 /**
+ * Detects whether the current runtime is in a production environment.
+ */
+export function isProductionEnvironment(): boolean {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.NEXT_PUBLIC_APP_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'production'
+  ) {
+    return true;
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (url && url.includes('tgohtdzwehhjfahtgovq')) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Checks whether live Supabase credentials are configured (non-mock).
  */
 export function isLiveSupabaseEnabled(): boolean {
@@ -352,10 +370,15 @@ class RlsQueryBuilder<T = any> implements PromiseLike<{ data: T | null; error: a
           return { data: null, error: { message: 'Row not found', code: 'PGRST116' } };
         }
 
-        if (['leads', 'lead_followups'].includes(this.table)) return { data: null, error: res.error };
+        // In live Supabase mode or production, never fall back to mock/seed store records
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          return { data: null, error: res.error };
+        }
         console.warn(`Supabase query for ${this.table} returned error, evaluating fallback:`, res.error.message);
       } catch (liveErr) {
-        if (['leads', 'lead_followups'].includes(this.table)) return { data: null, error: liveErr };
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          return { data: null, error: liveErr };
+        }
         console.warn(`Supabase query for ${this.table} failed, evaluating with local RLS:`, liveErr);
       }
     }

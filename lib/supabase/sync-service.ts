@@ -1,4 +1,4 @@
-import { getDb, isLiveSupabaseEnabled } from './db';
+import { getDb, isLiveSupabaseEnabled, isProductionEnvironment } from './db';
 import { store } from '@/lib/services/data-store';
 import { persistentStorage } from '@/lib/services/persistent-storage-adapter';
 
@@ -126,6 +126,9 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthReport> {
  * Pushes all in-memory / local state into Postgres tables
  */
 export async function syncLocalToPostgres(): Promise<SyncResult> {
+  if (isProductionEnvironment()) {
+    throw new Error('Push synchronization to Postgres is strictly forbidden in the production environment');
+  }
   const isLive = isLiveSupabaseEnabled();
   const errors: string[] = [];
   const syncedTables: string[] = [];
@@ -428,15 +431,8 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
     if (sErr) {
       errors.push(`students pull: ${sErr.message}`);
     } else if (students) {
-      for (const s of students) {
-        const idx = store.students.findIndex((item) => item.id === s.id);
-        if (idx >= 0) {
-          store.students[idx] = { ...store.students[idx], ...s };
-        } else {
-          store.students.push(s);
-        }
-        totalSynced++;
-      }
+      store.students = students as any[];
+      totalSynced += students.length;
       syncedTables.push('students');
     }
   } catch (err: any) {
@@ -457,15 +453,8 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
     if (aErr) {
       errors.push(`admissions pull: ${aErr.message}`);
     } else if (admissions) {
-      for (const adm of admissions) {
-        const idx = store.admissions.findIndex((item) => item.id === adm.id);
-        if (idx >= 0) {
-          store.admissions[idx] = { ...store.admissions[idx], ...adm };
-        } else {
-          store.admissions.push(adm);
-        }
-        totalSynced++;
-      }
+      store.admissions = admissions as any[];
+      totalSynced += admissions.length;
       syncedTables.push('admissions');
     }
   } catch (err: any) {
@@ -478,15 +467,8 @@ export async function syncPostgresToLocal(): Promise<SyncResult> {
     if (cErr) {
       errors.push(`courses pull: ${cErr.message}`);
     } else if (courses) {
-      for (const c of courses) {
-        const idx = store.courses.findIndex((item) => item.id === c.id);
-        if (idx >= 0) {
-          store.courses[idx] = { ...store.courses[idx], ...c };
-        } else {
-          store.courses.push(c);
-        }
-        totalSynced++;
-      }
+      store.courses = courses as any[];
+      totalSynced += courses.length;
       syncedTables.push('courses');
     }
   } catch (err: any) {

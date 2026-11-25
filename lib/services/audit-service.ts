@@ -1,6 +1,6 @@
 import { store } from './data-store';
 import { AuditLog } from '@/types';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createBrowserClient } from '@supabase/supabase-js';
 import { resolveSupabaseKey } from '@/lib/supabase/client';
@@ -45,13 +45,25 @@ export async function getAuditLogs(): Promise<AuditLog[]> {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[audit-service] Supabase audit logs direct query failed:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative audit logs: ${error.message || error}`);
+      }
+
+      if (Array.isArray(data)) {
         store.auditLogs = data as AuditLog[];
         return data as AuditLog[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase audit logs direct query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   return [...(store.auditLogs || [])].filter(l => l.module?.toUpperCase() !== 'CRM').sort(

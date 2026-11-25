@@ -1,4 +1,4 @@
-import { getDb, isLiveSupabaseEnabled } from './db';
+import { getDb, isLiveSupabaseEnabled, isProductionEnvironment } from './db';
 import { store } from '@/lib/services/data-store';
 import {
   Admission,
@@ -32,10 +32,19 @@ export class AdmissionsRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('admissions').select('*').order('created_at', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`AdmissionsRepository Postgres error: ${error.message}`);
+        }
+        if (Array.isArray(data)) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('AdmissionsRepository.getAll Postgres error, using local cache:', err);
       }
+    }
+    if (isProductionEnvironment()) {
+      return [];
     }
     return [...store.admissions];
   }
@@ -45,10 +54,20 @@ export class AdmissionsRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('admissions').select('*').eq('id', id).single();
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          if (error.code === 'PGRST116') return undefined;
+          throw new Error(`AdmissionsRepository.getById error: ${error.message}`);
+        }
+        if (data) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('AdmissionsRepository.getById Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+      return undefined;
     }
     return store.admissions.find((a) => a.id === id);
   }
@@ -105,10 +124,19 @@ export class StudentsRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('students').select('*').order('created_at', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`StudentsRepository Postgres error: ${error.message}`);
+        }
+        if (Array.isArray(data)) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('StudentsRepository.getAll Postgres error, using local cache:', err);
       }
+    }
+    if (isProductionEnvironment()) {
+      return [];
     }
     return [...store.students];
   }
@@ -118,10 +146,20 @@ export class StudentsRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('students').select('*').eq('id', id).single();
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          if (error.code === 'PGRST116') return undefined;
+          throw new Error(`StudentsRepository.getById error: ${error.message}`);
+        }
+        if (data) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('StudentsRepository.getById Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+      return undefined;
     }
     return store.students.find((s) => s.id === id);
   }
@@ -190,10 +228,19 @@ export class BatchesRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('batches').select('*').order('start_date', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`BatchesRepository Postgres error: ${error.message}`);
+        }
+        if (Array.isArray(data)) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('BatchesRepository.getAll Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment()) {
+      return [];
     }
     return [...store.batches];
   }
@@ -272,10 +319,19 @@ export class FinanceRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('student_fee_accounts').select('*');
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`FinanceRepository.getFeeAccounts error: ${error.message}`);
+        }
+        if (Array.isArray(data)) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('FinanceRepository.getFeeAccounts Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment()) {
+      return [];
     }
     return [...store.feeAccounts];
   }
@@ -285,10 +341,19 @@ export class FinanceRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('payments').select('*').order('payment_date', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`FinanceRepository.getPayments error: ${error.message}`);
+        }
+        if (Array.isArray(data)) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('FinanceRepository.getPayments Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment()) {
+      return [];
     }
     return [...store.payments];
   }
@@ -347,10 +412,19 @@ export class OnboardingRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('onboarding_cases').select('*').order('created_at', { ascending: false });
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`OnboardingRepository.getAll error: ${error.message}`);
+        }
+        if (Array.isArray(data)) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('OnboardingRepository.getAll Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment()) {
+      return [];
     }
     return [...store.onboardingCases];
   }
@@ -360,10 +434,19 @@ export class OnboardingRepository {
       try {
         const db = getDb();
         const { data, error } = await db.from('onboarding_cases').select('*').eq('id', id).maybeSingle();
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) {
+          throw new Error(`OnboardingRepository.getById error: ${error.message}`);
+        }
+        if (data) return data;
+      } catch (err: any) {
+        if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+          throw err;
+        }
         console.warn('OnboardingRepository.getById Postgres error:', err);
       }
+    }
+    if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+      return undefined;
     }
     return store.onboardingCases.find((c) => c.id === id);
   }

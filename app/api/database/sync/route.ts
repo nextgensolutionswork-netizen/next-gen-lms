@@ -3,6 +3,7 @@ import {
   syncLocalToPostgres,
   syncPostgresToLocal,
 } from '@/lib/supabase/sync-service';
+import { isProductionEnvironment } from '@/lib/supabase/db';
 import { authenticateApiRequest } from '@/lib/auth/server-session';
 import { recordAuditLog } from '@/lib/services/audit-service';
 
@@ -20,6 +21,16 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const direction = body.direction === 'pull' ? 'pull' : 'push';
+
+    if (direction === 'push' && isProductionEnvironment()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Push synchronization from local store to production database is strictly prohibited to preserve production data integrity.',
+        },
+        { status: 403 }
+      );
+    }
 
     let result;
     if (direction === 'pull') {

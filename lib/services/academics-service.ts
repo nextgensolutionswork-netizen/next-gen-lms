@@ -16,7 +16,7 @@ import {
   Student,
 } from '@/types';
 import { recordAuditLog } from './audit-service';
-import { createClient, isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { validateAssignmentDeadline, getInstituteTimezone } from '@/lib/utils/assignment-date';
 
 // --- Canonical Course UUID Mapping & Helper Functions ---
@@ -818,7 +818,7 @@ export async function getBatches(): Promise<Batch[]> {
         fetchAllRemoteStudents(supabase),
       ]);
 
-      if (remoteBatches && remoteBatches.length > 0) {
+      if (Array.isArray(remoteBatches)) {
         // Reconcile counts for remote batches directly from the authoritative remote students dataset
         for (const b of remoteBatches) {
           const activeMembers = filterActiveEnrolledStudents(remoteStudents, b.id, store.admissions);
@@ -833,6 +833,11 @@ export async function getBatches(): Promise<Batch[]> {
       throw new Error(`Failed to retrieve authoritative remote batches: ${err?.message || err}`);
     }
   }
+
+  if (isProductionEnvironment()) {
+    return [];
+  }
+
   reconcileBatchCounts();
   return [...store.batches];
 }
@@ -1141,12 +1146,23 @@ export async function getClassSessions(batchId?: string): Promise<ClassSession[]
         }
       }
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[academics-service] Supabase class_sessions query error:', error.message || error);
+        throw new Error(`Failed to retrieve authoritative class sessions: ${error.message || error}`);
+      }
+      if (Array.isArray(data)) {
         return data as ClassSession[];
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (isProductionEnvironment() || isLiveSupabaseEnabled()) {
+        throw err;
+      }
       console.warn('Supabase class_sessions query error, falling back to local persistent store:', err);
     }
+  }
+
+  if (isProductionEnvironment()) {
+    return [];
   }
 
   let list = [...store.classSessions];
