@@ -1502,6 +1502,11 @@ export interface StudentPaymentRecord {
   student_id: string;
   student_name: string;
   admission_number: string;
+  student_unique_id?: string;
+  student_code?: string;
+  student_phone?: string;
+  counsellor_id?: string;
+  counsellor_name?: string;
   fee_category: string;
   amount_paid: number;
   payment_date: string;

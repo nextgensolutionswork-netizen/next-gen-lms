@@ -238,6 +238,11 @@ export default function FeeApprovalsPage() {
         student_id: origSp?.student_id || u.student_id,
         student_name: origSp?.student_name || u.student_name || 'Student',
         admission_number: origSp?.admission_number || u.admission_number || '',
+        student_unique_id: origSp?.student_unique_id || (u as any).student_unique_id,
+        student_code: origSp?.student_code || (u as any).student_code,
+        student_phone: origSp?.student_phone || (u as any).student_phone || (u as any).phone,
+        counsellor_id: origSp?.counsellor_id || (u as any).counsellor_id,
+        counsellor_name: origSp?.counsellor_name || (u as any).counsellor_name,
         fee_category: origSp?.fee_category || (u as any).fee_category || u.course_name || 'Course Fee',
         amount_paid: typeof u.amount === 'number' ? u.amount : origSp?.amount_paid || 0,
         payment_date: origSp?.payment_date || u.payment_date,
@@ -407,17 +412,21 @@ export default function FeeApprovalsPage() {
         const matchesLmsId =
           matchingStudent?.student_unique_id?.toLowerCase().includes(q) ||
           matchingStudent?.student_code?.toLowerCase().includes(q) ||
-          matchingAdmission?.student_unique_id?.toLowerCase().includes(q);
+          matchingAdmission?.student_unique_id?.toLowerCase().includes(q) ||
+          p.student_unique_id?.toLowerCase().includes(q) ||
+          p.student_code?.toLowerCase().includes(q);
         const matchesPhone =
           matchingStudent?.phone?.includes(q) ||
           matchingAdmission?.phone?.includes(q) ||
+          p.student_phone?.includes(q) ||
           (p as any).phone?.includes(q);
         const matchesAccount =
           p.our_bank_account_name?.toLowerCase().includes(q) ||
           p.verified_our_bank_account_name?.toLowerCase().includes(q) ||
           p.our_bank_name?.toLowerCase().includes(q);
         const matchesCounsellor =
-          matchingAdmission?.counsellor_name?.toLowerCase().includes(q);
+          matchingAdmission?.counsellor_name?.toLowerCase().includes(q) ||
+          p.counsellor_name?.toLowerCase().includes(q);
         const matchesCategory = p.fee_category?.toLowerCase().includes(q);
         const matchesTxn = p.transaction_reference?.toLowerCase().includes(q) || p.bank_upi_reference?.toLowerCase().includes(q);
         const matchesRecorded = p.recorded_by_name?.toLowerCase().includes(q) || p.updated_by_name?.toLowerCase().includes(q);
@@ -1696,18 +1705,24 @@ export default function FeeApprovalsPage() {
                           matchingStudent?.full_name ||
                           matchingAdmission?.student_name ||
                           'Unknown Student';
-                        const lmsId =
+                        const isUuid = (val?: string | null) =>
+                          Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim()));
+                        const rawLmsCandidate =
                           matchingStudent?.student_unique_id ||
                           matchingStudent?.student_code ||
                           matchingAdmission?.student_unique_id ||
-                          (p.student_id && !p.student_id.startsWith('ADM-') ? p.student_id : null) ||
-                          (matchingStudent?.id && !matchingStudent.id.startsWith('ADM-') ? matchingStudent.id : 'N/A');
+                          p.student_unique_id ||
+                          p.student_code ||
+                          (p.student_id && !p.student_id.startsWith('ADM-') && !isUuid(p.student_id) ? p.student_id : null) ||
+                          (matchingStudent?.id && !matchingStudent.id.startsWith('ADM-') && !isUuid(matchingStudent.id) ? matchingStudent.id : null);
+                        const lmsId = rawLmsCandidate && !isUuid(rawLmsCandidate) ? rawLmsCandidate : 'Registration Pending';
                         const profileLink = matchingStudent?.id || p.student_id;
 
                         // 2. Authoritative Phone Number resolution
                         const registeredPhone =
                           matchingStudent?.phone ||
                           matchingAdmission?.phone ||
+                          p.student_phone ||
                           (p as any).phone ||
                           '';
                         const cleanPhone = registeredPhone.trim();
@@ -1742,7 +1757,7 @@ export default function FeeApprovalsPage() {
                             )
                           : null;
                         const effectiveAdm = linkedAdmission || admissionFromFa;
-                        const rawCounsellorId = effectiveAdm?.counsellor_id;
+                        const rawCounsellorId = effectiveAdm?.counsellor_id || p.counsellor_id;
                         const canonicalCounsellorId = rawCounsellorId ? resolveCanonicalCounsellorId(rawCounsellorId) : undefined;
                         const counsellorStaff = (store.users || []).find(
                           (u) =>
@@ -1751,15 +1766,24 @@ export default function FeeApprovalsPage() {
                         );
                         const counsellorName =
                           effectiveAdm?.counsellor_name ||
+                          p.counsellor_name ||
                           counsellorStaff?.full_name ||
                           'Unassigned';
 
                         // 5. Receiving Bank Account Holder Name (Never confuse with student name, never silent fallback)
                         const isApproved = isPaymentApproved(p);
                         const isCash = p.payment_mode === 'Cash';
-                        const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts) || (
-                          effectiveAdm ? findOriginalReceivingAccount(effectiveAdm, authorizedBankAccounts) : undefined
-                        );
+                        const auditBankEvidence = (store.auditLogs || []).find(
+                          (log) =>
+                            (log.action === 'PAYMENT_SUBMITTED' || log.action === 'PAYMENT_RECORDED') &&
+                            (log.record_id === p.id || log.record_id === `pay-${p.id}` || `spr-${log.record_id}` === p.id) &&
+                            log.new_value &&
+                            (log.new_value.our_bank_profile_id || log.new_value.our_bank_account_name)
+                        )?.new_value as { our_bank_profile_id?: string; our_bank_name?: string; our_bank_account_name?: string; our_bank_account_id?: string } | undefined;
+                        const origAccount =
+                          findOriginalReceivingAccount(p, authorizedBankAccounts) ||
+                          (effectiveAdm ? findOriginalReceivingAccount(effectiveAdm, authorizedBankAccounts) : undefined) ||
+                          (auditBankEvidence ? findOriginalReceivingAccount(auditBankEvidence, authorizedBankAccounts) : undefined);
 
                         let accountHolderName = '';
                         let accountSub = '';

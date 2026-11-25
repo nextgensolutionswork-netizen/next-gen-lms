@@ -434,16 +434,25 @@ class InstituteDataStore {
       );
       if (!spr) {
         const matchingFee = this.studentFees.find((f) => f.student_id === p.student_id);
+        const matchingStudent = (this.students || []).find((s) => s.id === p.student_id);
+        const matchingAdm = (this.admissions || []).find(
+          (a) => a.student_id === p.student_id || (p.admission_number && a.admission_number === p.admission_number)
+        );
         this.studentPayments.push({
           tenant_id: p.tenant_id,
-          enrollment_id: matchingFee?.enrollment_id,
+          enrollment_id: matchingFee?.enrollment_id || matchingAdm?.id,
           status: p.status === 'Success' ? 'Approved' : p.status === 'Failed' ? 'Rejected' : 'Pending Approval',
           id: `spr-${p.id}`,
           fee_id: matchingFee?.id || `fee-${p.fee_account_id}`,
           installment_id: p.installment_id,
           student_id: p.student_id,
-          student_name: p.student_name || 'Student',
-          admission_number: p.admission_number || '',
+          student_name: p.student_name || matchingStudent?.full_name || 'Student',
+          admission_number: p.admission_number || matchingStudent?.admission_number || '',
+          student_unique_id: matchingStudent?.student_unique_id || matchingAdm?.student_unique_id,
+          student_code: matchingStudent?.student_code,
+          student_phone: matchingStudent?.phone || matchingAdm?.phone,
+          counsellor_id: matchingAdm?.counsellor_id || matchingFee?.counsellor_id,
+          counsellor_name: matchingAdm?.counsellor_name || matchingFee?.counsellor_name,
           fee_category: matchingFee?.fee_category || 'Course Fee',
           amount_paid: p.amount,
           payment_date: p.payment_date,
@@ -451,6 +460,11 @@ class InstituteDataStore {
           transaction_reference: p.transaction_reference,
           receipt_number: p.receipt_number,
           notes: p.notes,
+          our_bank_profile_id: (p as any).our_bank_profile_id,
+          our_bank_name: p.our_bank_name,
+          our_bank_account_name: p.our_bank_account_name,
+          our_bank_account_id: p.our_bank_account_id,
+          our_upi_details: p.our_upi_details,
           recorded_by: p.collected_by,
           recorded_by_name: p.collected_by_name || 'Accounts Staff',
           recorded_by_role: 'accountant',

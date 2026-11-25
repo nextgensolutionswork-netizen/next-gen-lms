@@ -1005,6 +1005,13 @@ export class FeeWorkflowService {
 
     const matchedInstallment = rawInstallment;
 
+    const matchedAdmission = (store.admissions || []).find(
+      (a) =>
+        a.id === student.admission_id ||
+        (fee.enrollment_id && a.id === fee.enrollment_id) ||
+        (student.admission_number && a.admission_number === student.admission_number)
+    );
+
     const paymentRecord: StudentPaymentRecord = {
       tenant_id: tenantId(recorder),
       status: 'Pending Approval',
@@ -1016,6 +1023,11 @@ export class FeeWorkflowService {
       student_id: fee.student_id,
       student_name: fee.student_name,
       admission_number: fee.admission_number,
+      student_unique_id: student.student_unique_id || matchedAdmission?.student_unique_id,
+      student_code: student.student_code,
+      student_phone: student.phone || matchedAdmission?.phone,
+      counsellor_id: matchedAdmission?.counsellor_id || fee.counsellor_id,
+      counsellor_name: matchedAdmission?.counsellor_name || fee.counsellor_name,
       fee_category: fee.fee_category,
       amount_paid: amountPaid,
       payment_date: paymentDate,

@@ -58,8 +58,8 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
             const [admsRes, studsRes, paysRes, rcptsRes] = await Promise.all([
               db.from('admissions').select('id, course_id, status').eq('tenant_id', tenant),
               db.from('students').select('id, total_fee, paid_amount, outstanding_amount').eq('tenant_id', tenant),
-              db.from('payments').select('id, amount, status, receipt_number').eq('tenant_id', tenant),
-              db.from('receipts').select('id, payment_id, receipt_number, payment_amount, status').eq('tenant_id', tenant),
+              db.from('payments').select('id, amount, receipt_number').eq('tenant_id', tenant),
+              db.from('receipts').select('id, payment_id, receipt_number, amount').eq('tenant_id', tenant),
             ]);
 
             if (!admsRes.error && Array.isArray(admsRes.data)) {
@@ -101,7 +101,6 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
                   return {
                     ...p,
                     amount: typeof row.amount === 'number' ? row.amount : p.amount,
-                    status: row.status || p.status,
                     receipt_number: row.receipt_number || p.receipt_number,
                   };
                 });
@@ -115,9 +114,8 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
                   if (!row) return r;
                   return {
                     ...r,
-                    payment_amount: typeof row.payment_amount === 'number' ? row.payment_amount : r.payment_amount,
+                    payment_amount: typeof row.amount === 'number' ? row.amount : r.payment_amount,
                     receipt_number: row.receipt_number || r.receipt_number,
-                    status: row.status || r.status,
                   };
                 });
             }
