@@ -121,22 +121,55 @@ export function findOriginalReceivingAccount(
   if (!payment) return undefined;
   const accounts = accountsList || getAuthorizedBankAccounts(undefined, { includePending: true, includeArchived: true });
 
-  if (payment.our_bank_profile_id) {
-    const found = accounts.find((a) => a.id === payment.our_bank_profile_id);
+  // 1. Authoritative match by unique bank account profile ID
+  if (payment.our_bank_profile_id && payment.our_bank_profile_id.trim()) {
+    const targetId = payment.our_bank_profile_id.trim().toLowerCase();
+    const found = accounts.find((a) => a.id.toLowerCase() === targetId);
     if (found) return found;
   }
 
-  if (payment.our_bank_account_id) {
-    const cleanNum = payment.our_bank_account_id.replace(/\s+/g, '');
+  // 2. Exact or masked account number match
+  if (payment.our_bank_account_id && payment.our_bank_account_id.trim()) {
+    const rawInput = payment.our_bank_account_id.trim();
+    const cleanNum = rawInput.replace(/\s+/g, '');
     const found = accounts.find((a) => a.account_number.replace(/\s+/g, '') === cleanNum);
     if (found) return found;
+
+    // Handle masked formats like '•••• •••• 9271' or 'XXXX9271'
+    const digits = cleanNum.replace(/\D/g, '');
+    if (digits.length >= 4) {
+      const last4 = digits.slice(-4);
+      // Prioritize match where holder name or bank name matches
+      const matched = accounts.find((a) => {
+        const aDigits = a.account_number.replace(/\D/g, '');
+        if (!aDigits.endsWith(last4)) return false;
+        if (payment.our_bank_account_name && a.account_holder_name.trim().toLowerCase() === payment.our_bank_account_name.trim().toLowerCase()) {
+          return true;
+        }
+        if (payment.our_bank_name && a.bank_name.trim().toLowerCase() === payment.our_bank_name.trim().toLowerCase()) {
+          return true;
+        }
+        return false;
+      }) || accounts.find((a) => a.account_number.replace(/\D/g, '').endsWith(last4));
+      if (matched) return matched;
+    }
   }
 
+  // 3. Match by bank name AND account holder name
   if (payment.our_bank_name && payment.our_bank_account_name) {
     const bName = payment.our_bank_name.trim().toLowerCase();
     const hName = payment.our_bank_account_name.trim().toLowerCase();
     const found = accounts.find(
       (a) => a.bank_name.trim().toLowerCase() === bName && a.account_holder_name.trim().toLowerCase() === hName
+    );
+    if (found) return found;
+  }
+
+  // 4. Match by account holder name alone (case-insensitive)
+  if (payment.our_bank_account_name && payment.our_bank_account_name.trim()) {
+    const hName = payment.our_bank_account_name.trim().toLowerCase();
+    const found = accounts.find(
+      (a) => a.account_holder_name.trim().toLowerCase() === hName
     );
     if (found) return found;
   }

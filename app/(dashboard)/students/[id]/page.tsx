@@ -48,6 +48,8 @@ import { PhoneInput } from '@/components/ui/phone-input';
 import { validateAlternatePhoneNumber, validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
+import { BankAccountSearchableDropdown } from '@/components/ui/bank-account-searchable-dropdown';
 import { transferStudentBatch } from '@/lib/services/academics-service';
 import { issueCertificate } from '@/lib/services/certificate-service';
 import { PaymentMethod } from '@/types';
@@ -95,6 +97,12 @@ export default function StudentDetailsPage() {
   const [payLoading, setPayLoading] = React.useState(false);
   const [payError, setPayError] = React.useState<string | null>(null);
   const [paySuccessMsg, setPaySuccessMsg] = React.useState<string | null>(null);
+  const authorizedBankAccounts = React.useMemo(() => getAuthorizedBankAccounts(role), [role]);
+  const [payBankProfileId, setPayBankProfileId] = React.useState('');
+  const [payBankName, setPayBankName] = React.useState('');
+  const [payBankAccountName, setPayBankAccountName] = React.useState('');
+  const [payBankAccountId, setPayBankAccountId] = React.useState('');
+  const [payBankUpiDetails, setPayBankUpiDetails] = React.useState('');
 
   // Batch Transfer Modal state
   const [isTransferModalOpen, setIsTransferModalOpen] = React.useState(false);
@@ -351,6 +359,11 @@ export default function StudentDetailsPage() {
     setPayBankUpiRef('');
     setPayProofUrl('');
     setPayNotes('');
+    setPayBankProfileId('');
+    setPayBankName('');
+    setPayBankAccountName('');
+    setPayBankAccountId('');
+    setPayBankUpiDetails('');
     setIsPaymentModalOpen(true);
   };
 

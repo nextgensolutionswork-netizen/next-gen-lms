@@ -716,6 +716,7 @@ export default function AdmissionsPage() {
         payment_proof_url: collectInitialPayment && initialPaymentMode !== 'Cash' ? initialPaymentProofUrl || undefined : undefined,
         payment_date: collectInitialPayment ? initialPaymentDate : undefined,
         initial_payment_notes: initialPaymentNotes,
+        our_bank_profile_id: collectInitialPayment && initialPaymentMode !== 'Cash' && bankPreset !== 'custom' ? bankPreset : undefined,
         our_bank_name: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankName : undefined,
         our_bank_account_name: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankAccountName : undefined,
         our_bank_account_id: collectInitialPayment && initialPaymentMode !== 'Cash' ? ourBankAccountId : undefined,

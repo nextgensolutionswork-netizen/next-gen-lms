@@ -65,6 +65,17 @@ export interface UnifiedPaymentRecord extends Omit<Payment, 'status'> {
   updated_at?: string;
   updated_by?: string;
   updated_by_name?: string;
+  our_bank_profile_id?: string;
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
+  verified_our_bank_name?: string;
+  verified_our_bank_account_name?: string;
+  verified_our_bank_account_id?: string;
+  verified_bank_profile_id?: string;
+  verified_our_upi_details?: string;
+  bank_account_discrepancy_reason?: string;
 }
 
 /**
@@ -128,6 +139,11 @@ export function unifyDualLedgerPayments(
       recorded_by_role: 'accountant',
       fee_category: p.course_name || 'Course Fee',
       fee_id: p.fee_account_id,
+      our_bank_profile_id: p.our_bank_profile_id,
+      our_bank_name: p.our_bank_name,
+      our_bank_account_name: p.our_bank_account_name,
+      our_bank_account_id: p.our_bank_account_id,
+      our_upi_details: p.our_upi_details,
       raw_id: p.id,
     });
   }
@@ -257,6 +273,17 @@ export function unifyDualLedgerPayments(
       updated_at: sp.updated_at || existing?.updated_at,
       updated_by: sp.updated_by || existing?.updated_by,
       updated_by_name: sp.updated_by_name || existing?.updated_by_name,
+      our_bank_profile_id: sp.our_bank_profile_id || existing?.our_bank_profile_id,
+      our_bank_name: sp.our_bank_name || existing?.our_bank_name,
+      our_bank_account_name: sp.our_bank_account_name || existing?.our_bank_account_name,
+      our_bank_account_id: sp.our_bank_account_id || existing?.our_bank_account_id,
+      our_upi_details: sp.our_upi_details || existing?.our_upi_details,
+      verified_our_bank_name: sp.verified_our_bank_name || existing?.verified_our_bank_name,
+      verified_our_bank_account_name: sp.verified_our_bank_account_name || existing?.verified_our_bank_account_name,
+      verified_our_bank_account_id: sp.verified_our_bank_account_id || existing?.verified_our_bank_account_id,
+      verified_bank_profile_id: sp.verified_bank_profile_id || existing?.verified_bank_profile_id,
+      verified_our_upi_details: sp.verified_our_upi_details || existing?.verified_our_upi_details,
+      bank_account_discrepancy_reason: sp.bank_account_discrepancy_reason || existing?.bank_account_discrepancy_reason,
       notes: sp.notes || existing?.notes,
       created_at: sp.created_at || existing?.created_at,
     };

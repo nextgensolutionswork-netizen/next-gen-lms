@@ -254,6 +254,7 @@ export interface CreateAdmissionInput {
   initial_payment_notes?: string;
   payment_proof_url?: string;
   payment_date?: string;
+  our_bank_profile_id?: string;
   our_bank_name?: string;
   our_bank_account_name?: string;
   our_bank_account_id?: string;
@@ -573,6 +574,7 @@ export async function createAdmissionWorkflow(
     payment_plan: 'Full Payment',
     counsellor_id: counsellor?.id,
     counsellor_name: counsellor?.full_name || input.counsellor_name,
+    our_bank_profile_id: input.our_bank_profile_id,
     our_bank_name: input.our_bank_name,
     our_bank_account_name: input.our_bank_account_name,
     our_bank_account_id: input.our_bank_account_id,
@@ -793,6 +795,7 @@ export async function createAdmissionWorkflow(
       amount_paid: input.initial_payment_amount, payment_mode: input.payment_mode || 'UPI',
       payment_date: input.payment_date || actualPaymentDate(), transaction_reference: input.transaction_reference,
       payment_proof_url: input.payment_proof_url, notes: input.initial_payment_notes,
+      our_bank_profile_id: input.our_bank_profile_id,
       our_bank_name: input.our_bank_name,
       our_bank_account_name: input.our_bank_account_name,
       our_bank_account_id: input.our_bank_account_id,

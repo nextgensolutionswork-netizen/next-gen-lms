@@ -206,6 +206,7 @@ export interface Admission {
   counsellor_id?: string;
   counsellor_name?: string;
   lead_id?: string;
+  our_bank_profile_id?: string;
   our_bank_name?: string;
   our_bank_account_name?: string;
   our_bank_account_id?: string;
@@ -661,6 +662,7 @@ export interface Payment {
   collected_by: string;
   collected_by_name?: string;
   notes?: string;
+  our_bank_profile_id?: string;
   our_bank_name?: string;
   our_bank_account_name?: string;
   our_bank_account_id?: string;
@@ -688,6 +690,11 @@ export interface Receipt {
   institute_address: string;
   institute_phone: string;
   institute_gst: string;
+  our_bank_profile_id?: string;
+  our_bank_name?: string;
+  our_bank_account_name?: string;
+  our_bank_account_id?: string;
+  our_upi_details?: string;
   created_at: string;
 
   // GST & e-Invoice Compliance Fields
@@ -713,12 +720,6 @@ export interface Receipt {
   terms_and_conditions?: string;
   due_date?: string;
   logo_url?: string;
-
-  // Receiving Bank Details
-  our_bank_name?: string;
-  our_bank_account_name?: string;
-  our_bank_account_id?: string;
-  our_upi_details?: string;
 
   // Receipt Cancellation, Reversal & Credit Note Workflow
   status?: 'Valid' | 'Void' | 'Partially Reversed';

@@ -291,6 +291,7 @@ export default function PaymentsPage() {
           bank_upi_reference: bankUpiRef,
           payment_proof_url: proofUrl,
           notes,
+          our_bank_profile_id: paymentMode !== 'Cash' && selectedBankAccountId !== 'custom' ? selectedBankAccountId : undefined,
           our_bank_name: paymentMode !== 'Cash' ? ourBankName : undefined,
           our_bank_account_name: paymentMode !== 'Cash' ? ourBankAccountName : undefined,
           our_bank_account_id: paymentMode !== 'Cash' ? ourBankAccountId : undefined,

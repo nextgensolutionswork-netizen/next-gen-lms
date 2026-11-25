@@ -475,6 +475,11 @@ class InstituteDataStore {
         legacyP.payment_date = sp.payment_date;
         legacyP.payment_mode = sp.payment_mode;
         legacyP.transaction_reference = sp.payment_mode === 'Cash' ? null : sp.transaction_reference || sp.bank_upi_reference || legacyP.transaction_reference;
+        if (sp.our_bank_name) legacyP.our_bank_name = sp.our_bank_name;
+        if (sp.our_bank_account_name) legacyP.our_bank_account_name = sp.our_bank_account_name;
+        if (sp.our_bank_account_id) legacyP.our_bank_account_id = sp.our_bank_account_id;
+        if (sp.our_upi_details) legacyP.our_upi_details = sp.our_upi_details;
+        if (sp.our_bank_profile_id) (legacyP as any).our_bank_profile_id = sp.our_bank_profile_id;
       } else {
         const matchingFa = this.feeAccounts.find((fa) => fa.student_id === sp.student_id);
         const matchingFee = this.studentFees.find((f) => f.id === sp.fee_id);
@@ -497,6 +502,11 @@ class InstituteDataStore {
           collected_by: sp.recorded_by,
           collected_by_name: sp.recorded_by_name,
           notes: sp.notes,
+          our_bank_profile_id: sp.our_bank_profile_id,
+          our_bank_name: sp.our_bank_name,
+          our_bank_account_name: sp.our_bank_account_name,
+          our_bank_account_id: sp.our_bank_account_id,
+          our_upi_details: sp.our_upi_details,
           created_at: sp.created_at,
         });
       }

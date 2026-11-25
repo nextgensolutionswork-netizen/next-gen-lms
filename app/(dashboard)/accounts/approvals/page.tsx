@@ -153,6 +153,12 @@ export default function FeeApprovalsPage() {
   const [editBankRef, setEditBankRef] = React.useState<string>('');
   const [editProofUrl, setEditProofUrl] = React.useState<string>('');
   const [editNotes, setEditNotes] = React.useState<string>('');
+  const [editBankProfileId, setEditBankProfileId] = React.useState<string>('');
+  const [editBankName, setEditBankName] = React.useState<string>('');
+  const [editBankAccountName, setEditBankAccountName] = React.useState<string>('');
+  const [editBankAccountId, setEditBankAccountId] = React.useState<string>('');
+  const [editBankUpiDetails, setEditBankUpiDetails] = React.useState<string>('');
+  const [editReason, setEditReason] = React.useState<string>('');
 
   // Record Payment Modal state (Sales / Staff)
   const [recordPaymentModalOpen, setRecordPaymentModalOpen] = React.useState(false);
@@ -165,6 +171,11 @@ export default function FeeApprovalsPage() {
   const [recProofUrl, setRecProofUrl] = React.useState<string>('');
   const [paymentProofUploading, setPaymentProofUploading] = React.useState(false);
   const [recNotes, setRecNotes] = React.useState<string>('');
+  const [recBankProfileId, setRecBankProfileId] = React.useState<string>('');
+  const [recBankName, setRecBankName] = React.useState<string>('');
+  const [recBankAccountName, setRecBankAccountName] = React.useState<string>('');
+  const [recBankAccountId, setRecBankAccountId] = React.useState<string>('');
+  const [recBankUpiDetails, setRecBankUpiDetails] = React.useState<string>('');
 
   // Form inputs
   const [approvalNotes, setApprovalNotes] = React.useState('');
@@ -247,6 +258,17 @@ export default function FeeApprovalsPage() {
         updated_by_name: origSp?.updated_by_name || (u as any).updated_by_name,
         created_at: origSp?.created_at || u.created_at || new Date().toISOString(),
         status: (u.status as any) || origSp?.status,
+        our_bank_profile_id: origSp?.our_bank_profile_id || (u as any).our_bank_profile_id,
+        our_bank_name: origSp?.our_bank_name || (u as any).our_bank_name,
+        our_bank_account_name: origSp?.our_bank_account_name || (u as any).our_bank_account_name,
+        our_bank_account_id: origSp?.our_bank_account_id || (u as any).our_bank_account_id,
+        our_upi_details: origSp?.our_upi_details || (u as any).our_upi_details,
+        verified_our_bank_name: origSp?.verified_our_bank_name || (u as any).verified_our_bank_name,
+        verified_our_bank_account_name: origSp?.verified_our_bank_account_name || (u as any).verified_our_bank_account_name,
+        verified_our_bank_account_id: origSp?.verified_our_bank_account_id || (u as any).verified_our_bank_account_id,
+        verified_bank_profile_id: origSp?.verified_bank_profile_id || (u as any).verified_bank_profile_id,
+        verified_our_upi_details: origSp?.verified_our_upi_details || (u as any).verified_our_upi_details,
+        bank_account_discrepancy_reason: origSp?.bank_account_discrepancy_reason || (u as any).bank_account_discrepancy_reason,
       };
     });
     setPayments(spList);
@@ -523,6 +545,36 @@ export default function FeeApprovalsPage() {
     setEditBankRef(p.bank_upi_reference || '');
     setEditProofUrl(p.payment_proof_url || '');
     setEditNotes(p.notes || '');
+    setEditReason('');
+
+    // Authoritative Receiving Bank Account resolution for update
+    const matchingAdm = (store.admissions || []).find(
+      (a) => (p.admission_number && a.admission_number === p.admission_number) || (p.student_id && a.student_id === p.student_id)
+    );
+    const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts) || (
+      matchingAdm ? findOriginalReceivingAccount(matchingAdm, authorizedBankAccounts) : undefined
+    );
+
+    if (origAccount) {
+      setEditBankProfileId(origAccount.id);
+      setEditBankName(origAccount.bank_name);
+      setEditBankAccountName(origAccount.account_holder_name);
+      setEditBankAccountId(origAccount.account_number);
+      setEditBankUpiDetails(origAccount.upi_id || '');
+    } else if (p.our_bank_account_name || p.our_bank_name) {
+      setEditBankProfileId(p.our_bank_profile_id || 'custom');
+      setEditBankName(p.our_bank_name || '');
+      setEditBankAccountName(p.our_bank_account_name || '');
+      setEditBankAccountId(p.our_bank_account_id || '');
+      setEditBankUpiDetails(p.our_upi_details || '');
+    } else {
+      setEditBankProfileId('');
+      setEditBankName('');
+      setEditBankAccountName('');
+      setEditBankAccountId('');
+      setEditBankUpiDetails('');
+    }
+
     setActionError(null);
     setPaymentUpdateModalOpen(true);
   };
@@ -531,6 +583,17 @@ export default function FeeApprovalsPage() {
     e.preventDefault();
     if (paymentProofUploading) return;
     if (!updatingPayment || !user) return;
+
+    if (!editReason.trim()) {
+      setActionError('Please provide a mandatory reason for updating this payment transaction.');
+      return;
+    }
+
+    if (editPaymentMode !== 'Cash' && !editBankProfileId && !editBankAccountName) {
+      setActionError('Please select an authorized receiving bank account for non-cash payment.');
+      return;
+    }
+
     setActionError(null);
     try {
       await paymentWorkflowClient.updatePayment(
@@ -542,7 +605,12 @@ export default function FeeApprovalsPage() {
           transaction_reference: editTxnRef,
           bank_upi_reference: editBankRef,
           payment_proof_url: editProofUrl,
-          notes: editNotes,
+          notes: `${editNotes ? editNotes.trim() + '\n' : ''}[Update Reason by ${user.full_name} (${user.role}) on ${new Date().toISOString()}]: ${editReason.trim()}`,
+          our_bank_profile_id: editPaymentMode !== 'Cash' && editBankProfileId && editBankProfileId !== 'custom' ? editBankProfileId : undefined,
+          our_bank_name: editPaymentMode !== 'Cash' ? editBankName : undefined,
+          our_bank_account_name: editPaymentMode !== 'Cash' ? editBankAccountName : undefined,
+          our_bank_account_id: editPaymentMode !== 'Cash' ? editBankAccountId : undefined,
+          our_upi_details: (editPaymentMode === 'UPI' || editBankUpiDetails) ? editBankUpiDetails : undefined,
         },
         user.id,
         role || 'counsellor'
@@ -568,6 +636,11 @@ export default function FeeApprovalsPage() {
     setRecBankRef('');
     setRecProofUrl('');
     setRecNotes('');
+    setRecBankProfileId('');
+    setRecBankName('');
+    setRecBankAccountName('');
+    setRecBankAccountId('');
+    setRecBankUpiDetails('');
     setActionError(null);
     setRecordPaymentModalOpen(true);
   };
@@ -578,6 +651,10 @@ export default function FeeApprovalsPage() {
     if (!user) return;
     if (!recFeeId) {
       setActionError('Please select a student fee account.');
+      return;
+    }
+    if (recMode !== 'Cash' && !recBankProfileId && !recBankAccountName) {
+      setActionError('Please select an authorized receiving bank account for non-cash payment.');
       return;
     }
     setActionError(null);
@@ -592,6 +669,11 @@ export default function FeeApprovalsPage() {
           bank_upi_reference: recBankRef,
           payment_proof_url: recProofUrl,
           notes: recNotes,
+          our_bank_profile_id: recMode !== 'Cash' && recBankProfileId && recBankProfileId !== 'custom' ? recBankProfileId : undefined,
+          our_bank_name: recMode !== 'Cash' ? recBankName : undefined,
+          our_bank_account_name: recMode !== 'Cash' ? recBankAccountName : undefined,
+          our_bank_account_id: recMode !== 'Cash' ? recBankAccountId : undefined,
+          our_upi_details: (recMode === 'UPI' || recBankUpiDetails) ? recBankUpiDetails : undefined,
         },
         user.id,
         role || 'counsellor'
@@ -1633,31 +1715,7 @@ export default function FeeApprovalsPage() {
                         const paymentDateStr = p.payment_date || p.created_at?.split('T')[0] || '';
                         const formattedPaymentDate = paymentDateStr ? formatDate(paymentDateStr) : '—';
 
-                        // 5. Receiving Bank Account Holder Name (Never confuse with student name)
-                        const isApproved = isPaymentApproved(p);
-                        const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts);
-                        const defaultAccount = authorizedBankAccounts[0];
-                        let accountHolderName = 'Next-Gen ERP Solutions';
-                        let accountSub = '';
-
-                        if (p.payment_mode === 'Cash') {
-                          accountHolderName = 'Institute Cash Counter';
-                          accountSub = 'Cash Collection';
-                        } else if (isApproved && p.verified_our_bank_account_name) {
-                          accountHolderName = p.verified_our_bank_account_name;
-                          accountSub = p.verified_our_bank_name || 'Verified Receiving Account';
-                        } else if (p.our_bank_account_name) {
-                          accountHolderName = p.our_bank_account_name;
-                          accountSub = p.our_bank_name || 'Receiving Account';
-                        } else if (origAccount?.account_holder_name) {
-                          accountHolderName = origAccount.account_holder_name;
-                          accountSub = origAccount.bank_name || '';
-                        } else if (defaultAccount?.account_holder_name) {
-                          accountHolderName = defaultAccount.account_holder_name;
-                          accountSub = defaultAccount.bank_name || '';
-                        }
-
-                        // 6. Assigned Counsellor Name resolution (via canonical IDs from admission/fee)
+                        // 6. Assigned Counsellor Name & Linked Admission resolution
                         const linkedAdmission = matchingAdmission || (store.admissions || []).find(
                           (a) =>
                             (p.admission_number && a.admission_number === p.admission_number) ||
@@ -1689,6 +1747,47 @@ export default function FeeApprovalsPage() {
                           effectiveAdm?.counsellor_name ||
                           counsellorStaff?.full_name ||
                           'Unassigned';
+
+                        // 5. Receiving Bank Account Holder Name (Never confuse with student name, never silent fallback)
+                        const isApproved = isPaymentApproved(p);
+                        const isCash = p.payment_mode === 'Cash';
+                        const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts) || (
+                          effectiveAdm ? findOriginalReceivingAccount(effectiveAdm, authorizedBankAccounts) : undefined
+                        );
+
+                        let accountHolderName = '';
+                        let accountSub = '';
+                        let isBankMissingOrInvalid = false;
+
+                        if (isCash) {
+                          accountHolderName = 'Institute Cash Counter';
+                          accountSub = 'Cash Collection';
+                        } else if (isApproved && (p.verified_our_bank_account_name || p.verified_bank_profile_id)) {
+                          const vAcc = p.verified_bank_profile_id
+                            ? authorizedBankAccounts.find((a) => a.id === p.verified_bank_profile_id)
+                            : undefined;
+                          accountHolderName = p.verified_our_bank_account_name || vAcc?.account_holder_name || 'Verified Receiving Account';
+                          const bankName = p.verified_our_bank_name || vAcc?.bank_name || 'Bank';
+                          const rawNum = (p.verified_our_bank_account_id || vAcc?.account_number || '').replace(/\D/g, '');
+                          const last4 = rawNum ? rawNum.slice(-4) : '';
+                          accountSub = last4 ? `${bankName} — XXXX${last4}` : bankName;
+                        } else if (origAccount) {
+                          accountHolderName = origAccount.account_holder_name;
+                          const rawNum = (origAccount.account_number || '').replace(/\D/g, '');
+                          const last4 = rawNum ? rawNum.slice(-4) : '';
+                          accountSub = last4 ? `${origAccount.bank_name} — XXXX${last4}` : origAccount.bank_name;
+                        } else if (p.our_bank_account_name) {
+                          accountHolderName = p.our_bank_account_name;
+                          const bankName = p.our_bank_name || 'Bank';
+                          const rawNum = (p.our_bank_account_id || '').replace(/\D/g, '');
+                          const last4 = rawNum ? rawNum.slice(-4) : '';
+                          accountSub = last4 ? `${bankName} — XXXX${last4}` : bankName;
+                        } else {
+                          // Non-cash payment lacking valid receiving bank account mapping
+                          isBankMissingOrInvalid = true;
+                          accountHolderName = 'Bank Account Verification Required';
+                          accountSub = 'Action needed: Update receiving bank details';
+                        }
 
                         return (
                           <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
@@ -1743,13 +1842,27 @@ export default function FeeApprovalsPage() {
                             {/* Column 5: Account Holder Name */}
                             <td className="px-4 py-3 text-slate-800">
                               <div>
-                                <span className="font-semibold text-slate-900 block text-xs">
-                                  {accountHolderName}
-                                </span>
-                                {accountSub && (
-                                  <span className="text-[10px] text-slate-500 block truncate max-w-[170px]" title={accountSub}>
-                                    {accountSub}
-                                  </span>
+                                {isBankMissingOrInvalid ? (
+                                  <div className="flex items-center space-x-1">
+                                    <span
+                                      className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                      title="The recorded payment lacks an authorized receiving bank profile. Please click Update to resolve bank account mapping before approving."
+                                    >
+                                      <AlertTriangle className="h-3 w-3 mr-1 text-amber-600 shrink-0" />
+                                      Bank Account Verification Required
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <span className="font-semibold text-slate-900 block text-xs">
+                                      {accountHolderName}
+                                    </span>
+                                    {accountSub && (
+                                      <span className="text-[10px] text-slate-500 block truncate max-w-[190px] font-mono" title={accountSub}>
+                                        {accountSub}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -1801,7 +1914,7 @@ export default function FeeApprovalsPage() {
                                       }`}
                                       title={
                                         canCounsellorEdit
-                                          ? 'Sales / Staff: Update payment amount, UTR reference, proof slip, or notes'
+                                          ? 'Sales / Staff: Update payment amount, receiving bank account, UTR reference, proof slip, or notes'
                                           : 'Only authorized staff may update pending payment entries.'
                                       }
                                     >
@@ -1813,36 +1926,24 @@ export default function FeeApprovalsPage() {
                                     <Button
                                       variant="sap"
                                       size="sm"
-                                      disabled={!canAccountantVerify}
+                                      disabled={!canAccountantVerify || isBankMissingOrInvalid}
                                       onClick={() => {
                                         setSelectedPayment(p);
                                         setPaymentVerificationNotes('');
                                         setActionError(null);
                                         setManualVerification({ reference: '', amount: '', payment_date: '' });
                                         setVerificationErrors({});
-                                        const origAccount = findOriginalReceivingAccount(p, authorizedBankAccounts);
-                                        if (origAccount) {
-                                          setSelectedVerifiedBankAccountId(origAccount.id);
-                                          setVerifiedBankName(origAccount.bank_name);
-                                          setVerifiedBankAccountName(origAccount.account_holder_name);
-                                          setVerifiedBankAccountId(origAccount.account_number);
-                                          setVerifiedUpiDetails(origAccount.upi_id || '');
-                                        } else if (p.payment_mode !== 'Cash') {
-                                          const defaultAcc = authorizedBankAccounts[0];
-                                          if (defaultAcc) {
-                                            setSelectedVerifiedBankAccountId(defaultAcc.id);
-                                            setVerifiedBankName(defaultAcc.bank_name);
-                                            setVerifiedBankAccountName(defaultAcc.account_holder_name);
-                                            setVerifiedBankAccountId(defaultAcc.account_number);
-                                            setVerifiedUpiDetails(defaultAcc.upi_id || '');
-                                          } else {
-                                            setSelectedVerifiedBankAccountId('');
-                                            setVerifiedBankName('');
-                                            setVerifiedBankAccountName('');
-                                            setVerifiedBankAccountId('');
-                                            setVerifiedUpiDetails('');
-                                          }
+                                        const origAcc = findOriginalReceivingAccount(p, authorizedBankAccounts) || (
+                                          effectiveAdm ? findOriginalReceivingAccount(effectiveAdm, authorizedBankAccounts) : undefined
+                                        );
+                                        if (origAcc) {
+                                          setSelectedVerifiedBankAccountId(origAcc.id);
+                                          setVerifiedBankName(origAcc.bank_name);
+                                          setVerifiedBankAccountName(origAcc.account_holder_name);
+                                          setVerifiedBankAccountId(origAcc.account_number);
+                                          setVerifiedUpiDetails(origAcc.upi_id || '');
                                         } else {
+                                          // Never silent fallback to default account! Require explicit accountant resolution.
                                           setSelectedVerifiedBankAccountId('');
                                           setVerifiedBankName('');
                                           setVerifiedBankAccountName('');
@@ -1853,12 +1954,14 @@ export default function FeeApprovalsPage() {
                                         setPaymentVerifyModalOpen(true);
                                       }}
                                       className={`text-xs px-2.5 py-1 h-7 flex items-center space-x-1 ${
-                                        canAccountantVerify
+                                        canAccountantVerify && !isBankMissingOrInvalid
                                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                                           : 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-600'
                                       }`}
                                       title={
-                                        isOwn && role !== 'admin' && role !== 'super_admin'
+                                        isBankMissingOrInvalid
+                                          ? 'Bank Account Verification Required: Please click Update to resolve bank account mapping before approving.'
+                                          : isOwn && role !== 'admin' && role !== 'super_admin'
                                           ? 'Separation of duties: Payment recorder cannot verify their own payment entry.'
                                           : !canAccessApprovals
                                           ? 'Restricted to authorized Accountant / Admin users.'
@@ -2999,9 +3102,89 @@ export default function FeeApprovalsPage() {
                 />
               </div>
 
+              {editPaymentMode !== 'Cash' && (
+                <div className="md:col-span-2">
+                  <label className="block text-slate-700 font-medium mb-1">
+                    Institute Receiving Bank Account Preset <span className="text-rose-500">*</span>
+                  </label>
+                  <BankAccountSearchableDropdown
+                    accounts={authorizedBankAccounts}
+                    selectedId={editBankProfileId}
+                    mode="fee-collection"
+                    allowCustom={true}
+                    placeholder="Search & select institute receiving bank account..."
+                    onSelect={(acc) => {
+                      if (acc === 'custom') {
+                        setEditBankProfileId('custom');
+                      } else {
+                        setEditBankProfileId(acc.id);
+                        setEditBankName(acc.bank_name);
+                        setEditBankAccountName(acc.account_holder_name);
+                        setEditBankAccountId(acc.account_number);
+                        setEditBankUpiDetails(acc.upi_id || '');
+                        setEditBankRef(`${acc.bank_name} - ${acc.account_holder_name}`);
+                      }
+                    }}
+                  />
+                  {editBankProfileId && editBankProfileId !== 'custom' && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Account Holder:</span>
+                        <span className="font-bold text-slate-800">{editBankAccountName}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Bank Name:</span>
+                        <span className="font-semibold text-blue-700">{editBankName}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Account Number:</span>
+                        <span className="font-mono text-slate-700">•••• •••• {editBankAccountId.replace(/\s+/g, '').slice(-4)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {editBankProfileId === 'custom' && (
+                    <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-slate-600 text-[10px] mb-0.5">Bank Name</label>
+                        <input
+                          type="text"
+                          value={editBankName}
+                          onChange={(e) => setEditBankName(e.target.value)}
+                          className="w-full text-xs p-1.5 border border-slate-300 rounded"
+                          placeholder="Bank Name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 text-[10px] mb-0.5">Account Holder</label>
+                        <input
+                          type="text"
+                          value={editBankAccountName}
+                          onChange={(e) => setEditBankAccountName(e.target.value)}
+                          className="w-full text-xs p-1.5 border border-slate-300 rounded"
+                          placeholder="Holder Name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 text-[10px] mb-0.5">Account Number</label>
+                        <input
+                          type="text"
+                          value={editBankAccountId}
+                          onChange={(e) => setEditBankAccountId(e.target.value)}
+                          className="w-full text-xs p-1.5 border border-slate-300 rounded"
+                          placeholder="Account Number"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-700 font-medium mb-1">
-                  Bank / Account Reference
+                  Bank / Account Reference Notes
                 </label>
                 <input
                   type="text"
@@ -3028,12 +3211,26 @@ export default function FeeApprovalsPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-medium mb-1">Sales Modification Notes</label>
+              <label className="block text-slate-700 font-medium mb-1">
+                Reason for Update / Correction <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                rows={2}
+                required
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="Mandatory rationale (e.g. Corrected receiving bank account from Charitha to E Anasuya per deposit slip)..."
+                className="w-full text-xs p-2 border border-slate-300 rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-medium mb-1">Sales Modification Notes (Optional)</label>
               <textarea
                 rows={2}
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Reason for modifying amount or UTR..."
+                placeholder="Additional notes for accountant reference..."
                 className="w-full text-xs p-2 border border-slate-300 rounded-lg"
               />
             </div>
@@ -3151,6 +3348,86 @@ export default function FeeApprovalsPage() {
                 className="w-full text-xs p-2 border border-slate-300 rounded-lg font-mono"
               />
             </div>
+
+            {recMode !== 'Cash' && (
+              <div className="md:col-span-2">
+                <label className="block text-slate-700 font-medium mb-1">
+                  Institute Receiving Bank Account Preset <span className="text-rose-500">*</span>
+                </label>
+                <BankAccountSearchableDropdown
+                  accounts={authorizedBankAccounts}
+                  selectedId={recBankProfileId}
+                  mode="fee-collection"
+                  allowCustom={true}
+                  placeholder="Search & select institute receiving bank account..."
+                  onSelect={(acc) => {
+                    if (acc === 'custom') {
+                      setRecBankProfileId('custom');
+                    } else {
+                      setRecBankProfileId(acc.id);
+                      setRecBankName(acc.bank_name);
+                      setRecBankAccountName(acc.account_holder_name);
+                      setRecBankAccountId(acc.account_number);
+                      setRecBankUpiDetails(acc.upi_id || '');
+                      setRecBankRef(`${acc.bank_name} - ${acc.account_holder_name}`);
+                    }
+                  }}
+                />
+                {recBankProfileId && recBankProfileId !== 'custom' && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">Account Holder:</span>
+                      <span className="font-bold text-slate-800">{recBankAccountName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">Bank Name:</span>
+                      <span className="font-semibold text-blue-700">{recBankName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">Account Number:</span>
+                      <span className="font-mono text-slate-700">•••• •••• {recBankAccountId.replace(/\s+/g, '').slice(-4)}</span>
+                    </div>
+                  </div>
+                )}
+                {recBankProfileId === 'custom' && (
+                  <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-slate-600 text-[10px] mb-0.5">Bank Name</label>
+                      <input
+                        type="text"
+                        value={recBankName}
+                        onChange={(e) => setRecBankName(e.target.value)}
+                        className="w-full text-xs p-1.5 border border-slate-300 rounded"
+                        placeholder="Bank Name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 text-[10px] mb-0.5">Account Holder</label>
+                      <input
+                        type="text"
+                        value={recBankAccountName}
+                        onChange={(e) => setRecBankAccountName(e.target.value)}
+                        className="w-full text-xs p-1.5 border border-slate-300 rounded"
+                        placeholder="Holder Name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 text-[10px] mb-0.5">Account Number</label>
+                      <input
+                        type="text"
+                        value={recBankAccountId}
+                        onChange={(e) => setRecBankAccountId(e.target.value)}
+                        className="w-full text-xs p-1.5 border border-slate-300 rounded"
+                        placeholder="Account Number"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-slate-700 font-medium mb-1">

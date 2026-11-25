@@ -435,6 +435,9 @@ export function generateCollectionsExcelXml(payments?: Payment[]): string {
     { header: 'Course', width: 26 },
     { header: 'Amount (₹)', width: 18, style: 'CurrencyInt' },
     { header: 'Payment Mode', width: 18 },
+    { header: 'Receiving Bank', width: 20 },
+    { header: 'Account Holder', width: 22 },
+    { header: 'Account Ending', width: 16 },
     { header: 'Gateway', width: 16 },
     { header: 'Reference / Txn ID', width: 24 },
     { header: 'Payment Date', width: 14, style: 'Date' },
@@ -444,12 +447,17 @@ export function generateCollectionsExcelXml(payments?: Payment[]): string {
   let sumAmount = 0;
   const rows = list.map((p) => {
     sumAmount += p.amount || 0;
+    const rawNum = (p.our_bank_account_id || '').replace(/\D/g, '');
+    const last4 = rawNum ? `XXXX${rawNum.slice(-4)}` : (p.our_bank_account_id || '—');
     return [
       p.receipt_number,
       p.student_name,
       p.course_name,
       p.amount,
       p.payment_mode,
+      p.payment_mode === 'Cash' ? 'Cash Counter' : (p.our_bank_name || '—'),
+      p.payment_mode === 'Cash' ? 'Institute Cash Counter' : (p.our_bank_account_name || '—'),
+      p.payment_mode === 'Cash' ? 'Cash' : last4,
       p.gateway_name || 'Direct / Bank',
       p.transaction_reference || '—',
       p.payment_date,
@@ -461,7 +469,7 @@ export function generateCollectionsExcelXml(payments?: Payment[]): string {
     name: 'Collections Log',
     columns,
     rows,
-    summaryRow: ['TOTAL COLLECTIONS', `${list.length} Payments`, '', sumAmount, '', '', '', '', ''],
+    summaryRow: ['TOTAL COLLECTIONS', `${list.length} Payments`, '', sumAmount, '', '', '', '', '', '', '', ''],
   };
 
   return buildXmlSpreadsheet([sheet]);

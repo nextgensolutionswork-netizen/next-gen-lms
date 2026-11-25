@@ -59,6 +59,7 @@ const schema = z.object({
     .optional(),
   alternate_phone: z.string().trim().max(50).optional(),
   photo_url: z.string().max(4096).optional(),
+  our_bank_profile_id: z.string().trim().max(200).optional(),
   our_bank_name: z.string().trim().max(200).optional(),
   our_bank_account_name: z.string().trim().max(200).optional(),
   our_bank_account_id: z.string().trim().max(100).optional(),
