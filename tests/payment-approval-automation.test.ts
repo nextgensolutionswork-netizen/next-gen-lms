@@ -12,6 +12,7 @@ import { actualPaymentDate, normalizePaymentFields } from '@/lib/services/paymen
 import { GET as getProof } from '@/app/api/fees/proof/route';
 import { createHash } from 'crypto';
 import { generateAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } from '@/lib/security/auth-cookie';
+import { idempotencyService } from '@/lib/services/idempotency-service';
 import { StudentFee, UserProfile } from '@/types';
 
 const profile = (id: string, role: UserProfile['role'], tenant_id = 'default'): UserProfile => ({ id, role, tenant_id, email: `${id}@example.test`, full_name: id, is_active: true, created_at: '2026-10-12', updated_at: '2026-10-12' });
@@ -23,6 +24,7 @@ let studentId: string;
 const input = () => ({ fee_id: fee.id, student_id: studentId, enrollment_id: fee.enrollment_id, amount_paid: 5000, payment_mode: 'UPI' as const, payment_date: '2026-10-12', transaction_reference: 'UTR-123', payment_proof_url: 'https://example.test/proof.png' });
 
 beforeEach(async () => {
+  idempotencyService.clear();
   vi.spyOn(store, 'persist').mockImplementation(() => {});
   vi.spyOn(store, 'persistSync').mockReturnValue(true);
   store.users = [structuredClone(counsellor), structuredClone(accountant), structuredClone(onboarding), profile('other-counsellor', 'counsellor'), profile('other-tenant', 'accountant', 'tenant-b')];

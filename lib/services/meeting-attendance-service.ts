@@ -10,6 +10,7 @@ import {
   MeetingAttendanceSyncResult,
 } from '@/types';
 import { publishRealtimeEvent } from './realtime-service';
+import { emitSyncEvent } from './sync-events';
 import { dispatchMultiChannelNotification } from './notification-service';
 import { recordAuditLog } from './audit-service';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
@@ -475,6 +476,10 @@ export async function recordMeetingAttendanceForStudent(params: {
     overall_percentage: updatedOverallAttendance,
   });
   publishRealtimeEvent(`student:${params.studentId}`, 'attendance_updated', record);
+  emitSyncEvent('attendance', 'updated', {
+    entity_id: record.id,
+    actor_id: (params as any).actorId || 'system',
+  });
 
   // Multi-channel notification:
   // If student was Absent or Late, or if overall attendance dropped below 80% (certificate threshold)

@@ -3,6 +3,7 @@ import { StudentDoubt, DoubtMessage, DoubtStatus, DoubtPriority, DoubtCategory, 
 import { recordAuditLog } from './audit-service';
 import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { publishRealtimeEvent } from './realtime-service';
+import { emitSyncEvent } from './sync-events';
 import { resolveCanonicalBatchUuid, isUuid, matchesBatchId } from './academics-service';
 import {
   dispatchMultiChannelNotification,
@@ -260,6 +261,10 @@ export async function createStudentDoubt(
 
   // 1. Broadcast real-time event to staff support desk and Supabase doubt_messages channel
   publishRealtimeEvent('doubts', 'doubt_created', newDoubt);
+  emitSyncEvent('doubts', 'created', {
+    entity_id: newDoubt.id,
+    actor_id: newDoubt.student_id,
+  });
   try {
     const supabase = createClient();
     if (supabase && typeof supabase.channel === 'function') {
@@ -376,6 +381,10 @@ export async function replyToDoubt(
     doubtId: doubt.id,
     message: newMessage,
     status: doubt.status,
+  });
+  emitSyncEvent('doubts', 'updated', {
+    entity_id: doubt.id,
+    actor_id: senderUserId,
   });
   try {
     const supabase = createClient();
@@ -581,6 +590,10 @@ export async function resolveDoubt(
     doubtId: doubt.id,
     status: 'Resolved',
     resolvedBy: actor?.full_name,
+  });
+  emitSyncEvent('doubts', 'resolved', {
+    entity_id: doubt.id,
+    actor_id: resolvedByUserId,
   });
 
   // 2. Dispatch notification to student

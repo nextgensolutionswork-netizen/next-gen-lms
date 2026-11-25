@@ -107,33 +107,45 @@ export async function POST(request: NextRequest) {
       throw new Error('Forbidden: Admission registration requires counsellor access.');
     }
 
-    const input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
-    const targetTenant = actor.tenant_id || 'default';
-    if (input.idempotency_key) {
-      const existing = idempotencyService.acquire(input.idempotency_key, actor.id, targetTenant, input);
-      if (existing.isExisting && existing.result) {
-        return NextResponse.json(existing.result);
-      }
-    }
-    if (input.lead_id) {
-      await authorizedLead(input.lead_id, actor);
-    }
+    let input: CreateAdmissionInput | undefined;
+    let targetTenant = 'default';
+    try {
+      input = schema.parse(normalizePaymentFields(await request.json())) as unknown as CreateAdmissionInput;
+      targetTenant = actor.tenant_id || 'default';
 
-    const phoneCheck = validatePhoneNumber('IN', input.phone, 'Phone number', true);
-    if (!phoneCheck.isValid) {
-      throw new Error(phoneCheck.error || 'Please enter a valid phone number.');
-    }
-    if (input.alternate_phone && input.alternate_phone.trim()) {
-      const altCheck = validateAlternatePhoneNumber(input.alternate_phone, 'Alternate mobile number');
-      if (!altCheck.isValid) {
-        throw new Error(altCheck.error || 'Please enter a valid alternate mobile number.');
+      if (input.lead_id) {
+        await authorizedLead(input.lead_id, actor);
       }
-    }
-    if (input.initial_payment_amount && input.initial_payment_amount > 0) {
-      const mode = input.payment_mode || 'UPI';
-      if (mode !== 'Cash' && !input.transaction_reference?.trim() && !input.bank_upi_reference?.trim()) {
-        throw new Error('Transaction reference is required for non-cash initial payments.');
+
+      const phoneCheck = validatePhoneNumber('IN', input.phone, 'Phone number', true);
+      if (!phoneCheck.isValid) {
+        throw new Error(phoneCheck.error || 'Please enter a valid phone number.');
       }
+      if (input.alternate_phone && input.alternate_phone.trim()) {
+        const altCheck = validateAlternatePhoneNumber(input.alternate_phone, 'Alternate mobile number');
+        if (!altCheck.isValid) {
+          throw new Error(altCheck.error || 'Please enter a valid alternate mobile number.');
+        }
+      }
+      if (input.initial_payment_amount && input.initial_payment_amount > 0) {
+        const mode = input.payment_mode || 'UPI';
+        if (mode !== 'Cash' && !input.transaction_reference?.trim() && !input.bank_upi_reference?.trim()) {
+          throw new Error('Transaction reference is required for non-cash initial payments.');
+        }
+      }
+
+      // Check idempotency only after input validations succeed
+      if (input.idempotency_key) {
+        const existing = await idempotencyService.acquireAsync(input.idempotency_key, actor.id, targetTenant, input, 'admission_create');
+        if (existing.isExisting && existing.result) {
+          return NextResponse.json(existing.result);
+        }
+      }
+    } catch (valErr) {
+      if (input?.idempotency_key) {
+        idempotencyService.fail(input.idempotency_key, actor.id, targetTenant, 'admission_create');
+      }
+      throw valErr;
     }
 
     // Resolve verified team members for counsellor_lead
@@ -159,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     const responsePayload = { success: true, ...data };
     if (input.idempotency_key) {
-      idempotencyService.complete(input.idempotency_key, actor.id, targetTenant, responsePayload);
+      await idempotencyService.completeAsync(input.idempotency_key, actor.id, targetTenant, responsePayload, 'admission_create');
     }
 
     emitSyncEvent('admissions', 'created', {

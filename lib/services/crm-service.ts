@@ -6,7 +6,7 @@ import { leadFields } from './lead-input';
 import { authorizedLead, resolveLeadScope, scopeLeadQuery, validateLeadAssignment, teamCreators } from './lead-security';
 import { matchesCourseId } from '@/lib/services/academics-service';
 import { idempotencyService } from './idempotency-service';
-import { concurrencyGuard } from './concurrency-guard';
+import { concurrencyGuard, RecordConflictError } from './concurrency-guard';
 import { emitSyncEvent } from './sync-events';
 
 /**
@@ -172,7 +172,7 @@ export async function createLead(
 
   const targetTenant = data.tenant_id || actor?.tenant_id || 'default';
   if (data.idempotency_key) {
-    const idemp = idempotencyService.acquire(data.idempotency_key, actor?.id || 'sys', targetTenant, data);
+    const idemp = await idempotencyService.acquireAsync(data.idempotency_key, actor?.id || 'sys', targetTenant, data, 'lead_create');
     if (idemp.isExisting && idemp.result) {
       return idemp.result;
     }
@@ -396,7 +396,7 @@ export async function createLead(
   });
 
     if (data.idempotency_key) {
-      idempotencyService.complete(data.idempotency_key, actor?.id || 'sys', targetTenant, newLead);
+      await idempotencyService.completeAsync(data.idempotency_key, actor?.id || 'sys', targetTenant, newLead, 'lead_create');
     }
     emitSyncEvent('leads', 'created', {
       entity_id: newLead.id,
@@ -412,7 +412,7 @@ export async function createLead(
     return await creationPromise;
   } catch (err) {
     if (data.idempotency_key) {
-      idempotencyService.fail(data.idempotency_key, actor?.id || 'sys', targetTenant);
+      await idempotencyService.failAsync(data.idempotency_key, actor?.id || 'sys', targetTenant, 'lead_create');
     }
     throw err;
   } finally {
@@ -548,7 +548,7 @@ export async function updateLeadDetails(
   if (updates.demo_preference !== undefined) lead.demo_preference = updates.demo_preference;
   if (isLiveSupabaseEnabled()) {
       const supabase = createAdminClient();
-      const result = await scopeLeadQuery(supabase.from('leads').update({
+      let updateQuery = supabase.from('leads').update({
         full_name: lead.full_name,
         phone: lead.phone,
         country_code: lead.country_code || '+91',
@@ -561,12 +561,36 @@ export async function updateLeadDetails(
         lead_source: lead.lead_source,
         counsellor_id: lead.counsellor_id,
         notes: lead.notes,
-        stage: lead.stage, follow_up_date: lead.follow_up_date || null,
-        demo_date: lead.demo_date || null, demo_preference: lead.demo_preference,
+        stage: lead.stage,
+        follow_up_date: lead.follow_up_date || null,
+        demo_date: lead.demo_date || null,
+        demo_preference: lead.demo_preference,
         experience_years: lead.experience_years,
         updated_at: lead.updated_at,
-      }).eq('id', leadId), scope).select('id');
-      if (result.error || !result.data?.length) throw new Error('CRM update failed.');
+      }).eq('id', leadId);
+
+      // Atomic SQL conditional update: check version timestamp directly in database query
+      if (expectedUpdatedAt) {
+        updateQuery = updateQuery.eq('updated_at', expectedUpdatedAt);
+      }
+
+      const result = await scopeLeadQuery(updateQuery, scope).select('id, updated_at');
+      if (result.error) throw new Error('CRM update failed.');
+      if (!result.data || result.data.length === 0) {
+        // Row was modified by another user or deleted concurrently
+        const fresh = await supabase.from('leads').select('id, updated_at').eq('id', leadId).maybeSingle();
+        if (!fresh.data) {
+          throw new RecordConflictError(
+            'This record has been deleted or is no longer available.',
+            'deleted'
+          );
+        }
+        throw new RecordConflictError(
+          'This record has been updated by another user. Please review the latest information before saving your changes.',
+          'modified',
+          fresh.data
+        );
+      }
   }
   const index = store.leads.findIndex(l => l.id === leadId);
   if (index >= 0) store.leads[index] = lead;

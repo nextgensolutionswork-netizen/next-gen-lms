@@ -2,6 +2,7 @@ import { store } from './data-store';
 import { Certificate } from '@/types';
 import { generateCertificateId } from '@/lib/utils/formatters';
 import { recordAuditLog } from './audit-service';
+import { emitSyncEvent } from './sync-events';
 import {
   dispatchMultiChannelNotification,
   buildCertificateEmailHtml,
@@ -160,6 +161,11 @@ export async function verifyAndGenerateCertificate(
     metadata: { htmlTemplate: emailHtml, pdfUrl },
   }).catch((err) => console.warn('Certificate notification dispatch error:', err));
 
+  emitSyncEvent('certificates', 'issued', {
+    entity_id: cert.id,
+    actor_id: issuedByUserId,
+  });
+
   return { eligible: true, reasons: [], certificate: cert };
 }
 
@@ -192,6 +198,11 @@ export async function revokeCertificate(
     module: 'CERTIFICATES',
     record_id: cert.id,
     new_value: { certificate_id: cert.certificate_id, reason, status, is_valid: false },
+  });
+
+  emitSyncEvent('certificates', 'revoked', {
+    entity_id: cert.id,
+    actor_id: revokedByUserId,
   });
 
   return cert;

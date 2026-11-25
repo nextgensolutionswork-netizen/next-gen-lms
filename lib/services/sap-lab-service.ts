@@ -1,6 +1,7 @@
 import { store } from './data-store';
 import { SapServerAllocation, SapServerSystem } from '@/types';
 import { recordAuditLog } from './audit-service';
+import { emitSyncEvent } from './sync-events';
 import { createClient, isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import {
   getEffectiveSapAllocationStatus,
@@ -251,6 +252,11 @@ export async function provisionSapAccess(
     },
   });
 
+  emitSyncEvent('sap_lab', 'allocated', {
+    entity_id: newAllocation.id,
+    actor_id: allocatedByUserId,
+  });
+
   return newAllocation;
 }
 
@@ -334,6 +340,11 @@ export async function revokeSapAccess(
     module: 'ACADEMICS',
     record_id: alloc.id,
     new_value: { status: 'Revoked' },
+  });
+
+  emitSyncEvent('sap_lab', 'revoked', {
+    entity_id: allocationId,
+    actor_id: actionByUserId,
   });
 
   return alloc;
@@ -498,6 +509,11 @@ export async function createSapServerSystem(
     module: 'ACADEMICS',
     record_id: newSystem.id,
     new_value: newSystem,
+  });
+
+  emitSyncEvent('sap_lab', 'system_updated', {
+    entity_id: newSystem.id,
+    actor_id: actionByUserId,
   });
 
   return newSystem;

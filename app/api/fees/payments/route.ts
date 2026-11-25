@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const targetTenant = actor.tenant_id || 'default';
 
     if (body.action === 'record') {
-      const idemp = idempotencyService.acquire(body.input.idempotency_key, actor.id, targetTenant, body.input);
+      const idemp = await idempotencyService.acquireAsync(body.input.idempotency_key, actor.id, targetTenant, body.input, 'payment_record');
       if (idemp.isExisting && idemp.result) {
         return NextResponse.json(idemp.result);
       }
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     const responsePayload = { success: true, ...result };
     if (body.action === 'record') {
-      idempotencyService.complete(body.input.idempotency_key, actor.id, targetTenant, responsePayload);
+      await idempotencyService.completeAsync(body.input.idempotency_key, actor.id, targetTenant, responsePayload, 'payment_record');
       emitSyncEvent('payments', 'recorded', {
         entity_id: result.payment?.id,
         tenant_id: targetTenant,
