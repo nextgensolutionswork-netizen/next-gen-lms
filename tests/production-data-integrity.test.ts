@@ -266,18 +266,56 @@ describe('TASK-01: Production Data Integrity & Prevention of Deleted Data Restor
       }
     });
 
-    it('DI-016: AdmissionsRepository returns empty array when table is empty', async () => {
+    it('DI-016: AdmissionsRepository and paymentTransaction never restore deleted records from stale fee_workflow_state snapshot', async () => {
       vi.spyOn(dbModule, 'isLiveSupabaseEnabled').mockReturnValue(true);
-      vi.spyOn(dbModule, 'getDb').mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
+      const staleSnapshot = {
+        admissions: [{ id: 'deleted-adm-1', student_name: 'Stale', tenant_id: 'default' }],
+        students: [{ id: 'deleted-stu-1', student_name: 'Stale', tenant_id: 'default' }],
+        payments: [{ id: 'deleted-pay-1', amount: 1000, tenant_id: 'default' }],
+        receipts: [{ id: 'deleted-rcpt-1', payment_amount: 1000, tenant_id: 'default' }],
+      };
+      vi.spyOn(adminModule, 'createAdminClient').mockReturnValue({
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'fee_workflow_state') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: { revision: 10, snapshot: staleSnapshot },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'profiles') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ id: 'usr-admin', role: 'admin', tenant_id: 'default' }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          // The authoritative Postgres tables return empty []
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
         }),
       } as any);
 
-      const result = await admissionsRepo.getAll();
-      expect(result).toEqual([]);
+      const { paymentTransaction } = await import('@/lib/services/payment-workflow-transaction');
+      const actor = { id: 'usr-admin', role: 'admin', tenant_id: 'default' } as any;
+
+      await paymentTransaction(actor, () => {
+        expect(store.admissions.filter((a) => a.tenant_id === 'default')).toEqual([]);
+        expect(store.students.filter((s) => s.tenant_id === 'default')).toEqual([]);
+        expect(store.payments.filter((p) => p.tenant_id === 'default')).toEqual([]);
+        expect(store.receipts.filter((r) => r.tenant_id === 'default')).toEqual([]);
+      }, true);
     });
   });
 

@@ -1,6 +1,6 @@
 import { store } from './data-store';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { isLiveSupabaseEnabled, isProductionEnvironment } from '@/lib/supabase/db';
 import { tenantId } from '@/lib/auth/tenant';
 import { UserProfile } from '@/types';
 import { workflowKeys, workflowSnapshot, mergeWorkflowSnapshot } from './payment-workflow-state';
@@ -51,6 +51,38 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         if (data) {
           revision = data.revision;
           mergeWorkflowSnapshot(data.snapshot, tenant);
+
+          // TASK-01: In live Supabase mode or production, PostgreSQL tables are the authoritative source.
+          // Never allow a stale JSON snapshot in fee_workflow_state to restore records that were deleted from PostgreSQL.
+          if (isLiveSupabaseEnabled() || isProductionEnvironment()) {
+            const [admsRes, studsRes, paysRes, rcptsRes] = await Promise.all([
+              db.from('admissions').select('id').eq('tenant_id', tenant),
+              db.from('students').select('id').eq('tenant_id', tenant),
+              db.from('payments').select('id').eq('tenant_id', tenant),
+              db.from('receipts').select('id').eq('tenant_id', tenant),
+            ]);
+
+            if (!admsRes.error && Array.isArray(admsRes.data)) {
+              const liveAdmIds = new Set(admsRes.data.map((r: any) => r.id));
+              store.admissions = store.admissions.filter((a) => tenantId(a) !== tenant || liveAdmIds.has(a.id));
+            }
+            if (!studsRes.error && Array.isArray(studsRes.data)) {
+              const liveStudIds = new Set(studsRes.data.map((r: any) => r.id));
+              store.students = store.students.filter((s) => tenantId(s) !== tenant || liveStudIds.has(s.id));
+            }
+            if (!paysRes.error && Array.isArray(paysRes.data)) {
+              const livePayIds = new Set(paysRes.data.map((r: any) => r.id));
+              store.payments = store.payments.filter((p) => tenantId(p) !== tenant || livePayIds.has(p.id));
+            }
+            if (!rcptsRes.error && Array.isArray(rcptsRes.data)) {
+              const liveRcptIds = new Set(rcptsRes.data.map((r: any) => r.id));
+              store.receipts = store.receipts.filter((r) => tenantId(r) !== tenant || liveRcptIds.has(r.id));
+            }
+            const validStudentIds = new Set(store.students.filter((s) => tenantId(s) === tenant).map((s) => s.id));
+            store.feeAccounts = store.feeAccounts.filter((fa) => tenantId(fa) !== tenant || validStudentIds.has(fa.student_id));
+            store.studentFees = store.studentFees.filter((sf) => tenantId(sf) !== tenant || validStudentIds.has(sf.student_id));
+            store.studentPayments = store.studentPayments.filter((sp) => tenantId(sp) !== tenant || validStudentIds.has(sp.student_id));
+          }
         } else {
         // Explicit bootstrap, performed from trusted database rows, never a browser snapshot.
         const tables = { users: 'profiles', students: 'students', admissions: 'admissions', feeAccounts: 'student_fee_accounts', installments: 'installments', payments: 'payments', receipts: 'receipts', onboardingCases: 'onboarding_cases' } as const;
