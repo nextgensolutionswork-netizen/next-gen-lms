@@ -861,25 +861,22 @@ export async function validateAndSettleExpense(
   try {
     if (isLiveSupabaseEnabled()) {
       const supabase = createClient();
-      const { data: updatedRow, error: updateErr } = await supabase
-        .from('expenses')
-        .update({
-          status: 'Settled',
-          payment_mode: details.payment_mode,
-          reference: details.reference.trim(),
-          paid_by: validatorUserId,
-          updated_at: settledAt,
-        })
-        .eq('id', expenseId)
-        .eq('status', 'Approved')
-        .select('id')
-        .maybeSingle();
+      const { error: rpcErr } = await supabase.rpc('settle_expense_atomic', {
+        p_expense_id: expenseId,
+        p_tenant: tenant,
+        p_validator_id: validatorUserId,
+        p_payment_mode: details.payment_mode,
+        p_reference: details.reference.trim(),
+        p_bank_account: resolvedBankAccount || 'Institute Cash Counter',
+        p_bank_profile_id: details.bank_account_profile_id || null,
+        p_idempotency_key: details.idempotency_key || null,
+      });
 
-      if (updateErr) {
-        throw new Error(`Expense settlement database update failed: ${updateErr.message}`);
-      }
-      if (!updatedRow) {
-        throw new Error('Conflict: Expense has already been settled or updated by another user. Please review the latest information.');
+      if (rpcErr) {
+        if (rpcErr.code === '40001' || rpcErr.message?.includes('Conflict')) {
+          throw new Error('Conflict: Expense has already been settled or updated by another user. Please review the latest information.');
+        }
+        throw new Error(`Expense settlement database update failed: ${rpcErr.message}`);
       }
     }
 

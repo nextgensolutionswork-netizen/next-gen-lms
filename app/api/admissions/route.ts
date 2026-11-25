@@ -16,6 +16,8 @@ import {
 import { store } from '@/lib/services/data-store';
 import { idempotencyService } from '@/lib/services/idempotency-service';
 import { emitSyncEvent } from '@/lib/services/sync-events';
+import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -115,6 +117,22 @@ export async function POST(request: NextRequest) {
 
       if (input.lead_id) {
         await authorizedLead(input.lead_id, actor);
+      }
+
+      // Phase 1 Fail-Closed Containment: Do not allow snapshot-only admissions when normalized course master is missing in PostgreSQL
+      if (isLiveSupabaseEnabled()) {
+        const adminDb = createAdminClient();
+        const { data: courseRow, error: courseErr } = await adminDb
+          .from('courses')
+          .select('id')
+          .eq('id', input.course_id)
+          .maybeSingle();
+        if (courseErr) {
+          throw new Error(`Authoritative course verification failed: ${courseErr.message}`);
+        }
+        if (!courseRow) {
+          throw new Error('Selected course is unavailable in the authoritative database. Admission cannot be saved without a valid course master record.');
+        }
       }
 
       const phoneCheck = validatePhoneNumber('IN', input.phone, 'Phone number', true);
