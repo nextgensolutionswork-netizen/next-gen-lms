@@ -9,7 +9,8 @@ import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
 import { store } from '@/lib/services/data-store';
 import { assertSameTenant } from '@/lib/auth/tenant';
 import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
-import { idempotencyService } from '@/lib/services/idempotency-service';
+import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
+import { idempotencyService, IdempotencyConflictError } from '@/lib/services/idempotency-service';
 import { emitSyncEvent } from '@/lib/services/sync-events';
 
 export const runtime = 'nodejs';
@@ -35,6 +36,7 @@ const command = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('approve'),
     paymentId: z.string(),
+    idempotency_key: z.string().min(1).max(200).optional(),
     notes: z.string().max(2000).optional(),
     verification: z.object({
       reference: z.string().max(200).optional(),
@@ -44,13 +46,21 @@ const command = z.discriminatedUnion('action', [
       bank_account_discrepancy_reason: z.string().max(2000).optional(),
     }).optional(),
   }),
-  z.object({ action: z.literal('reject'), paymentId: z.string(), reason: z.string().trim().min(1).max(2000) }),
+  z.object({ action: z.literal('reject'), paymentId: z.string(), reason: z.string().trim().min(1).max(2000), idempotency_key: z.string().min(1).max(200).optional() }),
   z.object({ action: z.literal('void_receipt'), receiptId: z.string().min(1), reason: z.string().trim().min(1).max(2000), amount: z.number().finite().positive().optional() }),
 ]);
 
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : 'Payment operation failed.';
-  const status = message.startsWith('Unauthorized') ? 401 : /Forbidden|Access denied|Separation of duties/.test(message) ? 403 : message.startsWith('Conflict') ? 409 : 400;
+  const status = error instanceof IdempotencyConflictError
+    ? 409
+    : message.startsWith('Unauthorized')
+      ? 401
+      : /Forbidden|Access denied|Separation of duties/.test(message)
+        ? 403
+        : message.startsWith('Conflict')
+          ? 409
+          : 400;
   return NextResponse.json({ success: false, error: message, ...(error instanceof PaymentVerificationError ? { fieldErrors: error.fieldErrors } : {}) }, { status });
 }
 
@@ -77,6 +87,12 @@ export async function POST(request: NextRequest) {
       if (idemp.isExisting && idemp.result) {
         return NextResponse.json(idemp.result);
       }
+    } else if ((body.action === 'approve' || body.action === 'reject') && body.idempotency_key) {
+      const scope = body.action === 'approve' ? 'payment_approve' : 'payment_reject';
+      const idemp = await idempotencyService.acquireAsync(body.idempotency_key, actor.id, targetTenant, body, scope);
+      if (idemp.isExisting && idemp.result) {
+        return NextResponse.json(idemp.result);
+      }
     }
 
     const result = await paymentTransaction(actor, () => {
@@ -94,6 +110,16 @@ export async function POST(request: NextRequest) {
         const studentFee = store.studentFees.find((f) => f.id === body.input.fee_id);
         if (!studentFee) throw new Error('Fee account not found.');
         assertSameTenant(actor, studentFee);
+        if (body.input.our_bank_profile_id) {
+          const validAccounts = getAuthorizedBankAccounts(actor.role, { includePending: false });
+          const matchedAcc = validAccounts.find((a) => a.id === body.input.our_bank_profile_id);
+          if (!matchedAcc) {
+            throw new Error('The selected receiving bank account is invalid or unavailable. Please select a valid account.');
+          }
+          if ((matchedAcc as any).tenant_id && (matchedAcc as any).tenant_id !== targetTenant && targetTenant !== 'default') {
+            throw new Error('Forbidden: Cross-tenant receiving bank account is not permitted.');
+          }
+        }
       } else {
         const existing = store.studentPayments.find(
           (p) => p.id === body.paymentId || p.id === body.paymentId.replace(/^pay-/, '') || `pay-${p.id}` === body.paymentId
@@ -154,6 +180,9 @@ export async function POST(request: NextRequest) {
         actor_id: actor.id,
       });
     } else if (body.action === 'approve') {
+      if (body.idempotency_key) {
+        await idempotencyService.completeAsync(body.idempotency_key, actor.id, targetTenant, responsePayload, 'payment_approve');
+      }
       emitSyncEvent('payments', 'approved', {
         entity_id: body.paymentId,
         tenant_id: targetTenant,
@@ -164,6 +193,9 @@ export async function POST(request: NextRequest) {
         actor_id: actor.id,
       });
     } else if (body.action === 'reject') {
+      if (body.idempotency_key) {
+        await idempotencyService.completeAsync(body.idempotency_key, actor.id, targetTenant, responsePayload, 'payment_reject');
+      }
       emitSyncEvent('payments', 'rejected', {
         entity_id: body.paymentId,
         tenant_id: targetTenant,

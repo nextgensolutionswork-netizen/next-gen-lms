@@ -20,6 +20,8 @@ import { receiptAmounts } from './receipt-amounts';
 import { generateAndSaveReceiptPdf } from './pdf-service';
 import { dispatchMultiChannelNotification, buildReceiptEmailHtml } from './notification-service';
 import { emitSyncEvent } from './sync-events';
+import { isPaymentApproved, isPaymentPending } from '@/lib/utils/dashboard-metrics';
+import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -784,10 +786,21 @@ export async function validateAndSettleExpense(
     reference: string;
     expense_date?: string;
     bank_account?: string;
+    bank_account_profile_id?: string;
+    idempotency_key?: string;
   }
 ): Promise<Expense> {
   const exp = store.expenses.find((e) => e.id === expenseId);
   if (!exp) throw new Error('Expense not found');
+
+  // Idempotent replay check for repeated settlement attempts with same idempotency_key
+  if (
+    details.idempotency_key &&
+    exp.status === 'Settled' &&
+    (exp as any).settlement_idempotency_key === details.idempotency_key
+  ) {
+    return exp;
+  }
 
   if (exp.status !== 'Approved') {
     throw new Error(`Invalid workflow transition: Only 'Approved' expenses can be validated and settled. Current status: ${exp.status}`);
@@ -807,6 +820,22 @@ export async function validateAndSettleExpense(
     throw new Error('Mandatory reference: Bank UTR or transaction reference is required for payment settlement.');
   }
 
+  let resolvedBankAccount = details.bank_account?.trim();
+  if (details.bank_account_profile_id) {
+    const accounts = getAuthorizedBankAccounts(validator.role, { includePending: false });
+    const matched = accounts.find((a) => a.id === details.bank_account_profile_id);
+    if (!matched) {
+      throw new Error('The selected paying bank account is invalid or unavailable. Please select a valid account.');
+    }
+    resolvedBankAccount = `${matched.bank_name} - ${matched.account_holder_name} (A/C: ${matched.account_number})`;
+  } else if (!resolvedBankAccount) {
+    if (details.payment_mode === 'Cash') {
+      resolvedBankAccount = 'Institute Cash Counter';
+    } else {
+      throw new Error('Paying bank account is required for non-cash expense settlement.');
+    }
+  }
+
   const prevStatus = exp.status;
   exp.status = 'Settled';
   exp.payment_mode = details.payment_mode;
@@ -814,7 +843,13 @@ export async function validateAndSettleExpense(
   if (details.expense_date) {
     exp.expense_date = details.expense_date;
   }
-  exp.bank_account = details.bank_account || 'HDFC Bank - Next-Gen ERP Solutions (A/C: 50200088921)';
+  exp.bank_account = resolvedBankAccount;
+  if (details.bank_account_profile_id) {
+    (exp as any).bank_account_profile_id = details.bank_account_profile_id;
+  }
+  if (details.idempotency_key) {
+    (exp as any).settlement_idempotency_key = details.idempotency_key;
+  }
   exp.settled_by = validatorUserId;
   exp.settled_by_name = validator.full_name;
   exp.settled_at = new Date().toISOString();
@@ -865,8 +900,14 @@ export async function validateAndSettleExpense(
       mode: exp.payment_mode,
       reference: exp.reference,
       bank_account: exp.bank_account,
+      bank_account_profile_id: details.bank_account_profile_id,
       settled_by: validator.full_name,
     },
+  });
+
+  emitSyncEvent('expenses', 'settled', {
+    entity_id: expenseId,
+    actor_id: validatorUserId,
   });
 
   return exp;
@@ -1287,44 +1328,60 @@ export async function getFinanceDashboardMetrics() {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
-  // Collections
-  const todayCollections = store.payments
+  // Only verified/approved payments count toward verified collections
+  const verifiedPayments = store.payments.filter((p) => isPaymentApproved(p));
+  const pendingPayments = store.payments.filter((p) => isPaymentPending(p));
+  const rejectedPaymentsList = store.payments.filter(
+    (p) => !isPaymentApproved(p) && !isPaymentPending(p)
+  );
+
+  // Collections (verified only)
+  const todayCollections = verifiedPayments
     .filter((p) => p.payment_date === todayStr)
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const monthlyPayments = store.payments.filter((p) => {
+  const monthlyPayments = verifiedPayments.filter((p) => {
     const d = new Date(p.payment_date);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
   const monthlyCollections = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
 
+  const pendingCollections = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+  const rejectedPayments = rejectedPaymentsList.reduce((sum, p) => sum + p.amount, 0);
+
   const totalOutstanding = store.feeAccounts.reduce((sum, f) => sum + f.outstanding_amount, 0);
 
-  // Expenses
+  // Expenses (Paid or Settled)
   const monthlyExpensesList = store.expenses.filter((e) => {
     const d = new Date(e.expense_date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear && e.status === 'Paid';
+    return (
+      d.getMonth() === currentMonth &&
+      d.getFullYear() === currentYear &&
+      (e.status === 'Paid' || e.status === 'Settled')
+    );
   });
   const monthlyExpenses = monthlyExpensesList.reduce((sum, e) => sum + e.amount, 0);
 
   const netCashFlow = monthlyCollections - monthlyExpenses;
 
-  // Course-wise collections
+  // Course-wise collections (verified only)
   const courseRevenueMap: Record<string, number> = {};
-  for (const p of store.payments) {
+  for (const p of verifiedPayments) {
     const name = p.course_name || 'SAP Course';
     courseRevenueMap[name] = (courseRevenueMap[name] || 0) + p.amount;
   }
 
-  // Payment mode distribution
+  // Payment mode distribution (verified only)
   const paymentModeMap: Record<string, number> = {};
-  for (const p of store.payments) {
+  for (const p of verifiedPayments) {
     paymentModeMap[p.payment_mode] = (paymentModeMap[p.payment_mode] || 0) + p.amount;
   }
 
   return {
     todayCollections,
     monthlyCollections,
+    pendingCollections,
+    rejectedPayments,
     totalOutstanding,
     monthlyExpenses,
     totalRefunds: 0,
