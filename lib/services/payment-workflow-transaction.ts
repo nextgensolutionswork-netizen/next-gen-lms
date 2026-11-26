@@ -182,7 +182,32 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         const snapshot = workflowSnapshot(tenant);
         if (db) {
           const response = await db.rpc('commit_fee_workflow', { p_tenant: tenant, p_revision: revision, p_snapshot: snapshot });
-          if (response.error || !response.data) throw new Error('Conflict: Payment state changed or could not be committed. Refresh and retry.');
+          if (response.error) {
+            const pgCode = (response.error as { code?: string }).code;
+            const pgMsg = response.error.message || '';
+            console.error('[paymentTransaction] commit_fee_workflow failed:', {
+              code: pgCode,
+              message: pgMsg,
+              tenant,
+              expectedRevision: revision,
+            });
+            if (pgCode === '40001' || pgMsg.includes('Conflict: workflow revision changed')) {
+              throw new Error('Conflict: This payment was updated by another user. Review the latest payment details before continuing.');
+            }
+            if (pgCode === '23505') {
+              if (pgMsg.includes('transaction_reference')) {
+                throw new Error('Conflict: This transaction reference is already associated with another payment.');
+              }
+              if (pgMsg.includes('receipt_number') || pgMsg.includes('payment_id')) {
+                throw new Error('Conflict: This payment has already been verified. View the existing receipt.');
+              }
+              throw new Error('Conflict: Duplicate financial record prevented commit. Refresh and check payment status.');
+            }
+            throw new Error('Database failure: Payment verification could not be completed. Please try again after checking the transaction status.');
+          }
+          if (!response.data) {
+            throw new Error('Conflict: This payment was updated by another user. Review the latest payment details before continuing.');
+          }
         } else if (!store.persistSync()) {
           throw new Error('Payment storage failed; no changes were committed.');
         }

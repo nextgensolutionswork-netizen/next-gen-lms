@@ -60,7 +60,9 @@ function failure(error: unknown) {
         ? 403
         : message.startsWith('Conflict')
           ? 409
-          : 400;
+          : message.startsWith('Database failure') || message.startsWith('Payment database unavailable')
+            ? 500
+            : 400;
   return NextResponse.json({ success: false, error: message, ...(error instanceof PaymentVerificationError ? { fieldErrors: error.fieldErrors } : {}) }, { status });
 }
 

@@ -62,11 +62,23 @@ export const paymentWorkflowClient = {
   async updatePayment(paymentId: string, input: Parameters<typeof feeWorkflowService.updatePayment>[1], _userId?: string, _role?: string) {
     return (await request({ action: 'update', paymentId, input })).payment as StudentPaymentRecord;
   },
-  async verifyPayment(paymentId: string, _userId?: string, notes?: string, verification?: ManualPaymentVerification) {
-    return (await request({ action: 'approve', paymentId, notes, verification })).payment as StudentPaymentRecord;
+  verifyPayment(paymentId: string, _userId?: string, notes?: string, verification?: ManualPaymentVerification): Promise<StudentPaymentRecord> {
+    const signature = JSON.stringify({ action: 'approve', paymentId, notes: notes || '', verification: verification || null });
+    if (pending.has(signature)) return pending.get(signature)!;
+    const key = keys.get(signature) || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `apr-key-${Date.now()}`);
+    keys.set(signature, key);
+    const task = request({ action: 'approve', paymentId, idempotency_key: key, notes, verification })
+      .then((data) => {
+        keys.delete(signature);
+        return data.payment as StudentPaymentRecord;
+      })
+      .finally(() => pending.delete(signature));
+    pending.set(signature, task);
+    return task;
   },
   async rejectPayment(paymentId: string, _userId: string, reason: string) {
-    return (await request({ action: 'reject', paymentId, reason })).payment as StudentPaymentRecord;
+    const key = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `rej-key-${Date.now()}`;
+    return (await request({ action: 'reject', paymentId, idempotency_key: key, reason })).payment as StudentPaymentRecord;
   },
   async voidReceipt(receiptId: string, reason: string, amount?: number) {
     return (await request({ action: 'void_receipt', receiptId, reason, amount })).result;

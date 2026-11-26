@@ -1500,6 +1500,7 @@ export class FeeWorkflowService {
       our_upi_details: payment.verified_our_upi_details || payment.our_upi_details,
       remaining_balance: fee.outstanding_amount,
       authorized_by: verifierName,
+      issued_by: verifierUserId,
       institute_name: store.settings?.institute_name || 'Next-Gen ERP Solutions',
       institute_address: resolveInstituteAddress(store.settings?.address),
       institute_phone: store.settings?.phone || '+91 98765 43210',
