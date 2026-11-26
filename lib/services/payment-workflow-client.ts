@@ -10,8 +10,13 @@ const keys = new Map<string, string>();
 let refreshTask: Promise<any> | undefined;
 async function request(body?: unknown, endpoint = '/api/fees/payments') {
   const res = await fetch(endpoint, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'same-origin' });
-  const data = await res.json();
-  if (!res.ok || !data.success) throw Object.assign(new Error(data.error || 'Payment request failed.'), { fieldErrors: data.fieldErrors });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) {
+    throw Object.assign(new Error(data.error || `Request failed (${res.status})`), {
+      status: res.status,
+      fieldErrors: data.fieldErrors,
+    });
+  }
   if (data.snapshot) mergeWorkflowSnapshot(data.snapshot);
   return data;
 }

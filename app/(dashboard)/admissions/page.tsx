@@ -26,6 +26,8 @@ import {
   Image as ImageIcon,
   User,
   X,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,17 +65,46 @@ import {
   getStandardFeeForCourseAndTraining,
   calculateEnrollmentFinancials,
 } from '@/lib/services/fee-config-service';
+import {
+  AdmissionsErrorInfo,
+  classifyAdmissionsError,
+  deriveAdmissionsViewState,
+  filterAdmissions,
+} from '@/lib/services/admissions-loading-state';
 
 export default function AdmissionsPage() {
   const router = useRouter();
-  const { user, role, hasPermission } = useAuth();
+  const { user, role, hasPermission, isLoading: isAuthLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [admissions, setAdmissions] = React.useState<Admission[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [loadError, setLoadError] = React.useState('');
+  const [allAdmissions, setAllAdmissions] = React.useState<Admission[]>([]);
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
+  const [isFetching, setIsFetching] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<AdmissionsErrorInfo | null>(null);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('All');
   const [isNewModalOpen, setIsNewModalOpen] = React.useState(false);
+
+  const requestGenerationRef = React.useRef(0);
+  const isMountedRef = React.useRef(true);
+  const sessionKey = `${user?.id ?? 'anon'}:${user?.role ?? 'none'}`;
+  const sessionKeyRef = React.useRef(sessionKey);
+
+  React.useEffect(() => {
+    sessionKeyRef.current = sessionKey;
+  }, [sessionKey]);
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const admissions = React.useMemo(
+    () => filterAdmissions(allAdmissions, { search, statusFilter }),
+    [allAdmissions, search, statusFilter]
+  );
+  const hasActiveFilters = Boolean(search.trim() || statusFilter !== 'All');
 
   const canAccessAdmissions =
     hasPermission('admissions:read') ||
@@ -459,52 +490,67 @@ export default function AdmissionsPage() {
 
   // Due date cleared when full payment option is toggled
 
-  // Cache clearing on user switch
+  // Cache clearing and request generation bump on user/role switch or logout
   React.useEffect(() => {
+    requestGenerationRef.current += 1;
     const timer = setTimeout(() => {
-      setAdmissions([]);
+      setAllAdmissions([]);
+      setHasLoadedOnce(false);
+      setLoadError(null);
       paymentWorkflowClient.clearCache();
     }, 0);
     return () => clearTimeout(timer);
   }, [user?.id, user?.role]);
 
   const refreshList = React.useCallback(async () => {
-    setIsLoading(true);
+    if (isAuthLoading) return;
+    if (!user) {
+      setAllAdmissions([]);
+      setHasLoadedOnce(false);
+      setIsFetching(false);
+      return;
+    }
+
+    const requestId = ++requestGenerationRef.current;
+    const expectedSessionKey = sessionKeyRef.current;
+    setIsFetching(true);
+
     try {
-      let list = await getAdmissions(user || undefined);
-      if (user?.role === 'counsellor') {
+      let list = await getAdmissions(user);
+      if (user.role === 'counsellor') {
         const canonicalId = resolveCanonicalCounsellorId(user.id) || user.id;
         list = list.filter((a) => a.counsellor_id === user.id || a.counsellor_id === canonicalId);
       }
-      if (statusFilter !== 'All') {
-        list = list.filter((a) => a.status === statusFilter);
+
+      if (!isMountedRef.current || requestId !== requestGenerationRef.current || sessionKeyRef.current !== expectedSessionKey) {
+        return;
       }
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        list = list.filter(
-          (a) =>
-            a.student_name?.toLowerCase().includes(q) ||
-            a.admission_number?.toLowerCase().includes(q) ||
-            a.student_unique_id?.toLowerCase().includes(q) ||
-            a.phone?.includes(q) ||
-            a.alternate_phone?.includes(q) ||
-            a.email?.toLowerCase().includes(q)
-        );
-      }
-      setAdmissions(list);
-      setLoadError('');
+
+      setAllAdmissions(list);
+      setHasLoadedOnce(true);
+      setLoadError(null);
     } catch (error) {
-      setAdmissions([]);
-      setLoadError(error instanceof Error ? error.message : 'Unable to load admissions. Please retry.');
+      if (!isMountedRef.current || requestId !== requestGenerationRef.current || sessionKeyRef.current !== expectedSessionKey) {
+        return;
+      }
+
+      const classified = classifyAdmissionsError(error);
+      setLoadError(classified);
+      if (classified.kind === 'session_expired' || classified.kind === 'unauthorized') {
+        setAllAdmissions([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current && requestId === requestGenerationRef.current && sessionKeyRef.current === expectedSessionKey) {
+        setIsFetching(false);
+      }
     }
-  }, [search, statusFilter, user]);
+  }, [isAuthLoading, user]);
 
   React.useEffect(() => {
-    void (async () => {
-      await refreshList();
-    })();
+    const timer = setTimeout(() => {
+      void refreshList();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [refreshList]);
 
   useDataSync({
@@ -684,7 +730,40 @@ export default function AdmissionsPage() {
     }
   };
 
-  if (!canAccessAdmissions) {
+  const viewState = deriveAdmissionsViewState({
+    isAuthLoading,
+    isAuthenticated: Boolean(user),
+    canAccess: canAccessAdmissions,
+    hasLoadedOnce,
+    isFetching,
+    error: loadError,
+    totalAuthorizedCount: allAdmissions.length,
+    filteredCount: admissions.length,
+    hasActiveFilters,
+  });
+
+  if (viewState === 'session_expired') {
+    return (
+      <div className="max-w-md mx-auto my-16 text-center space-y-4">
+        <div className="h-12 w-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Session Expired</h2>
+        <p className="text-xs text-slate-500">
+          {loadError?.message || 'Your session has expired. Please sign in again to access student admissions.'}
+        </p>
+        <div className="pt-2">
+          <Link href="/login">
+            <Button variant="sap" size="sm" className="text-xs">
+              Sign In
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (viewState === 'unauthorized') {
     return (
       <div className="max-w-md mx-auto my-16 text-center space-y-4">
         <div className="h-12 w-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
@@ -707,32 +786,99 @@ export default function AdmissionsPage() {
 
   return (
     <div className="space-y-4">
-      {loadError && (
-        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-          <p>{loadError}</p>
-          <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void refreshList()}>
-            Retry
+      {loadError && hasLoadedOnce && allAdmissions.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              Showing previously loaded records — refresh failed ({loadError.message}). Data may be stale.
+            </span>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isFetching}
+            onClick={() => void refreshList()}
+            className="text-xs bg-white"
+          >
+            {isFetching ? 'Retrying...' : 'Retry'}
           </Button>
         </div>
       )}
+
+      {viewState === 'error' && loadError && (
+        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-rose-900">Unable to load admissions</p>
+              <p className="text-xs text-rose-700 mt-0.5">{loadError.message}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2.5 bg-white"
+                disabled={isFetching}
+                onClick={() => void refreshList()}
+              >
+                {isFetching ? 'Retrying...' : 'Retry'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Student Admissions</h1>
-            <Badge variant="outline" className="text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200">
-              {admissions.length} {role === 'counsellor' ? 'Assigned Records' : 'Registered Records'}
-            </Badge>
+            {viewState === 'initial_loading' ? (
+              <Skeleton className="h-5 w-32 rounded-full" aria-hidden="true" />
+            ) : viewState !== 'error' ? (
+              <Badge variant="outline" className="text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200">
+                {hasActiveFilters
+                  ? `${admissions.length} of ${allAdmissions.length}`
+                  : allAdmissions.length}{' '}
+                {role === 'counsellor' ? 'Assigned Records' : 'Registered Records'}
+              </Badge>
+            ) : null}
+            {viewState === 'refreshing' && (
+              <span
+                role="status"
+                aria-live="polite"
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5"
+              >
+                <RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+                <span>Refreshing...</span>
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Confirmed student enrollments with automated fee ledger, and portal enablement.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 max-w-full">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void refreshList()}
+            disabled={isFetching}
+            className="flex items-center space-x-1.5 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+            <span>{isFetching ? 'Refreshing' : 'Refresh'}</span>
+          </Button>
           {canExportAdmissions && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportCSV}
+              disabled={viewState === 'initial_loading' || admissions.length === 0}
               className="flex items-center space-x-1.5 text-xs text-slate-700 hover:bg-slate-50"
             >
               <Download className="h-3.5 w-3.5" />
@@ -798,21 +944,83 @@ export default function AdmissionsPage() {
                   <th className="px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <TableSkeleton columns={8} rows={6} />
-                ) : admissions.length === 0 ? (
+              <tbody
+                className="divide-y divide-slate-100"
+                aria-busy={viewState === 'initial_loading' || viewState === 'refreshing'}
+              >
+                {viewState === 'initial_loading' ? (
+                  <>
+                    <tr className="sr-only">
+                      <td colSpan={8} role="status" aria-live="polite">
+                        Loading student admissions...
+                      </td>
+                    </tr>
+                    <TableSkeleton columns={8} rows={6} />
+                  </>
+                ) : viewState === 'error' ? (
+                  <tr>
+                    <td colSpan={8} className="px-3.5 py-8 text-center text-slate-500">
+                      <AlertCircle className="h-8 w-8 mx-auto text-rose-400 mb-2" />
+                      <p className="font-semibold text-slate-700">Unable to load admissions</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {loadError?.message || "We couldn't retrieve the admission records. Please try again."}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 text-xs"
+                        disabled={isFetching}
+                        onClick={() => void refreshList()}
+                      >
+                        {isFetching ? 'Retrying...' : 'Retry'}
+                      </Button>
+                    </td>
+                  </tr>
+                ) : viewState === 'filtered_empty' ? (
+                  <tr>
+                    <td colSpan={8} className="px-3.5 py-8 text-center text-slate-500">
+                      <Search className="h-8 w-8 mx-auto text-slate-400 mb-2 opacity-50" />
+                      <p className="font-semibold text-slate-700">No matching admissions</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        No records match your current search or filters.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 text-xs"
+                        onClick={() => {
+                          setSearch('');
+                          setStatusFilter('All');
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
+                    </td>
+                  </tr>
+                ) : viewState === 'confirmed_empty' ? (
                   <tr>
                     <td colSpan={8} className="px-3.5 py-8 text-center text-slate-500">
                       <UserCheck className="h-8 w-8 mx-auto text-slate-400 mb-2 opacity-50" />
-                      <p className="font-semibold text-slate-700">No Admissions Found</p>
+                      <p className="font-semibold text-slate-700">No admissions yet</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        {search || statusFilter !== 'All'
-                          ? 'Try adjusting your search query or status filter.'
-                          : role === 'counsellor'
-                          ? 'No Admissions Assigned: You currently have no student admissions assigned to your counsellor account.'
-                          : 'No admissions have been registered yet. Click "New Admission" above to add one.'}
+                        {role === 'counsellor'
+                          ? 'No admissions are currently assigned to your counsellor scope.'
+                          : 'New admission records will appear here once they are created.'}
                       </p>
+                      {canCreateAdmission && (
+                        <Button
+                          type="button"
+                          variant="sap"
+                          size="sm"
+                          className="mt-3 text-xs inline-flex items-center space-x-1"
+                          onClick={() => setIsNewModalOpen(true)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>New Admission</span>
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ) : (
