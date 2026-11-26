@@ -38,6 +38,12 @@ import {
 } from '@/lib/services/academics-service';
 import { canAccessBatch } from '@/lib/auth/rbac';
 import { formatDate } from '@/lib/utils/formatters';
+import {
+  formatBatchDisplay,
+  formatCourseDisplay,
+  formatCourseOptionLabel,
+  formatBatchOptionLabel,
+} from '@/lib/utils/course-batch-display';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -479,9 +485,9 @@ export default function BatchesPage() {
                       className="font-bold text-slate-900 text-sm mt-1 group-hover:text-[#0A6ED1] transition-colors"
                       title="Click card to view enrolled student roster"
                     >
-                      {b.batch_name}
+                      {formatBatchDisplay(b, b.course_name).displayName}
                     </h3>
-                    <p className="text-xs text-slate-500">{b.course_name}</p>
+                    <p className="text-xs text-slate-500">{formatCourseDisplay({ course_name: b.course_name }).baseCourseName}</p>
                   </div>
                   <Badge
                     variant={
@@ -658,7 +664,7 @@ export default function BatchesPage() {
                 >
                   <option value="" disabled>Select a course</option>
                   {courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.course_name} ({c.course_code})</option>
+                    <option key={c.id} value={c.id}>{formatCourseOptionLabel(c)}</option>
                   ))}
                 </select>
               )}
@@ -969,7 +975,7 @@ export default function BatchesPage() {
               >
                 {transferableStudents.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.full_name} ({s.student_code} - Current Batch: {s.batch_name || 'Unassigned'})
+                    {s.full_name} ({s.student_code} - Current Batch: {s.batch_name || 'Batch not assigned'})
                   </option>
                 ))}
               </select>
@@ -996,7 +1002,7 @@ export default function BatchesPage() {
                   const isFull = b.maximum_capacity && b.current_enrolled >= b.maximum_capacity;
                   return (
                     <option key={b.id} value={b.id} disabled={Boolean(isFull)}>
-                      {b.batch_name} ({b.start_time} - {b.end_time}, {b.current_enrolled}/{b.maximum_capacity}) {isFull ? '[AT CAPACITY]' : ''}
+                      {formatBatchOptionLabel(b, activeBatch?.course_name)}
                     </option>
                   );
                 })}

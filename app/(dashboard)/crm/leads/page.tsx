@@ -33,6 +33,7 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { Lead, LeadStage, LeadCurrentStatus, LeadTrainingPreference, LeadSource, Course } from '@/types';
 import { getCourses, createBatch } from '@/lib/services/academics-service';
+import { formatCourseOptionLabel, formatBatchOptionLabel } from '@/lib/utils/course-batch-display';
 import {
   getLeads,
   createLead,
@@ -240,8 +241,8 @@ export default function LeadsPage() {
       'WhatsApp Country Code': l.whatsapp_country_code || l.country_code || '+91',
       'WhatsApp Number': l.whatsapp_number || l.phone,
       'Email': l.email,
-      'Interested Course': l.interested_course_name || 'N/A',
-      'Training Preference': l.training_preference || 'Online',
+      'Interested Course': l.interested_course_name || 'Course unavailable',
+      'Training Preference': l.training_preference || 'Mode unavailable',
       'Lead Source': l.lead_source || 'Website',
       'Current Status': l.current_status || 'Working Professional',
       'Stage': l.stage,
@@ -1335,12 +1336,12 @@ export default function LeadsPage() {
                           )}
                         </td>
                         <td className="px-3.5 py-2.5 font-medium text-slate-800">
-                          {lead.interested_course_name || 'SAP Course'}
+                          {lead.interested_course_name || 'Course unavailable'}
                         </td>
                         <td className="px-3.5 py-2.5">
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium text-slate-800">
-                              {lead.training_preference || 'Online'}
+                              {lead.training_preference || 'Mode unavailable'}
                             </span>
                             <span className="text-[11px] text-slate-500">
                               via {lead.lead_source || 'Website'}
@@ -2170,7 +2171,7 @@ export default function LeadsPage() {
                 >
                   {publishedCourses.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.course_name} (₹{c.price.toLocaleString('en-IN')})
+                      {formatCourseOptionLabel(c)}
                     </option>
                   ))}
                 </select>
@@ -2198,7 +2199,7 @@ export default function LeadsPage() {
                         <option value="">{courseBatches.length === 0 ? 'No dedicated batches (General)' : 'Select Batch (Optional)'}</option>
                         {courseBatches.map((b) => (
                           <option key={b.id} value={b.id}>
-                            {b.batch_name} ({b.training_mode})
+                            {formatBatchOptionLabel(b, publishedCourses.find((c) => c.id === convertCourseId)?.course_name)}
                           </option>
                         ))}
                         <option value="__ADD_NEW_BATCH__" className="text-blue-600 font-bold">
@@ -2322,7 +2323,7 @@ export default function LeadsPage() {
                 Course (Auto-Matched)
               </label>
               <Input
-                value={publishedCourses.find((c) => c.id === convertCourseId)?.course_name || 'Selected Course'}
+                value={publishedCourses.find((c) => c.id === convertCourseId)?.course_name || 'Course unavailable'}
                 disabled
                 className="bg-slate-50 text-slate-700 font-medium"
               />

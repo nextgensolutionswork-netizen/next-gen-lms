@@ -1334,11 +1334,11 @@ export default function StudentDetailsPage() {
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100">
                       <span className="text-slate-500">Assigned Batch:</span>
-                      <span className="font-semibold text-slate-800">{batch?.batch_name || onboardingCase.batch_name || 'SAP Morning Batch'}</span>
+                      <span className="font-semibold text-slate-800">{batch?.batch_name || onboardingCase.batch_name || 'Batch not assigned'}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100">
                       <span className="text-slate-500">Designated Faculty Lead:</span>
-                      <span className="font-semibold text-slate-800">{batch?.trainer_name || onboardingCase.trainer_name || 'Lead Trainer'}</span>
+                      <span className="font-semibold text-slate-800">{batch?.trainer_name || onboardingCase.trainer_name || 'Unassigned'}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-100">
                       <span className="text-slate-500">Workflow Completion Date:</span>

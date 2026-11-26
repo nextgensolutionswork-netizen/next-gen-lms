@@ -68,7 +68,9 @@ export function filterAdmissions(
         a.student_unique_id?.toLowerCase().includes(q) ||
         a.phone?.includes(q) ||
         a.alternate_phone?.includes(q) ||
-        a.email?.toLowerCase().includes(q)
+        a.email?.toLowerCase().includes(q) ||
+        a.course_name?.toLowerCase().includes(q) ||
+        a.batch_name?.toLowerCase().includes(q)
     );
   });
 }

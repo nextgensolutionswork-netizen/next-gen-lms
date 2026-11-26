@@ -454,7 +454,9 @@ export default function StudentsListPage() {
                         <p className="font-semibold text-slate-800 text-xs">{stu.course_name}</p>
                       </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
-                        <span className="text-xs text-slate-700 font-medium">{stu.batch_name || 'Assigned Batch'}</span>
+                        <span className={`text-xs font-medium ${stu.batch_name ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+                          {stu.batch_name || 'Batch not assigned'}
+                        </span>
                       </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <div className="flex items-center space-x-1.5">
