@@ -45,11 +45,22 @@
 | ADM-UX-039 | Actual browser evidence recorded | 7 screenshots + JSON metrics | Playwright | PASS | Harness simulation |
 | ADM-UX-040 | Authenticated business-route verification | Unauthenticated `/admissions` gated by `/login` | Production Smoke | BLOCKED | `AUTH_REQUIRED` — deferred to TASK-11 |
 | ADM-UX-041 | TASK-01 through TASK-07 safeguards preserved | All existing suites pass | Full Regression | PASS | None |
-| ADM-UX-042 | Dedicated regression tests pass | `tests/task-08-admissions-loading-state.test.tsx`: 6/6 passed | Vitest | PASS | None |
-| ADM-UX-043 | Full automated regression passes | Full verbose Vitest run after final edit | Vitest | PASS | None |
+| ADM-UX-042 | Dedicated regression tests pass | `tests/task-08-admissions-loading-state.test.tsx`: 8/8 passed | Vitest | PASS | None |
+| ADM-UX-043 | Full automated regression passes | Complete sequential regression: 138/138 files, 2,234/2,234 passed | Vitest | PASS | None |
 | ADM-UX-044 | TypeScript and ESLint pass | `tsc --noEmit` (0 errors), `npm run lint` (0 errors, 0 warnings) | CLI | PASS | None |
 | ADM-UX-045 | Production build passes | `npm run build` (52/52 static pages + API routes) | CLI | PASS | None |
 | ADM-UX-046 | Git push and active deployment verified | Pushed to `origin/main` & Vercel `● Ready` | Git + Vercel | PASS | None |
 
-## 2. Final Recommendation
+## 2. Regression & Verification Summary
+
+- **Total Test Files:** 138 passed (138)
+- **Total Tests:** 2,234 passed (2,234)
+- **Automated Pass Rate:** 100%
+- **DI-037 Resolution:** Successfully resolved by mocking `createAdminClient` in `tests/production-data-integrity.test.ts`. Execution time reduced from 7.4s / 15s timeout to <5ms.
+- **Platform Temporal Boundary:** Successfully resolved by aligning local date string generation with local midnight in `tests/platform-admin-operations.test.ts`.
+- **TypeScript:** 0 errors (`tsc --noEmit --incremental false`).
+- **ESLint:** 0 errors, 0 warnings (`eslint .`).
+- **Production Build:** 52/52 routes generated successfully (`next build --webpack`).
+
+## 3. Final Recommendation
 **GO — Formal Acceptance for TASK-08** (authenticated `/admissions` browser E2E `ADM-UX-040` explicitly retained for TASK-11).
