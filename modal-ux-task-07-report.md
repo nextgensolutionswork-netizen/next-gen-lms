@@ -1,37 +1,73 @@
 # TASK-07 — Modal Scrolling, Whitespace, Responsive Layout & UX Optimization Report
 
-## 1. Objective
-Resolve modal scrolling, excessive whitespace, oversized headers, sticky footer ergonomics, background scroll locking (including nested modal stacking), responsive viewport bounds (`dvh` + mobile width constraints), and keyboard accessibility across Next-Gen ERP Solutions LMS & CRM.
+**Final Verified Implementation Branch:** `task-07-final-acceptance` (merged & pushed to `origin/main`)  
+**Production URL:** https://next-gen-lms-omega.vercel.app  
 
-## 2. Root Causes Identified
-1. **Shared `Modal` (`components/ui/modal.tsx`):**
-   - Lacked `flex flex-col max-h-[90dvh]` on the dialog container, relying only on `max-h-[82vh]` on the inner body without a dedicated sticky footer slot.
-   - Lacked `max-w-[calc(100vw-1.5rem)]` mobile width containment and `'3xl'` / `'4xl'` max-width variants.
-   - Used non-reference-counted `document.body.style.overflow = 'hidden'`, causing premature scroll unlock when nested modals (e.g., Batch Creation inside Admissions) closed.
-   - Hardcoded static `id="modal-title"` / `id="modal-description"`, causing ARIA ID collisions when multiple modals mounted simultaneously.
-   - Lacked `overscroll-contain` on backdrop and scrollable body, allowing scroll chaining to the background page.
-2. **Custom Standalone Overlays:**
-   - `components/ui/custom-date-range-picker.tsx` lacked background scroll lock, `Escape` key handling, `overscroll-contain`, mobile `calc(100vw-1.5rem)` cap, and `90dvh` viewport bounds.
-   - `components/portal/quiz-runner-modal.tsx` lacked shared reference-counted scroll lock, `Escape` routing, `overscroll-contain`, mobile width cap, and `92dvh` viewport bounds.
-3. **Bulk Import Modal (`components/bulk-import-modal.tsx`):**
-   - Rendered its primary action buttons inside the scrollable body instead of a sticky modal footer.
+---
 
-## 3. Changes Implemented
-- **`components/ui/modal.tsx`:**
-  - Added reference-counted `acquireModalLock` and `useModalScrollLock(isOpen, onClose)` with scrollbar-width compensation and topmost-only `Escape` key routing.
-  - Upgraded `Modal` with `React.useId()` unique ARIA IDs, `max-w-[calc(100vw-1.5rem)]`, `max-h-[90vh] max-h-[90dvh] flex flex-col`, compact `shrink-0` header (`px-4 sm:px-5 py-3`), `flex-1 min-h-0 p-4 sm:p-5 overflow-y-auto overscroll-contain` body, optional sticky `footer?: React.ReactNode`, `bodyClassName?: string`, and `maxWidth` `'3xl'` / `'4xl'`.
-- **`components/ui/custom-date-range-picker.tsx`:**
-  - Integrated `useModalScrollLock(isOpen, onClose)`, backdrop click close, `overscroll-contain`, `max-w-[calc(100vw-1.5rem)] sm:max-w-lg`, and `max-h-[90vh] max-h-[90dvh]`.
-- **`components/portal/quiz-runner-modal.tsx`:**
-  - Integrated `useModalScrollLock(isOpen, onClose)`, `overscroll-contain`, `max-w-[calc(100vw-1.5rem)] lg:max-w-4xl`, and `max-h-[92vh] max-h-[92dvh]`.
-- **`components/bulk-import-modal.tsx`:**
-  - Moved action controls (`Cancel`/`Close`, `Validate & Preview`, `Commit Rows`) into `<Modal footer={...}>` so they remain pinned during long CSV previews and validation lists.
-- **`tests/task-07-modal-ux.test.tsx`:**
-  - Added 5 targeted unit/contract tests covering reference-counted nested scroll lock, scrollbar-width compensation, topmost `Escape` routing, `Modal` layout/ARIA contracts, `CustomDateRangePicker`, `QuizRunnerModal`, and `BulkImportModal` sticky footer.
+## 1. Executive Summary
+TASK-07 resolves modal scrolling, viewport containment, excessive whitespace, sticky header/footer ergonomics, nested background scroll locking, and keyboard accessibility (`Tab`/`Shift+Tab` focus trapping, initial focus, LIFO `Escape`, and focus restoration) across Next-Gen ERP Solutions LMS & CRM, without altering business logic, financial calculations, or database schemas.
 
-## 4. Verification Summary
-- **Targeted TASK-07 Tests (`npx vitest run tests/task-07-modal-ux.test.tsx`):** 5/5 passed.
-- **Full Regression Suite (`npx vitest run`):** 137/137 files passed, 2,223/2,223 tests passed (0 failures).
-- **TypeScript (`npx tsc --noEmit`):** 0 errors.
-- **ESLint (`npm run lint`):** 0 errors, 0 warnings.
-- **Next.js Production Build (`npm run build`):** 52/52 static pages + all API routes compiled cleanly.
+---
+
+## 2. Complete Modal Inventory (UX-R02)
+Every modal across the application was inventoried: **100 shared `<Modal>` instances** across dashboard, portal, and shared components plus **2 standalone overlays** (`CustomDateRangePicker`, `QuizRunnerModal`):
+
+| Domain / Route | Source File | Modal Count & Type | Header / Scroll / Footer / A11y Status |
+| :--- | :--- | :--- | :--- |
+| **Shared Core** | `components/ui/modal.tsx` | Shared `<Modal>` + `acquireModalLock` + `attachDialogFocusTrap` | Compact sticky header (`shrink-0`), `90dvh` + `calc(100vw-1.5rem)`, `flex-1 min-h-0 overflow-y-auto overscroll-contain`, optional sticky `footer`, `React.useId()` ARIA, LIFO `Escape`, Tab trap + focus restore |
+| **Bulk Import** | `components/bulk-import-modal.tsx` | 1 Shared `<Modal>` | Upgraded with sticky `footer={...}` |
+| **CRM Leads** | `app/(dashboard)/crm/leads/page.tsx` | 4 Shared `<Modal>` (Create Lead, Edit Lead, Convert Lead, Inline Batch) | Create Lead (`create-lead-form`) & Convert Lead upgraded with sticky `footer`; Inline Batch inherits nested lock/focus stack |
+| **CRM Follow-ups** | `app/(dashboard)/crm/followups/page.tsx` | 3 Shared `<Modal>` | Inherits shared `<Modal>` header/scroll/lock/focus trap |
+| **Admissions** | `app/(dashboard)/admissions/page.tsx` | 3 Shared `<Modal>` (New Admission + Installments, Confirmation, Inline Batch) | New Admission (`new-admission-form`) upgraded with sticky `footer`; Inline Batch inherits nested lock/focus stack |
+| **Students 360°** | `app/(dashboard)/students/[id]/page.tsx` | 3 Shared `<Modal>` | Inherits shared `<Modal>` |
+| **Accounts — Approvals** | `app/(dashboard)/accounts/approvals/page.tsx` | 11 Shared `<Modal>` (Fee Proposal Approve/Correct/Reject/Create/Revise/History/Categories, Payment Verify/Reject/Edit/Record) | Inherits shared `<Modal>` |
+| **Accounts — Expenses** | `app/(dashboard)/accounts/expenses/page.tsx` | 3 Shared `<Modal>` (Record Expense, Add Category, Validate Expense) | Record Expense (`create-expense-form`) upgraded with sticky `footer`; Add Category inherits nested lock/focus stack |
+| **Accounts — Payments** | `app/(dashboard)/accounts/payments/page.tsx` | 4 Shared `<Modal>` (Record Payment, Verify, Reject, Edit) | Record Payment (`record-payment-form`) upgraded with sticky `footer` |
+| **Accounts — Fees / Receipts / Vendors** | `fees/page.tsx`, `receipts/page.tsx`, `vendors/page.tsx` | 4 Shared `<Modal>` | Inherits shared `<Modal>` |
+| **Academics** | `assessments/page.tsx` (5), `assignments/page.tsx` (4), `attendance/page.tsx` (1), `batches/page.tsx` (4), `courses/page.tsx` (10), `sap-servers/page.tsx` (3), `schedule/page.tsx` (2) | 29 Shared `<Modal>` | Inherits shared `<Modal>` |
+| **Onboarding** | `app/(dashboard)/onboarding/page.tsx` | 5 Shared `<Modal>` (Case Details, Reassign, Hold, Upload, Orientation) | Inherits shared `<Modal>` |
+| **Placement** | `placement/page.tsx` (5), `placement/enrollments/page.tsx` (8), `student-placement-hub.tsx` (3) | 16 Shared `<Modal>` | Inherits shared `<Modal>` |
+| **Administration & Support** | `users/page.tsx` (3), `audit-logs/page.tsx` (1), `certificates/page.tsx` (2), `support/page.tsx` (2) | 8 Shared `<Modal>` | Create User (`create-user-form`) upgraded with sticky `footer` |
+| **Student Portal** | `app/portal/page.tsx` | 5 Shared `<Modal>` | Inherits shared `<Modal>` |
+| **Standalone Overlay 1** | `components/ui/custom-date-range-picker.tsx` | 1 Standalone `fixed inset-0` dialog | Upgraded with `useModalScrollLock`, `useModalFocusTrap`, `overscroll-contain`, `90dvh`, `calc(100vw-1.5rem)` |
+| **Standalone Overlay 2** | `components/portal/quiz-runner-modal.tsx` | 1 Standalone `fixed inset-0` dialog | Upgraded with `useModalScrollLock`, `useModalFocusTrap`, `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, `overscroll-contain`, `92dvh`, `calc(100vw-1.5rem)` |
+
+---
+
+## 3. Sticky Footer Adoption Matrix (UX-R03)
+
+| Prioritized Modal | Source File | Adoption Status | Form Association / Notes |
+| :--- | :--- | :--- | :--- |
+| **1. Create Lead** | `app/(dashboard)/crm/leads/page.tsx` | **Adopted** | `id="create-lead-form"` + `form="create-lead-form"` |
+| **2. Edit Lead** | `app/(dashboard)/crm/leads/page.tsx` | Compact / Tabbed | Tabbed sections fit cleanly inside `90dvh` scrollable body |
+| **3. New Admission** | `app/(dashboard)/admissions/page.tsx` | **Adopted** | `id="new-admission-form"` + `form="new-admission-form"` |
+| **4. Convert Lead to Admission** | `app/(dashboard)/crm/leads/page.tsx` | **Adopted** | Sticky `<Modal footer={...}>` with `handleConvertLead` |
+| **5. Admission with Installments** | `app/(dashboard)/admissions/page.tsx` | **Adopted** | Covered inside `new-admission-form` sticky footer |
+| **6. Inline Batch Creation** | `crm/leads/page.tsx` & `admissions/page.tsx` | Compact Child Dialog | Short 4-field nested form; no sticky footer needed |
+| **7. Record Payment** | `app/(dashboard)/accounts/payments/page.tsx` | **Adopted** | `id="record-payment-form"` + `form="record-payment-form"` |
+| **8. Payment Approval** | `accounts/approvals/page.tsx` & `payments/page.tsx` | Compact Confirm/Verify | Short verification dialog |
+| **9. Payment Rejection** | `accounts/approvals/page.tsx` & `payments/page.tsx` | Short Reason Dialog | Single textarea + Cancel/Reject |
+| **10. Create Expense** | `app/(dashboard)/accounts/expenses/page.tsx` | **Adopted** | `id="create-expense-form"` + `form="create-expense-form"` |
+| **11. Expense Settlement** | `app/(dashboard)/accounts/expenses/page.tsx` | Short Action Dialog | Compact validation/settlement dialog |
+| **12. Create Course** | `app/(dashboard)/academics/courses/page.tsx` | Compact Form | Fits within `90dvh` scrollable body |
+| **13. Create Batch** | `app/(dashboard)/academics/batches/page.tsx` | Compact Form | Fits within `90dvh` scrollable body |
+| **14. Create User** | `app/(dashboard)/users/page.tsx` | **Adopted** | `id="create-user-form"` + `form="create-user-form"` |
+| **15. Onboarding Case Details** | `app/(dashboard)/onboarding/page.tsx` | Read/Checklist Detail | Tabular/checklist inspection modal |
+| **16. Bulk Import** | `components/bulk-import-modal.tsx` | **Adopted** | Sticky `footer={...}` for Validate & Commit buttons |
+
+---
+
+## 4. Scroll Lock, Nested Safety, Focus Trap & Browser Evidence (UX-R04, UX-R05, UX-R06)
+
+- **Scroll Lock & Nested Stack:** `acquireModalLock` / `useModalScrollLock` (`components/ui/modal.tsx`) uses an `activeModalLocks` counter, `savedBodyOverflow` / `savedBodyPaddingRight` restoration, scrollbar-width compensation, and `escapeHandlers` LIFO routing.
+- **Keyboard Focus Trap & Restoration:** `attachDialogFocusTrap` / `useModalFocusTrap` (`components/ui/modal.tsx`) maintains `dialogStack` so only the topmost dialog traps `Tab` / `Shift+Tab`, sets initial focus inside the newly opened dialog, and restores focus to `previousActiveElement` (including restoring focus to parent dialog when a child closes).
+- **Playwright Responsive Browser Measurements (Isolated Harness, Edge/Chromium):**
+  - `360×640`: dialog `336×576`, `fitsViewportWidth: true`, `fitsViewportHeight: true`, `noHorizontalOverflow: true`, `bodyScrollable: true` (`1056 > 462`), `footerVisibleInViewport: true`, `bodyOverflowLocked: true`, `bgScrollY: 0`.
+  - `390×844`: dialog `366×760`, all checks `true`.
+  - `768×1024`: dialog `736×922`, all checks `true`.
+  - `1024×768`: dialog `992×691`, all checks `true`.
+  - `1280×720`: dialog `1248×648`, all checks `true`; nested `Escape` closes child first while keeping parent open & body locked; second `Escape` restores `overflow: ''` and restores focus to `#open-long`; short confirmation modal height `170px`.
+  - `1440×900`: dialog `1408×810`, all checks `true`.
+  - `1920×1080`: dialog `1888×972`, all checks `true`.
+- **Authenticated Business-Route Browser Verification:** `BLOCKED — AUTH_REQUIRED` (unauthenticated `/crm/leads` redirects to `/login?redirectTo=%2Fcrm%2Fleads`; retained for TASK-11).
