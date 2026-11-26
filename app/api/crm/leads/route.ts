@@ -16,8 +16,13 @@ async function authorize(request: NextRequest) {
 
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : 'Lead request failed.';
+  const isUnauthorized = message.startsWith('Unauthorized');
+  const isForbidden = message.startsWith('Forbidden') || message.includes('denied') || message.includes('tamper') || message.includes('reassign');
+  const isNotFound = message.includes('not found') || message.includes('deleted or is no longer available');
+  const isConflict = message.includes('updated by another user') || message.includes('conflict');
+  const status = isUnauthorized ? 401 : isForbidden ? 403 : isNotFound ? 404 : isConflict ? 409 : 400;
   return NextResponse.json({ success: false, error: message }, {
-    status: message.startsWith('Unauthorized') ? 401 : message.startsWith('Forbidden') ? 403 : 400,
+    status,
     headers: { 'Cache-Control': 'private, no-store' },
   });
 }
@@ -77,6 +82,9 @@ export async function PATCH(request: NextRequest) {
     const { leadId, updates } = body;
     if (!leadId) {
       return NextResponse.json({ success: false, error: 'leadId is required' }, { status: 400 });
+    }
+    if (body.action !== 'stage' && (!updates || typeof updates !== 'object')) {
+      return NextResponse.json({ success: false, error: 'updates payload is required' }, { status: 400 });
     }
     await authorizedLead(leadId, actor);
     const lead = body.action === 'stage'

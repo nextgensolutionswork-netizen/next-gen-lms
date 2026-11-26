@@ -23,6 +23,7 @@ import { emitSyncEvent } from './sync-events';
 import { isPaymentApproved, isPaymentPending } from '@/lib/utils/dashboard-metrics';
 import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
 import { idempotencyService } from './idempotency-service';
+import { tenantId } from '@/lib/auth/tenant';
 
 // --- Student Fee Accounts & Installments ---
 export async function getStudentFeeAccounts(): Promise<StudentFeeAccount[]> {
@@ -238,8 +239,31 @@ export async function recordPaymentAtomic(
     throw new Error(`Payment amount (₹${input.amount}) exceeds outstanding balance (₹${feeAccount.outstanding_amount})`);
   }
 
+export function getNextReceiptSequence(year = new Date().getFullYear(), tenant?: string): number {
+  const prefix = `REC-${year}-`;
+  let maxSeq = 0;
+  for (const r of store.receipts || []) {
+    if (tenant && tenantId(r) !== tenant) continue;
+    const num = r.receipt_number;
+    if (num && num.startsWith(prefix)) {
+      const val = parseInt(num.slice(prefix.length), 10);
+      if (Number.isFinite(val) && val > maxSeq) maxSeq = val;
+    }
+  }
+  for (const p of store.payments || []) {
+    if (tenant && tenantId(p) !== tenant) continue;
+    const num = p.receipt_number;
+    if (num && num.startsWith(prefix)) {
+      const val = parseInt(num.slice(prefix.length), 10);
+      if (Number.isFinite(val) && val > maxSeq) maxSeq = val;
+    }
+  }
+  return maxSeq + 1;
+}
+
+// ... existing code ...
   // --- BEGIN TRANSACTION ---
-  const receiptSequence = store.receipts.length + 1;
+  const receiptSequence = getNextReceiptSequence(new Date().getFullYear(), tenantId(feeAccount));
   const receiptNumber = generateReceiptNumber(receiptSequence);
 
   // 1. Create Payment

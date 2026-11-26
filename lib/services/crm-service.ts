@@ -13,6 +13,69 @@ import { emitSyncEvent } from './sync-events';
  * Finds the authoritative admission linked to a lead, if one exists.
  * Resolves by lead_id, matching admission number in lead notes, or matching email and course.
  */
+/**
+ * Verified roster of pre-cleanup admissions intentionally purged in the 25-Nov-2026 database reset.
+ * Only admissions in this verified inventory are classified as Historical Conversions.
+ * Any other converted lead missing an admission is flagged as an Integrity Error.
+ */
+export const VERIFIED_HISTORICAL_ADMISSIONS: readonly string[] = Object.freeze([
+  'ADM-2026-0001',
+  'ADM-2026-0002',
+  'ADM-2026-0007',
+  'ADM-2026-0008',
+  'ADM-2026-0009',
+  'ADM-2026-0010',
+  'ADM-2026-0011',
+  'ADM-2026-0012',
+  'ADM-2026-0013',
+  'ADM-2026-0016',
+  'ADM-2026-0017',
+  'ADM-2026-0018',
+  'ADM-2026-0021',
+  'ADM-2026-0024',
+]);
+
+/**
+ * Authoritative immutable mapping of verified historical leads from 25-Nov reset.
+ * Precludes any manipulation of conversion status through editable lead notes.
+ */
+export const VERIFIED_HISTORICAL_LEAD_MAP: Readonly<Record<string, string>> = Object.freeze({
+  'b350177a-4915-4a33-8c5e-d6f3b07e452a': 'ADM-2026-0001',
+  'e2a8078d-f768-49d4-915d-9405cf30462b': 'ADM-2026-0002',
+  '46995a17-8d37-4670-a6db-7eac8ab05423': 'ADM-2026-0007',
+  '6620a551-0f9f-4f37-8404-3646c6428531': 'ADM-2026-0008',
+  'ee36d411-8287-48db-9336-1bf005d5638e': 'ADM-2026-0009',
+  '74f35094-4df9-498b-b92c-42e482a0aa96': 'ADM-2026-0010',
+  '11e15d52-f1bd-4509-871c-f2dae5b014d1': 'ADM-2026-0011',
+  '5c44d3a4-dea8-4859-a3d7-1e78bb251e93': 'ADM-2026-0012',
+  '03b40812-f553-49cd-bbb3-6f43eefd165e': 'ADM-2026-0013',
+  '871a4179-e085-4f75-a044-dfea0739031c': 'ADM-2026-0016',
+  '5b264e6d-bfb3-4f5d-af76-12e641d6499c': 'ADM-2026-0017',
+  '2d099cd5-5951-4d32-9d42-491a95546347': 'ADM-2026-0018',
+  'b80a99d9-efa2-450e-930c-3713c52f7751': 'ADM-2026-0021',
+  '9520e05c-48a8-4196-af55-2d2f2654e610': 'ADM-2026-0024',
+});
+
+export type LeadConversionLifecycleStatus =
+  | 'unconverted'
+  | 'active'
+  | 'historical'
+  | 'cancelled'
+  | 'integrity_error';
+
+export interface LeadConversionStatusInfo {
+  status: LeadConversionLifecycleStatus;
+  matchingAdmission?: Admission;
+  admissionNumber?: string;
+  historicalReference?: string;
+  isIntegrityError: boolean;
+  message: string;
+}
+
+/**
+ * Finds the authoritative admission linked to a lead, if one exists.
+ * Resolves by lead_id, matching admission number in lead notes, or matching email and course.
+ */
 export function getLeadAdmission(lead: Lead, admissions?: Admission[]): Admission | undefined {
   const list = admissions || store.admissions || [];
   return list.find(
@@ -25,13 +88,97 @@ export function getLeadAdmission(lead: Lead, admissions?: Admission[]): Admissio
 }
 
 /**
- * Extracts a historical admission number reference from lead notes if present.
+ * Extracts a historical admission number reference from structured fields or legacy notes.
  * Example note: "Converted to Admission: ADM-2026-0012"
  */
 export function getLeadHistoricalAdmissionNumber(lead: Lead): string | undefined {
+  if ((lead as any).historical_admission_reference) {
+    return (lead as any).historical_admission_reference;
+  }
+  if (lead.id && VERIFIED_HISTORICAL_LEAD_MAP[lead.id]) {
+    return VERIFIED_HISTORICAL_LEAD_MAP[lead.id];
+  }
   if (!lead.notes) return undefined;
   const match = lead.notes.match(/Converted to Admission:\s*(ADM-[\w-]+)/i);
   return match ? match[1] : undefined;
+}
+
+/**
+ * Formally classifies lead conversion lifecycle according to rigorous business rules:
+ * - Active: Linked admission exists in public.admissions
+ * - Historical: Admission removed during verified historical cleanup
+ * - Cancelled: Linked admission has status = 'Cancelled'
+ * - Integrity Error: Converted status with missing admission and no verified archival evidence
+ * - Unconverted: Lead has not been converted
+ */
+export function classifyLeadConversion(
+  lead: Lead,
+  admissions?: Admission[],
+  verifiedHistoricalList: readonly string[] = VERIFIED_HISTORICAL_ADMISSIONS
+): LeadConversionStatusInfo {
+  const matchingAdmission = getLeadAdmission(lead, admissions);
+  const historicalRef = (lead as any).historical_admission_reference || getLeadHistoricalAdmissionNumber(lead);
+  const isMarkedConverted = lead.stage === 'Converted' || lead.stage === 'Enrolled';
+
+  // 1. Live Admission exists
+  if (matchingAdmission) {
+    if (matchingAdmission.status === 'Cancelled') {
+      return {
+        status: 'cancelled',
+        matchingAdmission,
+        admissionNumber: matchingAdmission.admission_number,
+        historicalReference: historicalRef,
+        isIntegrityError: false,
+        message: `Linked admission ${matchingAdmission.admission_number} is cancelled.`,
+      };
+    }
+    return {
+      status: 'active',
+      matchingAdmission,
+      admissionNumber: matchingAdmission.admission_number,
+      historicalReference: historicalRef,
+      isIntegrityError: false,
+      message: `Active linked admission ${matchingAdmission.admission_number}.`,
+    };
+  }
+
+  // 2. Marked as Converted, but no live admission exists
+  if (isMarkedConverted) {
+    // Check if supported by documented cleanup / archival evidence
+    if (historicalRef && verifiedHistoricalList.includes(historicalRef)) {
+      return {
+        status: 'historical',
+        historicalReference: historicalRef,
+        isIntegrityError: false,
+        message: `Historical conversion reference ${historicalRef} verified from 25-Nov cleanup evidence.`,
+      };
+    }
+
+    // Explicit archival status on lead if present
+    if ((lead as any).conversion_status === 'historical' && (lead as any).archival_reason) {
+      return {
+        status: 'historical',
+        historicalReference: historicalRef,
+        isIntegrityError: false,
+        message: `Historical conversion verified: ${(lead as any).archival_reason}`,
+      };
+    }
+
+    // Otherwise: this is an unexpected missing admission -> INTEGRITY ERROR
+    return {
+      status: 'integrity_error',
+      historicalReference: historicalRef,
+      isIntegrityError: true,
+      message: `INTEGRITY ERROR: Lead ${lead.lead_code || lead.id} is marked Converted but has no linked admission and no verified archival evidence.`,
+    };
+  }
+
+  // 3. Unconverted lead
+  return {
+    status: 'unconverted',
+    isIntegrityError: false,
+    message: 'Lead is not converted.',
+  };
 }
 
 /**
@@ -460,7 +607,12 @@ export async function updateLeadDetails(
   }
 
   requireCrmActor(actor);
-  if ('created_by' in updates || 'tenant_id' in updates || 'id' in updates || 'created_at' in updates) throw new Error('Forbidden: Immutable lead fields.');
+  if ('created_by' in updates || 'tenant_id' in updates || 'id' in updates || 'created_at' in updates) {
+    throw new Error('Forbidden: Immutable lead fields.');
+  }
+  if ('payment_id' in updates || 'admission_id' in updates || 'fee' in updates || 'amount' in updates) {
+    throw new Error('Forbidden: Financial and admission mutations are not permitted via lead update.');
+  }
   const expectedUpdatedAt = (updates as any).expected_updated_at;
   updates = leadFields.partial().parse(updates);
   const lead = await authorizedLead(leadId, actor);
@@ -468,6 +620,9 @@ export async function updateLeadDetails(
     concurrencyGuard.assertVersionMatch(lead, expectedUpdatedAt);
   }
   const scope = await resolveLeadScope(actor);
+  if (scope.actor.role === 'counsellor' && updates.counsellor_id !== undefined && updates.counsellor_id !== lead.counsellor_id) {
+    throw new Error('Forbidden: Counsellors cannot reassign leads.');
+  }
   await validateLeadAssignment(updates.counsellor_id, scope.actor);
 
   const country_code = updates.country_code || lead.country_code || '+91';
@@ -531,53 +686,156 @@ export async function updateLeadDetails(
     }
   }
   if (updates.interested_course_id !== undefined) {
-    lead.interested_course_id = updates.interested_course_id;
-    const course = (store.courses || []).find((c) => c.id === updates.interested_course_id || matchesCourseId(c.id, updates.interested_course_id));
+    if (updates.interested_course_id && updates.interested_course_id.trim() !== '') {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updates.interested_course_id.trim());
+      if (!isUUID) {
+        throw new Error('Invalid course ID format. Must be a valid UUID or empty.');
+      }
+      lead.interested_course_id = updates.interested_course_id.trim();
+    } else {
+      lead.interested_course_id = '';
+    }
+    const course = (store.courses || []).find((c) => c.id === lead.interested_course_id || matchesCourseId(c.id, lead.interested_course_id));
     lead.interested_course_name = course?.course_name;
   }
   if (updates.current_status !== undefined) lead.current_status = updates.current_status;
   if (updates.training_preference !== undefined) lead.training_preference = updates.training_preference;
   if (updates.lead_source !== undefined) lead.lead_source = updates.lead_source;
   if (updates.counsellor_id !== undefined) {
-    lead.counsellor_id = updates.counsellor_id;
-    const counsellor = (store.users || []).find((u) => u.id === updates.counsellor_id);
+    if (updates.counsellor_id && updates.counsellor_id.trim() !== '') {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updates.counsellor_id.trim());
+      if (!isUUID) {
+        throw new Error('Invalid counsellor ID format. Must be a valid UUID or empty.');
+      }
+      if (actor?.role === 'counsellor' && updates.counsellor_id.trim() !== lead.counsellor_id) {
+        throw new Error('Forbidden: Counsellors cannot reassign lead ownership.');
+      }
+      lead.counsellor_id = updates.counsellor_id.trim();
+    } else {
+      if (actor?.role === 'counsellor' && lead.counsellor_id) {
+        throw new Error('Forbidden: Counsellors cannot unassign lead ownership.');
+      }
+      lead.counsellor_id = undefined;
+    }
+    const counsellor = (store.users || []).find((u) => u.id === lead.counsellor_id);
     lead.counsellor_name = counsellor?.full_name;
   }
-  if (updates.notes !== undefined) lead.notes = updates.notes;
-  if (updates.experience !== undefined) lead.experience = updates.experience;
-  if (updates.dob !== undefined) lead.dob = updates.dob;
+  const historicalRef = (lead as any).historical_admission_reference || getLeadHistoricalAdmissionNumber(lead);
+  if (updates.notes !== undefined) {
+    let sanitizedNotes = updates.notes;
+    // Preclude forgery: if lead is not converted, strip any user-injected "Converted to Admission" strings
+    if (lead.stage !== 'Converted' && lead.stage !== 'Enrolled' && updates.stage !== 'Converted' && updates.stage !== 'Enrolled') {
+      sanitizedNotes = sanitizedNotes.replace(/Converted to Admission:\s*ADM-[\w-]+/gi, '').trim();
+    }
+    lead.notes = sanitizedNotes;
+    // Always preserve historical admission reference if lead was previously converted
+    if (historicalRef && !lead.notes.includes(historicalRef)) {
+      const refNote = `Converted to Admission: ${historicalRef}`;
+      lead.notes = lead.notes ? `${lead.notes}\n${refNote}` : refNote;
+    }
+  }
+  if (updates.experience !== undefined) {
+    lead.experience = updates.experience;
+    if (updates.experience_years === undefined) {
+      const exp = updates.experience.trim();
+      const expMap: Record<string, number> = {
+        'Fresher': 0,
+        '0–2 Years': 1,
+        '0-2 Years': 1,
+        '2–5 Years': 3,
+        '2-5 Years': 3,
+        '5+ Years': 5,
+        '5-8 Years': 6,
+        '8+ Years': 9,
+        '10+ Years': 10,
+      };
+      if (exp in expMap) {
+        lead.experience_years = expMap[exp];
+      } else {
+        const match = exp.match(/^(\d+)/);
+        if (match) {
+          lead.experience_years = parseInt(match[1], 10);
+        } else if (exp.toLowerCase().includes('fresh')) {
+          lead.experience_years = 0;
+        } else {
+          lead.experience_years = undefined;
+        }
+      }
+    }
+  }
+  if (updates.dob !== undefined) {
+    if (updates.dob && updates.dob.trim()) {
+      const d = new Date(updates.dob);
+      if (isNaN(d.getTime())) {
+        throw new Error('Invalid date format for date of birth.');
+      }
+      lead.dob = updates.dob.trim();
+    } else {
+      lead.dob = undefined;
+    }
+  }
   if (updates.address !== undefined) lead.address = updates.address;
   if (updates.experience_years !== undefined) lead.experience_years = updates.experience_years;
   if (updates.education !== undefined) lead.education = updates.education;
   // NOTE: do NOT modify lead.stage unless updates.stage is explicitly provided!
-  if (updates.stage !== undefined) lead.stage = updates.stage;
+  if (updates.stage !== undefined) {
+    if (lead.stage === 'Converted' && updates.stage !== 'Converted') {
+      throw new Error('Forbidden: Cannot alter stage of a converted lead through candidate details.');
+    }
+    lead.stage = updates.stage;
+  }
 
   lead.updated_at = new Date().toISOString();
-  if (updates.follow_up_date !== undefined) lead.follow_up_date = updates.follow_up_date || undefined;
-  if (updates.demo_date !== undefined) lead.demo_date = updates.demo_date;
+  if (updates.follow_up_date !== undefined) {
+    if (updates.follow_up_date && updates.follow_up_date.trim()) {
+      const d = new Date(updates.follow_up_date);
+      if (isNaN(d.getTime())) {
+        throw new Error('Invalid date format for follow-up date.');
+      }
+      lead.follow_up_date = d.toISOString();
+    } else {
+      lead.follow_up_date = undefined;
+    }
+  }
+  if (updates.demo_date !== undefined) {
+    if (updates.demo_date && updates.demo_date.trim()) {
+      const d = new Date(updates.demo_date);
+      if (isNaN(d.getTime())) {
+        throw new Error('Invalid date format for demo date.');
+      }
+      lead.demo_date = d.toISOString();
+    } else {
+      lead.demo_date = undefined;
+    }
+  }
   if (updates.demo_preference !== undefined) lead.demo_preference = updates.demo_preference;
   if (isLiveSupabaseEnabled()) {
       const supabase = createAdminClient();
-      let updateQuery = supabase.from('leads').update({
+      const payload: Record<string, any> = {
         full_name: lead.full_name,
         phone: lead.phone,
         country_code: lead.country_code || '+91',
         whatsapp_number: lead.whatsapp_number,
         whatsapp_country_code: lead.whatsapp_country_code || '+91',
         email: lead.email,
-        interested_course_id: lead.interested_course_id,
+        interested_course_id: lead.interested_course_id || null,
         current_status: lead.current_status,
         training_preference: lead.training_preference,
         lead_source: lead.lead_source,
-        counsellor_id: lead.counsellor_id,
+        counsellor_id: lead.counsellor_id || null,
         notes: lead.notes,
         stage: lead.stage,
-        follow_up_date: lead.follow_up_date || null,
-        demo_date: lead.demo_date || null,
-        demo_preference: lead.demo_preference,
-        experience_years: lead.experience_years,
+        demo_preference: Boolean(lead.demo_preference),
+        experience_years: typeof lead.experience_years === 'number' && !isNaN(lead.experience_years) ? lead.experience_years : null,
         updated_at: lead.updated_at,
-      }).eq('id', leadId);
+      };
+      if (updates.follow_up_date !== undefined) payload.follow_up_date = lead.follow_up_date || null;
+      if (updates.demo_date !== undefined) payload.demo_date = lead.demo_date || null;
+      if (updates.dob !== undefined) payload.dob = lead.dob || null;
+      if (updates.address !== undefined) payload.address = lead.address || null;
+      if (updates.education !== undefined) payload.education = lead.education || null;
+
+      let updateQuery = supabase.from('leads').update(payload).eq('id', leadId);
 
       // Atomic SQL conditional update: check version timestamp directly in database query
       if (expectedUpdatedAt) {
@@ -585,7 +843,10 @@ export async function updateLeadDetails(
       }
 
       const result = await scopeLeadQuery(updateQuery, scope).select('id, updated_at');
-      if (result.error) throw new Error('CRM update failed.');
+      if (result.error) {
+        console.error('[CRM updateLeadDetails] Supabase update error:', result.error);
+        throw new Error(`CRM update failed: ${result.error.message || 'Database rejected update.'}`);
+      }
       if (!result.data || result.data.length === 0) {
         // Row was modified by another user or deleted concurrently
         const fresh = await supabase.from('leads').select('id, updated_at').eq('id', leadId).maybeSingle();

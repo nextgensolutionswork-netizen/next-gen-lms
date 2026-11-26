@@ -43,7 +43,16 @@ export const localTeamMembers: { tenant_id: string; leader_id: string; member_id
 
 export function scopeLeadQuery(query: any, scope: LeadScope): any {
   query = query.eq('tenant_id', scope.actor.tenant_id);
-  return scope.creatorIds === null ? query : query.in('created_by', scope.creatorIds);
+  if (scope.creatorIds === null) return query;
+
+  if (scope.actor.role === 'counsellor') {
+    return query.or(`counsellor_id.eq.${scope.actor.id},and(counsellor_id.is.null,created_by.eq.${scope.actor.id})`);
+  }
+  if (scope.actor.role === 'counsellor_lead' && scope.creatorIds && scope.creatorIds.length > 0) {
+    const ids = scope.creatorIds.join(',');
+    return query.or(`counsellor_id.in.(${ids}),and(counsellor_id.is.null,created_by.in.(${ids}))`);
+  }
+  return query.in('created_by', scope.creatorIds);
 }
 
 export async function authorizedLead(id: string, actor: UserProfile): Promise<Lead> {

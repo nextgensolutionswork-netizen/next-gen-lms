@@ -1,4 +1,5 @@
 import { authorizedLead } from './lead-security';
+import { VERIFIED_HISTORICAL_LEAD_MAP } from './crm-service';
 import { onTransactionCommit } from './payment-workflow-transaction';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
@@ -361,6 +362,14 @@ export async function createAdmissionWorkflow(
         receipt: existingReceipt,
         lead,
       };
+    }
+
+    const lead = store.leads.find((l) => l.id === input.lead_id);
+    if (lead) {
+      const histRef = (lead as any).historical_admission_reference || (VERIFIED_HISTORICAL_LEAD_MAP as any)[lead.id];
+      if (histRef) {
+        throw new Error(`This lead was already converted to historical admission ${histRef}. Duplicate conversion is not permitted.`);
+      }
     }
   }
 
@@ -834,7 +843,7 @@ export async function createAdmissionWorkflow(
 
     if (isLiveSupabaseEnabled() && transactional) {
       const targetLeadId = input.lead_id;
-      const targetAdmNumber = admission_number;
+      const targetNotes = lead.notes;
       onTransactionCommit(async () => {
         try {
           const supabase = createAdminClient();
@@ -842,7 +851,7 @@ export async function createAdmissionWorkflow(
             .from('leads')
             .update({
               stage: 'Converted',
-              notes: `Converted to Admission: ${targetAdmNumber}`,
+              notes: targetNotes,
               updated_at: new Date().toISOString(),
             })
             .eq('id', targetLeadId);

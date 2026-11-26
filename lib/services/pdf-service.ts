@@ -103,8 +103,8 @@ export async function generateReceiptPdfBuffer(receipt: Receipt): Promise<Buffer
       doc.fillColor('#475569').font('Helvetica').fontSize(8.5).text(finalAddress, textStartX, 63, { width: textWidth, lineGap: 1.5 });
 
       const phone = resolveInstitutePhone(receipt.institute_phone);
-      const gst = receipt.institute_gst;
-      const contactLine = [phone ? 'Phone: ' + phone : '', gst ? 'GST: ' + gst : ''].filter(Boolean).join('  |  ');
+      // Fee receipts are non-tax payment acknowledgements and must not print GST/tax details
+      const contactLine = phone ? `Phone: ${phone}` : '';
       if (contactLine) {
         doc.fillColor('#64748B').fontSize(8).text(contactLine, textStartX, doc.y + 2, { width: textWidth });
       }

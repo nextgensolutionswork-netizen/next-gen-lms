@@ -18,6 +18,8 @@ import {
   ShieldAlert,
   Edit2,
   CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,7 @@ import {
   bulkUpdateLeadStage,
   getLeadAdmission,
   getLeadHistoricalAdmissionNumber,
+  classifyLeadConversion,
   isLeadConverted,
 } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -96,19 +99,63 @@ export default function LeadsPage() {
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
   const [search, setSearch] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const [selectedStage, setSelectedStage] = React.useState<string>('All');
   const [selectedTrainingMode, setSelectedTrainingMode] = React.useState<string>('All');
   const [selectedSource, setSelectedSource] = React.useState<string>('All');
   const [summary, setSummary] = React.useState<any>(null);
   const visibleSummary = summary?.owner === user?.id ? summary : null;
+
   React.useEffect(() => {
-    let active = true;
-    const params = new URLSearchParams({ search, stage: selectedStage, training_preference: selectedTrainingMode === 'All' ? '' : selectedTrainingMode, lead_source: selectedSource === 'All' ? '' : selectedSource, created_by: creatorFilter, counsellor_id: salespersonFilter, course_id: courseFilter, team_id: teamFilter, from: dateFrom, to: dateTo });
-    fetch('/api/crm/summary?' + params, { cache: 'no-store' }).then(r => r.json()).then(data => {
-      if (active && data.success) setSummary({ ...data, owner: user?.id });
-    }).catch(() => { if (active) setSummary(null); });
-    return () => { active = false; };
-  }, [user?.id, role, leadSnapshot, creatorFilter, salespersonFilter, courseFilter, teamFilter, dateFrom, dateTo, search, selectedStage, selectedTrainingMode, selectedSource]);
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      search: debouncedSearch.trim(),
+      stage: selectedStage,
+      training_preference: selectedTrainingMode === 'All' ? '' : selectedTrainingMode,
+      lead_source: selectedSource === 'All' ? '' : selectedSource,
+      created_by: creatorFilter,
+      counsellor_id: salespersonFilter,
+      course_id: courseFilter,
+      team_id: teamFilter,
+      from: dateFrom,
+      to: dateTo,
+    });
+    fetch('/api/crm/summary?' + params, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setSummary({ ...data, owner: user?.id });
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setSummary(null);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [
+    user?.id,
+    role,
+    leadSnapshot.rows.length,
+    creatorFilter,
+    salespersonFilter,
+    courseFilter,
+    teamFilter,
+    dateFrom,
+    dateTo,
+    debouncedSearch,
+    selectedStage,
+    selectedTrainingMode,
+    selectedSource,
+  ]);
   const scopeLabel = role === 'counsellor' ? 'My' : role === 'counsellor_lead' ? 'My Team' : 'All';
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -282,6 +329,8 @@ export default function LeadsPage() {
   const [editExperience, setEditExperience] = React.useState('');
   const [editDob, setEditDob] = React.useState('');
   const [editAddress, setEditAddress] = React.useState('');
+  const [isSavingDetails, setIsSavingDetails] = React.useState(false);
+  const [saveDetailsError, setSaveDetailsError] = React.useState('');
 
   // Follow-up notes update state
   const [updateNotes, setUpdateNotes] = React.useState('');
@@ -444,16 +493,49 @@ export default function LeadsPage() {
     setEditExperience(lead.experience || (lead.current_status === 'Fresher' ? 'Fresher' : '0–2 Years'));
     setEditDob(lead.dob || '');
     setEditAddress(lead.address || '');
+    setIsSavingDetails(false);
+    setSaveDetailsError('');
   }, []);
 
   const refreshLeads = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetched = await getLeads({ stage: selectedStage as LeadStage, search: search.trim() || undefined, created_by: creatorFilter, counsellor_id: salespersonFilter, course_id: courseFilter, from: dateFrom, to: dateTo, team_id: teamFilter });
-      setLeadSnapshot({ owner: user?.id, rows: fetched.filter(l => (selectedTrainingMode === 'All' || l.training_preference === selectedTrainingMode)
-        && (selectedSource === 'All' || l.lead_source === selectedSource)) });
-    } catch { setLeadSnapshot({ owner: user?.id, rows: [] }); } finally { setIsLoading(false); }
-  }, [search, selectedStage, selectedTrainingMode, selectedSource, user, creatorFilter, salespersonFilter, courseFilter, dateFrom, dateTo, teamFilter]);
+      const fetched = await getLeads({
+        stage: selectedStage as LeadStage,
+        search: debouncedSearch.trim() || undefined,
+        created_by: creatorFilter,
+        counsellor_id: salespersonFilter,
+        course_id: courseFilter,
+        from: dateFrom,
+        to: dateTo,
+        team_id: teamFilter,
+      });
+      setLeadSnapshot({
+        owner: user?.id,
+        rows: fetched.filter(
+          (l) =>
+            (selectedTrainingMode === 'All' || l.training_preference === selectedTrainingMode) &&
+            (selectedSource === 'All' || l.lead_source === selectedSource)
+        ),
+      });
+    } catch {
+      setLeadSnapshot({ owner: user?.id, rows: [] });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    debouncedSearch,
+    selectedStage,
+    selectedTrainingMode,
+    selectedSource,
+    user,
+    creatorFilter,
+    salespersonFilter,
+    courseFilter,
+    dateFrom,
+    dateTo,
+    teamFilter,
+  ]);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -663,7 +745,8 @@ export default function LeadsPage() {
   };
 
   const handleSaveLeadDetails = async () => {
-    if (!selectedLead || !user) return;
+    if (!selectedLead || !user || isSavingDetails) return;
+    setSaveDetailsError('');
 
     const pCheck = validatePhoneNumber(editCountryCode, editPhone, 'Mobile number');
     if (!pCheck.isValid) {
@@ -691,8 +774,9 @@ export default function LeadsPage() {
     }
     setEditEmailError('');
 
+    setIsSavingDetails(true);
     try {
-      await updateLeadDetails(
+      const updatedLead = await updateLeadDetails(
         selectedLead.id,
         {
           full_name: editFullName.trim(),
@@ -701,11 +785,11 @@ export default function LeadsPage() {
           whatsapp_country_code: finalWaCountry,
           whatsapp_number: finalWaNumber.trim(),
           email: editEmail.trim(),
-          interested_course_id: editCourseId,
+          interested_course_id: editCourseId || undefined,
           current_status: editCurrentStatus,
           training_preference: editTrainingPref,
           lead_source: editSource,
-          counsellor_id: editCounsellorId,
+          counsellor_id: editCounsellorId || undefined,
           notes: editNotes,
           experience: editExperience.trim() || undefined,
           dob: editDob.trim() || undefined,
@@ -715,10 +799,17 @@ export default function LeadsPage() {
         user.id
       );
 
+      // Optimistically update the local row
+      setLeadSnapshot((prev) => ({
+        owner: prev.owner,
+        rows: prev.rows.map((r) => (r.id === updatedLead.id ? updatedLead : r)),
+      }));
+
       setSelectedLead(null);
-      void refreshLeads();
     } catch (err: any) {
-      alert(err?.message || 'Failed to update lead details');
+      setSaveDetailsError(err?.message || 'Failed to update lead details');
+    } finally {
+      setIsSavingDetails(false);
     }
   };
 
@@ -988,9 +1079,12 @@ export default function LeadsPage() {
           <Card key={key} className="p-3">
             <p className="text-xs text-slate-500">{scopeLabel} {['Leads', 'New Leads', 'Follow-ups', 'Pending Leads', 'Converted Leads', 'Conversion Rate'][index]}</p>
             <p className="text-xl font-semibold">{visibleSummary?.metrics?.[key] ?? '—'}{key === 'conversionRate' ? '%' : ''}</p>
-            {key === 'converted' && Boolean(visibleSummary?.metrics?.historicalConversions) && (
+            {key === 'converted' && (Boolean(visibleSummary?.metrics?.historicalConversions) || Boolean(visibleSummary?.metrics?.integrityErrors)) && (
               <p className="text-[10px] text-slate-500 mt-0.5">
-                {visibleSummary?.metrics?.activeConversions ?? 0} active · {visibleSummary?.metrics?.historicalConversions} archived
+                {visibleSummary?.metrics?.activeConversions ?? 0} active · {visibleSummary?.metrics?.historicalConversions ?? 0} archived
+                {Boolean(visibleSummary?.metrics?.integrityErrors) && (
+                  <span className="text-rose-600 font-semibold"> · {visibleSummary.metrics.integrityErrors} discrepancies</span>
+                )}
               </p>
             )}
           </Card>
@@ -1188,10 +1282,8 @@ export default function LeadsPage() {
                   </tr>
                 ) : (
                   leads.map((lead) => {
+                    const conversionInfo = classifyLeadConversion(lead, store.admissions);
                     const isSelected = selectedLeadIds.includes(lead.id);
-                    const matchingAdmission = getLeadAdmission(lead, store.admissions);
-                    const historicalAdmNo = getLeadHistoricalAdmissionNumber(lead);
-                    const isConverted = lead.stage === 'Converted' || lead.stage === 'Enrolled' || Boolean(matchingAdmission);
                     const waCode = lead.whatsapp_country_code || lead.country_code || '+91';
                     const waNum = lead.whatsapp_number || lead.phone;
                     const waDigits = getCanonicalPhoneDigits(waCode, waNum);
@@ -1257,23 +1349,43 @@ export default function LeadsPage() {
                         </td>
                         <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <div>
-                            {matchingAdmission ? (
+                            {conversionInfo.status === 'active' && conversionInfo.matchingAdmission ? (
                               <div className="flex flex-col gap-0.5">
                                 <Badge variant="success" className="whitespace-nowrap font-medium">Converted</Badge>
                                 <span className="text-[10px] text-emerald-700 font-semibold">
-                                  {matchingAdmission.admission_number}
+                                  {conversionInfo.admissionNumber}
                                 </span>
                               </div>
-                            ) : isConverted ? (
+                            ) : conversionInfo.status === 'historical' ? (
                               <div className="flex flex-col gap-0.5">
                                 <Badge variant="warning" className="whitespace-nowrap font-medium text-amber-800 bg-amber-50 border border-amber-200">
                                   Historical Conversion
                                 </Badge>
-                                {historicalAdmNo && (
+                                {conversionInfo.historicalReference && (
                                   <span className="text-[10px] text-slate-500 font-medium">
-                                    Ref: {historicalAdmNo}
+                                    Ref: {conversionInfo.historicalReference}
                                   </span>
                                 )}
+                              </div>
+                            ) : conversionInfo.status === 'cancelled' ? (
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant="outline" className="whitespace-nowrap font-medium text-slate-600 bg-slate-50 border-slate-300">
+                                  Conversion Cancelled
+                                </Badge>
+                                {conversionInfo.admissionNumber && (
+                                  <span className="text-[10px] text-slate-400 line-through">
+                                    {conversionInfo.admissionNumber}
+                                  </span>
+                                )}
+                              </div>
+                            ) : conversionInfo.status === 'integrity_error' ? (
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant="destructive" className="whitespace-nowrap font-semibold bg-rose-100 text-rose-800 border-rose-300">
+                                  Integrity Error
+                                </Badge>
+                                <span className="text-[10px] text-rose-600 font-medium">
+                                  Missing Admission
+                                </span>
                               </div>
                             ) : (
                               getStageBadge(lead.stage)
@@ -1301,24 +1413,38 @@ export default function LeadsPage() {
                                 Edit
                               </Button>
                             )}
-                            {matchingAdmission?.admission_number ? (
+                            {conversionInfo.status === 'active' && conversionInfo.matchingAdmission?.admission_number ? (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  router.push(`/admissions?search=${encodeURIComponent(matchingAdmission.admission_number)}`);
+                                  router.push(`/admissions?search=${encodeURIComponent(conversionInfo.matchingAdmission!.admission_number)}`);
                                 }}
                                 className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-800 border-blue-200 hover:bg-blue-50 font-medium"
-                                title={`View live admission record ${matchingAdmission.admission_number}`}
+                                title={`View live admission record ${conversionInfo.matchingAdmission.admission_number}`}
                               >
                                 View Admission
                               </Button>
-                            ) : isConverted ? (
+                            ) : conversionInfo.status === 'historical' ? (
                               <span
                                 className="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200"
-                                title={historicalAdmNo ? `Archived admission reference: ${historicalAdmNo}. Admission record was archived during historical cleanup.` : 'Historical conversion record (admission archived)'}
+                                title={conversionInfo.historicalReference ? `Archived admission reference: ${conversionInfo.historicalReference}. Original admission record was removed during historical cleanup.` : 'Historical conversion record (admission archived)'}
                               >
-                                Archived{historicalAdmNo ? ` (${historicalAdmNo})` : ''}
+                                Archived{conversionInfo.historicalReference ? ` (${conversionInfo.historicalReference})` : ''}
+                              </span>
+                            ) : conversionInfo.status === 'cancelled' ? (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200"
+                                title="Admission was cancelled per approved policy"
+                              >
+                                Cancelled
+                              </span>
+                            ) : conversionInfo.status === 'integrity_error' ? (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200"
+                                title="Integrity Warning: Converted stage has no live admission and no verified archival record."
+                              >
+                                Data Discrepancy
                               </span>
                             ) : (
                               canConvert && (
@@ -1949,17 +2075,31 @@ export default function LeadsPage() {
                   </span>
                 </div>
 
+                {saveDetailsError && (
+                  <div className="p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                    <span>{saveDetailsError}</span>
+                  </div>
+                )}
+
                 <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-                  <Button variant="outline" size="sm" onClick={() => setSelectedLead(null)}>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedLead(null)} disabled={isSavingDetails}>
                     Cancel
                   </Button>
                   <Button
                     variant="sap"
                     size="sm"
                     onClick={handleSaveLeadDetails}
-                    disabled={Boolean(editPhoneError || editWaError)}
+                    disabled={isSavingDetails || Boolean(editPhoneError || editWaError)}
                   >
-                    Save Candidate Details
+                    {isSavingDetails ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        Saving Details...
+                      </>
+                    ) : (
+                      'Save Candidate Details'
+                    )}
                   </Button>
                 </div>
               </div>

@@ -167,9 +167,13 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
     if (userIndex < 0) store.users.push(actor); else store.users[userIndex] = actor;
     const before = Object.fromEntries(workflowKeys.map((key) => [key, structuredClone(store[key])]));
     const originalPersist = store.persist;
-    store.persist = () => {}; // no intermediate durable snapshots
-    const postCommitTasks: Array<() => Promise<void>> = [];
-    currentPostCommitTasks = postCommitTasks;
+    const previousPostCommitTasks = currentPostCommitTasks;
+    let postCommitTasks: Array<() => Promise<void>> | null = null;
+    if (!readOnly) {
+      store.persist = () => {}; // no intermediate durable snapshots
+      postCommitTasks = [];
+      currentPostCommitTasks = postCommitTasks;
+    }
     try {
       const result = await operation();
       if (!readOnly) {
@@ -182,22 +186,28 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
         } else if (!store.persistSync()) {
           throw new Error('Payment storage failed; no changes were committed.');
         }
-      }
-      currentPostCommitTasks = null;
-      for (const task of postCommitTasks) {
-        try {
-          await task();
-        } catch (taskErr) {
-          console.warn('Post-commit task execution error:', taskErr);
+        currentPostCommitTasks = previousPostCommitTasks;
+        if (postCommitTasks) {
+          for (const task of postCommitTasks) {
+            try {
+              await task();
+            } catch (taskErr) {
+              console.warn('Post-commit task execution error:', taskErr);
+            }
+          }
         }
       }
       return result;
     } catch (error) {
-      currentPostCommitTasks = null;
-      Object.assign(store, before);
+      if (!readOnly) {
+        currentPostCommitTasks = previousPostCommitTasks;
+        Object.assign(store, before);
+      }
       throw error;
     } finally {
-      store.persist = originalPersist;
+      if (!readOnly) {
+        store.persist = originalPersist;
+      }
     }
   });
   if (!readOnly) {

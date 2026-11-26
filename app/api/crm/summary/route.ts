@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
-import { getLeads, getLeadAdmission } from '@/lib/services/crm-service';
+import { getLeads, getLeadAdmission, classifyLeadConversion } from '@/lib/services/crm-service';
 import { resolveLeadScope } from '@/lib/services/lead-security';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
@@ -32,19 +32,28 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+    const leadClassifications = leads.map(l => ({ lead: l, ...classifyLeadConversion(l, store.admissions) }));
     const converted = leads.filter(l => ['Converted', 'Enrolled'].includes(l.stage)).length;
-    const activeConversions = leads.filter(l => ['Converted', 'Enrolled'].includes(l.stage) && Boolean(getLeadAdmission(l, store.admissions))).length;
-    const historicalConversions = Math.max(0, converted - activeConversions);
+    const activeConversions = leadClassifications.filter(c => c.status === 'active').length;
+    const historicalConversions = leadClassifications.filter(c => c.status === 'historical').length;
+    const cancelledConversions = leadClassifications.filter(c => c.status === 'cancelled').length;
+    const integrityErrors = leadClassifications.filter(c => c.status === 'integrity_error').length;
     const performance = users.map(u => {
-      const uLeads = leads.filter(l => l.created_by === u.id);
+      const uLeads = leads.filter(l => l.counsellor_id === u.id || (l.created_by === u.id && !l.counsellor_id));
+      const uClassified = uLeads.map(l => ({ lead: l, ...classifyLeadConversion(l, store.admissions) }));
       const uConverted = uLeads.filter(l => ['Converted', 'Enrolled'].includes(l.stage)).length;
-      const uActive = uLeads.filter(l => ['Converted', 'Enrolled'].includes(l.stage) && Boolean(getLeadAdmission(l, store.admissions))).length;
+      const uActive = uClassified.filter(c => c.status === 'active').length;
+      const uHistorical = uClassified.filter(c => c.status === 'historical').length;
+      const uCancelled = uClassified.filter(c => c.status === 'cancelled').length;
+      const uIntegrity = uClassified.filter(c => c.status === 'integrity_error').length;
       return {
         ...u,
         total: uLeads.length,
         converted: uConverted,
         activeConversions: uActive,
-        historicalConversions: Math.max(0, uConverted - uActive),
+        historicalConversions: uHistorical,
+        cancelledConversions: uCancelled,
+        integrityErrors: uIntegrity,
       };
     });
     return NextResponse.json({ success: true, users, teams, performance, metrics: {
@@ -54,7 +63,10 @@ export async function GET(request: NextRequest) {
       converted,
       activeConversions,
       historicalConversions,
+      cancelledConversions,
+      integrityErrors,
       conversionRate: leads.length ? Math.round(converted / leads.length * 100) : 0,
+      activeAdmissionRatio: leads.length ? Math.round(activeConversions / leads.length * 100) : 0,
     } }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'CRM summary unavailable.';

@@ -5,7 +5,7 @@ export const leadFields = z.object({
   country_code: z.string().max(10).optional(), whatsapp_country_code: z.string().max(10).optional(), whatsapp_number: z.string().max(50).optional(),
   interested_course_id: z.string().max(100).optional(), current_status: z.string().max(100).optional(),
   education: z.string().max(500).optional(), experience_years: z.number().min(0).max(100).optional(),
-  experience: z.string().trim().min(1).max(100).optional(),
+  experience: z.string().max(100).optional(),
   dob: z.string().max(50).optional(),
   address: z.string().max(1000).optional(),
   training_preference: z.enum(['Online', 'Offline', 'Classroom', 'Hybrid']).optional(),

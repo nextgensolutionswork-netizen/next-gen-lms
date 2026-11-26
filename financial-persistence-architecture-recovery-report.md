@@ -108,3 +108,16 @@ ON CONFLICT (id) DO NOTHING;
 ## Final QA & Production Continuity Addendum (2026-11-26)
 - **Production Recovery Verified (`tgohtdzwehhjfahtgovq`):** `ADM-2026-0025` (`NGERP-2026-00001`) and subsequent live `ADM-2026-0026` (`NGERP-2026-00002`) both reside in normalized PostgreSQL tables (`admissions=2, students=2, student_fee_accounts=2, payments=2, receipts=0, workflow_rev=39`), with 0 discrepancies across 7 internal reconciliation levels and 0 historical cleaned records restored.
 - **Full QA Report:** See [task-03-final-qa-acceptance-report.md](task-03-final-qa-acceptance-report.md).
+
+
+---
+
+## TASK-03 Revalidation on `95f392b` (2026-11-26)
+- Verified `ADM-2026-0025` (`NGERP-2026-00001`) and `ADM-2026-0026` (`NGERP-2026-00002`) remain intact (`₹43,000` combined pending, `receipts=0`, `wf_rev=39`) with `0` discrepancies on `tgohtdzwehhjfahtgovq`.
+
+
+---
+
+## TASK-03 Final Closure Verification (2026-11-26)
+- **Production DB (`tgohtdzwehhjfahtgovq`):** `ADM-2026-0025` (`NGERP-2026-00001`) and `ADM-2026-0026` (`NGERP-2026-00002`) remain intact (`₹43,000` combined pending, `receipts=0`, `expenses=0`, `wf_rev=39`).
+- **Closure Suite & Full Regression:** `tests/task-03-final-closure-risks.test.ts` (`4/4`), full Vitest (`2,132/2,139` passed across `124/130` files, `0` financial failures). See [task-03-final-qa-acceptance-report.md](task-03-final-qa-acceptance-report.md).

@@ -18,9 +18,22 @@ export function leadScope(actor: UserProfile, teamCreatorIds: string[] = []): Le
     : actor.role === 'counsellor_lead' ? [...new Set([actor.id, ...teamCreatorIds])] : [actor.id] };
 }
 
-export function canAccessLead(scope: LeadScope, lead?: Pick<Lead, 'created_by' | 'tenant_id'> | null): boolean {
-  return Boolean(lead && tenantId(lead) === tenantId(scope.actor) &&
-    (scope.creatorIds === null || (lead.created_by && scope.creatorIds.includes(lead.created_by))));
+export function canAccessLead(scope: LeadScope, lead?: Pick<Lead, 'created_by' | 'counsellor_id' | 'tenant_id'> | null): boolean {
+  if (!lead) return false;
+  if (tenantId(lead) !== tenantId(scope.actor)) return false;
+  if (scope.creatorIds === null) return true;
+
+  if (scope.actor.role === 'counsellor') {
+    if (lead.counsellor_id) return lead.counsellor_id === scope.actor.id;
+    return Boolean(lead.created_by && lead.created_by === scope.actor.id);
+  }
+
+  if (scope.actor.role === 'counsellor_lead') {
+    if (lead.counsellor_id) return scope.creatorIds.includes(lead.counsellor_id);
+    return Boolean(lead.created_by && scope.creatorIds.includes(lead.created_by));
+  }
+
+  return false;
 }
 
 export function assertLeadAccess(scope: LeadScope, lead?: Lead | null): asserts lead is Lead {

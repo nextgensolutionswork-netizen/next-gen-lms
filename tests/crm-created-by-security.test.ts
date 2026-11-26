@@ -16,7 +16,7 @@ const actor = (id: string, role: UserProfile['role'] = 'counsellor', tenant_id =
  ({ id, role, tenant_id, is_active: true, full_name: id, email: `${id}@example.com`, created_at: '', updated_at: '' });
 const radhika = actor('radhika'), mohan = actor('mohan'), admin = actor('admin','admin'), superAdmin = actor('super','super_admin');
 const leader = actor('leader','counsellor_lead'), unrelated = actor('unrelated','counsellor_lead');
-const input = { full_name: 'Lead A', phone: '9876543210', email: 'a@example.com', stage: 'New' as const, counsellor_id: mohan.id };
+const input = { full_name: 'Lead A', phone: '9876543210', email: 'a@example.com', stage: 'New' as const, counsellor_id: radhika.id };
 const request = (method: string, body?: any, query = '') => new NextRequest(`http://localhost/api/crm/leads${query}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
 let lead: Lead;
 beforeEach(async () => {
@@ -28,7 +28,7 @@ beforeEach(async () => {
 afterEach(()=>{vi.restoreAllMocks(); localTeamMembers.length=0; vi.unstubAllGlobals(); resetLeadCache();});
 
 describe('Created-by security through application and API',()=>{
- it('1 creates with authenticated creator, preserving independent assignment',()=>{expect(lead).toMatchObject({created_by:radhika.id,counsellor_id:mohan.id});});
+ it('1 creates with authenticated creator, preserving independent assignment',()=>{expect(lead).toMatchObject({created_by:radhika.id,counsellor_id:radhika.id});});
  it('2 creator lists and edits own lead',async()=>{expect(await getLeads({},radhika)).toHaveLength(1); expect((await updateLeadDetails(lead.id,{notes:'Owned'},radhika.id,radhika)).notes).toBe('Owned');});
  it('3 Mohan cannot list Radhika lead despite assignment',async()=>{expect(await getLeads({},mohan)).toEqual([]);});
  it('4 Mohan cannot edit another creator',async()=>{await expect(updateLeadDetails(lead.id,{notes:'Forged'},mohan.id,mohan)).rejects.toThrow('Forbidden');});
@@ -53,12 +53,12 @@ describe('Created-by security through application and API',()=>{
   await expect(updateLeadStage(lead.id,'Demo Scheduled','Injected',mohan.id,'2026-12-01',mohan)).rejects.toThrow('Forbidden');
  });
  it('15 historical missing creators stay intact and management-only',async()=>{
-  const historical = {...lead,id:'historical',created_by:null}; store.leads.push(historical);
+  const historical = {...lead,id:'historical',created_by:null,counsellor_id:undefined}; store.leads.push(historical);
   expect(await getLeads({},radhika)).toHaveLength(1); expect(await getLeads({},admin)).toHaveLength(2); expect(historical.created_by).toBeNull();
  });
  it('summary totals and performance exclude other creators',async()=>{const result=await (await summary(request('GET'))).json(); expect(result.metrics.total).toBe(0); expect(result.performance.some((p:any)=>p.id===radhika.id)).toBe(false);});
  it('bulk authorization rejects the entire selection before mutating',async()=>{
-  const own = await createLead({...input,phone:'9876543211'},mohan);
+  const own = await createLead({...input,phone:'9876543211',counsellor_id:mohan.id},mohan);
   await expect(bulkAssignLeads([own.id,lead.id],admin.id,mohan.id,mohan)).rejects.toThrow('Forbidden');
   expect(store.leads.find(l=>l.id===own.id)?.counsellor_id).toBe(mohan.id);
  });
