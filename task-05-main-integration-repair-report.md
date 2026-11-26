@@ -25,3 +25,22 @@
 - **`npm run lint`:** **0 errors, 0 warnings**.
 - **`npm run build`:** **52/52 routes compiled**.
 - **Full Vitest Regression Suite (135 files):** **126/135 files passed**, **2,198/2,216 tests passed** (`18` failures = `6` pre-existing unrelated failures + `12` failures introduced by external commit `fe5ffa6` in `bug-14-rpc-admission-allocation.test.ts` (3), `crm-admissions-operations.test.ts` (3), `crm-service-role-scope.test.ts` (5), `enhancements-five-tasks.test.ts` (1)).
+
+
+---
+
+## 4. External Regression Resolution (`INT-R04` – `INT-R07`) & Final Full-Suite Pass
+
+| ID | Suite / Failing Tests | Root Cause | Resolution | Result |
+|---|---|---|---|---|
+| **INT-R04** | `tests/bug-14-rpc-admission-allocation.test.ts` (3 failures) | `createMockSupabaseAdmin` lacked `.or()` required by `scopeLeadQuery` in `lib/services/lead-security.ts:49` | Added `.or()` chaining to `makeQuery` mock | **PASS** (`13/13`) |
+| **INT-R05** | `tests/crm-admissions-operations.test.ts` (3 failures) | (1) Non-UUID `counsellorId = 'usr-counsellor-01'`; (2) `follow_up_date` normalized via `.toISOString()` in `crm-service.ts:801`; (3) `bulkUpdateLeadStage` lacked `counsellor` role restriction | (1) Deterministic UUID `33333333-...`; (2) Timezone-independent `.toISOString()` expectations; (3) Blocked `counsellor` in `bulkUpdateLeadStage` (`crm-service.ts`) | **PASS** (`17/17`) |
+| **INT-R06** | `tests/crm-service-role-scope.test.ts` (5 failures) | Test mock lacked `.or()` evaluator and asserted old `['created_by',['owner']]` instead of `scopeLeadQuery`'s `.or('counsellor_id.eq.owner,and(counsellor_id.is.null,created_by.eq.owner)')` | Added real `.or()` predicate filtering to mock and verified `['tenant_id','default']` + `['or',...]` on every read, write, and page | **PASS** (`5/5`) |
+| **INT-R07** | `tests/enhancements-five-tasks.test.ts` (`enforces mandatory Experience on lead creation`) | `createLead` in `crm-service.ts` parsed optional `experience` without rejecting explicit empty/whitespace `experience: ''` | Added explicit guard `if (data.experience !== undefined && data.experience.trim() === '') throw ...` in `crm-service.ts` | **PASS** (`13/13`) |
+
+### Final Full-Suite Result (`task-05-final-closure`)
+- **4 Repaired Suites:** **48/48 passed**.
+- **Full Vitest Suite (`npx vitest run`, 135 files):** **130/135 files passed**, **2,210/2,216 tests passed** (`99.73%`), `0` new failures, `HARDEN-PERF-01` & `HARDEN-PERF-02` both passed inside the full parallel run.
+- **`npx tsc --noEmit`:** **0 errors**.
+- **`npm run lint`:** **0 errors, 0 warnings**.
+- **`npm run build`:** **52/52 routes compiled**.
