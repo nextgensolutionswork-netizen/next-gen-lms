@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Admission } from '@/types';
 import {
   classifyAdmissionsError,
   deriveAdmissionsViewState,
   filterAdmissions,
 } from '@/lib/services/admissions-loading-state';
+import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton';
 
 const SAMPLE_ADMISSIONS = [
@@ -162,5 +163,48 @@ describe('TASK-08: Admissions Loading State, Skeleton UI & Authoritative Empty S
     expect(src).toContain('Unable to load admissions');
     expect(src).toContain('Showing previously loaded records — refresh failed');
     expect(src).toContain('aria-busy={');
+  });
+
+  describe('ADM-R05: Shared paymentWorkflowClient HTTP status & error resilience', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('attaches HTTP status for 401, 403, 409, and 500 without converting failures into empty success', async () => {
+      for (const status of [401, 403, 409, 500]) {
+        const fetchMock = vi.fn().mockResolvedValue({
+          ok: false,
+          status,
+          json: vi.fn().mockResolvedValue({ success: false, error: `HTTP ${status} failure` }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(paymentWorkflowClient.refreshAdmissions()).rejects.toMatchObject({
+          status,
+          message: `HTTP ${status} failure`,
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('handles non-JSON error bodies and network failures cleanly without automatic mutation retries', async () => {
+      const nonJsonFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token <')),
+      });
+      vi.stubGlobal('fetch', nonJsonFetch);
+
+      await expect(paymentWorkflowClient.refreshReceipts()).rejects.toMatchObject({
+        status: 502,
+        message: 'Request failed (502)',
+      });
+      expect(nonJsonFetch).toHaveBeenCalledTimes(1);
+
+      const networkFetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      vi.stubGlobal('fetch', networkFetch);
+      await expect(paymentWorkflowClient.createAdmission({} as never)).rejects.toThrow('Failed to fetch');
+      expect(networkFetch).toHaveBeenCalledTimes(1);
+    });
   });
 });
