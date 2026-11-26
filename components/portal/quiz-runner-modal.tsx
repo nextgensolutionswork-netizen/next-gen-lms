@@ -50,7 +50,7 @@ export function QuizRunnerModal({
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [evaluation, setEvaluation] = React.useState<QuizEvaluationResult | null>(null);
   const [attempt, setAttempt] = React.useState<QuizAttempt | null>(null);
-  const [startTime, setStartTime] = React.useState<number>(Date.now());
+  const [startTime, setStartTime] = React.useState<number>(() => Date.now());
   const [timeLeft, setTimeLeft] = React.useState<number>(1800); // 30 mins fallback
   const [showConfirmSubmit, setShowConfirmSubmit] = React.useState(false);
 
@@ -119,16 +119,19 @@ export function QuizRunnerModal({
   // Reset state when modal opens or quiz changes
   React.useEffect(() => {
     if (isOpen) {
-      submissionStarted.current = false;
-      setCurrentIndex(0);
-      setUserAnswers({});
-      setVisitedQuestions(new Set([0]));
-      setIsSubmitted(false);
-      setEvaluation(null);
-      setAttempt(null);
-      setShowConfirmSubmit(false);
-      setStartTime(Date.now());
-      setTimeLeft(timeLimitMinutes * 60);
+      const timer = setTimeout(() => {
+        submissionStarted.current = false;
+        setCurrentIndex(0);
+        setUserAnswers({});
+        setVisitedQuestions(new Set([0]));
+        setIsSubmitted(false);
+        setEvaluation(null);
+        setAttempt(null);
+        setShowConfirmSubmit(false);
+        setStartTime(Date.now());
+        setTimeLeft(timeLimitMinutes * 60);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, quiz?.id, timeLimitMinutes]);
 
@@ -147,11 +150,6 @@ export function QuizRunnerModal({
 
     return () => clearInterval(timer);
   }, [isOpen, isSubmitted, questions.length, startTime, timeLimitMinutes]);
-
-  // Auto-record visit when currentIndex changes
-  React.useEffect(() => {
-    setVisitedQuestions((prev) => new Set([...Array.from(prev), currentIndex]));
-  }, [currentIndex]);
 
   if (!isOpen) return null;
 
@@ -274,7 +272,10 @@ export function QuizRunnerModal({
                   return (
                     <button
                       key={q.id}
-                      onClick={() => setCurrentIndex(idx)}
+                      onClick={() => {
+                        setCurrentIndex(idx);
+                        setVisitedQuestions((prev) => new Set([...Array.from(prev), idx]));
+                      }}
                       className={`h-7 w-7 text-xs rounded-lg border transition-all flex items-center justify-center ${pillStyle}`}
                       title={`Question ${idx + 1}: ${
                         isAnswered ? 'Answered' : isVisited ? 'Visited' : 'Unvisited'
@@ -395,7 +396,11 @@ export function QuizRunnerModal({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
+                onClick={() => {
+                  const target = Math.max(currentIndex - 1, 0);
+                  setCurrentIndex(target);
+                  setVisitedQuestions((prev) => new Set([...Array.from(prev), target]));
+                }}
                 disabled={currentIndex === 0}
                 className="text-xs flex items-center space-x-1"
               >
@@ -408,7 +413,11 @@ export function QuizRunnerModal({
                   <Button
                     variant="sap"
                     size="sm"
-                    onClick={() => setCurrentIndex((prev) => Math.min(prev + 1, questions.length - 1))}
+                    onClick={() => {
+                      const target = Math.min(currentIndex + 1, questions.length - 1);
+                      setCurrentIndex(target);
+                      setVisitedQuestions((prev) => new Set([...Array.from(prev), target]));
+                    }}
                     className="text-xs flex items-center space-x-1"
                   >
                     <span>Next</span>

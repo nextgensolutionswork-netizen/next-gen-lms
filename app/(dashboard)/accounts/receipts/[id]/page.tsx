@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -205,16 +206,14 @@ export default function ReceiptPrintPage() {
           <div className="flex flex-col sm:flex-row items-start gap-4 max-w-xl">
             {/* Top-Left Company Logo */}
             <div className="shrink-0 pt-0.5">
-              <img
+              <Image
                 src="/branding/nextgen-logo.webp"
                 alt="Next-Gen ERP Solutions"
+                width={160}
+                height={48}
                 className="h-12 w-auto object-contain"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (target.src.endsWith('.webp')) {
-                    target.src = '/branding/nextgen-logo.png';
-                  }
-                }}
+                priority
+                unoptimized
               />
             </div>
             <div className="space-y-1 min-w-0">

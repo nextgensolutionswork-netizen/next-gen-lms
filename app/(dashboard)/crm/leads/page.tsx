@@ -39,6 +39,7 @@ import {
   bulkAssignLeads,
   bulkUpdateLeadStage,
   getLeadAdmission,
+  getLeadHistoricalAdmissionNumber,
   isLeadConverted,
 } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
@@ -77,6 +78,12 @@ const LEAD_SOURCE_OPTIONS: LeadSource[] = [
   'Other',
 ];
 
+function getDefaultFollowUpDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function LeadsPage() {
   const router = useRouter();
   const { user, role, hasPermission } = useAuth();
@@ -107,8 +114,6 @@ export default function LeadsPage() {
 
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
-  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
-  React.useEffect(() => { setSelectedLead(null); setSelectedLeadIds([]); setIsConvertModalOpen(false); setIsAddModalOpen(false); }, [user?.id]);
   const [isConvertModalOpen, setIsConvertModalOpen] = React.useState(false);
   const [isConverting, setIsConverting] = React.useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
@@ -118,6 +123,17 @@ export default function LeadsPage() {
   const [bulkCounsellorId, setBulkCounsellorId] = React.useState<string>('');
   const [bulkStage, setBulkStage] = React.useState<LeadStage>('Follow-up');
   const [isBulkProcessing, setIsBulkProcessing] = React.useState(false);
+
+  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSelectedLead(null);
+      setSelectedLeadIds([]);
+      setIsConvertModalOpen(false);
+      setIsAddModalOpen(false);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [user?.id]);
 
   const [authoritativeCounsellors, setAuthoritativeCounsellors] = React.useState<EligibleCounsellorOption[]>([]);
 
@@ -207,6 +223,10 @@ export default function LeadsPage() {
     return (courses || store.courses || []).filter((c) => !c.status || c.status === 'Published');
   }, [courses]);
 
+  const [courseId, setCourseId] = React.useState(courses[0]?.id || store.courses?.[0]?.id || '');
+  const [convertCourseId, setConvertCourseId] = React.useState(courses[0]?.id || store.courses?.[0]?.id || '');
+  const [convertCourseFee, setConvertCourseFee] = React.useState<number>(courses[0]?.price || store.courses?.[0]?.price || 0);
+
   React.useEffect(() => {
     let isMounted = true;
     getCourses()
@@ -224,11 +244,10 @@ export default function LeadsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [courseId, convertCourseId]);
 
   const [email, setEmail] = React.useState('');
   const [emailError, setEmailError] = React.useState('');
-  const [courseId, setCourseId] = React.useState(courses[0]?.id || store.courses?.[0]?.id || '');
   const [counsellorId, setCounsellorId] = React.useState<string>(user?.id || '');
   const [currentStatus, setCurrentStatus] = React.useState<LeadCurrentStatus>('Working Professional');
   const [trainingPref, setTrainingPref] = React.useState<'Online' | 'Offline'>('Online');
@@ -267,18 +286,12 @@ export default function LeadsPage() {
   // Follow-up notes update state
   const [updateNotes, setUpdateNotes] = React.useState('');
   const [nextStage, setNextStage] = React.useState<LeadStage>('Follow-up');
-  const [followUpDate, setFollowUpDate] = React.useState(
-    new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10)
-  );
+  const [followUpDate, setFollowUpDate] = React.useState(() => getDefaultFollowUpDate());
   const [followUpTime, setFollowUpTime] = React.useState('11:00');
-  const [bulkFollowUpDate, setBulkFollowUpDate] = React.useState(
-    new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10)
-  );
+  const [bulkFollowUpDate, setBulkFollowUpDate] = React.useState(() => getDefaultFollowUpDate());
 
   // Convert to Admission state
-  const [convertCourseId, setConvertCourseId] = React.useState(courses[0]?.id || store.courses?.[0]?.id || '');
   const [convertBatchId, setConvertBatchId] = React.useState('');
-  const [convertCourseFee, setConvertCourseFee] = React.useState<number>(courses[0]?.price || store.courses?.[0]?.price || 0);
   const [convertDob, setConvertDob] = React.useState('');
   const [convertGender, setConvertGender] = React.useState<'Male' | 'Female' | 'Other' | ''>('');
   const [convertCity, setConvertCity] = React.useState('');
@@ -304,23 +317,7 @@ export default function LeadsPage() {
   const [convertBatchName, setConvertBatchName] = React.useState('10AM NOV 26');
   const [convertBatchError, setConvertBatchError] = React.useState('');
 
-  React.useEffect(() => {
-    let timingStr = '10AM';
-    if (convertBatchTimingPreset === '09:00 AM') timingStr = '9AM';
-    else if (convertBatchTimingPreset === '10:00 AM') timingStr = '10AM';
-    else if (convertBatchTimingPreset === '11:00 AM') timingStr = '11AM';
-    else if (convertBatchTimingPreset === '12:00 PM') timingStr = '12PM';
-    else if (convertBatchCustomTime) {
-      const parts = convertBatchCustomTime.split(':');
-      const hour = parseInt(parts[0], 10);
-      if (!isNaN(hour)) {
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const h12 = hour % 12 || 12;
-        timingStr = `${h12}${ampm}`;
-      }
-    }
-    setConvertBatchName(`${timingStr} ${convertBatchMonth} ${convertBatchYear}`);
-  }, [convertBatchTimingPreset, convertBatchCustomTime, convertBatchMonth, convertBatchYear]);
+  // convertBatchName is maintained upon batch modal inputs
 
   const availableTrainers = React.useMemo(() => {
     return (store.users || []).filter(
@@ -391,11 +388,63 @@ export default function LeadsPage() {
     }
   };
 
-  React.useEffect(() => {
-    if (user?.id && !counsellorId) {
-      setCounsellorId(user.id);
+  // counsellorId defaults to user?.id || ''
+
+  const openEditModal = React.useCallback((lead: Lead) => {
+    setSelectedLead(lead);
+    setModalTab('stage');
+    setNextStage(lead.stage);
+
+    if (lead.follow_up_date) {
+      const parts = lead.follow_up_date.split('T');
+      setFollowUpDate(parts[0]);
+      if (parts[1]) {
+        setFollowUpTime(parts[1].slice(0, 5));
+      }
+    } else {
+      setFollowUpDate(getDefaultFollowUpDate());
+      setFollowUpTime('11:00');
     }
-  }, [user?.id, counsellorId]);
+
+    // Populate candidate details tab
+    setEditFullName(lead.full_name || '');
+    const parsedPhone = parseStoredPhone(lead.phone, lead.country_code || '+91');
+    setEditCountryCode(parsedPhone.dialCode);
+    setEditPhone(parsedPhone.nationalNumber);
+    setEditPhoneError('');
+    setEditPhoneDuplicateWarning('');
+
+    const hasDistinctWa = Boolean(
+      lead.whatsapp_number &&
+      lead.whatsapp_number.trim() &&
+      lead.whatsapp_number.replace(/\D/g, '') !== lead.phone.replace(/\D/g, '')
+    );
+    setEditIsWaSame(!hasDistinctWa);
+    if (hasDistinctWa && lead.whatsapp_number) {
+      const parsedWa = parseStoredPhone(lead.whatsapp_number, lead.whatsapp_country_code || '+91');
+      setEditWaCountryCode(parsedWa.dialCode);
+      setEditWaNumber(parsedWa.nationalNumber);
+    } else {
+      setEditWaCountryCode(parsedPhone.dialCode);
+      setEditWaNumber(parsedPhone.nationalNumber);
+    }
+    setEditWaError('');
+
+    setEditEmail(lead.email || '');
+    setEditCourseId(lead.interested_course_id || '');
+    setEditCounsellorId(lead.counsellor_id || '');
+    setEditCurrentStatus((lead.current_status as LeadCurrentStatus) || 'Working Professional');
+    setEditTrainingPref(
+      lead.training_preference === 'Offline' || lead.training_preference === 'Classroom'
+        ? 'Offline'
+        : 'Online'
+    );
+    setEditSource((lead.lead_source as LeadSource) || 'Website');
+    setEditNotes(lead.notes || '');
+    setEditExperience(lead.experience || (lead.current_status === 'Fresher' ? 'Fresher' : '0–2 Years'));
+    setEditDob(lead.dob || '');
+    setEditAddress(lead.address || '');
+  }, []);
 
   const refreshLeads = React.useCallback(async () => {
     setIsLoading(true);
@@ -404,27 +453,32 @@ export default function LeadsPage() {
       setLeadSnapshot({ owner: user?.id, rows: fetched.filter(l => (selectedTrainingMode === 'All' || l.training_preference === selectedTrainingMode)
         && (selectedSource === 'All' || l.lead_source === selectedSource)) });
     } catch { setLeadSnapshot({ owner: user?.id, rows: [] }); } finally { setIsLoading(false); }
-  }, [search, selectedStage, selectedTrainingMode, selectedSource, user?.id, role, creatorFilter, salespersonFilter, courseFilter, dateFrom, dateTo, teamFilter]);
+  }, [search, selectedStage, selectedTrainingMode, selectedSource, user, creatorFilter, salespersonFilter, courseFilter, dateFrom, dateTo, teamFilter]);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const q = params.get('search');
-      if (q) {
-        setSearch(q);
-      }
-      const leadId = params.get('leadId');
-      if (leadId) {
-        const matched = (cachedLeads(user?.id) || []).find((l) => l.id === leadId);
-        if (matched) {
-          openEditModal(matched);
+      const timer = setTimeout(() => {
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('search');
+        if (q) {
+          setSearch(q);
         }
-      }
+        const leadId = params.get('leadId');
+        if (leadId) {
+          const matched = (cachedLeads(user?.id) || []).find((l) => l.id === leadId);
+          if (matched) {
+            openEditModal(matched);
+          }
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [user?.id, openEditModal]);
 
   React.useEffect(() => {
-    refreshLeads();
+    void (async () => {
+      await refreshLeads();
+    })();
   }, [refreshLeads]);
 
   useDataSync({
@@ -574,61 +628,7 @@ export default function LeadsPage() {
     }
   };
 
-  const openEditModal = (lead: Lead) => {
-    setSelectedLead(lead);
-    setModalTab('stage');
-    setNextStage(lead.stage);
 
-    if (lead.follow_up_date) {
-      const parts = lead.follow_up_date.split('T');
-      setFollowUpDate(parts[0]);
-      if (parts[1]) {
-        setFollowUpTime(parts[1].slice(0, 5));
-      }
-    } else {
-      setFollowUpDate(new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10));
-      setFollowUpTime('11:00');
-    }
-
-    // Populate candidate details tab
-    setEditFullName(lead.full_name || '');
-    const parsedPhone = parseStoredPhone(lead.phone, lead.country_code || '+91');
-    setEditCountryCode(parsedPhone.dialCode);
-    setEditPhone(parsedPhone.nationalNumber);
-    setEditPhoneError('');
-    setEditPhoneDuplicateWarning('');
-
-    const hasDistinctWa = Boolean(
-      lead.whatsapp_number &&
-      lead.whatsapp_number.trim() &&
-      lead.whatsapp_number.replace(/\D/g, '') !== lead.phone.replace(/\D/g, '')
-    );
-    setEditIsWaSame(!hasDistinctWa);
-    if (hasDistinctWa && lead.whatsapp_number) {
-      const parsedWa = parseStoredPhone(lead.whatsapp_number, lead.whatsapp_country_code || '+91');
-      setEditWaCountryCode(parsedWa.dialCode);
-      setEditWaNumber(parsedWa.nationalNumber);
-    } else {
-      setEditWaCountryCode(parsedPhone.dialCode);
-      setEditWaNumber(parsedPhone.nationalNumber);
-    }
-    setEditWaError('');
-
-    setEditEmail(lead.email || '');
-    setEditCourseId(lead.interested_course_id || '');
-    setEditCounsellorId(lead.counsellor_id || '');
-    setEditCurrentStatus((lead.current_status as LeadCurrentStatus) || 'Working Professional');
-    setEditTrainingPref(
-      lead.training_preference === 'Offline' || lead.training_preference === 'Classroom'
-        ? 'Offline'
-        : 'Online'
-    );
-    setEditSource((lead.lead_source as LeadSource) || 'Website');
-    setEditNotes(lead.notes || '');
-    setEditExperience(lead.experience || (lead.current_status === 'Fresher' ? 'Fresher' : '0–2 Years'));
-    setEditDob(lead.dob || '');
-    setEditAddress(lead.address || '');
-  };
 
   const handleUpdateStage = async () => {
     if (!selectedLead) return;
@@ -985,8 +985,15 @@ export default function LeadsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3" aria-label="Lead statistics">
         {['total', 'new', 'followups', 'pending', 'converted', 'conversionRate'].map((key, index) => (
-          <Card key={key} className="p-3"><p className="text-xs text-slate-500">{scopeLabel} {['Leads', 'New Leads', 'Follow-ups', 'Pending Leads', 'Converted Leads', 'Conversion Rate'][index]}</p>
-            <p className="text-xl font-semibold">{visibleSummary?.metrics?.[key] ?? '—'}{key === 'conversionRate' ? '%' : ''}</p></Card>
+          <Card key={key} className="p-3">
+            <p className="text-xs text-slate-500">{scopeLabel} {['Leads', 'New Leads', 'Follow-ups', 'Pending Leads', 'Converted Leads', 'Conversion Rate'][index]}</p>
+            <p className="text-xl font-semibold">{visibleSummary?.metrics?.[key] ?? '—'}{key === 'conversionRate' ? '%' : ''}</p>
+            {key === 'converted' && Boolean(visibleSummary?.metrics?.historicalConversions) && (
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {visibleSummary?.metrics?.activeConversions ?? 0} active · {visibleSummary?.metrics?.historicalConversions} archived
+              </p>
+            )}
+          </Card>
         ))}
       </div>
       {role !== 'counsellor' && visibleSummary && <details className="text-sm"><summary>Salesperson and team performance</summary>
@@ -1183,6 +1190,7 @@ export default function LeadsPage() {
                   leads.map((lead) => {
                     const isSelected = selectedLeadIds.includes(lead.id);
                     const matchingAdmission = getLeadAdmission(lead, store.admissions);
+                    const historicalAdmNo = getLeadHistoricalAdmissionNumber(lead);
                     const isConverted = lead.stage === 'Converted' || lead.stage === 'Enrolled' || Boolean(matchingAdmission);
                     const waCode = lead.whatsapp_country_code || lead.country_code || '+91';
                     const waNum = lead.whatsapp_number || lead.phone;
@@ -1249,8 +1257,24 @@ export default function LeadsPage() {
                         </td>
                         <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <div>
-                            {isConverted ? (
-                              <Badge variant="success" className="whitespace-nowrap font-medium">Converted</Badge>
+                            {matchingAdmission ? (
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant="success" className="whitespace-nowrap font-medium">Converted</Badge>
+                                <span className="text-[10px] text-emerald-700 font-semibold">
+                                  {matchingAdmission.admission_number}
+                                </span>
+                              </div>
+                            ) : isConverted ? (
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant="warning" className="whitespace-nowrap font-medium text-amber-800 bg-amber-50 border border-amber-200">
+                                  Historical Conversion
+                                </Badge>
+                                {historicalAdmNo && (
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    Ref: {historicalAdmNo}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               getStageBadge(lead.stage)
                             )}
@@ -1277,19 +1301,25 @@ export default function LeadsPage() {
                                 Edit
                               </Button>
                             )}
-                            {isConverted ? (
-                              matchingAdmission?.admission_number && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    router.push(`/admissions?search=${encodeURIComponent(matchingAdmission.admission_number)}`);
-                                  }}
-                                  className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-800 border-blue-200 hover:bg-blue-50 font-medium"
-                                >
-                                  View Admission
-                                </Button>
-                              )
+                            {matchingAdmission?.admission_number ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  router.push(`/admissions?search=${encodeURIComponent(matchingAdmission.admission_number)}`);
+                                }}
+                                className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-800 border-blue-200 hover:bg-blue-50 font-medium"
+                                title={`View live admission record ${matchingAdmission.admission_number}`}
+                              >
+                                View Admission
+                              </Button>
+                            ) : isConverted ? (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200"
+                                title={historicalAdmNo ? `Archived admission reference: ${historicalAdmNo}. Admission record was archived during historical cleanup.` : 'Historical conversion record (admission archived)'}
+                              >
+                                Archived{historicalAdmNo ? ` (${historicalAdmNo})` : ''}
+                              </span>
                             ) : (
                               canConvert && (
                                 <Button

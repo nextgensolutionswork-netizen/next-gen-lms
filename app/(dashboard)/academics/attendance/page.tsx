@@ -46,25 +46,9 @@ export default function AttendancePage() {
   const [savedSuccess, setSavedSuccess] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlBatch = params.get('batch') || params.get('batchId');
-      const urlDate = params.get('date');
-      if (urlBatch && store.batches.some((b) => b.id === urlBatch)) {
-        setSelectedBatchId(urlBatch);
-      }
-      if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
-        setSelectedDate(urlDate);
-      }
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (accessibleBatches.length > 0 && !accessibleBatches.some((b) => b.id === selectedBatchId)) {
-      setSelectedBatchId(accessibleBatches[0].id);
-    }
-  }, [accessibleBatches, selectedBatchId]);
+  const effectiveBatchId = selectedBatchId && accessibleBatches.some((b) => b.id === selectedBatchId)
+    ? selectedBatchId
+    : (accessibleBatches[0]?.id || '');
 
   const canMark = hasPermission('attendance:write') || role === 'trainer' || role === 'admin' || role === 'super_admin';
 
@@ -106,9 +90,15 @@ export default function AttendancePage() {
   }, [selectedBatchId, selectedDate, students]);
 
   React.useEffect(() => {
-    refreshRecords();
-    setSavedSuccess(false);
-    setSaveError(null);
+    let active = true;
+    void (async () => {
+      await refreshRecords();
+      if (active) {
+        setSavedSuccess(false);
+        setSaveError(null);
+      }
+    })();
+    return () => { active = false; };
   }, [refreshRecords]);
 
   // Real-time listener for live automated webhook updates

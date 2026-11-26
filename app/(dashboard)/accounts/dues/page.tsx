@@ -108,7 +108,6 @@ export default function StudentPaymentDueDatesPage() {
 
   const fetchDues = React.useCallback(async () => {
     if (!isAuthorized) return;
-    setIsLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
@@ -149,7 +148,9 @@ export default function StudentPaymentDueDatesPage() {
   }, [isAuthorized, debouncedSearch, statusFilter, courseFilter, startDate, endDate, page, pageSize]);
 
   React.useEffect(() => {
-    fetchDues();
+    void (async () => {
+      await fetchDues();
+    })();
   }, [fetchDues, refreshTick]);
 
   if (!isAuthorized) {

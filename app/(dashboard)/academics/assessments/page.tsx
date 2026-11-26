@@ -68,14 +68,11 @@ export default function AssessmentsPage() {
   }, [quizzes, isStudent, isTrainer, currentStudent, user]);
 
   // Selected quiz for question management or taking exam
-  const [selectedQuizId, setSelectedQuizId] = React.useState<string>(visibleQuizzes[0]?.id || '');
-  React.useEffect(() => {
-    if (visibleQuizzes.length > 0 && !visibleQuizzes.some((q) => q.id === selectedQuizId)) {
-      setSelectedQuizId(visibleQuizzes[0].id);
-    }
-  }, [visibleQuizzes, selectedQuizId]);
-
-  const activeQuiz = visibleQuizzes.find((q) => q.id === selectedQuizId) || visibleQuizzes[0];
+  const [selectedQuizId, setSelectedQuizId] = React.useState<string>('');
+  const activeQuizId = selectedQuizId && visibleQuizzes.some((q) => q.id === selectedQuizId)
+    ? selectedQuizId
+    : (visibleQuizzes[0]?.id || '');
+  const activeQuiz = visibleQuizzes.find((q) => q.id === activeQuizId) || visibleQuizzes[0];
   const activeQuizQuestions = React.useMemo(() => {
     return activeQuiz ? quizQuestions.filter((q) => q.quiz_id === activeQuiz.id) : [];
   }, [quizQuestions, activeQuiz]);
@@ -107,12 +104,7 @@ export default function AssessmentsPage() {
   const [newDuration, setNewDuration] = React.useState(45);
   const [newPassPct, setNewPassPct] = React.useState(70);
 
-  // Sync newCourseId when store.courses populates
-  React.useEffect(() => {
-    if (!newCourseId && store.courses.length > 0) {
-      setNewCourseId(store.courses[0].id);
-    }
-  }, [newCourseId]);
+  // newCourseId defaults to store.courses[0]?.id || ''
 
   // Edit Quiz state
   const [editTitle, setEditTitle] = React.useState('');

@@ -50,20 +50,23 @@ export function CustomDateRangePicker({
   // Sync internal state whenever currentRange or isOpen changes
   React.useEffect(() => {
     if (isOpen) {
-      if (currentRange?.startDate && currentRange?.endDate) {
-        setStartDate(currentRange.startDate);
-        setEndDate(currentRange.endDate);
-        const y = parseInt(currentRange.startDate.slice(0, 4), 10);
-        const m = parseInt(currentRange.startDate.slice(5, 7), 10) - 1;
-        setViewYear(y);
-        setViewMonth(m);
-      } else {
-        setStartDate(todayStr);
-        setEndDate(todayStr);
-        setViewYear(parseInt(todayStr.slice(0, 4), 10));
-        setViewMonth(parseInt(todayStr.slice(5, 7), 10) - 1);
-      }
-      setPickingTarget('start');
+      const timer = setTimeout(() => {
+        if (currentRange?.startDate && currentRange?.endDate) {
+          setStartDate(currentRange.startDate);
+          setEndDate(currentRange.endDate);
+          const y = parseInt(currentRange.startDate.slice(0, 4), 10);
+          const m = parseInt(currentRange.startDate.slice(5, 7), 10) - 1;
+          setViewYear(y);
+          setViewMonth(m);
+        } else {
+          setStartDate(todayStr);
+          setEndDate(todayStr);
+          setViewYear(parseInt(todayStr.slice(0, 4), 10));
+          setViewMonth(parseInt(todayStr.slice(5, 7), 10) - 1);
+        }
+        setPickingTarget('start');
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, currentRange, todayStr]);
 

@@ -139,10 +139,13 @@ export default function PaymentsPage() {
   const isUrlAmountApplied = React.useRef(false);
 
   React.useEffect(() => {
-    loadData();
+    void (async () => {
+      await loadData();
+    })();
 
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
+      const timer = setTimeout(() => {
+        const params = new URLSearchParams(window.location.search);
       let sId = params.get('studentId') || params.get('student_id');
       const fId = params.get('feeAccountId') || params.get('fee_id') || params.get('feeId');
       const amt = params.get('amount') || params.get('amount_due');
@@ -221,6 +224,8 @@ export default function PaymentsPage() {
           }
         }
       }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, []);
 

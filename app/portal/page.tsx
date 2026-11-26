@@ -116,10 +116,11 @@ const StudentPlacementHub = dynamic(
 
 export default function StudentPortalPage() {
   const { user, logout } = useAuth();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [activePortalTab, setActivePortalTab] = React.useState<'curriculum' | 'placement'>('curriculum');
   const student = React.useMemo(() => {
     if (!user) return null;
@@ -178,20 +179,14 @@ export default function StudentPortalPage() {
   // Active Lesson for Video Player
   const sortedLessons = [...lessons].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-  const [activeLesson, setActiveLesson] = React.useState<any>(() => sortedLessons[0] || lessons[0] || null);
+  const [selectedLesson, setSelectedLesson] = React.useState<any>(null);
+  const activeLesson = (selectedLesson && sortedLessons.some((l) => l.id === selectedLesson.id))
+    ? selectedLesson
+    : (sortedLessons[0] || null);
   const [videoPosition, setVideoPosition] = React.useState(0);
   const [videoDuration, setVideoDuration] = React.useState(2700); // 45 mins
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [courseProgress, setCourseProgress] = React.useState(student?.course_progress ?? 0);
-
-  // Keep activeLesson updated when sortedLessons changes
-  React.useEffect(() => {
-    if (!activeLesson && sortedLessons.length > 0) {
-      setActiveLesson(sortedLessons[0]);
-    } else if (activeLesson && !sortedLessons.some((l) => l.id === activeLesson.id)) {
-      setActiveLesson(sortedLessons[0] || null);
-    }
-  }, [sortedLessons, activeLesson]);
 
   // Quizzes & Academic Assessments
   const courseQuizzes = (store.quizzes || []).filter((q) => q.course_id === student?.course_id);
@@ -309,17 +304,20 @@ export default function StudentPortalPage() {
     }
   };
 
+  const studentId = student?.id;
   const fetchStudentDoubts = React.useCallback(async () => {
-    if (!student?.id) return;
-    const list = await getDoubts({ student_id: student.id });
+    if (!studentId) return;
+    const list = await getDoubts({ student_id: studentId });
     setDoubtsList(list);
     if (list.length > 0) {
       setExpandedDoubtId((current) => current || list[0].id);
     }
-  }, [student?.id]);
+  }, [studentId]);
 
   React.useEffect(() => {
-    fetchStudentDoubts();
+    void (async () => {
+      await fetchStudentDoubts();
+    })();
   }, [fetchStudentDoubts]);
 
   // Realtime Live Stream for Student Helpdesk
@@ -627,7 +625,7 @@ export default function StudentPortalPage() {
       setToastMessage('Please complete previous lesson first');
       return;
     }
-    setActiveLesson(les);
+    setSelectedLesson(les);
     const existingProgress = student
       ? (store.lessonProgress || []).find(
           (lp) => lp.student_id === student.id && lp.lesson_id === les.id

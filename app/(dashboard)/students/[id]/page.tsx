@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -295,14 +296,25 @@ export default function StudentDetailsPage() {
     setEditProfileSaving(true);
     setEditAltPhoneError('');
     try {
-      student.alternate_phone = normalizedAlt;
-      student.photo_url = editPhotoUrl.trim() || undefined;
-      if (editPhotoUrl.trim()) {
-        student.profile_photo = editPhotoUrl.trim();
+      const studentId = student.id;
+      const studentCode = student.student_code;
+      const admissionId = student.admission_id || (admission && admission.id);
+      const targetStudent = store.students.find(
+        (s) => s.id === studentId || s.student_code === studentCode
+      );
+      if (targetStudent) {
+        targetStudent.alternate_phone = normalizedAlt;
+        targetStudent.photo_url = editPhotoUrl.trim() || undefined;
+        if (editPhotoUrl.trim()) {
+          targetStudent.profile_photo = editPhotoUrl.trim();
+        }
       }
-      if (admission) {
-        admission.alternate_phone = student.alternate_phone;
-        admission.photo_url = student.photo_url;
+      const targetAdmission = store.admissions.find(
+        (a) => a.id === admissionId
+      );
+      if (targetAdmission) {
+        targetAdmission.alternate_phone = normalizedAlt;
+        targetAdmission.photo_url = editPhotoUrl.trim() || undefined;
       }
       store.persist();
       setEditProfileSuccess('Student personal details updated.');
@@ -675,10 +687,13 @@ export default function StudentDetailsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
               {student.photo_url || student.profile_photo ? (
-                <img
-                  src={student.photo_url || student.profile_photo}
+                <Image
+                  src={student.photo_url || student.profile_photo || ''}
                   alt={student.full_name}
+                  width={64}
+                  height={64}
                   className="h-16 w-16 rounded-2xl object-cover border border-white/20 shadow-xs"
+                  unoptimized
                 />
               ) : (
                 <div className="h-16 w-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl font-extrabold text-white">
@@ -2474,10 +2489,13 @@ export default function StudentDetailsPage() {
             <div className="flex items-center space-x-4">
               {editPhotoPreview ? (
                 <div className="relative group">
-                  <img
+                  <Image
                     src={editPhotoPreview}
                     alt="Preview"
+                    width={64}
+                    height={64}
                     className="h-16 w-16 rounded-xl object-cover border border-slate-200"
+                    unoptimized
                   />
                   <button
                     type="button"

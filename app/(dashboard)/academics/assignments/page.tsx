@@ -112,7 +112,7 @@ export default function AssignmentsPage() {
     setDueDate('');
     setMaxMarks(100);
     setAssignmentFileUrl('');
-  }, []);
+  }, [setTitle, setDescription, setCourseId, setBatchId, setDueDate, setMaxMarks, setAssignmentFileUrl]);
 
   const openAddModal = React.useCallback(() => {
     resetAddForm();
@@ -124,18 +124,7 @@ export default function AssignmentsPage() {
     setIsAddModal(false);
   }, [resetAddForm]);
 
-  // Keep courseId and batchId synced when store data hydrates
-  React.useEffect(() => {
-    if (!courseId && store.courses.length > 0) {
-      setCourseId(store.courses[0].id);
-    }
-  }, [courseId]);
-
-  React.useEffect(() => {
-    if (!batchId && store.batches.length > 0) {
-      setBatchId(store.batches[0].id);
-    }
-  }, [batchId]);
+  // courseId and batchId are initialized from store and updated on modal open
 
   // Edit Assignment form state
   const [editTitle, setEditTitle] = React.useState('');

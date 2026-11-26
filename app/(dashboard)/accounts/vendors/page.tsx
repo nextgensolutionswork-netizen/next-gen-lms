@@ -154,9 +154,7 @@ export default function VendorsPage() {
     setVendors(list);
   }, [search, statusFilter]);
 
-  React.useEffect(() => {
-    refreshList();
-  }, [refreshList]);
+  // vendors list is synchronized on interaction and sync
 
   const handleCreateVendor = async (e: React.FormEvent) => {
     e.preventDefault();

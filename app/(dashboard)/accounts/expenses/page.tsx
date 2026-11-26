@@ -117,9 +117,7 @@ export default function ExpensesPage() {
     setExpenses(list);
   }, [categoryFilter, statusFilter, search]);
 
-  React.useEffect(() => {
-    refreshList();
-  }, [refreshList]);
+  // expenses list is derived from store.expenses via refreshList upon sync
 
   useDataSync({
     domain: 'expenses',

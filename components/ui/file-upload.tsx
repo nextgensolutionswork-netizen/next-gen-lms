@@ -50,14 +50,11 @@ export function FileUpload({
   const [isUploading, setIsUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
-  const [currentUrl, setCurrentUrl] = React.useState<string | undefined>(value);
+  const [internalUrl, setInternalUrl] = React.useState<string | undefined>(undefined);
+  const currentUrl = internalUrl !== undefined ? internalUrl : value;
 
   const bucketConfig = STORAGE_BUCKETS[bucket];
   const maxMb = Math.round(bucketConfig.maxSizeBytes / (1024 * 1024));
-
-  React.useEffect(() => {
-    setCurrentUrl(value);
-  }, [value]);
 
   const handleFileProcess = async (file: File) => {
     if (isUploading) return;
@@ -95,7 +92,7 @@ export function FileUpload({
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.url) {
-          setCurrentUrl(data.url);
+          setInternalUrl(data.url);
           onChange?.(data.url, data);
           return;
         }
@@ -115,7 +112,7 @@ export function FileUpload({
         entityId,
       });
 
-      setCurrentUrl(directResult.url);
+      setInternalUrl(directResult.url);
       onChange?.(directResult.url, directResult);
     } catch (err: any) {
       console.error('File upload error:', err);
@@ -156,7 +153,7 @@ export function FileUpload({
   };
 
   const handleClear = () => {
-    setCurrentUrl(undefined);
+    setInternalUrl('');
     setUploadError(null);
     onRemove?.();
     onChange?.('');

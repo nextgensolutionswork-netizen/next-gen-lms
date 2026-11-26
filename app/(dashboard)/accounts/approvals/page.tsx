@@ -94,7 +94,13 @@ export default function FeeApprovalsPage() {
 
   // Payment Approvals filters
   const [activePaymentTab, setActivePaymentTab] = React.useState<string>('Pending Verification');
-  const [paymentSearchQuery, setPaymentSearchQuery] = React.useState<string>('');
+  const [paymentSearchQuery, setPaymentSearchQuery] = React.useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('paymentId') || params.get('payment_id') || '';
+    }
+    return '';
+  });
 
   const canApproveFees = role === 'accountant' || role === 'super_admin' || role === 'admin';
   const canProposeFee = hasPermission('accounts:write') || role === 'counsellor' || role === 'admin' || role === 'super_admin';
@@ -195,7 +201,7 @@ export default function FeeApprovalsPage() {
   const [proposedDiscountPercent, setProposedDiscountPercent] = React.useState<number>(0);
   const [proposedDiscountReason, setProposedDiscountReason] = React.useState('');
   const [proposedDueDate, setProposedDueDate] = React.useState<string>(
-    new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0]
+    () => new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0]
   );
   const [proposedNotes, setProposedNotes] = React.useState('');
 
@@ -289,34 +295,16 @@ export default function FeeApprovalsPage() {
       if (active) timer = setTimeout(poll, 15000);
     };
     void poll();
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const deskParam = params.get('desk') || params.get('tab');
-      const paymentId = params.get('paymentId') || params.get('payment_id');
-      if (deskParam === 'payments' || deskParam === 'payment_approvals' || paymentId) {
-        setActiveDesk('payment_approvals');
-      }
-      if (paymentId) {
-        setPaymentSearchQuery(paymentId);
-      }
-    }
+    // paymentId search query is initialized from URL search params
     return () => { active = false; clearTimeout(timer); };
-  }, [loadData]);
+  }, [loadData, canAccessApprovals]);
 
   useDataSync({
     domain: 'payments',
     onSync: loadData,
   });
 
-  // Sync category default fee when category changes in proposal form
-  React.useEffect(() => {
-    if (isResubmitting) return;
-    const cat = categories.find((c) => c.name === selectedFeeCategory);
-    if (cat) {
-      setProposedStandardFee(cat.default_amount);
-      setProposedFeeAmount(cat.default_amount);
-    }
-  }, [selectedFeeCategory, categories, isResubmitting]);
+  // Category default fee is applied during category selection change
 
   // Sync discount amount & percent
   const handleDiscountAmountChange = (amt: number) => {

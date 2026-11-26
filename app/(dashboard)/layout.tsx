@@ -18,18 +18,15 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const drawer = React.useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = React.useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
-
-  React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem('sidebar_collapsed');
-      if (saved !== null) {
-        setSidebarCollapsed(saved === 'true');
-      }
-    } catch {
-      // Ignore if localStorage is restricted
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('sidebar_collapsed');
+        if (saved !== null) return saved === 'true';
+      } catch {}
     }
-  }, []);
+    return false;
+  });
 
   const handleToggleSidebar = React.useCallback(() => {
     setSidebarCollapsed((prev) => {
@@ -43,7 +40,10 @@ export default function DashboardLayout({
     });
   }, []);
 
-  React.useEffect(() => { setNavigationOpen(false); }, [pathname]);
+  React.useEffect(() => {
+    const timer = setTimeout(() => { setNavigationOpen(false); }, 0);
+    return () => clearTimeout(timer);
+  }, [pathname]);
   React.useEffect(() => {
     const dialog = drawer.current;
     if (!dialog) return;

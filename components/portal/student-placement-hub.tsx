@@ -158,7 +158,9 @@ export function StudentPlacementHub({ student, onOpenResumeModal }: StudentPlace
   }, [student.id]);
 
   React.useEffect(() => {
-    refreshData();
+    void (async () => {
+      await refreshData();
+    })();
   }, [refreshData]);
 
   const handleEnrollSubmit = async (e: React.FormEvent) => {

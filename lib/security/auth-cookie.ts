@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Next-Gen ERP LMS: Cryptographic Authentication Cookie Signing & Verification
  * Uses HMAC-SHA256 to ensure session cookies cannot be forged or altered.

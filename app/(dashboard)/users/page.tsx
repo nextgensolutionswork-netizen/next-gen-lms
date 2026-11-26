@@ -103,7 +103,9 @@ export default function UsersPage() {
   };
 
   React.useEffect(() => {
-    refreshList();
+    void (async () => {
+      await refreshList();
+    })();
   }, []);
 
   const filteredUsers = React.useMemo(() => {
@@ -293,8 +295,7 @@ export default function UsersPage() {
         throw new Error(data.error || 'Failed to update user status.');
       }
       if (data.user) {
-        const idx = store.users.findIndex((usr) => usr.id === data.user.id);
-        if (idx !== -1) store.users[idx] = data.user;
+        setUsers((prev) => prev.map((usr) => (usr.id === data.user.id ? data.user : usr)));
       }
       refreshList();
     } catch (err: any) {

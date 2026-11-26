@@ -40,7 +40,6 @@ export default function AuditLogsPage() {
   const [isLoading, setIsLoading] = React.useState(false);
 
   const loadLogs = React.useCallback(async () => {
-    setIsLoading(true);
     try {
       const data = await getAuditLogs();
       if (Array.isArray(data)) {
@@ -54,7 +53,9 @@ export default function AuditLogsPage() {
   }, []);
 
   React.useEffect(() => {
-    loadLogs();
+    void (async () => {
+      await loadLogs();
+    })();
   }, [loadLogs]);
 
   const modulesList = React.useMemo(() => {

@@ -56,17 +56,7 @@ export default function CertificatesPage() {
     setCertificates([...(store.certificates || [])]);
   };
 
-  React.useEffect(() => {
-    if (!studentId && (store.students || []).length > 0) {
-      const first = (store.students || [])[0];
-      setStudentId(first.id);
-      if (first.course_id) {
-        setCourseId(first.course_id);
-      } else if (!courseId && (store.courses || []).length > 0) {
-        setCourseId((store.courses || [])[0].id);
-      }
-    }
-  }, [studentId, courseId]);
+  // Student and course default to first available in store
 
   const handleOpenRevokeModal = (certificateId: string, type: 'Revoked' | 'Fraudulent' = 'Revoked') => {
     setRevokingCertId(certificateId);

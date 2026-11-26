@@ -17,7 +17,9 @@ function ProgressBarInner() {
   // Complete progress bar when route changes
   React.useEffect(() => {
     if (isLoading) {
-      setProgress(100);
+      const animFrame = requestAnimationFrame(() => {
+        setProgress(100);
+      });
       const hideTimeout = setTimeout(() => {
         setIsLoading(false);
         setVisible(false);
@@ -30,9 +32,12 @@ function ProgressBarInner() {
         timerRef.current = null;
       }
 
-      return () => clearTimeout(hideTimeout);
+      return () => {
+        cancelAnimationFrame(animFrame);
+        clearTimeout(hideTimeout);
+      };
     }
-  }, [pathname, searchParams]);
+  }, [pathname, searchParams, isLoading]);
 
   // Click listener for internal links
   React.useEffect(() => {

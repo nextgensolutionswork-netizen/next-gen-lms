@@ -56,16 +56,14 @@ export default function StudentFeesPage() {
     return store.feeAccounts || [];
   });
   const [isLoading, setIsLoading] = React.useState(true);
-  const [search, setSearch] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState('All');
-
-  React.useEffect(() => {
+  const [search, setSearch] = React.useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const q = params.get('search');
-      if (q) setSearch(q);
+      return params.get('search') || '';
     }
-  }, []);
+    return '';
+  });
+  const [statusFilter, setStatusFilter] = React.useState('All');
 
   // Discontinued Student Adjustment Modal State
   const [selectedFeeForDiscontinue, setSelectedFeeForDiscontinue] = React.useState<StudentFeeAccount | null>(null);
@@ -125,18 +123,19 @@ export default function StudentFeesPage() {
   };
 
   React.useEffect(() => {
-    setIsLoading(true);
+    let active = true;
     paymentWorkflowClient
       .refresh()
       .then(() => {
-        refreshList();
+        if (active) refreshList();
       })
       .catch(() => {
-        refreshList();
+        if (active) refreshList();
       })
       .finally(() => {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       });
+    return () => { active = false; };
   }, [refreshList]);
 
   if (!canAccessFees) {

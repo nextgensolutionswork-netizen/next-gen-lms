@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -151,14 +152,14 @@ export default function InvoiceViewPage() {
           <div className="flex flex-col md:flex-row items-start justify-between gap-6">
             {/* Top-Left: Original Company Logo */}
             <div className="flex items-center">
-              <img
+              <Image
                 src="/branding/nextgen-logo.webp"
                 alt="Next-Gen ERP Solutions"
+                width={180}
+                height={56}
                 className="h-14 w-auto object-contain"
-                onError={(e) => {
-                  // Fallback if webp fails
-                  (e.currentTarget as HTMLImageElement).src = '/branding/nextgen-logo.png';
-                }}
+                priority
+                unoptimized
               />
             </div>
 

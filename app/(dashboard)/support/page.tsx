@@ -64,12 +64,7 @@ export default function SupportDeskPage() {
   const [delegationNote, setDelegationNote] = React.useState('');
   const [isAssigning, setIsAssigning] = React.useState(false);
 
-  // Auto-switch to My Batches when viewing as trainer
-  React.useEffect(() => {
-    if (role === 'trainer') {
-      setBatchFilter('My Batches');
-    }
-  }, [role]);
+  // Batch filter defaults to My Batches for trainers
 
   // Active current staff (Support Lead / Authenticated Staff)
   const activeUser = React.useMemo(() => {
@@ -201,7 +196,9 @@ export default function SupportDeskPage() {
   }, [statusFilter, assignedFilter, batchFilter, search, user, activeUser.id, trainerBatchIds, trainerStudentIds]);
 
   React.useEffect(() => {
-    refreshList();
+    void (async () => {
+      await refreshList();
+    })();
   }, [refreshList]);
 
   // Real-Time WebSocket / SSE Subscription

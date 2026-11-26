@@ -16,7 +16,9 @@ export function useRealtime({ topics, onEvent, enabled = true }: UseRealtimeOpti
 
   const topicString = Array.isArray(topics) ? topics.join(',') : topics;
   const onEventRef = React.useRef(onEvent);
-  onEventRef.current = onEvent;
+  React.useEffect(() => {
+    onEventRef.current = onEvent;
+  });
 
   React.useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;

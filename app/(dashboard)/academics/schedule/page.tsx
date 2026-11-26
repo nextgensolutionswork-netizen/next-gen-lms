@@ -48,16 +48,7 @@ export default function SchedulePage() {
     getTodayInInstituteTimezone()
   );
 
-  // URL search parameter synchronization for ?date=YYYY-MM-DD
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlDate = params.get('date');
-      if (urlDate && isValidYMD(urlDate)) {
-        setSelectedReferenceDate(urlDate);
-      }
-    }
-  }, []);
+  // URL search parameter ?date=YYYY-MM-DD is read during initial state setup
 
   const isStudent = role === 'student';
   const isTrainer = role === 'trainer';
@@ -212,12 +203,7 @@ export default function SchedulePage() {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [validationError, setValidationError] = React.useState<string | null>(null);
 
-  // Synchronize batch selection with accessible batches
-  React.useEffect(() => {
-    if (accessibleBatches.length > 0 && !accessibleBatches.some((b) => b.id === batchId)) {
-      setBatchId(accessibleBatches[0].id);
-    }
-  }, [accessibleBatches, batchId]);
+  // Batch selection defaults to accessibleBatches[0]?.id
 
   // Edit Session form state
   const [editTopic, setEditTopic] = React.useState('');

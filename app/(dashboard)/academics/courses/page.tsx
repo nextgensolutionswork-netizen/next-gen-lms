@@ -59,12 +59,10 @@ export default function CoursesPage() {
   const { user, role, hasPermission } = useAuth();
   const [courses, setCourses] = React.useState<Course[]>(store.courses);
   const [selectedCourseId, setSelectedCourseId] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchCourses = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
     try {
       const data = await getCourses();
       setCourses(data);
@@ -78,7 +76,9 @@ export default function CoursesPage() {
   }, []);
 
   React.useEffect(() => {
-    fetchCourses();
+    void (async () => {
+      await fetchCourses();
+    })();
   }, [fetchCourses]);
 
   // RBAC Course Scoping: Trainers only see assigned courses; Admins see all.
@@ -204,9 +204,7 @@ export default function CoursesPage() {
     refreshCurriculum();
   };
 
-  React.useEffect(() => {
-    refreshCurriculum();
-  }, [refreshCurriculum, courses]);
+  // refreshCurriculum is called upon data reload or curriculum edit actions
 
   // Curriculum Review Approval Workflows
   const handleSubmitForReview = async () => {

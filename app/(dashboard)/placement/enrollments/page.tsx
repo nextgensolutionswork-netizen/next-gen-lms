@@ -128,6 +128,7 @@ export default function PlacementEnrollmentsPage() {
 
   // Live Automated Pre-requisite Audit Calculation for Candidate Enrollment
   React.useEffect(() => {
+    const timer = setTimeout(() => {
     if (!candidateStudentId) {
       setCandidateAuditResult(null);
       return;
@@ -153,10 +154,11 @@ export default function PlacementEnrollmentsPage() {
       allPassed: audit.all_passed,
       unmetCriteria: audit.unmet_criteria,
     });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [candidateStudentId, settings]);
 
   const loadData = React.useCallback(async () => {
-    setLoading(true);
     try {
       const data = await getPlacementEnrollments({
         status: (statusFilter as any) || 'all',
@@ -173,7 +175,9 @@ export default function PlacementEnrollmentsPage() {
   }, [statusFilter, moduleFilter, searchQuery]);
 
   React.useEffect(() => {
-    loadData();
+    void (async () => {
+      await loadData();
+    })();
   }, [loadData]);
 
   const handleOpenReview = async (enrollment: PlacementEnrollment) => {

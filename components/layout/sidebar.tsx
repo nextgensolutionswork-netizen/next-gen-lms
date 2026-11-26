@@ -55,12 +55,15 @@ export function Sidebar({
   };
 
   React.useEffect(() => {
-    if (pathname.startsWith('/crm')) setOpenSection('crm');
-    else if (pathname.startsWith('/admissions') || pathname.startsWith('/students')) setOpenSection('admissions');
-    else if (pathname.startsWith('/finance')) setOpenSection('finance');
-    else if (pathname.startsWith('/academics') || pathname.startsWith('/batches') || pathname.startsWith('/courses')) setOpenSection('academics');
-    else if (pathname.startsWith('/placement')) setOpenSection('placement');
-    else if (pathname.startsWith('/portal')) setOpenSection('portal');
+    const timer = setTimeout(() => {
+      if (pathname.startsWith('/crm')) setOpenSection('crm');
+      else if (pathname.startsWith('/admissions') || pathname.startsWith('/students')) setOpenSection('admissions');
+      else if (pathname.startsWith('/finance')) setOpenSection('finance');
+      else if (pathname.startsWith('/academics') || pathname.startsWith('/batches') || pathname.startsWith('/courses')) setOpenSection('academics');
+      else if (pathname.startsWith('/placement')) setOpenSection('placement');
+      else if (pathname.startsWith('/portal')) setOpenSection('portal');
+    }, 0);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`);

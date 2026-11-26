@@ -61,7 +61,7 @@ function safeAmount(val: unknown): number {
 export default function DashboardPage() {
   const { role, user } = useAuth();
   const [leadSnapshot, setLeadSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
-  const authorizedLeads = leadSnapshot.owner === user?.id ? leadSnapshot.rows : [];
+  const authorizedLeads = React.useMemo(() => (leadSnapshot.owner === user?.id ? leadSnapshot.rows : []), [leadSnapshot, user?.id]);
   React.useEffect(() => {
     let active = true;
     if (CRM_ROLES.includes(role)) getLeads().then(rows => { if (active) setLeadSnapshot({ owner: user?.id, rows }); }).catch(() => { if (active) setLeadSnapshot({ owner: user?.id, rows: [] }); });
@@ -91,6 +91,7 @@ export default function DashboardPage() {
 
   // Unified dual-ledger payments (reconciles store.payments & store.studentPayments)
   const allUnifiedPayments = React.useMemo(() => {
+    void refreshTick;
     store.reconcileDualLedgers();
     return unifyDualLedgerPayments(
       store.payments || [],
@@ -291,7 +292,9 @@ export default function DashboardPage() {
   }, [user]);
 
   React.useEffect(() => {
-    fetchUpcomingDues();
+    void (async () => {
+      await fetchUpcomingDues();
+    })();
   }, [fetchUpcomingDues, refreshTick]);
 
   if (role === 'student') {

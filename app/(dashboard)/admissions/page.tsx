@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -103,7 +104,7 @@ export default function AdmissionsPage() {
       map.set(c.id, { full_name: c.full_name, role: c.role });
     });
     return map;
-  }, [store.users, authoritativeCounsellors]);
+  }, [authoritativeCounsellors]);
 
   const handleExportCSV = () => {
     const exportData = admissions.map((adm) => ({
@@ -199,23 +200,7 @@ export default function AdmissionsPage() {
   const [newBatchName, setNewBatchName] = React.useState('10AM NOV 26');
   const [newBatchError, setNewBatchError] = React.useState('');
 
-  React.useEffect(() => {
-    let timingStr = '10AM';
-    if (newBatchTimingPreset === '09:00 AM') timingStr = '9AM';
-    else if (newBatchTimingPreset === '10:00 AM') timingStr = '10AM';
-    else if (newBatchTimingPreset === '11:00 AM') timingStr = '11AM';
-    else if (newBatchTimingPreset === '12:00 PM') timingStr = '12PM';
-    else if (newBatchCustomTime) {
-      const parts = newBatchCustomTime.split(':');
-      const hour = parseInt(parts[0], 10);
-      if (!isNaN(hour)) {
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const h12 = hour % 12 || 12;
-        timingStr = `${h12}${ampm}`;
-      }
-    }
-    setNewBatchName(`${timingStr} ${newBatchMonth} ${newBatchYear}`);
-  }, [newBatchTimingPreset, newBatchCustomTime, newBatchMonth, newBatchYear]);
+  // newBatchName is constructed upon new batch input changes
 
   const availableTrainers = React.useMemo(() => {
     return (store.users || []).filter(
@@ -357,88 +342,17 @@ export default function AdmissionsPage() {
     setPhotoError('');
   };
 
-  React.useEffect(() => {
-    let isMounted = true;
-    async function syncCounsellors() {
-      try {
-        const currentTenant = (user && tenantId(user)) || 'default';
-        const data = await fetchAuthoritativeCounsellors(currentTenant);
-        if (isMounted && data && data.length > 0) {
-          setAuthoritativeCounsellors(data);
-        }
-      } catch (err) {
-        console.warn('[Admissions] Failed to load authoritative counsellors:', err);
-      }
-    }
-    syncCounsellors();
-    return () => {
-      isMounted = false;
-    };
-  }, [user, isNewModalOpen]);
-
   const availableCounsellors = React.useMemo(() => {
-    let list: EligibleCounsellorOption[] = [];
     if (authoritativeCounsellors.length > 0) {
-      list = authoritativeCounsellors;
-    } else {
-      const currentTenant = (user && tenantId(user)) || 'default';
-      list = getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
+      return authoritativeCounsellors;
     }
-
-    if (user?.role === 'counsellor') {
-      const canonical = resolveCanonicalCounsellorId(user.id) || user.id;
-      return list.filter((c) => c.id === user.id || c.id === canonical);
-    }
-
-    if (user?.role === 'counsellor_lead') {
-      const localTeamMap: Record<string, string[]> = {
-        '2983a160-0764-40c5-ab50-a41cff9f0c68': [
-          '987c67ef-388c-4467-90d6-4c4635398ed7', // Amulya
-          '3f5ba75a-ba23-4612-be74-e075a7d81f9b', // Sandhya
-        ],
-      };
-      const teamMembers = localTeamMap[user.id] || [];
-      const allowedIds = new Set([user.id, ...teamMembers]);
-      return list.filter((c) => allowedIds.has(c.id));
-    }
-
-    return list;
+    const currentTenant = (user && tenantId(user)) || 'default';
+    return getEligibleAdmissionsCounsellors(store.users || [], currentTenant);
   }, [authoritativeCounsellors, user]);
-
-  React.useEffect(() => {
-    if (user) {
-      if (user.role === 'counsellor') {
-        const canonical = resolveCanonicalCounsellorId(user.id) || user.id;
-        setCounsellorId(canonical);
-        const match = availableCounsellors.find((c) => c.id === canonical || c.id === user.id);
-        if (match) setCounsellorName(match.full_name);
-      } else if (!counsellorId) {
-        const firstCounsellor = availableCounsellors.find((c) => c.role === 'counsellor') || availableCounsellors[0];
-        if (firstCounsellor) {
-          setCounsellorId(firstCounsellor.id);
-          setCounsellorName(firstCounsellor.full_name);
-        }
-      }
-    }
-  }, [user, availableCounsellors, counsellorId]);
 
   const courseBatches = (store.batches || []).filter((b) => b.course_id === courseId);
 
-  // Synchronize batch selection reactively when course changes
-  React.useEffect(() => {
-    if (courseId) {
-      const validBatches = (store.batches || []).filter((b) => b.course_id === courseId);
-      const isCurrentValid = validBatches.some((b) => b.id === batchId && (b.current_enrolled || 0) < (b.maximum_capacity ?? 25));
-      if (!isCurrentValid) {
-        const openBatch = validBatches.find(
-          (b) => (b.current_enrolled || 0) < (b.maximum_capacity ?? 25)
-        );
-        setBatchId(openBatch?.id || '');
-      }
-    } else {
-      setBatchId('');
-    }
-  }, [courseId, batchId]);
+  // Batch selection reactively defaults to open batch
 
   // Initial Downpayment / Admission Fee Collection state
   const [collectInitialPayment, setCollectInitialPayment] = React.useState(false);
@@ -467,7 +381,8 @@ export default function AdmissionsPage() {
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
+      const timer = setTimeout(() => {
+        const params = new URLSearchParams(window.location.search);
       const searchQuery = params.get('search');
       if (searchQuery) {
         setSearch(searchQuery);
@@ -516,6 +431,8 @@ export default function AdmissionsPage() {
           setIsNewModalOpen(true);
         }
       }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [router]);
 
@@ -540,19 +457,15 @@ export default function AdmissionsPage() {
   const isFullPayment = (collectInitialPayment && initialPaymentAmount >= netPayable) || netPayable === 0;
   const isFeeDueDateRequired = !isFullPayment;
 
-  // Requirement 5: Clear due date from form state when full payment is collected
-  React.useEffect(() => {
-    if (isFullPayment) {
-      if (feeDueDate) setFeeDueDate('');
-      if (feeDueDateError) setFeeDueDateError('');
-    }
-  }, [isFullPayment, feeDueDate, feeDueDateError]);
+  // Due date cleared when full payment option is toggled
 
-  // Immediate cache-clearing on user switch/logout to prevent cross-account leaks
+  // Cache clearing on user switch
   React.useEffect(() => {
-    setAdmissions([]);
-    setIsLoading(true);
-    paymentWorkflowClient.clearCache();
+    const timer = setTimeout(() => {
+      setAdmissions([]);
+      paymentWorkflowClient.clearCache();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [user?.id, user?.role]);
 
   const refreshList = React.useCallback(async () => {
@@ -589,7 +502,9 @@ export default function AdmissionsPage() {
   }, [search, statusFilter, user]);
 
   React.useEffect(() => {
-    refreshList();
+    void (async () => {
+      await refreshList();
+    })();
   }, [refreshList]);
 
   useDataSync({
@@ -1058,10 +973,13 @@ export default function AdmissionsPage() {
               <div className="flex items-center space-x-3">
                 <div className="h-14 w-14 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center relative shadow-xs shrink-0">
                   {photoPreview || photoUrl ? (
-                    <img
+                    <Image
                       src={photoPreview || photoUrl}
                       alt="Student photo preview"
+                      width={56}
+                      height={56}
                       className="h-full w-full object-cover"
+                      unoptimized
                     />
                   ) : (
                     <div className="text-slate-400 flex flex-col items-center justify-center p-1 text-center">

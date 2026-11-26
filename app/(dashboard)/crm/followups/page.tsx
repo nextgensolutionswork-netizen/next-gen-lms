@@ -45,10 +45,20 @@ import { tenantId } from '@/lib/auth/tenant';
 type UrgencyFilter = 'All' | 'Overdue' | 'Due Today' | 'Upcoming' | 'Unscheduled';
 type ViewMode = 'grid' | 'timeline' | 'calendar';
 
+function getTodayDateString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getFutureDateString(daysAhead: number = 2): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function FollowupsPage() {
   const { user, role, hasPermission } = useAuth();
   const [snapshot, setSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
-  const allLeads = snapshot.owner === user?.id ? snapshot.rows : [];
+  const allLeads = React.useMemo(() => (snapshot.owner === user?.id ? snapshot.rows : []), [snapshot, user?.id]);
   const [search, setSearch] = React.useState('');
   const [urgencyFilter, setUrgencyFilter] = React.useState<UrgencyFilter>('All');
   const [stageFilter, setStageFilter] = React.useState<'All' | 'Follow-up' | 'Demo Scheduled'>('All');
@@ -67,16 +77,23 @@ export default function FollowupsPage() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [completingId, setCompletingId] = React.useState<string | null>(null);
 
-  // Call History Timeline Modal
-  const [historyModalLead, setHistoryModalLead] = React.useState<Lead | null>(null);
-  React.useEffect(() => { setSelectedLead(null); setHistoryModalLead(null); setSelectedCalendarDay(null); }, [user?.id]);
-  const [quickNote, setQuickNote] = React.useState('');
-  const [isAddingNote, setIsAddingNote] = React.useState(false);
-
   // Calendar Day Details Modal
   const [selectedCalendarDay, setSelectedCalendarDay] = React.useState<{ dateStr: string; leads: Lead[] } | null>(null);
 
-  const todayStr = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Call History Timeline Modal
+  const [historyModalLead, setHistoryModalLead] = React.useState<Lead | null>(null);
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSelectedLead(null);
+      setHistoryModalLead(null);
+      setSelectedCalendarDay(null);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [user?.id]);
+  const [quickNote, setQuickNote] = React.useState('');
+  const [isAddingNote, setIsAddingNote] = React.useState(false);
+
+  const [todayStr] = React.useState(getTodayDateString);
 
   const getUrgency = React.useCallback((lead: Lead): 'overdue' | 'today' | 'upcoming' | 'unscheduled' => {
     if (!lead.follow_up_date) return 'unscheduled';
@@ -88,8 +105,12 @@ export default function FollowupsPage() {
 
   const refreshLeads = React.useCallback(async () => {
     try { setSnapshot({ owner: user?.id, rows: await getLeads() }); } catch { setSnapshot({ owner: user?.id, rows: [] }); }
-  }, [user?.id]);
-  React.useEffect(() => { setSnapshot({ owner: user?.id, rows: [] }); void refreshLeads(); }, [refreshLeads]);
+  }, [user]);
+  React.useEffect(() => {
+    void (async () => {
+      await refreshLeads();
+    })();
+  }, [user, refreshLeads]);
 
   // Base list of leads in follow-up pipeline
   const activeFollowups = React.useMemo(() => {
@@ -192,7 +213,7 @@ export default function FollowupsPage() {
     setNewFollowUpDate(
       lead.follow_up_date
         ? lead.follow_up_date.slice(0, 10)
-        : new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+        : getFutureDateString(2)
     );
     setNewFollowUpTime(
       lead.follow_up_date && lead.follow_up_date.includes('T')

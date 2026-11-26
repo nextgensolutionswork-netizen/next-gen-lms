@@ -123,7 +123,7 @@ export default function OnboardingPage() {
   // Orientation Modal
   const [isOrientationModal, setIsOrientationModal] = React.useState(false);
   const [orientationDate, setOrientationDate] = React.useState(
-    new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10)
+    () => new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10)
   );
   const [orientationMode, setOrientationMode] = React.useState<'Online' | 'Classroom' | 'Hybrid'>('Online');
   const [orientationNotes, setOrientationNotes] = React.useState('');
@@ -141,7 +141,6 @@ export default function OnboardingPage() {
   const isAdmin = currentUserProfile.role === 'super_admin' || currentUserProfile.role === 'admin';
 
   const loadData = React.useCallback(async () => {
-    setIsLoading(true);
     try {
       const caseList = await getOnboardingCases(currentUserProfile, {
         search,
@@ -198,8 +197,9 @@ export default function OnboardingPage() {
   };
 
   React.useEffect(() => {
-    loadData();
-    // Controlled bounded refresh managed via useDataSync
+    void (async () => {
+      await loadData();
+    })();
     const timer = window.setInterval(loadData, 45000);
     return () => window.clearInterval(timer);
   }, [loadData]);

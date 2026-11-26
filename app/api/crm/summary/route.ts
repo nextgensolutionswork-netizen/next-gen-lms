@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticatePaymentRequest } from '@/lib/auth/payment-session';
-import { getLeads } from '@/lib/services/crm-service';
+import { getLeads, getLeadAdmission } from '@/lib/services/crm-service';
 import { resolveLeadScope } from '@/lib/services/lead-security';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
@@ -33,13 +33,28 @@ export async function GET(request: NextRequest) {
       }
     }
     const converted = leads.filter(l => ['Converted', 'Enrolled'].includes(l.stage)).length;
-    const performance = users.map(u => ({ ...u, total: leads.filter(l => l.created_by === u.id).length,
-      converted: leads.filter(l => l.created_by === u.id && ['Converted', 'Enrolled'].includes(l.stage)).length }));
+    const activeConversions = leads.filter(l => ['Converted', 'Enrolled'].includes(l.stage) && Boolean(getLeadAdmission(l, store.admissions))).length;
+    const historicalConversions = Math.max(0, converted - activeConversions);
+    const performance = users.map(u => {
+      const uLeads = leads.filter(l => l.created_by === u.id);
+      const uConverted = uLeads.filter(l => ['Converted', 'Enrolled'].includes(l.stage)).length;
+      const uActive = uLeads.filter(l => ['Converted', 'Enrolled'].includes(l.stage) && Boolean(getLeadAdmission(l, store.admissions))).length;
+      return {
+        ...u,
+        total: uLeads.length,
+        converted: uConverted,
+        activeConversions: uActive,
+        historicalConversions: Math.max(0, uConverted - uActive),
+      };
+    });
     return NextResponse.json({ success: true, users, teams, performance, metrics: {
       total: leads.length, new: leads.filter(l => l.stage === 'New').length,
       followups: leads.filter(l => Boolean(l.follow_up_date)).length,
       pending: leads.filter(l => !['Converted', 'Enrolled', 'Lost', 'Not Interested'].includes(l.stage)).length,
-      converted, conversionRate: leads.length ? Math.round(converted / leads.length * 100) : 0,
+      converted,
+      activeConversions,
+      historicalConversions,
+      conversionRate: leads.length ? Math.round(converted / leads.length * 100) : 0,
     } }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'CRM summary unavailable.';

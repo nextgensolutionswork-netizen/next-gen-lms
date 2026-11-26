@@ -25,6 +25,16 @@ export function getLeadAdmission(lead: Lead, admissions?: Admission[]): Admissio
 }
 
 /**
+ * Extracts a historical admission number reference from lead notes if present.
+ * Example note: "Converted to Admission: ADM-2026-0012"
+ */
+export function getLeadHistoricalAdmissionNumber(lead: Lead): string | undefined {
+  if (!lead.notes) return undefined;
+  const match = lead.notes.match(/Converted to Admission:\s*(ADM-[\w-]+)/i);
+  return match ? match[1] : undefined;
+}
+
+/**
  * Authoritatively determines whether a lead has already been converted to an admission.
  */
 export function isLeadConverted(lead: Lead, admissions?: Admission[]): boolean {

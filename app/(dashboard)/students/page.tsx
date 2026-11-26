@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -121,7 +122,10 @@ export default function StudentsListPage() {
 
   // Reset page to 1 when filters change
   React.useEffect(() => {
-    setCurrentPage(1);
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [search, courseFilter, batchFilter, statusFilter, pageSize]);
 
   // Pagination computations
@@ -400,10 +404,13 @@ export default function StudentsListPage() {
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <div className="flex items-center space-x-2.5">
                           {stu.photo_url || stu.profile_photo ? (
-                            <img
-                              src={stu.photo_url || stu.profile_photo}
+                            <Image
+                              src={stu.photo_url || stu.profile_photo || ''}
                               alt={stu.full_name}
+                              width={32}
+                              height={32}
                               className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                              unoptimized
                             />
                           ) : (
                             <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-[11px] shrink-0 border border-slate-200">

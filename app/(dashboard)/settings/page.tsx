@@ -41,7 +41,14 @@ import {
 export default function SettingsPage() {
   const { role: currentRole, hasPermission } = useAuth();
   const [settings, setSettings] = React.useState<SystemSettings>(() => {
-    const base = store.settings || {};
+    let localParsed: any = {};
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('institute_settings');
+        if (stored) localParsed = JSON.parse(stored);
+      } catch {}
+    }
+    const base = { ...(store.settings || {}), ...localParsed };
     return {
       id: base.id || 'sys-01',
       institute_name: base.institute_name || 'Next-Gen ERP Solutions',
@@ -116,7 +123,9 @@ export default function SettingsPage() {
   }, [currentRole]);
 
   React.useEffect(() => {
-    reloadBankAccounts();
+    void (async () => {
+      await reloadBankAccounts();
+    })();
   }, [reloadBankAccounts]);
 
   const handleVerifyAccount = async (accountId: string) => {
@@ -213,24 +222,7 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     let isMounted = true;
-    // 1. Immediately hydrate from localStorage if client had previously saved
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('institute_settings');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (isMounted) {
-            setSettings((prev) => ({
-              ...prev,
-              ...parsed,
-              bank_account_no: parsed.bank_account_no || parsed.bank_account_number || prev.bank_account_no,
-              bank_account_number: parsed.bank_account_number || parsed.bank_account_no || prev.bank_account_number,
-            }));
-          }
-          store.settings = { ...store.settings, ...parsed };
-        }
-      } catch {}
-    }
+    // 1. Immediately hydrate from localStorage is performed during initial state setup
 
     // 2. Fetch authoritative persisted settings from server disk snapshot
     void fetch('/api/settings')

@@ -71,7 +71,9 @@ export default function ReceiptsListPage() {
   }, []);
 
   React.useEffect(() => {
-    refreshList();
+    void (async () => {
+      await refreshList();
+    })();
   }, [refreshList]);
 
   const filteredReceipts = React.useMemo(() => {

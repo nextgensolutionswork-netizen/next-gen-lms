@@ -82,6 +82,7 @@ export default function FinanceReportsPage() {
   const dateRange = getDateRangeForPeriod(period, customStart, customEnd);
 
   const allUnifiedPayments = React.useMemo(() => {
+    void refreshTick;
     store.reconcileDualLedgers();
     return unifyDualLedgerPayments(
       store.payments || [],

@@ -50,51 +50,69 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [targetRedirect, setTargetRedirect] = useState<string | null>(null);
+  const [targetRedirect, setTargetRedirect] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const query = new URLSearchParams(window.location.search);
+      return query.get('redirectTo');
+    }
+    return null;
+  });
 
   useEffect(() => {
-    // Capture the callback before the auth client consumes its URL parameters.
-    const query = new URLSearchParams(window.location.search);
-    const redirectToParam = query.get('redirectTo');
-    if (redirectToParam) {
-      setTargetRedirect(redirectToParam);
-    }
+    const timer = setTimeout(() => {
+      // Capture the callback before the auth client consumes its URL parameters.
+      const query = new URLSearchParams(window.location.search);
+      // redirectTo query is read during initial state setup
 
-    // Security Defense: Strip any sensitive credentials that may have leaked into URL query
-    const sensitiveKeys = ['password', 'pass', 'pwd', 'secret', 'newPassword', 'confirmPassword'];
-    let hadSensitive = false;
-    sensitiveKeys.forEach((k) => {
-      if (query.has(k)) {
-        query.delete(k);
-        hadSensitive = true;
+      // Security Defense: Strip any sensitive credentials that may have leaked into URL query
+      const sensitiveKeys = ['password', 'pass', 'pwd', 'secret', 'newPassword', 'confirmPassword'];
+      let hadSensitive = false;
+      sensitiveKeys.forEach((k) => {
+        if (query.has(k)) {
+          query.delete(k);
+          hadSensitive = true;
+        }
+      });
+      if (hadSensitive && typeof window !== 'undefined') {
+        const cleanSearch = query.toString() ? `?${query.toString()}` : '';
+        window.history.replaceState(null, '', `${window.location.pathname}${cleanSearch}`);
+        setError('Insecure login attempt detected. Credentials must never be transmitted in the URL.');
       }
-    });
-    if (hadSensitive && typeof window !== 'undefined') {
-      const cleanSearch = query.toString() ? `?${query.toString()}` : '';
-      window.history.replaceState(null, '', `${window.location.pathname}${cleanSearch}`);
-      setError('Insecure login attempt detected. Credentials must never be transmitted in the URL.');
-    }
 
-    // Handle standard server-side redirect error and notice query parameters
-    const urlError = query.get('error') || query.get('reason');
-    if (urlError) {
-      const errorMap: Record<string, string> = {
-        invalid_credentials: 'Unable to sign in. Check your email and password and try again.',
-        missing_credentials: 'Please enter both your email address and password.',
-        onboarding_pending: 'Your LMS portal account is currently pending onboarding verification. Please contact your coordinator.',
-        account_deactivated: 'This account has been deactivated. Please contact the administrator.',
-        access_unavailable: 'We could not verify your LMS access. Please retry in a moment or contact your coordinator.',
-        insecure_request: 'Insecure login attempt detected. Credentials must never be transmitted in the URL.',
-        csrf_failed: 'Security verification failed. Please try signing in again.',
-      };
-      setError(errorMap[urlError] || 'Unable to sign in. Please try again.');
-    }
+      // Handle standard server-side redirect error and notice query parameters
+      const urlError = query.get('error') || query.get('reason');
+      if (urlError) {
+        const errorMap: Record<string, string> = {
+          invalid_credentials: 'Unable to sign in. Check your email and password and try again.',
+          missing_credentials: 'Please enter both your email address and password.',
+          onboarding_pending: 'Your LMS portal account is currently pending onboarding verification. Please contact your coordinator.',
+          account_deactivated: 'This account has been deactivated. Please contact the administrator.',
+          access_unavailable: 'We could not verify your LMS access. Please retry in a moment or contact your coordinator.',
+          insecure_request: 'Insecure login attempt detected. Credentials must never be transmitted in the URL.',
+          csrf_failed: 'Security verification failed. Please try signing in again.',
+        };
+        setError(errorMap[urlError] || 'Unable to sign in. Please try again.');
+      }
 
-    const urlNotice = query.get('notice');
-    if (urlNotice === 'logged_out') {
-      setNotice('You have been securely signed out.');
-    }
+      const urlNotice = query.get('notice');
+      if (urlNotice === 'logged_out') {
+        setNotice('You have been securely signed out.');
+      }
 
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      const authError = query.get('error_description') || hash.get('error_description');
+      const authErrorCode = query.get('error_code') || hash.get('error_code');
+      if (authErrorCode || authError) {
+        setForgotPasswordMode(true);
+        setError(
+          authErrorCode === 'otp_expired'
+            ? 'This account link has expired or was already used. Request a fresh link below.'
+            : authError || 'This account link could not be verified. Request a fresh link below.'
+        );
+      }
+    }, 0);
+
+    const query = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const authError = query.get('error_description') || hash.get('error_description');
     const authErrorCode = query.get('error_code') || hash.get('error_code');
@@ -102,14 +120,6 @@ export default function LoginPage() {
     const isPasswordLink = authType === 'invite' || authType === 'recovery';
     const supabase = createClient();
     supabaseRef.current = supabase;
-    if (authErrorCode || authError) {
-      setForgotPasswordMode(true);
-      setError(
-        authErrorCode === 'otp_expired'
-          ? 'This account link has expired or was already used. Request a fresh link below.'
-          : authError || 'This account link could not be verified. Request a fresh link below.'
-      );
-    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' && !authError && !authErrorCode) {
@@ -145,7 +155,10 @@ export default function LoginPage() {
       console.warn('[Login] getSession exception:', err);
     });
 
-    return () => authListener.subscription.unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
 

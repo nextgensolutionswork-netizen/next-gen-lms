@@ -124,19 +124,7 @@ export default function BatchesPage() {
     };
   }, []);
 
-  // Sync courseId & trainerId if store arrays change or load asynchronously
-  React.useEffect(() => {
-    if (!courseId && courses.length > 0) {
-      setCourseId(courses[0].id);
-    }
-  }, [courseId, courses]);
-
-  React.useEffect(() => {
-    if (!trainerId) {
-      const defaultTrainer = store.users.find((u) => u.role === 'trainer')?.id || user?.id || '';
-      if (defaultTrainer) setTrainerId(defaultTrainer);
-    }
-  }, [trainerId, user?.id]);
+  // courseId & trainerId are initialized and updated on form interaction
 
   // Edit Batch form state
   const [editBatchName, setEditBatchName] = React.useState('');
@@ -215,27 +203,7 @@ export default function BatchesPage() {
     return list;
   }, [batches, selectedStudent, isTrainer, user]);
 
-  // Synchronize student selection with available transferable students
-  React.useEffect(() => {
-    if (transferableStudents.length > 0) {
-      if (!studentId || !transferableStudents.some((s) => s.id === studentId)) {
-        setStudentId(transferableStudents[0].id);
-      }
-    } else {
-      setStudentId('');
-    }
-  }, [transferableStudents, studentId]);
-
-  // Whenever student selection or destinationBatches change, set default destination batch
-  React.useEffect(() => {
-    if (destinationBatches.length > 0) {
-      if (!targetBatchId || !destinationBatches.some((b) => b.id === targetBatchId)) {
-        setTargetBatchId(destinationBatches[0].id);
-      }
-    } else {
-      setTargetBatchId('');
-    }
-  }, [destinationBatches, targetBatchId]);
+  // Transfer student & destination batch selections default to first available option
 
   const toggleDaySelection = (day: string, current: string[], setter: (val: string[]) => void) => {
     if (current.includes(day)) {

@@ -30,7 +30,7 @@ export function Header({
   const { logout, user } = useAuth();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   React.useEffect(() => {
-    if (!user?.id) { setNotifications([]); return; }
+    if (!user?.id) return;
     let active = true;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;

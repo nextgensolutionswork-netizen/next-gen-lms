@@ -322,6 +322,14 @@ export function HlsVideoPlayer({
     };
   }, []);
 
+  const triggerTamperViolation = React.useCallback(() => {
+    setIsTamperDetected(true);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, []);
+
   // 3. Anti-Tampering Mutation Observer (DevTools / DOM inspection detection)
   React.useEffect(() => {
     const watermarkEl = watermarkRef.current;
@@ -367,15 +375,7 @@ export function HlsVideoPlayer({
     }
 
     return () => observer.disconnect();
-  }, []);
-
-  const triggerTamperViolation = () => {
-    setIsTamperDetected(true);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    }
-  };
+  }, [triggerTamperViolation]);
 
   const handleResetCompliance = () => {
     setIsTamperDetected(false);

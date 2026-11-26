@@ -137,7 +137,9 @@ export default function PlacementPage() {
   }, []);
 
   React.useEffect(() => {
-    loadData();
+    void (async () => {
+      await loadData();
+    })();
   }, [loadData]);
 
   const refreshData = async () => {
@@ -218,7 +220,8 @@ export default function PlacementPage() {
 
   // Reset modal pagination when filter or selected drive changes
   React.useEffect(() => {
-    setModalPage(1);
+    const timer = setTimeout(() => { setModalPage(1); }, 0);
+    return () => clearTimeout(timer);
   }, [modalStatusFilter, modalSearch, viewJobApplications?.id]);
 
   const handleCreateJob = async (e: React.FormEvent) => {

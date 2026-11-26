@@ -48,12 +48,15 @@ export function BulkImportModal({
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    setEntityType(defaultEntity);
-    setCsvText('');
-    setFileName(null);
-    setPreviewResult(null);
-    setExecutionResult(null);
-    setErrorMessage(null);
+    const timer = setTimeout(() => {
+      setEntityType(defaultEntity);
+      setCsvText('');
+      setFileName(null);
+      setPreviewResult(null);
+      setExecutionResult(null);
+      setErrorMessage(null);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [defaultEntity, isOpen]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

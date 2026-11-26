@@ -16,6 +16,26 @@ import {
   Layers,
 } from 'lucide-react';
 
+async function probeTodos(cookieStore: any) {
+  let todos: any[] | null = null;
+  let error: any = null;
+  const startTime = Date.now();
+  let probeDurationMs = 0;
+
+  try {
+    const supabase = await createClient(cookieStore);
+    const res = await supabase.from('todos').select();
+    todos = res.data;
+    error = res.error;
+    probeDurationMs = Date.now() - startTime;
+  } catch (err: any) {
+    error = { message: err?.message || 'Database connection probe failure' };
+    probeDurationMs = Date.now() - startTime;
+  }
+
+  return { todos, error, probeDurationMs };
+}
+
 export default async function TodosDiagnosticsPage() {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get(AUTH_COOKIE_NAME)?.value;
@@ -67,21 +87,7 @@ export default async function TodosDiagnosticsPage() {
     redirect('/dashboard');
   }
 
-  let todos: any[] | null = null;
-  let error: any = null;
-  const startTime = Date.now();
-  let probeDurationMs = 0;
-
-  try {
-    const supabase = await createClient(cookieStore);
-    const res = await supabase.from('todos').select();
-    todos = res.data;
-    error = res.error;
-    probeDurationMs = Date.now() - startTime;
-  } catch (err: any) {
-    error = { message: err?.message || 'Database connection probe failure' };
-    probeDurationMs = Date.now() - startTime;
-  }
+  const { todos, error, probeDurationMs } = await probeTodos(cookieStore);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock-sap-lms.supabase.co';
   const isMock = supabaseUrl.includes('mock-sap-lms');

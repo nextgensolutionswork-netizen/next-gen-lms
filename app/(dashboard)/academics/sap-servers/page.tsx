@@ -114,26 +114,7 @@ export default function SapServersPage() {
   const [statusMessage, setStatusMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [testingSysId, setTestingSysId] = React.useState<string | null>(null);
 
-  // Synchronize initial select state if empty or invalid
-  React.useEffect(() => {
-    if (store.students.length > 0) {
-      if (!selectedStudentId || !store.students.some((s) => s.id === selectedStudentId)) {
-        setSelectedStudentId(store.students[0].id);
-      }
-    } else {
-      setSelectedStudentId('');
-    }
-  }, [selectedStudentId]);
-
-  React.useEffect(() => {
-    if (systems.length > 0) {
-      if (!selectedSystemId || !systems.some((s) => s.id === selectedSystemId)) {
-        setSelectedSystemId(systems[0].id);
-      }
-    } else {
-      setSelectedSystemId('');
-    }
-  }, [systems, selectedSystemId]);
+  // Initial student and system selections are initialized from store
 
   // Server Infrastructure Management Form State
   const [isServerModalOpen, setIsServerModalOpen] = React.useState(false);

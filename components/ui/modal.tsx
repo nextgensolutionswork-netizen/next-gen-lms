@@ -23,11 +23,11 @@ export function Modal({
   maxWidth = 'lg',
   className = '',
 }: ModalProps) {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Lock background body scroll and handle ESC key when modal is open
   React.useEffect(() => {
