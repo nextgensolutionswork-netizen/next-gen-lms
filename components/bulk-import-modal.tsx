@@ -150,6 +150,63 @@ export function BulkImportModal({
       title="Excel / CSV Bulk Data Ingestion"
       description="Upload enterprise spreadsheets for bulk student enrollments, CRM lead acquisition, and attendance registers."
       maxWidth="2xl"
+      footer={
+        <div className="flex items-center justify-between">
+          <Button variant="outline" size="sm" onClick={onClose} className="text-xs">
+            {executionResult ? 'Close' : 'Cancel'}
+          </Button>
+
+          <div className="flex items-center space-x-2">
+            {!previewResult && !executionResult && (
+              <Button
+                variant="sap"
+                size="sm"
+                onClick={handleRunPreview}
+                disabled={isPreviewing || !csvText.trim()}
+                className="text-xs flex items-center space-x-1.5"
+              >
+                {isPreviewing ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Validating CSV...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Validate & Preview</span>
+                  </>
+                )}
+              </Button>
+            )}
+
+            {previewResult && !executionResult && (
+              <Button
+                variant="sap"
+                size="sm"
+                onClick={handleRunExecute}
+                disabled={
+                  isExecuting ||
+                  (previewResult.validRowsCount === 0 && !skipInvalid) ||
+                  (previewResult.errorRowsCount > 0 && !skipInvalid)
+                }
+                className="text-xs flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {isExecuting ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Committing Records...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    <span>Commit {previewResult.validRowsCount} Rows</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      }
     >
       <div className="space-y-5">
         {/* Entity Type Selector Tabs */}
@@ -391,62 +448,6 @@ export function BulkImportModal({
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <Button variant="outline" size="sm" onClick={onClose} className="text-xs">
-            {executionResult ? 'Close' : 'Cancel'}
-          </Button>
-
-          <div className="flex items-center space-x-2">
-            {!previewResult && !executionResult && (
-              <Button
-                variant="sap"
-                size="sm"
-                onClick={handleRunPreview}
-                disabled={isPreviewing || !csvText.trim()}
-                className="text-xs flex items-center space-x-1.5"
-              >
-                {isPreviewing ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Validating CSV...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-3.5 w-3.5" />
-                    <span>Validate & Preview</span>
-                  </>
-                )}
-              </Button>
-            )}
-
-            {previewResult && !executionResult && (
-              <Button
-                variant="sap"
-                size="sm"
-                onClick={handleRunExecute}
-                disabled={
-                  isExecuting ||
-                  (previewResult.validRowsCount === 0 && !skipInvalid) ||
-                  (previewResult.errorRowsCount > 0 && !skipInvalid)
-                }
-                className="text-xs flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                {isExecuting ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Committing Records...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    <span>Commit {previewResult.validRowsCount} Rows</span>
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
       </div>
     </Modal>
   );

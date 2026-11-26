@@ -24,6 +24,7 @@ import {
 } from '@/lib/services/academics-service';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useModalScrollLock } from '@/components/ui/modal';
 
 export interface QuizRunnerModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export function QuizRunnerModal({
   courseId,
   onQuizCompleted,
 }: QuizRunnerModalProps) {
+  useModalScrollLock(isOpen, onClose);
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [userAnswers, setUserAnswers] = React.useState<Record<string, string>>({});
   const [visitedQuestions, setVisitedQuestions] = React.useState<Set<number>>(new Set([0]));
@@ -172,8 +174,8 @@ export function QuizRunnerModal({
   const isTimeCritical = timeLeft < 120 && timeLeft > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain">
+      <div className="w-full max-w-[calc(100vw-1.5rem)] lg:max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] max-h-[92dvh]">
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white shrink-0">
           <div className="flex items-center space-x-3 overflow-hidden">
