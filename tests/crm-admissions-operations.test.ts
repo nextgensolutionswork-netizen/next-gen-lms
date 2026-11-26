@@ -7,7 +7,7 @@ import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { getStudents, getStudentProfileFullDetails } from '@/lib/services/student-service';
 
 describe('CRM, Admissions & Student 360 Operations Suite', () => {
-  const counsellorId = 'usr-counsellor-01';
+  const counsellorId = '33333333-3333-4333-8333-333333333301';
   const studentUserId = 'usr-student-01';
   const otherStudentUserId = 'usr-student-02';
 
@@ -108,11 +108,11 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
 
       expect(updated.stage).toBe('Follow-up');
       expect(updated.notes).toContain('Callback requested');
-      expect(updated.follow_up_date).toBe('2026-10-20T11:00:00');
+      expect(updated.follow_up_date).toBe(new Date('2026-10-20T11:00:00').toISOString());
 
       const persisted = store.leads.find((l) => l.id === lead.id);
       expect(persisted?.stage).toBe('Follow-up');
-      expect(persisted?.follow_up_date).toBe('2026-10-20T11:00:00');
+      expect(persisted?.follow_up_date).toBe(new Date('2026-10-20T11:00:00').toISOString());
 
       // Test completing follow-up
       const completed = await completeFollowup(
@@ -156,8 +156,8 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
       );
       expect(stageCount).toBe(2);
       expect(store.leads.find((l) => l.id === l1.id)?.stage).toBe('Demo Scheduled');
-      expect(store.leads.find((l) => l.id === l1.id)?.follow_up_date).toBe('2026-10-25T14:00:00');
-      expect(store.leads.find((l) => l.id === l2.id)?.follow_up_date).toBe('2026-10-25T14:00:00');
+      expect(store.leads.find((l) => l.id === l1.id)?.follow_up_date).toBe(new Date('2026-10-25T14:00:00').toISOString());
+      expect(store.leads.find((l) => l.id === l2.id)?.follow_up_date).toBe(new Date('2026-10-25T14:00:00').toISOString());
     });
 
     it('handles empty courses safely during lead creation and conversion helper', async () => {
@@ -203,7 +203,7 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
 
       const updatedLead = store.leads.find((l) => l.id === lead.id);
       expect(updatedLead?.stage).toBe('Demo Scheduled');
-      expect(updatedLead?.follow_up_date).toBe('2026-10-25T14:00:00');
+      expect(updatedLead?.follow_up_date).toBe(new Date('2026-10-25T14:00:00').toISOString());
       expect(updatedLead?.notes).toContain('Candidate asked for weekend batch details');
       expect(updatedLead?.notes).toContain('Scheduled faculty demo for S/4HANA Finance');
 

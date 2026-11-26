@@ -55,6 +55,7 @@ describe('BUG-14: RPC Admission Allocation & Security Properties', () => {
       const q: any = {
         eq: vi.fn().mockImplementation(() => q),
         in: vi.fn().mockImplementation(() => q),
+        or: vi.fn().mockImplementation(() => q),
         maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
         single: vi.fn().mockResolvedValue({ data, error: null }),
       };

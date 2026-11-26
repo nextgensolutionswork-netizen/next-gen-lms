@@ -10,11 +10,19 @@ vi.mock('@/lib/supabase/admin',()=>({createAdminClient:()=>({from:(table:string)
  const call:any={table,filters:[],offset:0,end:999}; state.calls.push(call);
  const q:any={
   select:()=>q,eq:(k:string,v:any)=>{call.filters.push([k,v]);return q;},in:(k:string,v:any[])=>{call.filters.push([k,v]);return q;},
+  or:(expr:string)=>{call.filters.push(['or',expr]);return q;},
   order:()=>q,range:(a:number,b:number)=>{call.offset=a;call.end=b;return q;},
   update:(data:any)=>{call.update=data;return q;},single:()=>{call.single=true;return q;},maybeSingle:()=>{call.single=true;return q;},
   then:(resolve:any)=>{
    if(state.fail&&table==='leads') return Promise.resolve({data:null,error:{message:'database unavailable'}}).then(resolve);
-   const rows=(state.tables[table]||[]).filter(r=>call.filters.every(([k,v]:any)=>Array.isArray(v)?v.includes(r[k]):r[k]===v));
+   const rows=(state.tables[table]||[]).filter(r=>call.filters.every(([k,v]:any)=>{
+     if(k==='or'){
+       const m=String(v).match(/counsellor_id\.eq\.([^,]+),and\(counsellor_id\.is\.null,created_by\.eq\.([^)]+)\)/);
+       if(!m) return false;
+       return r.counsellor_id===m[1]||((r.counsellor_id===null||r.counsellor_id===undefined)&&r.created_by===m[2]);
+     }
+     return Array.isArray(v)?v.includes(r[k]):r[k]===v;
+   }));
    if(call.update) rows.forEach(r=>Object.assign(r,call.update));
    return Promise.resolve({data:call.single?rows[0]||null:rows.slice(call.offset,call.end+1),error:null}).then(resolve);
   }
@@ -31,11 +39,11 @@ beforeEach(()=>{
 afterEach(()=>vi.restoreAllMocks());
 it('privileged reads have creator AND tenant predicates',async()=>{
  expect((await getLeads({},actor)).map(l=>l.id)).toEqual(['own']);
- expect(state.calls.find(c=>c.table==='leads').filters).toEqual(expect.arrayContaining([['tenant_id','default'],['created_by',['owner']]]));
+ expect(state.calls.find(c=>c.table==='leads').filters).toEqual(expect.arrayContaining([['tenant_id','default'],['or','counsellor_id.eq.owner,and(counsellor_id.is.null,created_by.eq.owner)']]));
 });
 it('privileged updates repeat the scope on the write, not only the preflight',async()=>{
  await updateLeadDetails('own',{notes:'Safe'},actor.id,actor);
- expect(state.calls.find(c=>c.update).filters).toEqual(expect.arrayContaining([['id','own'],['tenant_id','default'],['created_by',['owner']]]));
+ expect(state.calls.find(c=>c.update).filters).toEqual(expect.arrayContaining([['id','own'],['tenant_id','default'],['or','counsellor_id.eq.owner,and(counsellor_id.is.null,created_by.eq.owner)']]));
  await expect(updateLeadDetails('other',{notes:'Unsafe'},actor.id,actor)).rejects.toThrow('Forbidden');
 });
 it('refreshes role from protected profiles instead of stale or supplied role',async()=>{
@@ -49,5 +57,5 @@ it('every database page uses the same authorization predicates',async()=>{
  state.tables.leads=Array.from({length:1001},(_,i)=>({...state.tables.leads[0],id:`own-${i}`}));
  expect(await getLeads({},actor)).toHaveLength(1001);
  const calls=state.calls.filter(c=>c.table==='leads');expect(calls).toHaveLength(2);
- for(const c of calls) expect(c.filters).toEqual(expect.arrayContaining([['tenant_id','default'],['created_by',['owner']]]));
+ for(const c of calls) expect(c.filters).toEqual(expect.arrayContaining([['tenant_id','default'],['or','counsellor_id.eq.owner,and(counsellor_id.is.null,created_by.eq.owner)']]));
 });

@@ -291,6 +291,9 @@ export async function createLead(
     if (data.created_by !== undefined && data.created_by !== actor.id) throw new Error('Forbidden: Cannot impersonate a creator.');
     if (data.tenant_id !== undefined && data.tenant_id !== actor.tenant_id) throw new Error('Forbidden: Tenant mismatch.');
     data = leadFields.parse(data);
+    if (data.experience !== undefined && data.experience.trim() === '') {
+      throw new Error('Experience is required and cannot be empty.');
+    }
     await validateLeadAssignment(data.counsellor_id, actor);
     data = { ...data, created_by: actor.id, tenant_id: actor.tenant_id };
   }
@@ -993,7 +996,13 @@ export async function bulkAssignLeads(leadIds: string[], counsellorId: string, a
 }
 
 export async function bulkUpdateLeadStage(leadIds: string[], stage: LeadStage, updatedByUserId: string, notes?: string, followUpDate?: string | null, actor?: UserProfile): Promise<number> {
-  if (typeof window === 'undefined') { requireCrmActor(actor); for (const id of leadIds) await authorizedLead(id, actor); }
+  if (typeof window === 'undefined') {
+    requireCrmActor(actor);
+    if (actor.role === 'counsellor') {
+      throw new Error('Forbidden: Counsellors cannot perform bulk stage updates.');
+    }
+    for (const id of leadIds) await authorizedLead(id, actor);
+  }
   for (const id of leadIds) await updateLeadStage(id, stage, notes || '', updatedByUserId, followUpDate, actor);
   return leadIds.length;
 }
