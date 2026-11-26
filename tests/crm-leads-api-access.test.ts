@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({ auth: vi.fn(), create: vi.fn(), list: vi.fn() 
 vi.mock('@/lib/auth/payment-session', () => ({ authenticatePaymentRequest: mocks.auth }));
 vi.mock('@/lib/services/crm-service', () => ({ createLead: mocks.create, getLeads: mocks.list }));
 beforeEach(() => { vi.resetAllMocks(); });
-const request = () => new NextRequest('http://localhost/api/crm/leads', { method: 'POST', body: JSON.stringify({ full_name: 'Test', counsellor_id: 'spoofed' }) });
+const request = () => new NextRequest('http://localhost/api/crm/leads', { method: 'POST', body: JSON.stringify({ full_name: 'Test', experience: 'Fresher', counsellor_id: 'spoofed' }) });
 
 it('rejects unauthenticated reads and writes before calling privileged services', async () => {
   mocks.auth.mockRejectedValue(new Error('Unauthorized: Signed session required.'));
@@ -23,5 +23,5 @@ it('binds a counsellor submission to the authenticated staff member', async () =
   mocks.auth.mockResolvedValue({ id: 'staff-1', role: 'counsellor', tenant_id: 'default', is_active: true });
   mocks.create.mockResolvedValue({ id: 'saved' });
   expect((await POST(request())).status).toBe(200);
-  expect(mocks.create).toHaveBeenCalledWith({ full_name: 'Test', counsellor_id: 'staff-1' }, expect.objectContaining({ id: 'staff-1', is_active: true }));
+  expect(mocks.create).toHaveBeenCalledWith({ full_name: 'Test', experience: 'Fresher', counsellor_id: 'staff-1' }, expect.objectContaining({ id: 'staff-1', is_active: true }));
 });

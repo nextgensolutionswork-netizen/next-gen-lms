@@ -741,7 +741,7 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
     it('records tamper-evident audit events and retrieves chronological forensic logs', async () => {
       const { recordAuditLog, getAuditLogs } = await import('@/lib/services/audit-service');
 
-      const initialCount = (store.auditLogs || []).length;
+      const initialCount = (await getAuditLogs()).length;
       const testAction = `SECURITY_ROLE_TEST_${Date.now()}`;
 
       const created = await recordAuditLog({

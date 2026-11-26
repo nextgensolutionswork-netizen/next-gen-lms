@@ -92,11 +92,11 @@ describe('Course LMS & Curriculum Management Tests', () => {
 
   describe('2. Course, Module, and Lesson CRUD Lifecycle & Count Cascading', () => {
     it('creates, updates, and deletes course hierarchy with cascading integrity', async () => {
-      // 1. Create Course
+      // 1. Create Course (using a distinct code/name not pre-seeded in store.courses)
       const newCourse = await createCourse({
-        course_name: 'SAP ABAP on Cloud',
-        course_code: 'SAP-ABAP-2026',
-        description: 'Modern ABAP programming for SAP BTP and S/4HANA',
+        course_name: 'SAP BTP Extension Suite',
+        course_code: 'SAP-BTP-2026',
+        description: 'Modern ABAP & CAP programming for SAP BTP and S/4HANA',
         duration_weeks: 8,
         category: 'SAP Technical',
         price: 35000,

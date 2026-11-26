@@ -87,7 +87,7 @@ describe('13. Excel Export Engine & Meta/Google Ads CSV Import Integration', () 
 
       const leadsCsv = [
         'first_name,last_name,user_email,user_phone,campaign_name,ad_name,sap_module',
-        'Tanvi,Kulkarni,tanvi.kulkarni@ads-test.com,+91 99887 76655,Q1_Admissions_Drive,Ad_03,crs-fico-01',
+        'Tanvi,Kulkarni,tanvi.kulkarni@ads-test.com,+91 99887 76691,Q1_Admissions_Drive,Ad_03,crs-fico-01',
       ].join('\n');
 
       const result = await executeBulkImport('leads', leadsCsv, 'usr-counsellor-01', 'Priya Counsellor');

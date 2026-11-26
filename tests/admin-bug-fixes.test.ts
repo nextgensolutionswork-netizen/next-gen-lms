@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as createUserRoute, PATCH as updateUserRoute } from '@/app/api/users/route';
 import { POST as resetPasswordRoute } from '@/app/api/users/reset-password/route';
@@ -273,6 +273,7 @@ describe('Role 2 Admin Defect Resolution (BUG-AD-001 through BUG-AD-004)', () =>
     };
 
     beforeEach(() => {
+      vi.spyOn(store, 'hydrateFromDisk').mockReturnValue(false);
       // Ensure other-tenant student exists in store
       if (!store.students.some((s) => s.id === 'stu-external-01')) {
         store.students.push({
@@ -296,6 +297,10 @@ describe('Role 2 Admin Defect Resolution (BUG-AD-001 through BUG-AD-004)', () =>
           created_at: new Date().toISOString(),
         } as any);
       }
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
     });
 
     it('Scenario 1: Student accessing own profile — allowed (200 OK)', async () => {
