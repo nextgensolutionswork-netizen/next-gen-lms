@@ -71,6 +71,13 @@ import {
   deriveAdmissionsViewState,
   filterAdmissions,
 } from '@/lib/services/admissions-loading-state';
+import {
+  formatCourseBatchCombined,
+  formatCourseOptionLabel,
+  formatBatchOptionLabel,
+  formatCourseDisplay,
+  formatTrainingMode,
+} from '@/lib/utils/course-batch-display';
 
 export default function AdmissionsPage() {
   const router = useRouter();
@@ -1068,15 +1075,57 @@ export default function AdmissionsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3.5 py-2.5 whitespace-nowrap">
-                        <p className="font-semibold text-slate-800 text-xs">{adm.course_name}</p>
-                        <span className="text-[10px] text-slate-500 font-medium">{adm.training_mode || 'Online'}</span>
-                      </td>
-                      <td className="px-3.5 py-2.5 whitespace-nowrap">
-                        <span className="text-xs text-slate-700 font-medium">
-                          {adm.batch_name || 'Assigned Batch'}
-                        </span>
-                      </td>
+                      {(() => {
+                        const { course, batch } = formatCourseBatchCombined(
+                          {
+                            course_name: adm.course_name,
+                            course_id: adm.course_id,
+                            training_category: adm.training_category,
+                          },
+                          {
+                            batch_name: adm.batch_name,
+                            batch_id: adm.batch_id,
+                            training_mode: adm.training_mode,
+                          }
+                        );
+                        return (
+                          <>
+                            <td className="px-3.5 py-2.5 whitespace-nowrap">
+                              <p className="font-semibold text-slate-800 text-xs">{course.baseCourseName}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {course.trainingTypeBadge && (
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                                      course.isPersonalTraining
+                                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                    }`}
+                                  >
+                                    {course.trainingTypeBadge}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  {batch.modeLabel}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3.5 py-2.5 whitespace-nowrap">
+                              <span
+                                className={`text-xs font-medium ${
+                                  batch.isAssigned ? 'text-slate-700' : 'text-slate-400 italic'
+                                }`}
+                              >
+                                {batch.displayName}
+                              </span>
+                              {batch.isAssigned && batch.timingAndModeLabel !== 'Schedule unavailable' && (
+                                <span className="text-[10px] text-slate-500 block mt-0.5">
+                                  {batch.timingAndModeLabel}
+                                </span>
+                              )}
+                            </td>
+                          </>
+                        );
+                      })()}
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <span className="text-xs text-slate-800 font-semibold">
                           {adm.counsellor_name || (counsellorMap.get(adm.counsellor_id || '')?.full_name) || '—'}
@@ -1392,7 +1441,7 @@ export default function AdmissionsPage() {
                 >
                   {publishedCourses.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.course_name} (₹{(c.price ?? (c as any).fee ?? 0).toLocaleString('en-IN')})
+                      {formatCourseOptionLabel(c)}
                     </option>
                   ))}
                 </select>
@@ -1453,9 +1502,10 @@ export default function AdmissionsPage() {
                       const cap = b.maximum_capacity ?? 25;
                       const enrolled = b.current_enrolled || 0;
                       const isFull = enrolled >= cap;
+                      const selectedCourseName = courses.find((c) => c.id === courseId)?.course_name;
                       return (
                         <option key={b.id} value={b.id} disabled={isFull}>
-                          {b.batch_name} ({b.start_time}-{b.end_time}) [{enrolled}/{cap} seats]{isFull ? ' - FULL (No Seats)' : ''}
+                          {formatBatchOptionLabel(b, selectedCourseName)}
                         </option>
                       );
                     })
@@ -1829,7 +1879,7 @@ export default function AdmissionsPage() {
                   </strong>
                 </p>
                 <p className="text-emerald-700 text-[11px]">
-                  Course: {admissionSuccessModal.admission.course_name} | Mode: {admissionSuccessModal.admission.training_mode} | Counsellor Name: <strong className="font-semibold text-emerald-950">{admissionSuccessModal.admission.counsellor_name || counsellorMap.get(admissionSuccessModal.admission.counsellor_id || '')?.full_name || '—'}</strong>
+                  Course: {formatCourseDisplay({ course_name: admissionSuccessModal.admission.course_name }).baseCourseName} | Mode: {formatTrainingMode(admissionSuccessModal.admission.training_mode) || 'Mode unavailable'} | Counsellor Name: <strong className="font-semibold text-emerald-950">{admissionSuccessModal.admission.counsellor_name || counsellorMap.get(admissionSuccessModal.admission.counsellor_id || '')?.full_name || '—'}</strong>
                 </p>
               </div>
             </div>
