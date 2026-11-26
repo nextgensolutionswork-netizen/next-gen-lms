@@ -24,7 +24,7 @@ import {
 } from '@/lib/services/academics-service';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useModalScrollLock } from '@/components/ui/modal';
+import { useModalScrollLock, useModalFocusTrap } from '@/components/ui/modal';
 
 export interface QuizRunnerModalProps {
   isOpen: boolean;
@@ -45,7 +45,10 @@ export function QuizRunnerModal({
   courseId,
   onQuizCompleted,
 }: QuizRunnerModalProps) {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const quizTitleId = React.useId();
   useModalScrollLock(isOpen, onClose);
+  useModalFocusTrap(isOpen, dialogRef);
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [userAnswers, setUserAnswers] = React.useState<Record<string, string>>({});
   const [visitedQuestions, setVisitedQuestions] = React.useState<Set<number>>(new Set([0]));
@@ -175,7 +178,14 @@ export function QuizRunnerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain">
-      <div className="w-full max-w-[calc(100vw-1.5rem)] lg:max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] max-h-[92dvh]">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={quizTitleId}
+        className="w-full max-w-[calc(100vw-1.5rem)] lg:max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] max-h-[92dvh] outline-none"
+      >
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white shrink-0">
           <div className="flex items-center space-x-3 overflow-hidden">
@@ -189,7 +199,7 @@ export function QuizRunnerModal({
                 </span>
                 <span className="text-xs text-slate-300">Passing: {passingPercentage}%</span>
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-white truncate mt-0.5">
+              <h2 id={quizTitleId} className="text-sm sm:text-base font-bold text-white truncate mt-0.5">
                 {quiz.title}
               </h2>
             </div>

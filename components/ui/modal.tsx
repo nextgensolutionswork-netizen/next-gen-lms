@@ -4,11 +4,93 @@ import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-// Reference-counted background scroll lock & topmost Escape stack for nested modals
+// Reference-counted background scroll lock, topmost Escape stack & focus trap stack for nested modals
 let activeModalLocks = 0;
 let savedBodyOverflow = '';
 let savedBodyPaddingRight = '';
 const escapeHandlers: Array<() => void> = [];
+const dialogStack: Array<HTMLElement> = [];
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+  );
+}
+
+/**
+ * Traps Tab/Shift+Tab keyboard focus inside the topmost open dialog container and
+ * restores focus to the previously focused element (or parent dialog) when closed.
+ */
+export function attachDialogFocusTrap(container: HTMLElement | null): () => void {
+  if (!container || typeof document === 'undefined' || typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const previousActiveElement = document.activeElement as HTMLElement | null;
+  dialogStack.push(container);
+
+  if (!container.contains(document.activeElement)) {
+    const focusables = getFocusableElements(container);
+    const target = focusables[0] ?? container;
+    target.focus?.({ preventScroll: true });
+  }
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Tab' || dialogStack[dialogStack.length - 1] !== container) return;
+
+    const focusables = getFocusableElements(container);
+    if (focusables.length === 0) {
+      e.preventDefault();
+      container.focus?.({ preventScroll: true });
+      return;
+    }
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    if (e.shiftKey) {
+      if (!active || active === first || !container.contains(active)) {
+        e.preventDefault();
+        last.focus?.({ preventScroll: true });
+      }
+    } else if (!active || active === last || !container.contains(active)) {
+      e.preventDefault();
+      first.focus?.({ preventScroll: true });
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    const idx = dialogStack.lastIndexOf(container);
+    if (idx !== -1) dialogStack.splice(idx, 1);
+
+    if (previousActiveElement && previousActiveElement.isConnected) {
+      previousActiveElement.focus?.({ preventScroll: true });
+    }
+  };
+}
+
+export function useModalFocusTrap(
+  isOpen: boolean,
+  containerRef: React.RefObject<HTMLElement | null>
+) {
+  React.useEffect(() => {
+    if (!isOpen) return;
+    return attachDialogFocusTrap(containerRef.current);
+  }, [isOpen, containerRef]);
+}
 
 /**
  * Acquires a reference-counted background scroll lock and optional topmost Escape handler.
@@ -101,6 +183,7 @@ export function Modal({
 }: ModalProps) {
   const titleId = React.useId();
   const descId = React.useId();
+  const dialogRef = React.useRef<HTMLDivElement>(null);
 
   const mounted = React.useSyncExternalStore(
     () => () => {},
@@ -109,6 +192,7 @@ export function Modal({
   );
 
   useModalScrollLock(isOpen, onClose);
+  useModalFocusTrap(isOpen && mounted, dialogRef);
 
   if (!isOpen || !mounted) return null;
 
@@ -132,7 +216,9 @@ export function Modal({
       }}
     >
       <div
-        className={`w-full max-w-[calc(100vw-1.5rem)] ${maxWidths[maxWidth]} max-h-[90vh] max-h-[90dvh] flex flex-col rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden transform transition-all ${className}`}
+        ref={dialogRef}
+        tabIndex={-1}
+        className={`w-full max-w-[calc(100vw-1.5rem)] ${maxWidths[maxWidth]} max-h-[90vh] max-h-[90dvh] flex flex-col rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden transform transition-all outline-none ${className}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

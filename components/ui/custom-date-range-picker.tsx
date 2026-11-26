@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useModalScrollLock } from '@/components/ui/modal';
+import { useModalScrollLock, useModalFocusTrap } from '@/components/ui/modal';
 import {
   DateRange,
   validateDateRange,
@@ -38,6 +38,8 @@ export function CustomDateRangePicker({
   useModalScrollLock(isOpen, onClose);
   const todayStr = React.useMemo(() => getTodayInInstituteTimezone(new Date(), instituteTimezone), [instituteTimezone]);
 
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  useModalFocusTrap(isOpen, dialogRef);
   const [startDate, setStartDate] = React.useState<string>(currentRange?.startDate || todayStr);
   const [endDate, setEndDate] = React.useState<string>(currentRange?.endDate || todayStr);
 
@@ -188,7 +190,9 @@ export function CustomDateRangePicker({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200 overscroll-contain" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-lg overflow-hidden flex flex-col max-h-[90vh] max-h-[90dvh]"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-lg overflow-hidden flex flex-col max-h-[90vh] max-h-[90dvh] outline-none"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

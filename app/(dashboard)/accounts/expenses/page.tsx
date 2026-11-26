@@ -574,8 +574,18 @@ export default function ExpensesPage() {
         onClose={() => setIsAddModal(false)}
         title="Record New Expense"
         description="Book operating expenditure with vendor tagging and mandatory multi-tier approval workflow."
+        footer={
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="create-expense-form" variant="sap" size="sm">
+              Submit Expense Requisition
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreateExpense} className="space-y-4 text-xs">
+        <form id="create-expense-form" onSubmit={handleCreateExpense} className="space-y-4 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
@@ -690,14 +700,6 @@ export default function ExpensesPage() {
             </p>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="sap" size="sm">
-              Submit Expense Requisition
-            </Button>
-          </div>
         </form>
       </Modal>
 

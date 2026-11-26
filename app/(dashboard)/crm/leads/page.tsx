@@ -1480,8 +1480,18 @@ export default function LeadsPage() {
         onClose={() => setIsAddModalOpen(false)}
         title="Add New Prospective Lead"
         description="Record prospective student inquiry for SAP training."
+        footer={
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="create-lead-form" variant="sap" size="sm" disabled={Boolean(phoneError || whatsappError)}>
+              Create Lead
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreateLead} className="space-y-4 text-xs">
+        <form id="create-lead-form" onSubmit={handleCreateLead} className="space-y-4 text-xs">
           <p className="text-slate-600">Created by: {user?.full_name} (your signed-in account)</p>
           <Input
             label="Full Name *"
@@ -1709,14 +1719,6 @@ export default function LeadsPage() {
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="sap" size="sm" disabled={Boolean(phoneError || whatsappError)}>
-              Create Lead
-            </Button>
-          </div>
         </form>
       </Modal>
 
@@ -2115,6 +2117,22 @@ export default function LeadsPage() {
           onClose={() => setIsConvertModalOpen(false)}
           title={`Convert Lead to Confirmed Admission: ${selectedLead.full_name}`}
           description={`Lead Code: ${selectedLead.lead_code} | Converting to student admission record`}
+          footer={
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsConvertModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="sap"
+                size="sm"
+                onClick={handleConvertLead}
+                disabled={isConverting || publishedCourses.length === 0}
+              >
+                {isConverting ? 'Converting...' : 'Confirm Admission & Create Profile'}
+              </Button>
+            </div>
+          }
         >
           <div className="space-y-4 text-xs">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
@@ -2282,19 +2300,6 @@ export default function LeadsPage() {
               );
             })()}
 
-            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => setIsConvertModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="sap"
-                size="sm"
-                onClick={handleConvertLead}
-                disabled={isConverting || publishedCourses.length === 0}
-              >
-                {isConverting ? 'Converting...' : 'Confirm Admission & Create Profile'}
-              </Button>
-            </div>
           </div>
         </Modal>
       )}

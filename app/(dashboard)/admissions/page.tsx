@@ -930,8 +930,18 @@ export default function AdmissionsPage() {
         title="Register New Student Admission"
         description="Enrolls the student, assigns course & batch, creates fee account, and tracks the outstanding balance."
         maxWidth="2xl"
+        footer={
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsNewModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="new-admission-form" variant="sap" size="sm" disabled={isSubmitting || isPaymentProofUploading || (courseBatches.length > 0 && !batchId)}>
+              {isSubmitting ? 'Registering Admission...' : 'Confirm Admission & Submit Payment'}
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreateAdmission} className="space-y-4 text-xs">
+        <form id="new-admission-form" onSubmit={handleCreateAdmission} className="space-y-4 text-xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input
               label="Student Full Name *"
@@ -1577,15 +1587,6 @@ export default function AdmissionsPage() {
               )}
             </div>
 
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsNewModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="sap" size="sm" disabled={isSubmitting || isPaymentProofUploading || (courseBatches.length > 0 && !batchId)}>
-              {isSubmitting ? 'Registering Admission...' : 'Confirm Admission & Submit Payment'}
-            </Button>
           </div>
         </form>
       </Modal>

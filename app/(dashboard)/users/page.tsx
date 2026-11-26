@@ -984,8 +984,18 @@ export default function UsersPage() {
         onClose={() => setIsAddModal(false)}
         title="Add Staff Member / Trainer"
         description="Assign RBAC roles and academic course scopes."
+        footer={
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="create-user-form" variant="sap" size="sm">
+              Create User Account
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreate} className="space-y-4 text-xs">
+        <form id="create-user-form" onSubmit={handleCreate} className="space-y-4 text-xs">
           <Input
             label="Full Name *"
             placeholder="e.g. Manoj Verma"
@@ -1065,14 +1075,6 @@ export default function UsersPage() {
             </div>
           )}
 
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="sap" size="sm">
-              Create User Account
-            </Button>
-          </div>
         </form>
       </Modal>
     </div>

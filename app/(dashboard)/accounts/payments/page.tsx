@@ -949,8 +949,24 @@ export default function PaymentsPage() {
         title="Record Student Fee Payment"
         description="Records student payment against an approved fee plan with strict separation of duties."
         maxWidth="lg"
+        footer={
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCollectModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="record-payment-form"
+              variant="sap"
+              size="sm"
+              disabled={!selectedFee || approvedFees.length === 0 || proofUploading || !proofUrl}
+            >
+              Commit Payment
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleRecordFeePayment} className="space-y-4 text-xs">
+        <form id="record-payment-form" onSubmit={handleRecordFeePayment} className="space-y-4 text-xs">
           {errorMessage && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center space-x-2">
               <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
@@ -1156,19 +1172,6 @@ export default function PaymentsPage() {
             </div>
           )}
 
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsCollectModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="sap"
-              size="sm"
-              disabled={!selectedFee || approvedFees.length === 0 || proofUploading || !proofUrl}
-            >
-              Commit Payment
-            </Button>
-          </div>
         </form>
       </Modal>
 
