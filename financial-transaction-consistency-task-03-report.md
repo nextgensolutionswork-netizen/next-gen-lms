@@ -227,3 +227,9 @@ Read-only SQL verification against Supabase project `tgohtdzwehhjfahtgovq`:
 - **Isolated Staging (`mzkrvvnmmjcjygwllabn`):** 20/20 PostgreSQL integration assertions + 500-student / 1,500-payment workload + expense settlement failure-injection passed.
 - **Automated Suites:** 310/310 passed across all 7 TASK-01/02/03 test files; `tsc --noEmit` (0 errors), `npm run lint` (0 errors, 121 warnings), `npm run build` (52/52 routes).
 - **Live Browser Verification:** `BLOCKED (AUTH_REQUIRED)` on `/accounts/approvals`; see [task-03-final-qa-acceptance-report.md](task-03-final-qa-acceptance-report.md).
+
+
+---
+
+## TASK-03 Revalidation on `95f392b` (2026-11-26)
+- Isolated worktree `wt-task03` @ `95f392b`: `tsc` (`0` errors), `eslint` (`0` errors, `0` warnings), `next build` (`52/52` routes), targeted suites (`433/433` passed). See [task-03-final-qa-acceptance-report.md](task-03-final-qa-acceptance-report.md).

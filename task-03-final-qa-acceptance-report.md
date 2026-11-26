@@ -57,3 +57,21 @@ Live authenticated role-wise browser testing on `https://next-gen-lms-omega.verc
   6. Latest complete application regression results.
   7. Active Vercel deployment ID verification.
   8. External bank statement reconciliation (subject to statement availability).
+
+
+---
+
+## Final Revalidation & Formal Closure Addendum (2026-11-26)
+- **Verified Commit (`origin/main`):** `95f392b` (`Reconcile historical CRM ownership and conversions and clean up React hooks`)
+- **Active Vercel Deployment:** `dpl_AxfLjjTgarYPeKKdwX1WSNUxd8HR` (`https://next-gen-bcu3m0u90-nextgensolutionswork-3370.vercel.app`, alias `https://next-gen-lms-omega.vercel.app`, `Ready`)
+- **Isolated Worktree (`wt-task03` @ `95f392b`) Build & Targeted Suites:**
+  - `npx tsc --noEmit`: **0 errors**
+  - `npm run lint`: **0 errors, 0 warnings**
+  - `npm run build`: **52/52** routes compiled
+  - Targeted TASK-01/02/03/04 Suites: **11/11 files, 433/433 tests passed** (`financial-transaction-consistency-task-03.test.ts` `101/101`, `financial-authoritative-persistence.test.ts` `35/35`, `financial-reconciliation.test.ts` `47/47`, `pending-payments-reconciliation.test.ts` `11/11`, `e2e-accountant-fee-approval.test.ts` `16/16`, `production-data-integrity.test.ts` `40/40`, `payment-id-mapping-task-01.test.ts` `15/15`, `backend-synchronization-task-02.test.ts` `60/60`, `backend-synchronization-task-02-hardening.test.ts` `31/31`, `vercel-sso-auth-task-04.test.ts` `7/7`, `trainer-70-scenarios.test.ts` `70/70`).
+- **Isolated Staging PG Integration (`mzkrvvnmmjcjygwllabn`):** Verified atomic `commit_fee_workflow` (`30,000` net, `14,000` verified, `16,000` outstanding), immutable `receipts`, terminal payment guard, `40001` revision conflict, mid-transaction `amount=0` rollback, and `settle_expense_atomic` concurrency (`PASS`).
+- **Production DB (`tgohtdzwehhjfahtgovq`):** `ADM-2026-0025` / `NGERP-2026-00001` (`₹10,000`, `2026-11-02`, `bank-acc-14` / `T Usha`, `Vineethaa`, `Pending Approval`) and `ADM-2026-0026` / `NGERP-2026-00002` (`₹33,000`, `2026-11-25`, `bank-acc-05` / `My Erp Hub`, `Vineethaa`, `Pending Approval`) intact (`receipts_cnt=0`, `expenses_cnt=0`, `wf_rev=39`).
+- **FIN-001 – FIN-060 Coverage:** `FIN-001`–`FIN-060` verified via `financial-transaction-consistency-task-03.test.ts` (`101/101`), `financial-authoritative-persistence.test.ts` (`35/35`), `financial-reconciliation.test.ts` (`47/47`), `payment-id-mapping-task-01.test.ts` (`15/15`), and staging PG integration (`PASS`).
+- **External Bank Reconciliation:** `NOT PERFORMED` (no external bank statement feed).
+- **Live Authenticated Browser Approval Desk & 20+50 Browser Capacity:** `BLOCKED (AUTH_REQUIRED)` — carried forward to TASK-11 / TASK-12.
+- **Full Vitest Regression Suite (`wt-task03` @ `95f392b`):** **122/129 files passed**, **2,127/2,135 tests passed** (`0` financial/TASK-03 regressions; `7` pre-existing non-TASK-03 failures + `1` CRM lead test added in `95f392b`).
