@@ -857,6 +857,7 @@ describe('BUG-15 — CRM Lead Update & Historical Lead Editing Test Suite', () =
         id: leadId,
         lead_code: 'LD-2026-20202020-2020',
         full_name: 'UUID Test Lead',
+        email: 'uuid-test@example.com',
         phone: '9848020202',
         country_code: '+91',
         stage: 'New',
@@ -895,6 +896,7 @@ describe('BUG-15 — CRM Lead Update & Historical Lead Editing Test Suite', () =
         id: leadId,
         lead_code: 'LD-2026-21212121-2121',
         full_name: 'Date Test Lead',
+        email: 'date-test@example.com',
         phone: '9848021212',
         country_code: '+91',
         stage: 'New',
@@ -949,6 +951,7 @@ describe('BUG-15 — CRM Lead Update & Historical Lead Editing Test Suite', () =
         id: leadId,
         lead_code: 'LD-2026-22222222-2222',
         full_name: 'Senior Lead',
+        email: 'senior-lead@example.com',
         phone: '9848022223',
         country_code: '+91',
         stage: 'New',
@@ -978,6 +981,7 @@ describe('BUG-15 — CRM Lead Update & Historical Lead Editing Test Suite', () =
         id: leadId,
         lead_code: 'LD-2026-23232323-2323',
         full_name: 'Converted Lead',
+        email: 'converted-lead@example.com',
         phone: '9848023232',
         country_code: '+91',
         stage: 'Converted',
@@ -997,7 +1001,7 @@ describe('BUG-15 — CRM Lead Update & Historical Lead Editing Test Suite', () =
         VINEETHAA_ID,
         vineethaa
       )
-    ).rejects.toThrow(/Forbidden: Counsellors cannot reassign lead ownership/i);
+    ).rejects.toThrow(/Forbidden: Counsellors cannot reassign leads/i);
 
     // Converted lead cannot be demoted away from Converted
     await expect(

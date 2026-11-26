@@ -843,7 +843,7 @@ export async function createAdmissionWorkflow(
 
     if (isLiveSupabaseEnabled() && transactional) {
       const targetLeadId = input.lead_id;
-      const targetNotes = lead.notes;
+      const targetNotes = lead ? lead.notes : `Converted to Admission: ${admission_number}`;
       onTransactionCommit(async () => {
         try {
           const supabase = createAdminClient();
