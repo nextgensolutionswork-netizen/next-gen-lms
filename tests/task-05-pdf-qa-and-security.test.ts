@@ -79,6 +79,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
     store.onboardingCases = [];
     store.studentRefunds = [];
     store.auditLogs = [];
+    store.settings = { ...(store.settings || {}), institute_name: OFFICIAL_INSTITUTE_NAME } as any;
   });
 
   it('Phase H & I: Controlled financial PDF scenario (35k/5k/14k/6k/2k) + bank account mapping + non-mutation', async () => {
