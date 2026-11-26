@@ -3,7 +3,7 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { acquireModalLock } from '@/components/ui/modal';
+import { acquireModalLock, attachDialogFocusTrap } from '@/components/ui/modal';
 import { CustomDateRangePicker } from '@/components/ui/custom-date-range-picker';
 import { QuizRunnerModal } from '@/components/portal/quiz-runner-modal';
 
@@ -24,6 +24,7 @@ describe('TASK-07: Modal Scrolling, Whitespace, Responsive Layout & UX Optimizat
     (globalThis as Record<string, unknown>).document = {
       body: { style: bodyStyle },
       documentElement: { clientWidth: 1265 },
+      activeElement: null,
     };
 
     (globalThis as Record<string, unknown>).window = {
@@ -32,6 +33,17 @@ describe('TASK-07: Modal Scrolling, Whitespace, Responsive Layout & UX Optimizat
       removeEventListener: (_type: string, fn: (e: KeyboardEvent) => void) => listeners.delete(fn),
       dispatchEscape: () => {
         const event = { key: 'Escape', stopPropagation: vi.fn() } as unknown as KeyboardEvent;
+        for (const fn of Array.from(listeners)) {
+          fn(event);
+        }
+        return event;
+      },
+      dispatchTab: (shiftKey = false) => {
+        const event = {
+          key: 'Tab',
+          shiftKey,
+          preventDefault: vi.fn(),
+        } as unknown as KeyboardEvent;
         for (const fn of Array.from(listeners)) {
           fn(event);
         }
@@ -141,10 +153,117 @@ describe('TASK-07: Modal Scrolling, Whitespace, Responsive Layout & UX Optimizat
     expect(html).toContain('max-w-[calc(100vw-1.5rem)]');
     expect(html).toContain('max-h-[92dvh]');
     expect(html).toContain('overscroll-contain');
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="true"');
   });
 
   it('wires sticky Modal footer on BulkImportModal so action buttons remain visible during long previews', () => {
     const src = readComponent('components/bulk-import-modal.tsx');
     expect(src).toContain('footer={');
+  });
+
+  it('maintains balanced scroll lock across Strict Mode double setup/cleanup and repeated open/close cycles', () => {
+    document.body.style.overflow = 'auto';
+    document.body.style.paddingRight = '4px';
+
+    for (let i = 0; i < 3; i++) {
+      // Simulate Strict Mode mount -> unmount -> remount
+      const release1 = acquireModalLock(vi.fn());
+      expect(document.body.style.overflow).toBe('hidden');
+      release1();
+      expect(document.body.style.overflow).toBe('auto');
+      expect(document.body.style.paddingRight).toBe('4px');
+
+      const release2 = acquireModalLock(vi.fn());
+      expect(document.body.style.overflow).toBe('hidden');
+      release2();
+      expect(document.body.style.overflow).toBe('auto');
+      expect(document.body.style.paddingRight).toBe('4px');
+    }
+  });
+
+  it('traps Tab/Shift+Tab in topmost dialog and restores focus from child to parent dialog and then trigger', () => {
+    const makeEl = (id: string) => {
+      const el = {
+        id,
+        isConnected: true,
+        hasAttribute: () => false,
+        getAttribute: () => null,
+        focus: vi.fn(() => {
+          (document as unknown as { activeElement: unknown }).activeElement = el;
+        }),
+      };
+      return el;
+    };
+
+    const triggerBtn = makeEl('trigger-btn');
+    const pFirst = makeEl('parent-first');
+    const pLast = makeEl('parent-last');
+    const cFirst = makeEl('child-first');
+    const cLast = makeEl('child-last');
+
+    const parentDialog = {
+      id: 'parent-dialog',
+      contains: (node: unknown) => node === parentDialog || node === pFirst || node === pLast,
+      querySelectorAll: () => [pFirst, pLast],
+      focus: vi.fn(),
+    } as unknown as HTMLElement;
+
+    const childDialog = {
+      id: 'child-dialog',
+      contains: (node: unknown) => node === childDialog || node === cFirst || node === cLast,
+      querySelectorAll: () => [cFirst, cLast],
+      focus: vi.fn(),
+    } as unknown as HTMLElement;
+
+    (document as unknown as { activeElement: unknown }).activeElement = triggerBtn;
+    const releaseParentTrap = attachDialogFocusTrap(parentDialog);
+    expect(pFirst.focus).toHaveBeenCalledTimes(1);
+
+    // Move focus to last element in parent, then open child dialog
+    pLast.focus();
+    const releaseChildTrap = attachDialogFocusTrap(childDialog);
+    expect(cFirst.focus).toHaveBeenCalledTimes(1);
+
+    // Shift+Tab from first element in child wraps to last element in child (does NOT touch parent)
+    const tabBack = (window as unknown as { dispatchTab: (s: boolean) => KeyboardEvent }).dispatchTab(true);
+    expect(tabBack.preventDefault).toHaveBeenCalledTimes(1);
+    expect(cLast.focus).toHaveBeenCalledTimes(1);
+
+    // Tab from last element in child wraps to first element in child
+    const tabFwd = (window as unknown as { dispatchTab: (s: boolean) => KeyboardEvent }).dispatchTab(false);
+    expect(tabFwd.preventDefault).toHaveBeenCalledTimes(1);
+    expect(cFirst.focus).toHaveBeenCalledTimes(2);
+
+    // Closing child restores focus to parent's pLast
+    releaseChildTrap();
+    expect(pLast.focus).toHaveBeenCalledTimes(2);
+
+    // Closing parent restores focus to original triggerBtn
+    releaseParentTrap();
+    expect(triggerBtn.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('wires sticky Modal footers with preserved form associations on prioritized long-form business modals', () => {
+    const leads = readComponent('app/(dashboard)/crm/leads/page.tsx');
+    expect(leads).toContain('form="create-lead-form"');
+    expect(leads).toContain('id="create-lead-form"');
+    expect(leads).toContain('Confirm Admission & Create Profile');
+
+    const admissions = readComponent('app/(dashboard)/admissions/page.tsx');
+    expect(admissions).toContain('form="new-admission-form"');
+    expect(admissions).toContain('id="new-admission-form"');
+
+    const payments = readComponent('app/(dashboard)/accounts/payments/page.tsx');
+    expect(payments).toContain('form="record-payment-form"');
+    expect(payments).toContain('id="record-payment-form"');
+
+    const expenses = readComponent('app/(dashboard)/accounts/expenses/page.tsx');
+    expect(expenses).toContain('form="create-expense-form"');
+    expect(expenses).toContain('id="create-expense-form"');
+
+    const users = readComponent('app/(dashboard)/users/page.tsx');
+    expect(users).toContain('form="create-user-form"');
+    expect(users).toContain('id="create-user-form"');
   });
 });
