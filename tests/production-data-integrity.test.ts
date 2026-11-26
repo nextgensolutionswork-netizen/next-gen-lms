@@ -617,6 +617,15 @@ describe('TASK-01: Production Data Integrity & Prevention of Deleted Data Restor
           }),
         }),
       } as any);
+      vi.spyOn(adminModule, 'createAdminClient').mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        }),
+      } as any);
 
       const leadActor = { id: 'counsellor-lead-01', role: 'counsellor_lead' } as any;
       const list = await getAdmissions(leadActor);

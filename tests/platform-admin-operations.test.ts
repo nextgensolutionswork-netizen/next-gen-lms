@@ -491,9 +491,12 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
     });
 
     it('correctly filters financial collections based on temporal period boundaries', () => {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const pastWeekStr = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
-      const oldMonthStr = new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10);
+      const now = new Date();
+      const formatLocalDate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const todayStr = formatLocalDate(now);
+      const pastWeekStr = formatLocalDate(new Date(now.getTime() - 3 * 86400000));
+      const oldMonthStr = formatLocalDate(new Date(now.getTime() - 45 * 86400000));
 
       const testPayments = [
         { id: 't-pay-1', amount: 5000, payment_date: todayStr },
