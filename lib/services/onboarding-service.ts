@@ -1463,9 +1463,14 @@ export async function getUnbackfilledAdmissionsCount(user: UserProfile): Promise
     return 0;
   }
   const confirmedAdmissions = store.admissions.filter((a) => a.status === 'Confirmed' && tenantId(a) === tenantId(user));
-  return confirmedAdmissions.filter(
-    (a) => !store.onboardingCases.some((c) => c.admission_id === a.id)
-  ).length;
+  return confirmedAdmissions.filter((adm) => {
+    if (store.onboardingCases.some((c) => c.admission_id === adm.id)) return false;
+    const student = store.students.find(
+      (s) => s.admission_id === adm.id || s.admission_number === adm.admission_number || s.email === adm.email
+    );
+    if (student && store.onboardingCases.some((c) => c.student_id === student.id)) return false;
+    return true;
+  }).length;
 }
 
 /**
