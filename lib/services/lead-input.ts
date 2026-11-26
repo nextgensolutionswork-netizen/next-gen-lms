@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { LeadSource } from '@/types';
 
 export const leadFields = z.object({
   full_name: z.string().trim().min(1).max(250), phone: z.string().min(1).max(50), email: z.string().max(320),
@@ -9,7 +10,7 @@ export const leadFields = z.object({
   dob: z.string().max(50).optional(),
   address: z.string().max(1000).optional(),
   training_preference: z.enum(['Online', 'Offline', 'Classroom', 'Hybrid']).optional(),
-  lead_source: z.enum(['Website', 'Google Ads', 'Meta Ads', 'YouTube', 'Referral', 'Walk-in', 'Other']).optional(),
+  lead_source: z.string().trim().min(1).max(200).transform((v) => v as LeadSource).optional(),
   campaign: z.string().max(500).optional(), counsellor_id: z.string().max(100).optional(),
   demo_preference: z.boolean().optional(), demo_date: z.string().max(50).optional(), follow_up_date: z.string().max(50).optional(),
   notes: z.string().max(20000).optional(),

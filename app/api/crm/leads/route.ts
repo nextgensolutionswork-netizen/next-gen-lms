@@ -65,6 +65,14 @@ export async function POST(request: NextRequest) {
     if (body.tenant_id !== undefined && body.tenant_id !== actor.tenant_id) {
       return NextResponse.json({ success: false, error: 'Forbidden: Tenant mismatch.' }, { status: 403 });
     }
+    const hasValidExpText = typeof body.experience === 'string' && body.experience.trim().length > 0;
+    const hasValidExpYears = typeof body.experience_years === 'number' && Number.isFinite(body.experience_years) && body.experience_years >= 0;
+    if (!hasValidExpText && !hasValidExpYears) {
+      return NextResponse.json(
+        { success: false, error: 'Experience is required for manual lead creation.' },
+        { status: 400 }
+      );
+    }
     const lead = await createLead({
       ...body,
       ...(actor.role === 'counsellor' ? { counsellor_id: actor.id } : {}),
