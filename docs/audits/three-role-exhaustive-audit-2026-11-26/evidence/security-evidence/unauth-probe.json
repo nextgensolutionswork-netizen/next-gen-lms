@@ -1,0 +1,80 @@
+[
+  {
+    "endpoint": "/api/users",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "endpoint": "/api/audit-logs",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "endpoint": "/api/database/backup",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "endpoint": "/api/database/health",
+    "status": 200,
+    "exposed": true,
+    "preview": "{\"success\":true,\"health\":{\"status\":\"connected\",\"isLive\":true,\"latencyMs\":689,\"tables\":{\"admissions\":0,\"students\":0,\"cour"
+  },
+  {
+    "endpoint": "/api/crm/leads",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/students",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/admissions",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/fees/payments",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/fees/receipts",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Receipt access denied.\"}"
+  },
+  {
+    "endpoint": "/api/fees/reconcile",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/settings",
+    "status": 200,
+    "exposed": true,
+    "preview": "{\"success\":true,\"settings\":{\"id\":\"sys-01\",\"institute_name\":\"Next-Gen ERP Solutions\",\"tagline\":\"Premier SAP Training, Cer"
+  },
+  {
+    "endpoint": "/api/bulk-import/template",
+    "status": 200,
+    "exposed": true,
+    "preview": "full_name,email,phone,course_code,batch_code,course_fee,paid_amount,address,city\nRohan Verma,rohan.verma@example.com,+91"
+  },
+  {
+    "endpoint": "/api/dashboard/metrics",
+    "status": 401,
+    "exposed": false,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  }
+]

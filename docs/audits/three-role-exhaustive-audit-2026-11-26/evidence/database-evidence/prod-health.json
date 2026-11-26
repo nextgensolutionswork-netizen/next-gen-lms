@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "health": {
+    "status": "connected",
+    "isLive": true,
+    "latencyMs": 244,
+    "tables": {
+      "admissions": 0,
+      "students": 0,
+      "courses": 0,
+      "batches": 0,
+      "payments": 0,
+      "leads": 0,
+      "attendance_records": 0,
+      "student_doubts": 0
+    },
+    "totalRecords": 0,
+    "lastSyncTimestamp": "2026-11-26T18:42:26.382Z"
+  }
+}

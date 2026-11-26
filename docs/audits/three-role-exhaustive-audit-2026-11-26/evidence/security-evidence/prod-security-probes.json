@@ -1,0 +1,118 @@
+[
+  {
+    "check": "UNAUTH GET /api/database/health",
+    "status": 200,
+    "ms": 2889,
+    "pass": false,
+    "preview": "{\"success\":true,\"health\":{\"status\":\"connected\",\"isLive\":true,\"latencyMs\":270,\"tables\":{\"admissions\":0,\"students\":0,\"courses\":0,\"batches\":0,\""
+  },
+  {
+    "check": "UNAUTH GET /api/bulk-import/template",
+    "status": 200,
+    "ms": 249,
+    "pass": false,
+    "preview": "full_name,email,phone,course_code,batch_code,course_fee,paid_amount,address,city\nRohan Verma,rohan.verma@example.com,+91 98765 11223,crs-fic"
+  },
+  {
+    "check": "UNAUTH POST /api/bulk-import/preview",
+    "status": 200,
+    "ms": 284,
+    "pass": false,
+    "preview": "{\"success\":true,\"data\":{\"entityType\":\"students\",\"totalRows\":1,\"validRowsCount\":0,\"errorRowsCount\":1,\"warningRowsCount\":1,\"errors\":[{\"rowNumb"
+  },
+  {
+    "check": "UNAUTH GET /api/users",
+    "status": 401,
+    "ms": 274,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/audit-logs",
+    "status": 401,
+    "ms": 325,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/database/backup",
+    "status": 401,
+    "ms": 252,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/crm/leads",
+    "status": 401,
+    "ms": 244,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/students",
+    "status": 401,
+    "ms": 303,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/fees/payments",
+    "status": 401,
+    "ms": 300,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/fees/receipts",
+    "status": 401,
+    "ms": 247,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Receipt access denied.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/fees/reconcile",
+    "status": 401,
+    "ms": 236,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "check": "UNAUTH GET /api/settings",
+    "status": 200,
+    "ms": 322,
+    "pass": false,
+    "preview": "{\"success\":true,\"settings\":{\"id\":\"sys-01\",\"institute_name\":\"Next-Gen ERP Solutions\",\"tagline\":\"Premier SAP Training, Certification & Placeme"
+  },
+  {
+    "check": "UNAUTH GET /api/dashboard/metrics",
+    "status": 401,
+    "ms": 246,
+    "pass": true,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "check": "UNAUTH POST /api/payments/create-order",
+    "status": 400,
+    "ms": 250,
+    "pass": false,
+    "preview": "{\"success\":false,\"error\":\"Payment amount must be greater than zero\"}"
+  },
+  {
+    "check": "SALES_ISOLATION GET /api/crm/leads",
+    "status": 200,
+    "pass": true,
+    "preview": "leadsCount=2"
+  },
+  {
+    "check": "SALES_ISOLATION GET /api/students vs /api/fees/receipts",
+    "status": 200,
+    "pass": false,
+    "preview": "studentsApi=0, receiptsSnapshotStudents=2"
+  },
+  {
+    "check": "SALES_RBAC GET /api/settings",
+    "status": 200,
+    "pass": false,
+    "preview": "HTTP 200"
+  }
+]

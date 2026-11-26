@@ -1,0 +1,251 @@
+{
+  "month": {
+    "success": true,
+    "period": "month",
+    "dateRange": {
+      "startDate": "2026-11-01",
+      "endDate": "2026-11-27"
+    },
+    "timeZone": "Asia/Kolkata",
+    "metrics": {
+      "collections": {
+        "periodCollections": 0,
+        "transactionCount": 0
+      },
+      "expenses": {
+        "periodExpenses": 0,
+        "count": 0
+      },
+      "netOperatingBalance": 0,
+      "outstandingFees": {
+        "totalOutstanding": 68000,
+        "pendingAmountInPeriod": 68000,
+        "pendingAccountsCount": 2
+      },
+      "paymentApproval": {
+        "approvedAmount": 0,
+        "approvedCount": 0,
+        "pendingAmount": 43000,
+        "pendingCount": 2
+      },
+      "enrollment": {
+        "newEnrollmentsCount": 2,
+        "activeStudentsCount": 2
+      },
+      "leads": {
+        "totalLeads": 29,
+        "convertedLeads": 16
+      },
+      "courseBreakdown": [
+        {
+          "id": "c1000000-0000-4000-a000-000000000101",
+          "name": "SAP FICO PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 2
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000102",
+          "name": "SAP FICO NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000103",
+          "name": "SAP MM PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000104",
+          "name": "SAP ABAP NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "__unassigned__",
+          "name": "Unassigned / unknown course",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        }
+      ],
+      "lifetime": {
+        "totalStudents": 2,
+        "activeStudents": 2,
+        "totalCourses": 4,
+        "activeBatches": 0,
+        "upcomingDemos": 0,
+        "activeJobOpenings": 2
+      }
+    }
+  },
+  "year": {
+    "success": true,
+    "period": "month",
+    "dateRange": {
+      "startDate": "2026-11-01",
+      "endDate": "2026-11-27"
+    },
+    "timeZone": "Asia/Kolkata",
+    "metrics": {
+      "collections": {
+        "periodCollections": 0,
+        "transactionCount": 0
+      },
+      "expenses": {
+        "periodExpenses": 0,
+        "count": 0
+      },
+      "netOperatingBalance": 0,
+      "outstandingFees": {
+        "totalOutstanding": 68000,
+        "pendingAmountInPeriod": 68000,
+        "pendingAccountsCount": 2
+      },
+      "paymentApproval": {
+        "approvedAmount": 0,
+        "approvedCount": 0,
+        "pendingAmount": 43000,
+        "pendingCount": 2
+      },
+      "enrollment": {
+        "newEnrollmentsCount": 2,
+        "activeStudentsCount": 2
+      },
+      "leads": {
+        "totalLeads": 29,
+        "convertedLeads": 16
+      },
+      "courseBreakdown": [
+        {
+          "id": "c1000000-0000-4000-a000-000000000101",
+          "name": "SAP FICO PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 2
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000102",
+          "name": "SAP FICO NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000103",
+          "name": "SAP MM PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000104",
+          "name": "SAP ABAP NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "__unassigned__",
+          "name": "Unassigned / unknown course",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        }
+      ],
+      "lifetime": {
+        "totalStudents": 2,
+        "activeStudents": 2,
+        "totalCourses": 4,
+        "activeBatches": 0,
+        "upcomingDemos": 0,
+        "activeJobOpenings": 2
+      }
+    }
+  },
+  "all": {
+    "success": true,
+    "period": "all",
+    "dateRange": {},
+    "timeZone": "Asia/Kolkata",
+    "metrics": {
+      "collections": {
+        "periodCollections": 0,
+        "transactionCount": 0
+      },
+      "expenses": {
+        "periodExpenses": 0,
+        "count": 0
+      },
+      "netOperatingBalance": 0,
+      "outstandingFees": {
+        "totalOutstanding": 68000,
+        "pendingAmountInPeriod": 68000,
+        "pendingAccountsCount": 2
+      },
+      "paymentApproval": {
+        "approvedAmount": 0,
+        "approvedCount": 0,
+        "pendingAmount": 43000,
+        "pendingCount": 2
+      },
+      "enrollment": {
+        "newEnrollmentsCount": 2,
+        "activeStudentsCount": 2
+      },
+      "leads": {
+        "totalLeads": 29,
+        "convertedLeads": 16
+      },
+      "courseBreakdown": [
+        {
+          "id": "c1000000-0000-4000-a000-000000000101",
+          "name": "SAP FICO PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 2
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000102",
+          "name": "SAP FICO NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000103",
+          "name": "SAP MM PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000104",
+          "name": "SAP ABAP NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "__unassigned__",
+          "name": "Unassigned / unknown course",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        }
+      ],
+      "lifetime": {
+        "totalStudents": 2,
+        "activeStudents": 2,
+        "totalCourses": 4,
+        "activeBatches": 0,
+        "upcomingDemos": 0,
+        "activeJobOpenings": 2
+      }
+    }
+  }
+}

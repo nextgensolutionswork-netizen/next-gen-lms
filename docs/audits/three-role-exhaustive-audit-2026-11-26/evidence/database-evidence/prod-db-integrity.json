@@ -1,0 +1,198 @@
+{
+  "timestamp": "2026-11-26T18:41:24.403Z",
+  "counts": {
+    "leads": 29,
+    "admissions": 2,
+    "students": 2,
+    "feeAccounts": 2,
+    "studentFees": 2,
+    "payments": 2,
+    "receipts": 0,
+    "dues": 1,
+    "users": 8,
+    "auditLogs": 4,
+    "healthTables": {
+      "admissions": 0,
+      "students": 0,
+      "courses": 0,
+      "batches": 0,
+      "payments": 0,
+      "leads": 0,
+      "attendance_records": 0,
+      "student_doubts": 0
+    }
+  },
+  "anomalies": [],
+  "reconciliation": {
+    "reconcileReport": {
+      "tenant_id": "default",
+      "generated_at": "2026-11-26T18:41:34.964Z",
+      "levels": [
+        {
+          "level": 1,
+          "label": "Student & Admission Fee Agreement Integrity",
+          "checks_executed": 8,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        },
+        {
+          "level": 2,
+          "label": "Payments & Receipts Consistency",
+          "checks_executed": 8,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        },
+        {
+          "level": 3,
+          "label": "Bank Account Mapping Integrity",
+          "checks_executed": 8,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        },
+        {
+          "level": 4,
+          "label": "Installment Allocation Integrity",
+          "checks_executed": 0,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        },
+        {
+          "level": 5,
+          "label": "Expenses & Settlements Integrity",
+          "checks_executed": 0,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        },
+        {
+          "level": 6,
+          "label": "Dashboard & Reports Consistency",
+          "checks_executed": 3,
+          "discrepancies": [
+            {
+              "level": 6,
+              "severity": "info",
+              "code": "L6-COLLECTION-SUMMARY",
+              "message": "Verified: ₹0 | Pending: ₹43,000 | Outstanding: ₹68,000 | Net Payable: ₹68,000",
+              "entity_type": "summary",
+              "details": {
+                "verifiedCollections": 0,
+                "pendingCollections": 43000,
+                "totalOutstanding": 68000,
+                "totalNetPayable": 68000
+              }
+            }
+          ],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        },
+        {
+          "level": 7,
+          "label": "Snapshot & Operation Integrity",
+          "checks_executed": 5,
+          "discrepancies": [
+            {
+              "level": 7,
+              "severity": "info",
+              "code": "L7-NORMALIZED-TOTALS",
+              "message": "Normalized verified total: ₹0 | Normalized outstanding: ₹68,000",
+              "entity_type": "summary",
+              "details": {
+                "normalizedVerified": 0,
+                "normalizedOutstanding": 68000
+              }
+            }
+          ],
+          "passed": true,
+          "checked_at": "2026-11-26T18:41:34.964Z"
+        }
+      ],
+      "total_discrepancies": 2,
+      "critical_count": 0,
+      "warning_count": 0,
+      "info_count": 2,
+      "external_bank_reconciliation": "Not Performed",
+      "passed": true,
+      "summary": "All 7 reconciliation levels passed. 0 warning(s), 2 informational note(s)."
+    },
+    "metricsAll": {
+      "collections": {
+        "periodCollections": 0,
+        "transactionCount": 0
+      },
+      "expenses": {
+        "periodExpenses": 0,
+        "count": 0
+      },
+      "netOperatingBalance": 0,
+      "outstandingFees": {
+        "totalOutstanding": 68000,
+        "pendingAmountInPeriod": 68000,
+        "pendingAccountsCount": 2
+      },
+      "paymentApproval": {
+        "approvedAmount": 0,
+        "approvedCount": 0,
+        "pendingAmount": 43000,
+        "pendingCount": 2
+      },
+      "enrollment": {
+        "newEnrollmentsCount": 2,
+        "activeStudentsCount": 2
+      },
+      "leads": {
+        "totalLeads": 29,
+        "convertedLeads": 16
+      },
+      "courseBreakdown": [
+        {
+          "id": "c1000000-0000-4000-a000-000000000101",
+          "name": "SAP FICO PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 2
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000102",
+          "name": "SAP FICO NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000103",
+          "name": "SAP MM PERSONAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "c1000000-0000-4000-a000-000000000104",
+          "name": "SAP ABAP NORMAL TRAINING",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        },
+        {
+          "id": "__unassigned__",
+          "name": "Unassigned / unknown course",
+          "transactions": 0,
+          "amount": 0,
+          "students": 0
+        }
+      ],
+      "lifetime": {
+        "totalStudents": 2,
+        "activeStudents": 2,
+        "totalCourses": 4,
+        "activeBatches": 0,
+        "upcomingDemos": 0,
+        "activeJobOpenings": 2
+      }
+    }
+  }
+}

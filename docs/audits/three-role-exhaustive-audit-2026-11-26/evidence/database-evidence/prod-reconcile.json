@@ -1,0 +1,98 @@
+{
+  "success": true,
+  "report": {
+    "tenant_id": "default",
+    "generated_at": "2026-11-26T18:42:20.277Z",
+    "levels": [
+      {
+        "level": 1,
+        "label": "Student & Admission Fee Agreement Integrity",
+        "checks_executed": 8,
+        "discrepancies": [],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.276Z"
+      },
+      {
+        "level": 2,
+        "label": "Payments & Receipts Consistency",
+        "checks_executed": 8,
+        "discrepancies": [],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.276Z"
+      },
+      {
+        "level": 3,
+        "label": "Bank Account Mapping Integrity",
+        "checks_executed": 8,
+        "discrepancies": [],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.276Z"
+      },
+      {
+        "level": 4,
+        "label": "Installment Allocation Integrity",
+        "checks_executed": 0,
+        "discrepancies": [],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.276Z"
+      },
+      {
+        "level": 5,
+        "label": "Expenses & Settlements Integrity",
+        "checks_executed": 0,
+        "discrepancies": [],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.276Z"
+      },
+      {
+        "level": 6,
+        "label": "Dashboard & Reports Consistency",
+        "checks_executed": 3,
+        "discrepancies": [
+          {
+            "level": 6,
+            "severity": "info",
+            "code": "L6-COLLECTION-SUMMARY",
+            "message": "Verified: ₹0 | Pending: ₹43,000 | Outstanding: ₹68,000 | Net Payable: ₹68,000",
+            "entity_type": "summary",
+            "details": {
+              "verifiedCollections": 0,
+              "pendingCollections": 43000,
+              "totalOutstanding": 68000,
+              "totalNetPayable": 68000
+            }
+          }
+        ],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.276Z"
+      },
+      {
+        "level": 7,
+        "label": "Snapshot & Operation Integrity",
+        "checks_executed": 5,
+        "discrepancies": [
+          {
+            "level": 7,
+            "severity": "info",
+            "code": "L7-NORMALIZED-TOTALS",
+            "message": "Normalized verified total: ₹0 | Normalized outstanding: ₹68,000",
+            "entity_type": "summary",
+            "details": {
+              "normalizedVerified": 0,
+              "normalizedOutstanding": 68000
+            }
+          }
+        ],
+        "passed": true,
+        "checked_at": "2026-11-26T18:42:20.277Z"
+      }
+    ],
+    "total_discrepancies": 2,
+    "critical_count": 0,
+    "warning_count": 0,
+    "info_count": 2,
+    "external_bank_reconciliation": "Not Performed",
+    "passed": true,
+    "summary": "All 7 reconciliation levels passed. 0 warning(s), 2 informational note(s)."
+  }
+}

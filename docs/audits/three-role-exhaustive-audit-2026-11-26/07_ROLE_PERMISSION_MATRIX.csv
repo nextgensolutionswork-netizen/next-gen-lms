@@ -1,0 +1,25 @@
+Resource,Super Admin,Admin,Sales (counsellor),Verification Notes
+/api/dashboard/metrics,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/crm/leads,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/crm/summary,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/crm/history,HTTP 403,HTTP 403,HTTP 403,Observed live on production
+/api/admissions,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/students,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/counsellors,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/fees/dues,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/fees/upcoming-dues,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/fees/payments,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/fees/receipts,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/fees/reconcile,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/vendors,HTTP 200,HTTP 403,HTTP 403,Observed live on production
+/api/onboarding/cases,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/onboarding/analytics,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/placement/jobs,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/placement/enrollments,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/placement/applications,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/users,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/audit-logs,HTTP 200,HTTP 200,HTTP 403,Observed live on production
+/api/settings,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/settings/bank-accounts,HTTP 200,HTTP 200,HTTP 200,Observed live on production
+/api/admin/integrity-monitor,HTTP 404,HTTP 404,HTTP 404,Observed live on production
+/api/database/health,HTTP 200,HTTP 200,HTTP 200,Observed live on production

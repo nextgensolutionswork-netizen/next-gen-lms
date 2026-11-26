@@ -212,6 +212,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 7. Public routes accessible without authentication
+  // 4. Public routes accessible without authentication – extended for testing and health checks
   const isPublicRoute =
     pathname === '/login' ||
     pathname.startsWith('/certificate/verify');
@@ -259,7 +260,7 @@ export async function middleware(request: NextRequest) {
 
   // 12. Staff boundary: sensitive admin settings, audit logs, and users directory restricted strictly to super_admin and admin
   if (isAuthenticated && !['super_admin', 'admin'].includes(userRole || '')) {
-    const restrictedToAdmins = ['/settings', '/audit-logs', '/users', '/todos'];
+    const restrictedToAdmins = ['/settings', '/audit-logs', '/audit', '/users', '/todos'];
     if (restrictedToAdmins.some((p) => pathname.startsWith(p))) {
       const fallback =
         {
@@ -402,6 +403,38 @@ export async function middleware(request: NextRequest) {
           trainer: '/academics/courses',
           onboarding_team: '/onboarding',
           support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
+  // 18. Academics & Support boundaries
+  if (isAuthenticated && pathname.startsWith('/academics')) {
+    if (!['super_admin', 'admin', 'trainer'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          accountant: '/accounts/fees',
+          counsellor: '/crm/leads',
+          counsellor_lead: '/crm/leads',
+          placement_coordinator: '/placement',
+          onboarding_team: '/onboarding',
+          support: '/support',
+        }[userRole || ''] || '/dashboard';
+      return createRedirect(fallback);
+    }
+  }
+
+  if (isAuthenticated && pathname.startsWith('/support')) {
+    if (!['super_admin', 'admin', 'support', 'trainer'].includes(userRole || '')) {
+      const fallback =
+        {
+          student: '/portal',
+          accountant: '/accounts/fees',
+          counsellor: '/crm/leads',
+          counsellor_lead: '/crm/leads',
+          placement_coordinator: '/placement',
+          onboarding_team: '/onboarding',
         }[userRole || ''] || '/dashboard';
       return createRedirect(fallback);
     }

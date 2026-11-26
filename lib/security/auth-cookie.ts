@@ -5,8 +5,17 @@
 
 export const AUTH_COOKIE_NAME = 'next_gen_auth_user';
 export const AUTH_SIG_COOKIE_NAME = 'next_gen_auth_user_sig';
-export const AUTH_COOKIE_SECRET =
-  process.env.AUTH_COOKIE_SECRET || 'next-gen-lms-secure-auth-secret-2026';
+export const AUTH_COOKIE_SECRET = (() => {
+  const secret = process.env.AUTH_COOKIE_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'test') {
+      // Provide a deterministic secret for test environments only.
+      return 'test-secret-123';
+    }
+    throw new Error('AUTH_COOKIE_SECRET environment variable is required for authentication security.');
+  }
+  return secret;
+})();
 
 /**
  * Computes an HMAC-SHA256 hex signature for an auth cookie value using Web Crypto / Node crypto.

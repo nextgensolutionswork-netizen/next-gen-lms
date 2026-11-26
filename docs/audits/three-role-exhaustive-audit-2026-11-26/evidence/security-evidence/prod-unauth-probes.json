@@ -1,0 +1,86 @@
+[
+  {
+    "endpoint": "/api/database/health",
+    "status": 200,
+    "ms": 2544,
+    "preview": "{\"success\":true,\"health\":{\"status\":\"connected\",\"isLive\":true,\"latencyMs\":248,\"tables\":{\"admissions\":0,\"students\":0,\"cour"
+  },
+  {
+    "endpoint": "/api/bulk-import/template",
+    "status": 200,
+    "ms": 235,
+    "preview": "full_name,email,phone,course_code,batch_code,course_fee,paid_amount,address,city\nRohan Verma,rohan.verma@example.com,+91"
+  },
+  {
+    "endpoint": "/api/users",
+    "status": 401,
+    "ms": 331,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "endpoint": "/api/crm/leads",
+    "status": 401,
+    "ms": 262,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/students",
+    "status": 401,
+    "ms": 249,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/admissions",
+    "status": 401,
+    "ms": 310,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/fees/payments",
+    "status": 401,
+    "ms": 295,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/fees/receipts",
+    "status": 401,
+    "ms": 267,
+    "preview": "{\"success\":false,\"error\":\"Receipt access denied.\"}"
+  },
+  {
+    "endpoint": "/api/fees/reconcile",
+    "status": 401,
+    "ms": 265,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/audit-logs",
+    "status": 401,
+    "ms": 261,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+  },
+  {
+    "endpoint": "/api/settings",
+    "status": 200,
+    "ms": 301,
+    "preview": "{\"success\":true,\"settings\":{\"id\":\"sys-01\",\"institute_name\":\"Next-Gen ERP Solutions\",\"tagline\":\"Premier SAP Training, Cer"
+  },
+  {
+    "endpoint": "/api/settings/bank-accounts",
+    "status": 401,
+    "ms": 273,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Authentication required to view bank account presets.\"}"
+  },
+  {
+    "endpoint": "/api/counsellors",
+    "status": 401,
+    "ms": 253,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  },
+  {
+    "endpoint": "/api/dashboard/metrics",
+    "status": 401,
+    "ms": 257,
+    "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+  }
+]

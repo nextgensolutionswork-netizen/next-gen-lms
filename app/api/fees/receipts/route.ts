@@ -8,11 +8,25 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const actor = await authenticatePaymentRequest(request);
-    if (!['student', 'counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role)) return NextResponse.json({ success: false }, { status: 403 });
+    if (!['student', 'counsellor', 'accountant', 'admin', 'super_admin'].includes(actor.role)) {
+      return NextResponse.json({ success: false }, { status: 403 });
+    }
     const snapshot = await paymentTransaction(actor, () => {
-      const students = store.students.filter((s) => tenantId(s) === tenantId(actor) && (actor.role !== 'student' || s.user_id === actor.id));
-      return { students, receipts: store.receipts.filter((r) => tenantId(r) === tenantId(actor) && students.some((s) => s.id === r.student_id)) };
+      const students = store.students.filter(
+        (s) =>
+          tenantId(s) === tenantId(actor) &&
+          (actor.role !== 'student' || s.user_id === actor.id) &&
+          (actor.role !== 'counsellor' || s.counsellor_id === actor.id)
+      );
+      return {
+        students,
+        receipts: store.receipts.filter(
+          (r) => tenantId(r) === tenantId(actor) && students.some((s) => s.id === r.student_id)
+        ),
+      };
     }, true);
     return NextResponse.json({ success: true, snapshot }, { headers: { 'Cache-Control': 'private, no-store' } });
-  } catch { return NextResponse.json({ success: false, error: 'Receipt access denied.' }, { status: 401 }); }
+  } catch {
+    return NextResponse.json({ success: false, error: 'Receipt access denied.' }, { status: 401 });
+  }
 }

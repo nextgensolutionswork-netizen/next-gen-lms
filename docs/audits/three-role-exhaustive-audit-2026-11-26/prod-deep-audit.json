@@ -1,0 +1,776 @@
+{
+  "timestamp": "2026-11-26T18:42:01.591Z",
+  "unauthenticatedSecurity": [
+    {
+      "endpoint": "/api/database/health",
+      "status": 200,
+      "ok": true,
+      "ms": 2485,
+      "preview": "{\"success\":true,\"health\":{\"status\":\"connected\",\"isLive\":true,\"latencyMs\":236,\"tables\":{\"admissions\":0,\"students\":0,\"courses\":0,\"batches\":0,\""
+    },
+    {
+      "endpoint": "/api/bulk-import/template?entityType=students",
+      "status": 200,
+      "ok": true,
+      "ms": 282,
+      "preview": "full_name,email,phone,course_code,batch_code,course_fee,paid_amount,address,city\nRohan Verma,rohan.verma@example.com,+91 98765 11223,crs-fic"
+    },
+    {
+      "endpoint": "/api/users",
+      "status": 401,
+      "ok": false,
+      "ms": 237,
+      "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+    },
+    {
+      "endpoint": "/api/crm/leads",
+      "status": 401,
+      "ok": false,
+      "ms": 247,
+      "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+    },
+    {
+      "endpoint": "/api/students",
+      "status": 401,
+      "ok": false,
+      "ms": 249,
+      "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+    },
+    {
+      "endpoint": "/api/fees/payments",
+      "status": 401,
+      "ok": false,
+      "ms": 277,
+      "preview": "{\"success\":false,\"error\":\"Unauthorized: Signed session required.\"}"
+    },
+    {
+      "endpoint": "/api/fees/receipts",
+      "status": 401,
+      "ok": false,
+      "ms": 251,
+      "preview": "{\"success\":false,\"error\":\"Receipt access denied.\"}"
+    },
+    {
+      "endpoint": "/api/audit-logs",
+      "status": 401,
+      "ok": false,
+      "ms": 247,
+      "preview": "{\"success\":false,\"error\":\"Unauthorized: Valid authentication session cookie or Bearer token is required.\"}"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ok": true,
+      "ms": 235,
+      "preview": "{\"success\":true,\"settings\":{\"id\":\"sys-01\",\"institute_name\":\"Next-Gen ERP Solutions\",\"tagline\":\"Premier SAP Training, Certification & Placeme"
+    },
+    {
+      "endpoint": "/api/settings/bank-accounts",
+      "status": 401,
+      "ok": false,
+      "ms": 266,
+      "preview": "{\"success\":false,\"error\":\"Unauthorized: Authentication required to view bank account presets.\"}"
+    }
+  ],
+  "reconciliation": {
+    "leadsCount": 29,
+    "studentsCount": 2,
+    "usersCount": 8,
+    "studentFeesCount": 2,
+    "studentPaymentsCount": 2,
+    "reconcileReport": {
+      "tenant_id": "default",
+      "generated_at": "2026-11-26T18:42:20.277Z",
+      "levels": [
+        {
+          "level": 1,
+          "label": "Student & Admission Fee Agreement Integrity",
+          "checks_executed": 8,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.276Z"
+        },
+        {
+          "level": 2,
+          "label": "Payments & Receipts Consistency",
+          "checks_executed": 8,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.276Z"
+        },
+        {
+          "level": 3,
+          "label": "Bank Account Mapping Integrity",
+          "checks_executed": 8,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.276Z"
+        },
+        {
+          "level": 4,
+          "label": "Installment Allocation Integrity",
+          "checks_executed": 0,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.276Z"
+        },
+        {
+          "level": 5,
+          "label": "Expenses & Settlements Integrity",
+          "checks_executed": 0,
+          "discrepancies": [],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.276Z"
+        },
+        {
+          "level": 6,
+          "label": "Dashboard & Reports Consistency",
+          "checks_executed": 3,
+          "discrepancies": [
+            {
+              "level": 6,
+              "severity": "info",
+              "code": "L6-COLLECTION-SUMMARY",
+              "message": "Verified: ₹0 | Pending: ₹43,000 | Outstanding: ₹68,000 | Net Payable: ₹68,000",
+              "entity_type": "summary",
+              "details": {
+                "verifiedCollections": 0,
+                "pendingCollections": 43000,
+                "totalOutstanding": 68000,
+                "totalNetPayable": 68000
+              }
+            }
+          ],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.276Z"
+        },
+        {
+          "level": 7,
+          "label": "Snapshot & Operation Integrity",
+          "checks_executed": 5,
+          "discrepancies": [
+            {
+              "level": 7,
+              "severity": "info",
+              "code": "L7-NORMALIZED-TOTALS",
+              "message": "Normalized verified total: ₹0 | Normalized outstanding: ₹68,000",
+              "entity_type": "summary",
+              "details": {
+                "normalizedVerified": 0,
+                "normalizedOutstanding": 68000
+              }
+            }
+          ],
+          "passed": true,
+          "checked_at": "2026-11-26T18:42:20.277Z"
+        }
+      ],
+      "total_discrepancies": 2,
+      "critical_count": 0,
+      "warning_count": 0,
+      "info_count": 2,
+      "external_bank_reconciliation": "Not Performed",
+      "passed": true,
+      "summary": "All 7 reconciliation levels passed. 0 warning(s), 2 informational note(s)."
+    },
+    "healthTables": {
+      "admissions": 0,
+      "students": 0,
+      "courses": 0,
+      "batches": 0,
+      "payments": 0,
+      "leads": 0,
+      "attendance_records": 0,
+      "student_doubts": 0
+    },
+    "dupPhonesCount": 0,
+    "dupStuIdsCount": 0,
+    "dupTxRefsCount": 0,
+    "negFeesCount": 0,
+    "sampleMarkersCount": 0
+  },
+  "dbIntegrityFindings": [],
+  "dashboardPeriods": {
+    "today": {
+      "status": 200,
+      "ms": 800,
+      "metrics": {
+        "success": true,
+        "period": "today",
+        "dateRange": {
+          "startDate": "2026-11-27",
+          "endDate": "2026-11-27"
+        },
+        "timeZone": "Asia/Kolkata",
+        "metrics": {
+          "collections": {
+            "periodCollections": 0,
+            "transactionCount": 0
+          },
+          "expenses": {
+            "periodExpenses": 0,
+            "count": 0
+          },
+          "netOperatingBalance": 0,
+          "outstandingFees": {
+            "totalOutstanding": 68000,
+            "pendingAmountInPeriod": 68000,
+            "pendingAccountsCount": 2
+          },
+          "paymentApproval": {
+            "approvedAmount": 0,
+            "approvedCount": 0,
+            "pendingAmount": 0,
+            "pendingCount": 0
+          },
+          "enrollment": {
+            "newEnrollmentsCount": 0,
+            "activeStudentsCount": 2
+          },
+          "leads": {
+            "totalLeads": 0,
+            "convertedLeads": 0
+          },
+          "courseBreakdown": [
+            {
+              "id": "c1000000-0000-4000-a000-000000000101",
+              "name": "SAP FICO PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 2
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000102",
+              "name": "SAP FICO NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000103",
+              "name": "SAP MM PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000104",
+              "name": "SAP ABAP NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "__unassigned__",
+              "name": "Unassigned / unknown course",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            }
+          ],
+          "lifetime": {
+            "totalStudents": 2,
+            "activeStudents": 2,
+            "totalCourses": 4,
+            "activeBatches": 0,
+            "upcomingDemos": 0,
+            "activeJobOpenings": 2
+          }
+        }
+      }
+    },
+    "month": {
+      "status": 200,
+      "ms": 751,
+      "metrics": {
+        "success": true,
+        "period": "month",
+        "dateRange": {
+          "startDate": "2026-11-01",
+          "endDate": "2026-11-27"
+        },
+        "timeZone": "Asia/Kolkata",
+        "metrics": {
+          "collections": {
+            "periodCollections": 0,
+            "transactionCount": 0
+          },
+          "expenses": {
+            "periodExpenses": 0,
+            "count": 0
+          },
+          "netOperatingBalance": 0,
+          "outstandingFees": {
+            "totalOutstanding": 68000,
+            "pendingAmountInPeriod": 68000,
+            "pendingAccountsCount": 2
+          },
+          "paymentApproval": {
+            "approvedAmount": 0,
+            "approvedCount": 0,
+            "pendingAmount": 43000,
+            "pendingCount": 2
+          },
+          "enrollment": {
+            "newEnrollmentsCount": 2,
+            "activeStudentsCount": 2
+          },
+          "leads": {
+            "totalLeads": 29,
+            "convertedLeads": 16
+          },
+          "courseBreakdown": [
+            {
+              "id": "c1000000-0000-4000-a000-000000000101",
+              "name": "SAP FICO PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 2
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000102",
+              "name": "SAP FICO NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000103",
+              "name": "SAP MM PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000104",
+              "name": "SAP ABAP NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "__unassigned__",
+              "name": "Unassigned / unknown course",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            }
+          ],
+          "lifetime": {
+            "totalStudents": 2,
+            "activeStudents": 2,
+            "totalCourses": 4,
+            "activeBatches": 0,
+            "upcomingDemos": 0,
+            "activeJobOpenings": 2
+          }
+        }
+      }
+    },
+    "year": {
+      "status": 200,
+      "ms": 789,
+      "metrics": {
+        "success": true,
+        "period": "month",
+        "dateRange": {
+          "startDate": "2026-11-01",
+          "endDate": "2026-11-27"
+        },
+        "timeZone": "Asia/Kolkata",
+        "metrics": {
+          "collections": {
+            "periodCollections": 0,
+            "transactionCount": 0
+          },
+          "expenses": {
+            "periodExpenses": 0,
+            "count": 0
+          },
+          "netOperatingBalance": 0,
+          "outstandingFees": {
+            "totalOutstanding": 68000,
+            "pendingAmountInPeriod": 68000,
+            "pendingAccountsCount": 2
+          },
+          "paymentApproval": {
+            "approvedAmount": 0,
+            "approvedCount": 0,
+            "pendingAmount": 43000,
+            "pendingCount": 2
+          },
+          "enrollment": {
+            "newEnrollmentsCount": 2,
+            "activeStudentsCount": 2
+          },
+          "leads": {
+            "totalLeads": 29,
+            "convertedLeads": 16
+          },
+          "courseBreakdown": [
+            {
+              "id": "c1000000-0000-4000-a000-000000000101",
+              "name": "SAP FICO PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 2
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000102",
+              "name": "SAP FICO NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000103",
+              "name": "SAP MM PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000104",
+              "name": "SAP ABAP NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "__unassigned__",
+              "name": "Unassigned / unknown course",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            }
+          ],
+          "lifetime": {
+            "totalStudents": 2,
+            "activeStudents": 2,
+            "totalCourses": 4,
+            "activeBatches": 0,
+            "upcomingDemos": 0,
+            "activeJobOpenings": 2
+          }
+        }
+      }
+    },
+    "all": {
+      "status": 200,
+      "ms": 735,
+      "metrics": {
+        "success": true,
+        "period": "all",
+        "dateRange": {},
+        "timeZone": "Asia/Kolkata",
+        "metrics": {
+          "collections": {
+            "periodCollections": 0,
+            "transactionCount": 0
+          },
+          "expenses": {
+            "periodExpenses": 0,
+            "count": 0
+          },
+          "netOperatingBalance": 0,
+          "outstandingFees": {
+            "totalOutstanding": 68000,
+            "pendingAmountInPeriod": 68000,
+            "pendingAccountsCount": 2
+          },
+          "paymentApproval": {
+            "approvedAmount": 0,
+            "approvedCount": 0,
+            "pendingAmount": 43000,
+            "pendingCount": 2
+          },
+          "enrollment": {
+            "newEnrollmentsCount": 2,
+            "activeStudentsCount": 2
+          },
+          "leads": {
+            "totalLeads": 29,
+            "convertedLeads": 16
+          },
+          "courseBreakdown": [
+            {
+              "id": "c1000000-0000-4000-a000-000000000101",
+              "name": "SAP FICO PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 2
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000102",
+              "name": "SAP FICO NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000103",
+              "name": "SAP MM PERSONAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "c1000000-0000-4000-a000-000000000104",
+              "name": "SAP ABAP NORMAL TRAINING",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            },
+            {
+              "id": "__unassigned__",
+              "name": "Unassigned / unknown course",
+              "transactions": 0,
+              "amount": 0,
+              "students": 0
+            }
+          ],
+          "lifetime": {
+            "totalStudents": 2,
+            "activeStudents": 2,
+            "totalCourses": 4,
+            "activeBatches": 0,
+            "upcomingDemos": 0,
+            "activeJobOpenings": 2
+          }
+        }
+      }
+    },
+    "custom&startDate=2026-11-01&endDate=2026-11-27": {
+      "status": 400,
+      "ms": 278,
+      "metrics": {
+        "success": false,
+        "error": "Both From Date and To Date are required."
+      }
+    },
+    "custom&startDate=2030-01-01&endDate=2030-12-31": {
+      "status": 400,
+      "ms": 340,
+      "metrics": {
+        "success": false,
+        "error": "Both From Date and To Date are required."
+      }
+    },
+    "custom&startDate=2026-12-01&endDate=2026-11-01": {
+      "status": 400,
+      "ms": 304,
+      "metrics": {
+        "success": false,
+        "error": "Both From Date and To Date are required."
+      }
+    }
+  },
+  "roleComparison": {
+    "admin": {
+      "metricsStatus": 200,
+      "metricsTotals": {
+        "collections": {
+          "periodCollections": 0,
+          "transactionCount": 0
+        },
+        "expenses": {
+          "periodExpenses": 0,
+          "count": 0
+        },
+        "netOperatingBalance": 0,
+        "outstandingFees": {
+          "totalOutstanding": 68000,
+          "pendingAmountInPeriod": 68000,
+          "pendingAccountsCount": 2
+        },
+        "paymentApproval": {
+          "approvedAmount": 0,
+          "approvedCount": 0,
+          "pendingAmount": 43000,
+          "pendingCount": 2
+        },
+        "enrollment": {
+          "newEnrollmentsCount": 2,
+          "activeStudentsCount": 2
+        },
+        "leads": {
+          "totalLeads": 29,
+          "convertedLeads": 16
+        },
+        "courseBreakdown": [
+          {
+            "id": "c1000000-0000-4000-a000-000000000101",
+            "name": "SAP FICO PERSONAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 2
+          },
+          {
+            "id": "c1000000-0000-4000-a000-000000000102",
+            "name": "SAP FICO NORMAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          },
+          {
+            "id": "c1000000-0000-4000-a000-000000000103",
+            "name": "SAP MM PERSONAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          },
+          {
+            "id": "c1000000-0000-4000-a000-000000000104",
+            "name": "SAP ABAP NORMAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          },
+          {
+            "id": "__unassigned__",
+            "name": "Unassigned / unknown course",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          }
+        ],
+        "lifetime": {
+          "totalStudents": 2,
+          "activeStudents": 2,
+          "totalCourses": 4,
+          "activeBatches": 0,
+          "upcomingDemos": 0,
+          "activeJobOpenings": 2
+        }
+      },
+      "leadsCount": 29,
+      "studentsCount": 2,
+      "receiptsSnapshotStudentsCount": 2,
+      "receiptsSnapshotPaymentsCount": null
+    },
+    "sales": {
+      "metricsStatus": 200,
+      "metricsTotals": {
+        "collections": {
+          "periodCollections": 0,
+          "transactionCount": 0
+        },
+        "expenses": {
+          "periodExpenses": 0,
+          "count": 0
+        },
+        "netOperatingBalance": 0,
+        "outstandingFees": {
+          "totalOutstanding": 68000,
+          "pendingAmountInPeriod": 68000,
+          "pendingAccountsCount": 2
+        },
+        "paymentApproval": {
+          "approvedAmount": 0,
+          "approvedCount": 0,
+          "pendingAmount": 43000,
+          "pendingCount": 2
+        },
+        "enrollment": {
+          "newEnrollmentsCount": 2,
+          "activeStudentsCount": 2
+        },
+        "leads": {
+          "totalLeads": 2,
+          "convertedLeads": 2
+        },
+        "courseBreakdown": [
+          {
+            "id": "c1000000-0000-4000-a000-000000000101",
+            "name": "SAP FICO PERSONAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 2
+          },
+          {
+            "id": "c1000000-0000-4000-a000-000000000102",
+            "name": "SAP FICO NORMAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          },
+          {
+            "id": "c1000000-0000-4000-a000-000000000103",
+            "name": "SAP MM PERSONAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          },
+          {
+            "id": "c1000000-0000-4000-a000-000000000104",
+            "name": "SAP ABAP NORMAL TRAINING",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          },
+          {
+            "id": "__unassigned__",
+            "name": "Unassigned / unknown course",
+            "transactions": 0,
+            "amount": 0,
+            "students": 0
+          }
+        ],
+        "lifetime": {
+          "totalStudents": 2,
+          "activeStudents": 2,
+          "totalCourses": 4,
+          "activeBatches": 0,
+          "upcomingDemos": 0,
+          "activeJobOpenings": 2
+        }
+      },
+      "leadsCount": 2,
+      "studentsCount": 0,
+      "receiptsSnapshotStudentsCount": 2,
+      "receiptsSnapshotPaymentsCount": null
+    }
+  },
+  "performance": [
+    {
+      "role": "super_admin",
+      "route": "/dashboard",
+      "networkIdleMs": 2976
+    },
+    {
+      "role": "super_admin",
+      "route": "/crm/leads",
+      "networkIdleMs": 4247
+    },
+    {
+      "role": "super_admin",
+      "route": "/admissions",
+      "networkIdleMs": 3640
+    },
+    {
+      "role": "super_admin",
+      "route": "/students",
+      "networkIdleMs": 3155
+    },
+    {
+      "role": "super_admin",
+      "route": "/accounts/fees",
+      "networkIdleMs": 5247
+    },
+    {
+      "role": "super_admin",
+      "route": "/accounts/payments",
+      "networkIdleMs": 3862
+    },
+    {
+      "role": "super_admin",
+      "route": "/accounts/reports",
+      "networkIdleMs": 3634
+    },
+    {
+      "role": "super_admin",
+      "route": "/users",
+      "networkIdleMs": 2924
+    }
+  ]
+}

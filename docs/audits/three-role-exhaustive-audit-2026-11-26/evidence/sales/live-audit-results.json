@@ -1,0 +1,949 @@
+{
+  "roleKey": "sales",
+  "email": "mohanreddyc.erp@gmail.com",
+  "baseUrl": "https://next-gen-lms-omega.vercel.app",
+  "timestamp": "2026-11-26T18:37:23.507Z",
+  "authenticatedIdentity": {
+    "id": "fc148d96-cf7c-4189-a0ba-b99eb5826d15",
+    "email": "mohanreddyc.erp@gmail.com",
+    "full_name": "Mohan Reddy",
+    "role": "counsellor",
+    "is_active": true
+  },
+  "authTests": [
+    {
+      "id": "AUTH-021",
+      "title": "Protected URL without login redirects to /login",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login?redirectTo=%2Fdashboard"
+    },
+    {
+      "id": "AUTH-002",
+      "title": "Incorrect password rejected",
+      "status": "PASS",
+      "note": "err=Unable to sign in. Check your email and password and try again."
+    },
+    {
+      "id": "AUTH-003",
+      "title": "Invalid email rejected",
+      "status": "PASS",
+      "note": "err=Unable to sign in. Check your email and password and try again."
+    },
+    {
+      "id": "AUTH-004",
+      "title": "Empty email rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-005",
+      "title": "Empty password rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-006",
+      "title": "Both fields empty rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-007",
+      "title": "Invalid email format rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-010",
+      "title": "Password case sensitivity enforced",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-011",
+      "title": "Password visibility toggle",
+      "status": "PASS",
+      "note": "type=text"
+    },
+    {
+      "id": "AUTH-008",
+      "title": "Leading/trailing spaces + email case normalization",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/crm/leads"
+    },
+    {
+      "id": "AUTH-001",
+      "title": "Valid login credentials",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/crm/leads"
+    },
+    {
+      "id": "AUTH-012",
+      "title": "Enter-key submission",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/crm/leads"
+    },
+    {
+      "id": "AUTH-016",
+      "title": "Post-login redirection",
+      "status": "PASS",
+      "note": "Redirected to /crm/leads"
+    },
+    {
+      "id": "AUTH-017",
+      "title": "Authenticated user identity verified",
+      "status": "PASS",
+      "note": "{\"id\":\"fc148d96-cf7c-4189-a0ba-b99eb5826d15\",\"email\":\"mohanreddyc.erp@gmail.com\",\"full_name\":\"Mohan Reddy\",\"role\":\"counsellor\",\"is_active\":true}"
+    },
+    {
+      "id": "AUTH-019",
+      "title": "Refresh after login preserves session",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/crm/leads"
+    },
+    {
+      "id": "AUTH-020",
+      "title": "New browser tab shares session",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-031",
+      "title": "Tampered auth cookie rejected",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login?redirectTo=%2Fdashboard"
+    },
+    {
+      "id": "AUTH-022",
+      "title": "Logout redirects to /login",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login"
+    },
+    {
+      "id": "AUTH-023",
+      "title": "Browser back after logout blocked",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login"
+    },
+    {
+      "id": "AUTH-024",
+      "title": "Refresh after logout stays on /login",
+      "status": "PASS",
+      "note": ""
+    }
+  ],
+  "pageTests": [
+    {
+      "route": "/dashboard",
+      "finalPath": "/dashboard",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2152,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 8,
+      "buttonsCount": 14,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Ente"
+    },
+    {
+      "route": "/onboarding",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2258,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/crm/leads",
+      "finalPath": "/crm/leads",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2150,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/crm/followups",
+      "finalPath": "/crm/followups",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2207,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/admissions",
+      "finalPath": "/admissions",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2178,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 7,
+      "buttonsCount": 8,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Admissions List Enrolled Students (360°) Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student"
+    },
+    {
+      "route": "/students",
+      "finalPath": "/students",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2240,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 6,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Admissions List Enrolled Students (360°) Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student"
+    },
+    {
+      "route": "/academics/courses",
+      "finalPath": "/academics/courses",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2179,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out SAP "
+    },
+    {
+      "route": "/academics/batches",
+      "finalPath": "/academics/batches",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2157,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out SAP "
+    },
+    {
+      "route": "/academics/schedule",
+      "finalPath": "/academics/schedule",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2169,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Clas"
+    },
+    {
+      "route": "/academics/attendance",
+      "finalPath": "/academics/attendance",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2167,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 5,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Atte"
+    },
+    {
+      "route": "/academics/assignments",
+      "finalPath": "/academics/assignments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2183,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 3,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Assi"
+    },
+    {
+      "route": "/academics/assessments",
+      "finalPath": "/academics/assessments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2242,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 0,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Asse"
+    },
+    {
+      "route": "/academics/sap-servers",
+      "finalPath": "/academics/sap-servers",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2133,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 8,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out SAP "
+    },
+    {
+      "route": "/accounts/approvals",
+      "finalPath": "/accounts/approvals",
+      "redirected": false,
+      "httpStatus": 403,
+      "elapsedMs": 2127,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /accounts/approvals"
+      ],
+      "snippet": "403 FORBIDDEN Access Restricted Users with the Counsellor role are not authorized to view or access Fee Approvals or Financial Analytics. Return to CRM Leads"
+    },
+    {
+      "route": "/accounts/dues",
+      "finalPath": "/accounts/dues",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2647,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Stud"
+    },
+    {
+      "route": "/accounts/fees",
+      "finalPath": "/accounts/fees",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2343,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /accounts/approvals"
+      ],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Stud"
+    },
+    {
+      "route": "/accounts/installments",
+      "finalPath": "/accounts/dues",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2157,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Stud"
+    },
+    {
+      "route": "/accounts/payments",
+      "finalPath": "/accounts/payments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2290,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 5,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()",
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /accounts/approvals",
+        "403 /accounts/approvals"
+      ],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Fee "
+    },
+    {
+      "route": "/accounts/receipts",
+      "finalPath": "/accounts/receipts",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2181,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 4,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Sign"
+    },
+    {
+      "route": "/accounts/expenses",
+      "finalPath": "/accounts/expenses",
+      "redirected": false,
+      "httpStatus": 403,
+      "elapsedMs": 2165,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /accounts/expenses"
+      ],
+      "snippet": "403 FORBIDDEN Access Restricted Users with the Counsellor role are not authorized to view or access Fee Approvals or Financial Analytics. Return to CRM Leads"
+    },
+    {
+      "route": "/accounts/vendors",
+      "finalPath": "/accounts/vendors",
+      "redirected": false,
+      "httpStatus": 403,
+      "elapsedMs": 2149,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /accounts/vendors"
+      ],
+      "snippet": "403 FORBIDDEN Access Restricted Users with the Counsellor role are not authorized to view or access Fee Approvals or Financial Analytics. Return to CRM Leads"
+    },
+    {
+      "route": "/accounts/reports",
+      "finalPath": "/accounts/reports",
+      "redirected": false,
+      "httpStatus": 403,
+      "elapsedMs": 2112,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /accounts/reports"
+      ],
+      "snippet": "403 FORBIDDEN Access Restricted Users with the Counsellor role are not authorized to view or access Fee Approvals or Financial Analytics. Return to CRM Leads"
+    },
+    {
+      "route": "/placement",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2183,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/placement/enrollments",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2213,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/support",
+      "finalPath": "/support",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2147,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Acce"
+    },
+    {
+      "route": "/certificates",
+      "finalPath": "/certificates",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2214,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Acce"
+    },
+    {
+      "route": "/users",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2308,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 12,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/audit-logs",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2189,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 12,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/audit",
+      "finalPath": "/audit",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2158,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /api/audit-logs"
+      ],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mohan Reddy Sales Sign Out Acce"
+    },
+    {
+      "route": "/settings",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2209,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/settings/audit",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2229,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 12,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    },
+    {
+      "route": "/portal",
+      "finalPath": "/portal",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2176,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 ()"
+      ],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [
+        "403 /api/realtime/stream"
+      ],
+      "snippet": "No Active Enrollment Found Your user account is not currently associated with an active student enrollment. If you recently registered or enrolled, please contact admissions or administrative support to activate your por"
+    },
+    {
+      "route": "/todos",
+      "finalPath": "/crm/leads",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2192,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard CRM & Leads All Leads Follow-ups & Demos Admissions Accounts & Finance Certificates Student LMS Portal Live M Mohan Reddy Sales Verify Certificate Student Portal M Mo"
+    }
+  ],
+  "uiInteractionTests": [
+    {
+      "id": "UI-/crm/leads",
+      "title": "Search & controls on /crm/leads",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/admissions",
+      "title": "Search & controls on /admissions",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/students",
+      "title": "Search & controls on /students",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/accounts/fees",
+      "title": "Search & controls on /accounts/fees",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/accounts/payments",
+      "title": "Search & controls on /accounts/payments",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/accounts/approvals",
+      "title": "Search & controls on /accounts/approvals",
+      "status": "PASS",
+      "note": "searchInput=false"
+    }
+  ],
+  "responsiveTests": [
+    {
+      "viewport": "tablet",
+      "route": "/dashboard",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/crm/leads",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/students",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/accounts/payments",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/dashboard",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/crm/leads",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/students",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/accounts/payments",
+      "overflow": false
+    }
+  ],
+  "apiGetTests": [
+    {
+      "endpoint": "/api/dashboard/metrics",
+      "status": 200,
+      "ok": true,
+      "len": 1294,
+      "preview": "{\"success\":true,\"period\":\"month\",\"dateRange\":{\"startDate\":\"2026-11-01\",\"endDate\":\"2026-11-27\"},\"timeZone\":\"Asia/Kolkata\",\"metrics\":{\"collections\":{\"periodCollections\":0,\"transactio"
+    },
+    {
+      "endpoint": "/api/crm/leads",
+      "status": 200,
+      "ok": true,
+      "len": 1639,
+      "preview": "{\"success\":true,\"leads\":[{\"id\":\"2d099cd5-5951-4d32-9d42-491a95546347\",\"lead_code\":\"LD-2026-2d099cd5-5951-4d32-9d42-491a95546347\",\"full_name\":\"Boge suresh\",\"phone\":\"+91 77778 31106\""
+    },
+    {
+      "endpoint": "/api/crm/summary",
+      "status": 200,
+      "ok": true,
+      "len": 523,
+      "preview": "{\"success\":true,\"users\":[{\"id\":\"fc148d96-cf7c-4189-a0ba-b99eb5826d15\",\"full_name\":\"Mohan Reddy\"}],\"teams\":[],\"performance\":[{\"id\":\"fc148d96-cf7c-4189-a0ba-b99eb5826d15\",\"full_name\""
+    },
+    {
+      "endpoint": "/api/crm/history",
+      "status": 403,
+      "ok": false,
+      "len": 51,
+      "preview": "{\"success\":false,\"error\":\"CRM lookup unavailable.\"}"
+    },
+    {
+      "endpoint": "/api/admissions",
+      "status": 200,
+      "ok": true,
+      "len": 5601,
+      "preview": "{\"success\":true,\"snapshot\":{\"studentPayments\":[],\"studentFees\":[],\"studentFinancialLedgers\":[],\"feeAccounts\":[],\"installments\":[],\"payments\":[],\"receipts\":[],\"students\":[],\"admissi"
+    },
+    {
+      "endpoint": "/api/students",
+      "status": 200,
+      "ok": true,
+      "len": 5609,
+      "preview": "{\"success\":true,\"count\":0,\"students\":[],\"snapshot\":{\"studentPayments\":[],\"studentFees\":[],\"studentFinancialLedgers\":[],\"feeAccounts\":[],\"installments\":[],\"payments\":[],\"receipts\":["
+    },
+    {
+      "endpoint": "/api/counsellors",
+      "status": 200,
+      "ok": true,
+      "len": 839,
+      "preview": "{\"success\":true,\"counsellors\":[{\"id\":\"987c67ef-388c-4467-90d6-4c4635398ed7\",\"full_name\":\"Amulya\",\"email\":\"amulya.sapficobhub@gmail.com\",\"role\":\"counsellor\",\"display_label\":\"Amulya "
+    },
+    {
+      "endpoint": "/api/fees/dues",
+      "status": 200,
+      "ok": true,
+      "len": 376,
+      "preview": "{\"success\":true,\"dues\":[],\"totalDueAmount\":0,\"summary\":{\"totalOutstanding\":0,\"totalCount\":0,\"overdueAmount\":0,\"overdueCount\":0,\"todayAmount\":0,\"todayCount\":0,\"next3DaysAmount\":0,\"n"
+    },
+    {
+      "endpoint": "/api/fees/upcoming-dues",
+      "status": 200,
+      "ok": true,
+      "len": 375,
+      "preview": "{\"success\":true,\"dues\":[],\"totalDueAmount\":0,\"asOfDate\":\"2026-11-27\",\"dates\":[\"2026-11-27\",\"2026-11-28\",\"2026-11-29\"],\"summary\":{\"totalOutstanding\":0,\"totalCount\":0,\"overdueAmount\""
+    },
+    {
+      "endpoint": "/api/fees/payments",
+      "status": 200,
+      "ok": true,
+      "len": 5585,
+      "preview": "{\"success\":true,\"snapshot\":{\"studentPayments\":[],\"studentFees\":[],\"studentFinancialLedgers\":[],\"feeAccounts\":[],\"installments\":[],\"payments\":[],\"receipts\":[],\"students\":[],\"admissi"
+    },
+    {
+      "endpoint": "/api/fees/receipts",
+      "status": 200,
+      "ok": true,
+      "len": 2050,
+      "preview": "{\"success\":true,\"snapshot\":{\"students\":[{\"id\":\"74600d9d-1750-4d8c-b4a0-ce3bca646b50\",\"city\":\"Hyderabad\",\"email\":\"sattinarayanareddy2@gmail.com\",\"phone\":\"+91 79896 30335\",\"state\":\"T"
+    },
+    {
+      "endpoint": "/api/fees/reconcile",
+      "status": 403,
+      "ok": false,
+      "len": 119,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Financial reconciliation access is restricted to administrators and accountants.\"}"
+    },
+    {
+      "endpoint": "/api/vendors",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/onboarding/cases",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/onboarding/analytics",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/placement/jobs",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/placement/enrollments",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/placement/applications",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/users",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/audit-logs",
+      "status": 403,
+      "ok": false,
+      "len": 110,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Role 'counsellor' is not authorized to access this onboarding endpoint.\"}"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ok": true,
+      "len": 10033,
+      "preview": "{\"success\":true,\"settings\":{\"id\":\"sys-01\",\"institute_name\":\"Next-Gen ERP Solutions\",\"tagline\":\"Premier SAP Training, Certification & Placement Institute\",\"address\":\"Pillar No 707, "
+    },
+    {
+      "endpoint": "/api/settings/bank-accounts",
+      "status": 200,
+      "ok": true,
+      "len": 8825,
+      "preview": "{\"success\":true,\"total\":20,\"accounts\":[{\"id\":\"bank-acc-01\",\"account_holder_name\":\"Katari Charitha\",\"bank_name\":\"HDFC Bank\",\"account_number\":\"•••• •••• 1140\",\"branch\":\"Main Branch\","
+    },
+    {
+      "endpoint": "/api/admin/integrity-monitor",
+      "status": 404,
+      "ok": false,
+      "len": 7814,
+      "preview": "<!DOCTYPE html><html lang=\"en\" class=\"bg-slate-50\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_"
+    },
+    {
+      "endpoint": "/api/database/health",
+      "status": 200,
+      "ok": true,
+      "len": 270,
+      "preview": "{\"success\":true,\"health\":{\"status\":\"connected\",\"isLive\":true,\"latencyMs\":330,\"tables\":{\"admissions\":0,\"students\":0,\"courses\":0,\"batches\":0,\"payments\":0,\"leads\":0,\"attendance_record"
+    }
+  ]
+}

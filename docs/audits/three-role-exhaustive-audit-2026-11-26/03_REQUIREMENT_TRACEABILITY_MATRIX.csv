@@ -1,0 +1,234 @@
+Requirement/Feature ID,Module,Mapped Test Cases,Status
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-021,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-002,FAIL
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-003,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-004,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-005,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-006,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-007,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-010,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-011,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-008,FAIL
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-001,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-012,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-016,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-017,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-019,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-020,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-031,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-022,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-023,PASS
+FEAT-PUB-002,Authentication,SUPER_ADMIN-AUTH-024,PASS
+PAGE-/dashboard,dashboard,SUPER_ADMIN-PAGE-dashboard,PASS
+PAGE-/onboarding,onboarding,SUPER_ADMIN-PAGE-onboarding,PASS
+PAGE-/crm/leads,crm,SUPER_ADMIN-PAGE-crm_leads,PASS
+PAGE-/crm/followups,crm,SUPER_ADMIN-PAGE-crm_followups,PASS
+PAGE-/admissions,admissions,SUPER_ADMIN-PAGE-admissions,PASS
+PAGE-/students,students,SUPER_ADMIN-PAGE-students,PASS
+PAGE-/academics/courses,academics,SUPER_ADMIN-PAGE-academics_courses,PASS
+PAGE-/academics/batches,academics,SUPER_ADMIN-PAGE-academics_batches,PASS
+PAGE-/academics/schedule,academics,SUPER_ADMIN-PAGE-academics_schedule,PASS
+PAGE-/academics/attendance,academics,SUPER_ADMIN-PAGE-academics_attendance,PASS
+PAGE-/academics/assignments,academics,SUPER_ADMIN-PAGE-academics_assignments,PASS
+PAGE-/academics/assessments,academics,SUPER_ADMIN-PAGE-academics_assessments,PASS
+PAGE-/academics/sap-servers,academics,SUPER_ADMIN-PAGE-academics_sap-servers,PASS
+PAGE-/accounts/approvals,accounts,SUPER_ADMIN-PAGE-accounts_approvals,PASS
+PAGE-/accounts/dues,accounts,SUPER_ADMIN-PAGE-accounts_dues,PASS
+PAGE-/accounts/fees,accounts,SUPER_ADMIN-PAGE-accounts_fees,PASS
+PAGE-/accounts/installments,accounts,SUPER_ADMIN-PAGE-accounts_installments,PASS
+PAGE-/accounts/payments,accounts,SUPER_ADMIN-PAGE-accounts_payments,PASS
+PAGE-/accounts/receipts,accounts,SUPER_ADMIN-PAGE-accounts_receipts,PASS
+PAGE-/accounts/expenses,accounts,SUPER_ADMIN-PAGE-accounts_expenses,PASS
+PAGE-/accounts/vendors,accounts,SUPER_ADMIN-PAGE-accounts_vendors,PASS
+PAGE-/accounts/reports,accounts,SUPER_ADMIN-PAGE-accounts_reports,PASS
+PAGE-/placement,placement,SUPER_ADMIN-PAGE-placement,PASS
+PAGE-/placement/enrollments,placement,SUPER_ADMIN-PAGE-placement_enrollments,PASS
+PAGE-/support,support,SUPER_ADMIN-PAGE-support,PASS
+PAGE-/certificates,certificates,SUPER_ADMIN-PAGE-certificates,PASS
+PAGE-/users,users,SUPER_ADMIN-PAGE-users,PASS
+PAGE-/audit-logs,audit-logs,SUPER_ADMIN-PAGE-audit-logs,PASS
+PAGE-/audit,audit,SUPER_ADMIN-PAGE-audit,PASS
+PAGE-/settings,settings,SUPER_ADMIN-PAGE-settings,PASS
+PAGE-/settings/audit,settings,SUPER_ADMIN-PAGE-settings_audit,PASS
+PAGE-/portal,portal,SUPER_ADMIN-PAGE-portal,PASS
+PAGE-/todos,todos,SUPER_ADMIN-PAGE-todos,PASS
+API-/api/dashboard/metrics,API Authorization,SUPER_ADMIN-API-_api_dashboard_metrics,PASS
+API-/api/crm/leads,API Authorization,SUPER_ADMIN-API-_api_crm_leads,PASS
+API-/api/crm/summary,API Authorization,SUPER_ADMIN-API-_api_crm_summary,PASS
+API-/api/crm/history,API Authorization,SUPER_ADMIN-API-_api_crm_history,FAIL
+API-/api/admissions,API Authorization,SUPER_ADMIN-API-_api_admissions,PASS
+API-/api/students,API Authorization,SUPER_ADMIN-API-_api_students,PASS
+API-/api/counsellors,API Authorization,SUPER_ADMIN-API-_api_counsellors,PASS
+API-/api/fees/dues,API Authorization,SUPER_ADMIN-API-_api_fees_dues,PASS
+API-/api/fees/upcoming-dues,API Authorization,SUPER_ADMIN-API-_api_fees_upcoming_dues,PASS
+API-/api/fees/payments,API Authorization,SUPER_ADMIN-API-_api_fees_payments,PASS
+API-/api/fees/receipts,API Authorization,SUPER_ADMIN-API-_api_fees_receipts,PASS
+API-/api/fees/reconcile,API Authorization,SUPER_ADMIN-API-_api_fees_reconcile,PASS
+API-/api/vendors,API Authorization,SUPER_ADMIN-API-_api_vendors,PASS
+API-/api/onboarding/cases,API Authorization,SUPER_ADMIN-API-_api_onboarding_cases,PASS
+API-/api/onboarding/analytics,API Authorization,SUPER_ADMIN-API-_api_onboarding_analytics,PASS
+API-/api/placement/jobs,API Authorization,SUPER_ADMIN-API-_api_placement_jobs,PASS
+API-/api/placement/enrollments,API Authorization,SUPER_ADMIN-API-_api_placement_enrollments,PASS
+API-/api/placement/applications,API Authorization,SUPER_ADMIN-API-_api_placement_applications,PASS
+API-/api/users,API Authorization,SUPER_ADMIN-API-_api_users,PASS
+API-/api/audit-logs,API Authorization,SUPER_ADMIN-API-_api_audit_logs,PASS
+API-/api/settings,API Authorization,SUPER_ADMIN-API-_api_settings,PASS
+API-/api/settings/bank-accounts,API Authorization,SUPER_ADMIN-API-_api_settings_bank_accounts,PASS
+API-/api/admin/integrity-monitor,API Authorization,SUPER_ADMIN-API-_api_admin_integrity_monitor,FAIL
+API-/api/database/health,API Authorization,SUPER_ADMIN-API-_api_database_health,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-021,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-002,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-003,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-004,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-005,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-006,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-007,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-010,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-011,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-008,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-001,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-012,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-016,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-017,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-019,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-020,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-031,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-022,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-023,PASS
+FEAT-PUB-002,Authentication,ADMIN-AUTH-024,PASS
+PAGE-/dashboard,dashboard,ADMIN-PAGE-dashboard,PASS
+PAGE-/onboarding,onboarding,ADMIN-PAGE-onboarding,PASS
+PAGE-/crm/leads,crm,ADMIN-PAGE-crm_leads,PASS
+PAGE-/crm/followups,crm,ADMIN-PAGE-crm_followups,PASS
+PAGE-/admissions,admissions,ADMIN-PAGE-admissions,PASS
+PAGE-/students,students,ADMIN-PAGE-students,PASS
+PAGE-/academics/courses,academics,ADMIN-PAGE-academics_courses,PASS
+PAGE-/academics/batches,academics,ADMIN-PAGE-academics_batches,PASS
+PAGE-/academics/schedule,academics,ADMIN-PAGE-academics_schedule,PASS
+PAGE-/academics/attendance,academics,ADMIN-PAGE-academics_attendance,PASS
+PAGE-/academics/assignments,academics,ADMIN-PAGE-academics_assignments,PASS
+PAGE-/academics/assessments,academics,ADMIN-PAGE-academics_assessments,PASS
+PAGE-/academics/sap-servers,academics,ADMIN-PAGE-academics_sap-servers,PASS
+PAGE-/accounts/approvals,accounts,ADMIN-PAGE-accounts_approvals,PASS
+PAGE-/accounts/dues,accounts,ADMIN-PAGE-accounts_dues,PASS
+PAGE-/accounts/fees,accounts,ADMIN-PAGE-accounts_fees,PASS
+PAGE-/accounts/installments,accounts,ADMIN-PAGE-accounts_installments,PASS
+PAGE-/accounts/payments,accounts,ADMIN-PAGE-accounts_payments,PASS
+PAGE-/accounts/receipts,accounts,ADMIN-PAGE-accounts_receipts,PASS
+PAGE-/accounts/expenses,accounts,ADMIN-PAGE-accounts_expenses,PASS
+PAGE-/accounts/vendors,accounts,ADMIN-PAGE-accounts_vendors,PASS
+PAGE-/accounts/reports,accounts,ADMIN-PAGE-accounts_reports,PASS
+PAGE-/placement,placement,ADMIN-PAGE-placement,PASS
+PAGE-/placement/enrollments,placement,ADMIN-PAGE-placement_enrollments,PASS
+PAGE-/support,support,ADMIN-PAGE-support,PASS
+PAGE-/certificates,certificates,ADMIN-PAGE-certificates,PASS
+PAGE-/users,users,ADMIN-PAGE-users,PASS
+PAGE-/audit-logs,audit-logs,ADMIN-PAGE-audit-logs,PASS
+PAGE-/audit,audit,ADMIN-PAGE-audit,PASS
+PAGE-/settings,settings,ADMIN-PAGE-settings,PASS
+PAGE-/settings/audit,settings,ADMIN-PAGE-settings_audit,PASS
+PAGE-/portal,portal,ADMIN-PAGE-portal,PASS
+PAGE-/todos,todos,ADMIN-PAGE-todos,PASS
+API-/api/dashboard/metrics,API Authorization,ADMIN-API-_api_dashboard_metrics,PASS
+API-/api/crm/leads,API Authorization,ADMIN-API-_api_crm_leads,PASS
+API-/api/crm/summary,API Authorization,ADMIN-API-_api_crm_summary,PASS
+API-/api/crm/history,API Authorization,ADMIN-API-_api_crm_history,FAIL
+API-/api/admissions,API Authorization,ADMIN-API-_api_admissions,PASS
+API-/api/students,API Authorization,ADMIN-API-_api_students,PASS
+API-/api/counsellors,API Authorization,ADMIN-API-_api_counsellors,PASS
+API-/api/fees/dues,API Authorization,ADMIN-API-_api_fees_dues,PASS
+API-/api/fees/upcoming-dues,API Authorization,ADMIN-API-_api_fees_upcoming_dues,PASS
+API-/api/fees/payments,API Authorization,ADMIN-API-_api_fees_payments,PASS
+API-/api/fees/receipts,API Authorization,ADMIN-API-_api_fees_receipts,PASS
+API-/api/fees/reconcile,API Authorization,ADMIN-API-_api_fees_reconcile,PASS
+API-/api/vendors,API Authorization,ADMIN-API-_api_vendors,FAIL
+API-/api/onboarding/cases,API Authorization,ADMIN-API-_api_onboarding_cases,PASS
+API-/api/onboarding/analytics,API Authorization,ADMIN-API-_api_onboarding_analytics,PASS
+API-/api/placement/jobs,API Authorization,ADMIN-API-_api_placement_jobs,PASS
+API-/api/placement/enrollments,API Authorization,ADMIN-API-_api_placement_enrollments,PASS
+API-/api/placement/applications,API Authorization,ADMIN-API-_api_placement_applications,PASS
+API-/api/users,API Authorization,ADMIN-API-_api_users,PASS
+API-/api/audit-logs,API Authorization,ADMIN-API-_api_audit_logs,PASS
+API-/api/settings,API Authorization,ADMIN-API-_api_settings,PASS
+API-/api/settings/bank-accounts,API Authorization,ADMIN-API-_api_settings_bank_accounts,PASS
+API-/api/admin/integrity-monitor,API Authorization,ADMIN-API-_api_admin_integrity_monitor,FAIL
+API-/api/database/health,API Authorization,ADMIN-API-_api_database_health,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-021,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-002,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-003,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-004,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-005,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-006,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-007,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-010,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-011,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-008,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-001,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-012,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-016,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-017,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-019,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-020,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-031,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-022,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-023,PASS
+FEAT-PUB-002,Authentication,SALES-AUTH-024,PASS
+PAGE-/dashboard,dashboard,SALES-PAGE-dashboard,PASS
+PAGE-/onboarding,onboarding,SALES-PAGE-onboarding,PASS
+PAGE-/crm/leads,crm,SALES-PAGE-crm_leads,PASS
+PAGE-/crm/followups,crm,SALES-PAGE-crm_followups,PASS
+PAGE-/admissions,admissions,SALES-PAGE-admissions,PASS
+PAGE-/students,students,SALES-PAGE-students,PASS
+PAGE-/academics/courses,academics,SALES-PAGE-academics_courses,FAIL
+PAGE-/academics/batches,academics,SALES-PAGE-academics_batches,FAIL
+PAGE-/academics/schedule,academics,SALES-PAGE-academics_schedule,FAIL
+PAGE-/academics/attendance,academics,SALES-PAGE-academics_attendance,FAIL
+PAGE-/academics/assignments,academics,SALES-PAGE-academics_assignments,FAIL
+PAGE-/academics/assessments,academics,SALES-PAGE-academics_assessments,FAIL
+PAGE-/academics/sap-servers,academics,SALES-PAGE-academics_sap-servers,FAIL
+PAGE-/accounts/approvals,accounts,SALES-PAGE-accounts_approvals,PASS
+PAGE-/accounts/dues,accounts,SALES-PAGE-accounts_dues,PASS
+PAGE-/accounts/fees,accounts,SALES-PAGE-accounts_fees,PASS
+PAGE-/accounts/installments,accounts,SALES-PAGE-accounts_installments,PASS
+PAGE-/accounts/payments,accounts,SALES-PAGE-accounts_payments,PASS
+PAGE-/accounts/receipts,accounts,SALES-PAGE-accounts_receipts,PASS
+PAGE-/accounts/expenses,accounts,SALES-PAGE-accounts_expenses,PASS
+PAGE-/accounts/vendors,accounts,SALES-PAGE-accounts_vendors,PASS
+PAGE-/accounts/reports,accounts,SALES-PAGE-accounts_reports,PASS
+PAGE-/placement,placement,SALES-PAGE-placement,PASS
+PAGE-/placement/enrollments,placement,SALES-PAGE-placement_enrollments,PASS
+PAGE-/support,support,SALES-PAGE-support,FAIL
+PAGE-/certificates,certificates,SALES-PAGE-certificates,PASS
+PAGE-/users,users,SALES-PAGE-users,PASS
+PAGE-/audit-logs,audit-logs,SALES-PAGE-audit-logs,PASS
+PAGE-/audit,audit,SALES-PAGE-audit,FAIL
+PAGE-/settings,settings,SALES-PAGE-settings,PASS
+PAGE-/settings/audit,settings,SALES-PAGE-settings_audit,PASS
+PAGE-/portal,portal,SALES-PAGE-portal,PASS
+PAGE-/todos,todos,SALES-PAGE-todos,PASS
+API-/api/dashboard/metrics,API Authorization,SALES-API-_api_dashboard_metrics,PASS
+API-/api/crm/leads,API Authorization,SALES-API-_api_crm_leads,PASS
+API-/api/crm/summary,API Authorization,SALES-API-_api_crm_summary,PASS
+API-/api/crm/history,API Authorization,SALES-API-_api_crm_history,FAIL
+API-/api/admissions,API Authorization,SALES-API-_api_admissions,PASS
+API-/api/students,API Authorization,SALES-API-_api_students,PASS
+API-/api/counsellors,API Authorization,SALES-API-_api_counsellors,PASS
+API-/api/fees/dues,API Authorization,SALES-API-_api_fees_dues,PASS
+API-/api/fees/upcoming-dues,API Authorization,SALES-API-_api_fees_upcoming_dues,PASS
+API-/api/fees/payments,API Authorization,SALES-API-_api_fees_payments,PASS
+API-/api/fees/receipts,API Authorization,SALES-API-_api_fees_receipts,FAIL
+API-/api/fees/reconcile,API Authorization,SALES-API-_api_fees_reconcile,PASS
+API-/api/vendors,API Authorization,SALES-API-_api_vendors,PASS
+API-/api/onboarding/cases,API Authorization,SALES-API-_api_onboarding_cases,PASS
+API-/api/onboarding/analytics,API Authorization,SALES-API-_api_onboarding_analytics,PASS
+API-/api/placement/jobs,API Authorization,SALES-API-_api_placement_jobs,PASS
+API-/api/placement/enrollments,API Authorization,SALES-API-_api_placement_enrollments,PASS
+API-/api/placement/applications,API Authorization,SALES-API-_api_placement_applications,PASS
+API-/api/users,API Authorization,SALES-API-_api_users,PASS
+API-/api/audit-logs,API Authorization,SALES-API-_api_audit_logs,PASS
+API-/api/settings,API Authorization,SALES-API-_api_settings,FAIL
+API-/api/settings/bank-accounts,API Authorization,SALES-API-_api_settings_bank_accounts,PASS
+API-/api/admin/integrity-monitor,API Authorization,SALES-API-_api_admin_integrity_monitor,FAIL
+API-/api/database/health,API Authorization,SALES-API-_api_database_health,FAIL
+WF-STG-001,CRM / Admissions / Finance,WF-STG-001,BLOCKED
+WF-ACC-001,Accounts & Finance,WF-ACC-001,BLOCKED

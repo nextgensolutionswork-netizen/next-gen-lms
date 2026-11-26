@@ -8,29 +8,42 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/components/providers/auth-provider';
 import { getSafeRedirectUrl } from '@/lib/auth/rbac';
-import {
-  generateAuthCookieSignature,
-  AUTH_COOKIE_NAME,
-  AUTH_SIG_COOKIE_NAME,
-  AUTH_COOKIE_SECRET,
-} from '@/lib/security/auth-cookie';
+// Removed client-side auth cookie signing imports
 
-async function signAuthCookiePayload(cookieVal: string): Promise<string> {
-  const sig = await generateAuthCookieSignature(cookieVal, AUTH_COOKIE_SECRET);
-  if (typeof document !== 'undefined') {
-    document.cookie = `${AUTH_SIG_COOKIE_NAME}=${sig}; path=/; max-age=604800; SameSite=Lax`;
-  }
-  return sig;
-}
 
-async function signCurrentAuthCookie(): Promise<string | null> {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + AUTH_COOKIE_NAME + '=([^;]*)'));
-  if (match && match[1]) {
-    return await signAuthCookiePayload(match[1]);
-  }
-  return null;
-}
+// Removed client-side signing of auth cookie; server sets signed cookies securely.
+// // Removed client-side auth cookie signing functions – server now sets secure HTTP‑Only cookies.
+// async function signAuthCookiePayload(cookieVal: string): Promise<string> {
+//   const sig = await generateAuthCookieSignature(cookieVal, AUTH_COOKIE_SECRET);
+//   if (typeof document !== 'undefined') {
+//     document.cookie = `${AUTH_SIG_COOKIE_NAME}=${sig}; path=/; max-age=604800; SameSite=Lax`;
+//   }
+//   return sig;
+// }
+//
+// async function signCurrentAuthCookie(): Promise<string | null> {
+//   if (typeof document === 'undefined') return null;
+//   const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + AUTH_COOKIE_NAME + '=([^;]*)'));
+//   if (match && match[1]) {
+//     return await signAuthCookiePayload(match[1]);
+//   }
+//   return null;
+// }
+//   const sig = await generateAuthCookieSignature(cookieVal, AUTH_COOKIE_SECRET);
+//   if (typeof document !== 'undefined') {
+//     document.cookie = `${AUTH_SIG_COOKIE_NAME}=${sig}; path=/; max-age=604800; SameSite=Lax`;
+//   }
+//   return sig;
+// }
+
+// async function signCurrentAuthCookie(): Promise<string | null> {
+//   if (typeof document === 'undefined') return null;
+//   const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + AUTH_COOKIE_NAME + '=([^;]*)'));
+//   if (match && match[1]) {
+//     return await signAuthCookiePayload(match[1]);
+//   }
+//   return null;
+// }
 
 
 export default function LoginPage() {
@@ -172,7 +185,9 @@ export default function LoginPage() {
       if (!ok) {
         setError('Unable to sign in. Check your email and password and try again.');
       } else {
-        await signCurrentAuthCookie();
+            // await signCurrentAuthCookie(); // Removed: server sets signed cookies securely.
+    // No client-side signing needed.
+
       }
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in. Check your email and password and try again.');

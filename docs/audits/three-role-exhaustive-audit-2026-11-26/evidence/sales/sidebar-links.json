@@ -1,0 +1,42 @@
+[
+  {
+    "text": "Dashboard",
+    "href": "/dashboard"
+  },
+  {
+    "text": "All Leads",
+    "href": "/crm/leads"
+  },
+  {
+    "text": "Follow-ups & Demos",
+    "href": "/crm/followups"
+  },
+  {
+    "text": "Certificates",
+    "href": "/certificates"
+  },
+  {
+    "text": "Student LMS PortalLive",
+    "href": "/portal"
+  },
+  {
+    "text": "Dashboard",
+    "href": "/dashboard"
+  },
+  {
+    "text": "All Leads",
+    "href": "/crm/leads"
+  },
+  {
+    "text": "Follow-ups & Demos",
+    "href": "/crm/followups"
+  },
+  {
+    "text": "Certificates",
+    "href": "/certificates"
+  },
+  {
+    "text": "Student LMS PortalLive",
+    "href": "/portal"
+  }
+]

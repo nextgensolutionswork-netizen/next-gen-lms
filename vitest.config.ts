@@ -4,7 +4,7 @@ import path from 'path';
 export default defineConfig({
   test: {
     exclude: ['**/node_modules/**', '**/.git/**', '.audit-build-check/**', 'staging-runtime/**', '.next*/**'],
-    setupFiles: ['./tests/setup-storage.ts'],
+    setupFiles: ['./tests/setup-storage.ts', './tests/setupAuth.ts'],
     environment: 'node',
     globals: true,
     testTimeout: 15000,

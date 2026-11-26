@@ -6,7 +6,14 @@ import { AUTH_COOKIE_NAME } from '@/lib/security/auth-cookie';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
 import { validatePhoneNumber } from '@/lib/utils/phone-validation';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authUser = await getAuthenticatedUserFromRequest(req);
+  if (!authUser) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized: Authentication is required to view settings.' },
+      { status: 401 }
+    );
+  }
   store.hydrateFromDisk();
   return NextResponse.json({
     success: true,

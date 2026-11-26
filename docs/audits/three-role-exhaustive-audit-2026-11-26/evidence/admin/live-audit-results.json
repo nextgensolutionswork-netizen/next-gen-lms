@@ -1,0 +1,915 @@
+{
+  "roleKey": "admin",
+  "email": "niranjan.emparala@gmail.com",
+  "baseUrl": "https://next-gen-lms-omega.vercel.app",
+  "timestamp": "2026-11-26T18:34:23.806Z",
+  "authenticatedIdentity": {
+    "id": "1a71c880-1618-4398-adee-a5506ee4b6d0",
+    "email": "niranjan.emparala@gmail.com",
+    "full_name": "Niranjan Emparala",
+    "role": "admin",
+    "is_active": true
+  },
+  "authTests": [
+    {
+      "id": "AUTH-021",
+      "title": "Protected URL without login redirects to /login",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login?redirectTo=%2Fdashboard"
+    },
+    {
+      "id": "AUTH-002",
+      "title": "Incorrect password rejected",
+      "status": "PASS",
+      "note": "err=Unable to sign in. Check your email and password and try again."
+    },
+    {
+      "id": "AUTH-003",
+      "title": "Invalid email rejected",
+      "status": "PASS",
+      "note": "err=Unable to sign in. Check your email and password and try again."
+    },
+    {
+      "id": "AUTH-004",
+      "title": "Empty email rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-005",
+      "title": "Empty password rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-006",
+      "title": "Both fields empty rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-007",
+      "title": "Invalid email format rejected",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-010",
+      "title": "Password case sensitivity enforced",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-011",
+      "title": "Password visibility toggle",
+      "status": "PASS",
+      "note": "type=text"
+    },
+    {
+      "id": "AUTH-008",
+      "title": "Leading/trailing spaces + email case normalization",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/dashboard"
+    },
+    {
+      "id": "AUTH-001",
+      "title": "Valid login credentials",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/dashboard"
+    },
+    {
+      "id": "AUTH-012",
+      "title": "Enter-key submission",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/dashboard"
+    },
+    {
+      "id": "AUTH-016",
+      "title": "Post-login redirection",
+      "status": "PASS",
+      "note": "Redirected to /dashboard"
+    },
+    {
+      "id": "AUTH-017",
+      "title": "Authenticated user identity verified",
+      "status": "PASS",
+      "note": "{\"id\":\"1a71c880-1618-4398-adee-a5506ee4b6d0\",\"email\":\"niranjan.emparala@gmail.com\",\"full_name\":\"Niranjan Emparala\",\"role\":\"admin\",\"is_active\":true}"
+    },
+    {
+      "id": "AUTH-019",
+      "title": "Refresh after login preserves session",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/dashboard"
+    },
+    {
+      "id": "AUTH-020",
+      "title": "New browser tab shares session",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "AUTH-031",
+      "title": "Tampered auth cookie rejected",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login?redirectTo=%2Fdashboard"
+    },
+    {
+      "id": "AUTH-022",
+      "title": "Logout redirects to /login",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login"
+    },
+    {
+      "id": "AUTH-023",
+      "title": "Browser back after logout blocked",
+      "status": "PASS",
+      "note": "url=https://next-gen-lms-omega.vercel.app/login"
+    },
+    {
+      "id": "AUTH-024",
+      "title": "Refresh after logout stays on /login",
+      "status": "PASS",
+      "note": ""
+    }
+  ],
+  "pageTests": [
+    {
+      "route": "/dashboard",
+      "finalPath": "/dashboard",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2106,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 8,
+      "buttonsCount": 14,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/onboarding",
+      "finalPath": "/onboarding",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2226,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 5,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/crm/leads",
+      "finalPath": "/crm/leads",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2163,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 29,
+      "buttonsCount": 52,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads All Leads Follow-ups & Demos Admissions Academics & LMS Accounts & Finance Placement Support Academic Support Helpdesk Certi"
+    },
+    {
+      "route": "/crm/followups",
+      "finalPath": "/crm/followups",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2331,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads All Leads Follow-ups & Demos Admissions Academics & LMS Accounts & Finance Placement Support Academic Support Helpdesk Certi"
+    },
+    {
+      "route": "/admissions",
+      "finalPath": "/admissions",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2183,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 7,
+      "buttonsCount": 8,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Admissions List Enrolled Students (360°) Academics & LMS Accounts & Finance Placement Support Academic Support He"
+    },
+    {
+      "route": "/students",
+      "finalPath": "/students",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2159,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 8,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Admissions List Enrolled Students (360°) Academics & LMS Accounts & Finance Placement Support Academic Support He"
+    },
+    {
+      "route": "/academics/courses",
+      "finalPath": "/academics/courses",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2199,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 6,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/academics/batches",
+      "finalPath": "/academics/batches",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2138,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 3,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/academics/schedule",
+      "finalPath": "/academics/schedule",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2150,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 9,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/academics/attendance",
+      "finalPath": "/academics/attendance",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2179,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/academics/assignments",
+      "finalPath": "/academics/assignments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2203,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/academics/assessments",
+      "finalPath": "/academics/assessments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2136,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/academics/sap-servers",
+      "finalPath": "/academics/sap-servers",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2133,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 19,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/approvals",
+      "finalPath": "/accounts/approvals",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2159,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 8,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/dues",
+      "finalPath": "/accounts/dues",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2157,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/fees",
+      "finalPath": "/accounts/fees",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2276,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 6,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/installments",
+      "finalPath": "/accounts/dues",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2116,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 7,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/payments",
+      "finalPath": "/accounts/payments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2142,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 5,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/receipts",
+      "finalPath": "/accounts/receipts",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2152,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 4,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/expenses",
+      "finalPath": "/accounts/expenses",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2153,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 21,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/vendors",
+      "finalPath": "/accounts/vendors",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2163,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 10,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/accounts/reports",
+      "finalPath": "/accounts/reports",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2153,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 4,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/placement",
+      "finalPath": "/placement",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2144,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 6,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Accounts & Finance Placement Support Drives & Openings Enrollments & Candidates Academic Support "
+    },
+    {
+      "route": "/placement/enrollments",
+      "finalPath": "/placement/enrollments",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2128,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 2,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Accounts & Finance Placement Support Drives & Openings Enrollments & Candidates Academic Support "
+    },
+    {
+      "route": "/support",
+      "finalPath": "/support",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2149,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 3,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/certificates",
+      "finalPath": "/certificates",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2406,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 1,
+      "buttonsCount": 5,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/users",
+      "finalPath": "/users",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2545,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 8,
+      "buttonsCount": 33,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/audit-logs",
+      "finalPath": "/audit-logs",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2379,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 4,
+      "buttonsCount": 26,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/audit",
+      "finalPath": "/audit",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2484,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 24,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/settings",
+      "finalPath": "/settings",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2322,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 20,
+      "buttonsCount": 27,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/settings/audit",
+      "finalPath": "/settings/audit",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2212,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 2,
+      "buttonsCount": 24,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    },
+    {
+      "route": "/portal",
+      "finalPath": "/portal",
+      "redirected": false,
+      "httpStatus": 200,
+      "elapsedMs": 2167,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 0,
+      "buttonsCount": 0,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "No Active Enrollment Found Your user account is not currently associated with an active student enrollment. If you recently registered or enrolled, please contact admissions or administrative support to activate your por"
+    },
+    {
+      "route": "/todos",
+      "finalPath": "/dashboard",
+      "redirected": true,
+      "httpStatus": 200,
+      "elapsedMs": 2284,
+      "hasCrash": false,
+      "overflow": false,
+      "tableRows": 8,
+      "buttonsCount": 14,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failed5xx": [],
+      "failed4xx": [],
+      "snippet": "SAP NEXT-GEN ERP LMS & Institute Management Dashboard Student Onboarding Operations CRM & Leads Admissions Academics & LMS Courses & Modules Batches & Transfers Timetable & Sessions Mark Attendance Assignments & Grading "
+    }
+  ],
+  "uiInteractionTests": [
+    {
+      "id": "UI-/crm/leads",
+      "title": "Search & controls on /crm/leads",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/admissions",
+      "title": "Search & controls on /admissions",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/students",
+      "title": "Search & controls on /students",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/accounts/fees",
+      "title": "Search & controls on /accounts/fees",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/accounts/payments",
+      "title": "Search & controls on /accounts/payments",
+      "status": "PASS",
+      "note": "searchInput=true"
+    },
+    {
+      "id": "UI-/accounts/approvals",
+      "title": "Search & controls on /accounts/approvals",
+      "status": "PASS",
+      "note": "searchInput=true"
+    }
+  ],
+  "responsiveTests": [
+    {
+      "viewport": "tablet",
+      "route": "/dashboard",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/crm/leads",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/students",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/accounts/payments",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/dashboard",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/crm/leads",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/students",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/accounts/payments",
+      "overflow": false
+    }
+  ],
+  "apiGetTests": [
+    {
+      "endpoint": "/api/dashboard/metrics",
+      "status": 200,
+      "ok": true,
+      "len": 1296,
+      "preview": "{\"success\":true,\"period\":\"month\",\"dateRange\":{\"startDate\":\"2026-11-01\",\"endDate\":\"2026-11-27\"},\"timeZone\":\"Asia/Kolkata\",\"metrics\":{\"collections\":{\"periodCollections\":0,\"transactio"
+    },
+    {
+      "endpoint": "/api/crm/leads",
+      "status": 200,
+      "ok": true,
+      "len": 23258,
+      "preview": "{\"success\":true,\"leads\":[{\"id\":\"a0e33764-aeed-49db-93ac-01f32896497a\",\"lead_code\":\"LD-2026-a0e33764-aeed-49db-93ac-01f32896497a\",\"full_name\":\"Mangi. Puspalata\",\"phone\":\"+91 82490 5"
+    },
+    {
+      "endpoint": "/api/crm/summary",
+      "status": 200,
+      "ok": true,
+      "len": 2335,
+      "preview": "{\"success\":true,\"users\":[{\"id\":\"46f46ae2-5b39-4cc3-aab0-764b42036c11\",\"full_name\":\"Dilip Palukuri\"},{\"id\":\"1a71c880-1618-4398-adee-a5506ee4b6d0\",\"full_name\":\"Niranjan Emparala\"},{\""
+    },
+    {
+      "endpoint": "/api/crm/history",
+      "status": 403,
+      "ok": false,
+      "len": 51,
+      "preview": "{\"success\":false,\"error\":\"CRM lookup unavailable.\"}"
+    },
+    {
+      "endpoint": "/api/admissions",
+      "status": 200,
+      "ok": true,
+      "len": 24110,
+      "preview": "{\"success\":true,\"snapshot\":{\"studentPayments\":[{\"id\":\"spr-1795674104453-kjw5\",\"notes\":\"\",\"fee_id\":\"ee56057e-04c1-4a93-b168-6dc49888e1bc\",\"status\":\"Pending Approval\",\"tenant_id\":\"de"
+    },
+    {
+      "endpoint": "/api/students",
+      "status": 200,
+      "ok": true,
+      "len": 23528,
+      "preview": "{\"success\":true,\"count\":2,\"students\":[{\"id\":\"74600d9d-1750-4d8c-b4a0-ce3bca646b50\",\"city\":\"Hyderabad\",\"email\":\"sattinarayanareddy2@gmail.com\",\"phone\":\"+91 79896 30335\",\"state\":\"Tel"
+    },
+    {
+      "endpoint": "/api/counsellors",
+      "status": 200,
+      "ok": true,
+      "len": 839,
+      "preview": "{\"success\":true,\"counsellors\":[{\"id\":\"987c67ef-388c-4467-90d6-4c4635398ed7\",\"full_name\":\"Amulya\",\"email\":\"amulya.sapficobhub@gmail.com\",\"role\":\"counsellor\",\"display_label\":\"Amulya "
+    },
+    {
+      "endpoint": "/api/fees/dues",
+      "status": 200,
+      "ok": true,
+      "len": 882,
+      "preview": "{\"success\":true,\"dues\":[{\"id\":\"adm-due-f1a4bd7c-d854-4aa2-9645-291e3d35bb0b\",\"student_id\":\"ed0378b7-9213-4e23-ba01-00eefda4ecbc\",\"student_name\":\"Dinesh Reddy Kalakoti\",\"admission_n"
+    },
+    {
+      "endpoint": "/api/fees/upcoming-dues",
+      "status": 200,
+      "ok": true,
+      "len": 881,
+      "preview": "{\"success\":true,\"dues\":[{\"id\":\"adm-due-f1a4bd7c-d854-4aa2-9645-291e3d35bb0b\",\"student_id\":\"ed0378b7-9213-4e23-ba01-00eefda4ecbc\",\"student_name\":\"Dinesh Reddy Kalakoti\",\"admission_n"
+    },
+    {
+      "endpoint": "/api/fees/payments",
+      "status": 200,
+      "ok": true,
+      "len": 21511,
+      "preview": "{\"success\":true,\"snapshot\":{\"studentPayments\":[{\"id\":\"spr-1795674104453-kjw5\",\"notes\":\"\",\"fee_id\":\"ee56057e-04c1-4a93-b168-6dc49888e1bc\",\"status\":\"Pending Approval\",\"tenant_id\":\"de"
+    },
+    {
+      "endpoint": "/api/fees/receipts",
+      "status": 200,
+      "ok": true,
+      "len": 2050,
+      "preview": "{\"success\":true,\"snapshot\":{\"students\":[{\"id\":\"74600d9d-1750-4d8c-b4a0-ce3bca646b50\",\"city\":\"Hyderabad\",\"email\":\"sattinarayanareddy2@gmail.com\",\"phone\":\"+91 79896 30335\",\"state\":\"T"
+    },
+    {
+      "endpoint": "/api/fees/reconcile",
+      "status": 200,
+      "ok": true,
+      "len": 1877,
+      "preview": "{\"success\":true,\"report\":{\"tenant_id\":\"default\",\"generated_at\":\"2026-11-26T18:36:56.751Z\",\"levels\":[{\"level\":1,\"label\":\"Student & Admission Fee Agreement Integrity\",\"checks_execute"
+    },
+    {
+      "endpoint": "/api/vendors",
+      "status": 403,
+      "ok": false,
+      "len": 98,
+      "preview": "{\"success\":false,\"error\":\"Forbidden: Insufficient privileges. Missing 'vendors:read' permission.\"}"
+    },
+    {
+      "endpoint": "/api/onboarding/cases",
+      "status": 200,
+      "ok": true,
+      "len": 37,
+      "preview": "{\"success\":true,\"count\":0,\"cases\":[]}"
+    },
+    {
+      "endpoint": "/api/onboarding/analytics",
+      "status": 200,
+      "ok": true,
+      "len": 1527,
+      "preview": "{\"success\":true,\"kpis\":{\"total\":0,\"pending\":0,\"inProgress\":0,\"completed\":0,\"blocked\":0,\"overdue\":0},\"staffPerformance\":[{\"staff_id\":\"46f46ae2-5b39-4cc3-aab0-764b42036c11\",\"staff_na"
+    },
+    {
+      "endpoint": "/api/placement/jobs",
+      "status": 200,
+      "ok": true,
+      "len": 26,
+      "preview": "{\"success\":true,\"jobs\":[]}"
+    },
+    {
+      "endpoint": "/api/placement/enrollments",
+      "status": 200,
+      "ok": true,
+      "len": 65,
+      "preview": "{\"success\":true,\"enrollments\":[],\"total\":0,\"isLiveDatabase\":true}"
+    },
+    {
+      "endpoint": "/api/placement/applications",
+      "status": 200,
+      "ok": true,
+      "len": 390,
+      "preview": "{\"success\":true,\"total\":1,\"totalForDrive\":1,\"page\":1,\"pageSize\":10,\"totalPages\":1,\"applications\":[{\"id\":\"app-01\",\"job_id\":\"job-01\",\"job_title\":\"SAP FICO Associate Consultant\",\"comp"
+    },
+    {
+      "endpoint": "/api/users",
+      "status": 200,
+      "ok": true,
+      "len": 2699,
+      "preview": "{\"success\":true,\"users\":[{\"id\":\"8fac380f-cc47-4209-9a13-e85153529dd1\",\"email\":\"vineethaa.myerp@gmail.com\",\"full_name\":\"Vineethaa\",\"role\":\"counsellor\",\"phone\":null,\"avatar_url\":null"
+    },
+    {
+      "endpoint": "/api/audit-logs",
+      "status": 200,
+      "ok": true,
+      "len": 3635,
+      "preview": "{\"success\":true,\"logs\":[{\"id\":\"49df36a6-20f0-4286-89d4-48190542a073\",\"action\":\"ADMISSION_CONFIRMED\",\"module\":\"ADMISSIONS\",\"user_id\":\"8fac380f-cc47-4209-9a13-e85153529dd1\",\"new_valu"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ok": true,
+      "len": 10033,
+      "preview": "{\"success\":true,\"settings\":{\"id\":\"sys-01\",\"institute_name\":\"Next-Gen ERP Solutions\",\"tagline\":\"Premier SAP Training, Certification & Placement Institute\",\"address\":\"Pillar No 707, "
+    },
+    {
+      "endpoint": "/api/settings/bank-accounts",
+      "status": 200,
+      "ok": true,
+      "len": 8844,
+      "preview": "{\"success\":true,\"total\":20,\"accounts\":[{\"id\":\"bank-acc-01\",\"account_holder_name\":\"Katari Charitha\",\"bank_name\":\"HDFC Bank\",\"account_number\":\"50100 76776 1140\",\"branch\":\"Main Branch"
+    },
+    {
+      "endpoint": "/api/admin/integrity-monitor",
+      "status": 404,
+      "ok": false,
+      "len": 7814,
+      "preview": "<!DOCTYPE html><html lang=\"en\" class=\"bg-slate-50\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_"
+    },
+    {
+      "endpoint": "/api/database/health",
+      "status": 200,
+      "ok": true,
+      "len": 270,
+      "preview": "{\"success\":true,\"health\":{\"status\":\"connected\",\"isLive\":true,\"latencyMs\":249,\"tables\":{\"admissions\":0,\"students\":0,\"courses\":0,\"batches\":0,\"payments\":0,\"leads\":0,\"attendance_record"
+    }
+  ]
+}

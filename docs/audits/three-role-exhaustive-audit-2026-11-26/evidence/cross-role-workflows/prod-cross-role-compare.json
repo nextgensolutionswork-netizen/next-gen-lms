@@ -1,0 +1,86 @@
+{
+  "super_admin": {
+    "leadsCount": 29,
+    "admissionsStudentsCount": 2,
+    "admissionsPaymentsCount": 2,
+    "studentsCount": 2,
+    "receiptsStudentsCount": 2,
+    "receiptsCount": 0,
+    "duesCount": 1,
+    "metricsLeads": {
+      "totalLeads": 29,
+      "convertedLeads": 16
+    },
+    "metricsCollections": {
+      "periodCollections": 0,
+      "transactionCount": 0
+    },
+    "metricsOutstanding": {
+      "totalOutstanding": 68000,
+      "pendingAmountInPeriod": 68000,
+      "pendingAccountsCount": 2
+    },
+    "metricsPaymentApproval": {
+      "approvedAmount": 0,
+      "approvedCount": 0,
+      "pendingAmount": 43000,
+      "pendingCount": 2
+    }
+  },
+  "admin": {
+    "leadsCount": 29,
+    "admissionsStudentsCount": 2,
+    "admissionsPaymentsCount": 2,
+    "studentsCount": 2,
+    "receiptsStudentsCount": 2,
+    "receiptsCount": 0,
+    "duesCount": 1,
+    "metricsLeads": {
+      "totalLeads": 29,
+      "convertedLeads": 16
+    },
+    "metricsCollections": {
+      "periodCollections": 0,
+      "transactionCount": 0
+    },
+    "metricsOutstanding": {
+      "totalOutstanding": 68000,
+      "pendingAmountInPeriod": 68000,
+      "pendingAccountsCount": 2
+    },
+    "metricsPaymentApproval": {
+      "approvedAmount": 0,
+      "approvedCount": 0,
+      "pendingAmount": 43000,
+      "pendingCount": 2
+    }
+  },
+  "sales": {
+    "leadsCount": 2,
+    "admissionsStudentsCount": 0,
+    "admissionsPaymentsCount": 0,
+    "studentsCount": 0,
+    "receiptsStudentsCount": 2,
+    "receiptsCount": 0,
+    "duesCount": 0,
+    "metricsLeads": {
+      "totalLeads": 2,
+      "convertedLeads": 2
+    },
+    "metricsCollections": {
+      "periodCollections": 0,
+      "transactionCount": 0
+    },
+    "metricsOutstanding": {
+      "totalOutstanding": 68000,
+      "pendingAmountInPeriod": 68000,
+      "pendingAccountsCount": 2
+    },
+    "metricsPaymentApproval": {
+      "approvedAmount": 0,
+      "approvedCount": 0,
+      "pendingAmount": 43000,
+      "pendingCount": 2
+    }
+  }
+}

@@ -95,6 +95,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'assignments:read',
     'assessments:read',
     'accounts:read',
+    'vendors:read',
+    'vendors:write',
     'reports:read',
     'placements:read',
     'placements:write',

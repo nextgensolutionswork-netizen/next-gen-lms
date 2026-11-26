@@ -1,0 +1,46 @@
+[
+  {
+    "route": "/dashboard",
+    "networkIdleMs": 3273
+  },
+  {
+    "route": "/crm/leads",
+    "networkIdleMs": 4454
+  },
+  {
+    "route": "/admissions",
+    "networkIdleMs": 4631
+  },
+  {
+    "route": "/students",
+    "networkIdleMs": 2965
+  },
+  {
+    "route": "/accounts/payments",
+    "networkIdleMs": 3650
+  },
+  {
+    "route": "/accounts/reports",
+    "networkIdleMs": 2633
+  },
+  {
+    "route": "/users",
+    "networkIdleMs": 3371
+  },
+  {
+    "api": "/api/dashboard/metrics",
+    "ms": 1230
+  },
+  {
+    "api": "/api/crm/leads",
+    "ms": 821
+  },
+  {
+    "api": "/api/students",
+    "ms": 1497
+  },
+  {
+    "api": "/api/fees/reconcile",
+    "ms": 1688
+  }
+]

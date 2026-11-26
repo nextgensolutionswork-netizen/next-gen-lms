@@ -1,0 +1,839 @@
+{
+  "role": "super_admin",
+  "baseUrl": "http://localhost:3000",
+  "timestamp": "2026-11-26T15:31:05.972Z",
+  "authTests": [
+    {
+      "id": "AUTH-023",
+      "title": "Direct protected URL without login",
+      "status": "PASS",
+      "note": "Redirected to http://localhost:3000/login?redirectTo=%2Fdashboard"
+    },
+    {
+      "id": "AUTH-002",
+      "title": "Valid email and incorrect password",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login?error=invalid_credentials err=Unable to sign in. Check your email and password and try again."
+    },
+    {
+      "id": "AUTH-003",
+      "title": "Invalid email and valid password",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login?error=invalid_credentials err=Unable to sign in. Check your email and password and try again."
+    },
+    {
+      "id": "AUTH-004",
+      "title": "Both credentials invalid",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login?error=invalid_credentials"
+    },
+    {
+      "id": "AUTH-005",
+      "title": "Empty email blocked",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    },
+    {
+      "id": "AUTH-006",
+      "title": "Empty password blocked",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    },
+    {
+      "id": "AUTH-007",
+      "title": "Both fields empty blocked",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    },
+    {
+      "id": "AUTH-008",
+      "title": "Invalid email format rejected",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    },
+    {
+      "id": "AUTH-012",
+      "title": "Password case sensitivity",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login?error=invalid_credentials"
+    },
+    {
+      "id": "AUTH-013",
+      "title": "Password visibility toggle",
+      "status": "FAIL",
+      "note": "type after click=password"
+    },
+    {
+      "id": "AUTH-011",
+      "title": "Email trim & case normalization",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/dashboard"
+    },
+    {
+      "id": "AUTH-001",
+      "title": "Valid email and valid password",
+      "status": "PASS",
+      "note": "Redirected to http://localhost:3000/dashboard"
+    },
+    {
+      "id": "AUTH-014",
+      "title": "Enter-key submission",
+      "status": "PASS",
+      "note": "Redirected to http://localhost:3000/dashboard"
+    },
+    {
+      "id": "AUTH-018",
+      "title": "Correct role redirection",
+      "status": "PASS",
+      "note": "Expected /dashboard, got http://localhost:3000/dashboard"
+    },
+    {
+      "id": "AUTH-019",
+      "title": "Authenticated username displayed",
+      "status": "PASS",
+      "note": "Sidebar footer present"
+    },
+    {
+      "id": "AUTH-021",
+      "title": "Refresh after login preserves session",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/dashboard"
+    },
+    {
+      "id": "AUTH-022",
+      "title": "New browser tab shares session",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/dashboard"
+    },
+    {
+      "id": "AUTH-035",
+      "title": "Tampered auth cookie rejected",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login?redirectTo=%2Fdashboard"
+    },
+    {
+      "id": "AUTH-024",
+      "title": "Logout redirects to login",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    },
+    {
+      "id": "AUTH-025",
+      "title": "Browser back after logout cannot access protected page",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    },
+    {
+      "id": "AUTH-026",
+      "title": "Refresh after logout stays on login",
+      "status": "PASS",
+      "note": "url=http://localhost:3000/login"
+    }
+  ],
+  "pageTests": [
+    {
+      "route": "/dashboard",
+      "finalPath": "/dashboard",
+      "httpStatus": 200,
+      "elapsedMs": 2571,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/onboarding",
+      "finalPath": "/onboarding",
+      "httpStatus": 200,
+      "elapsedMs": 11657,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/crm/leads",
+      "finalPath": "/crm/leads",
+      "httpStatus": 200,
+      "elapsedMs": 7662,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/crm/followups",
+      "finalPath": "/crm/followups",
+      "httpStatus": 200,
+      "elapsedMs": 7966,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/admissions",
+      "finalPath": "/admissions",
+      "httpStatus": 200,
+      "elapsedMs": 8229,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/students",
+      "finalPath": "/students",
+      "httpStatus": 200,
+      "elapsedMs": 8369,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 552
+    },
+    {
+      "route": "/academics/courses",
+      "finalPath": "/academics/courses",
+      "httpStatus": 200,
+      "elapsedMs": 8139,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "[student-service] Supabase query failed: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load courses: Error: Authoritative course registry unavailable: Failed to load courses from Supabase: permission denied for function get_current_user_role\n    at getCourses (webpack-internal:///(app-pages-browser)/./lib/services/academics-service.ts:144:19)\n    at async CoursesPage.useCallback[fetchCourses] (webpack-internal:///(app-pages-browser)/./app/(dashboard)/academics/courses/page.tsx:66:30)\n    at async CoursesPage.useEffect (webpack-internal:///(app-pages-browser)/./app/(dashboard)/academics/courses/page.tsx:83:21)",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load courses: Error: Authoritative course registry unavailable: Failed to load courses from Supabase: permission denied for function get_current_user_role\n    at getCourses (webpack-internal:///(app-pages-browser)/./lib/services/academics-service.ts:144:19)\n    at async CoursesPage.useCallback[fetchCourses] (webpack-internal:///(app-pages-browser)/./app/(dashboard)/academics/courses/page.tsx:66:30)\n    at async CoursesPage.useEffect (webpack-internal:///(app-pages-browser)/./app/(dashboard)/academics/courses/page.tsx:83:21)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/academics/batches",
+      "finalPath": "/academics/batches",
+      "httpStatus": 200,
+      "elapsedMs": 5283,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/academics/schedule",
+      "finalPath": "/academics/schedule",
+      "httpStatus": 200,
+      "elapsedMs": 5912,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Supabase batches query error: {code: 42501, details: null, hint: null, message: permission denied for function get_current_user_role}",
+        "Failed to load batches: Error: Failed to retrieve authoritative remote batches: permission denied for function get_current_user_role\n    at getBatches (webpack-internal:///(app-pages-browser)/./lib/services/academics-service.ts:758:19)\n    at async loadBatches (webpack-internal:///(app-pages-browser)/./app/(dashboard)/academics/batches/page.tsx:82:34)",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Authoritative courses query failed: Failed to load courses from Supabase: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Supabase batches query error: {code: 42501, details: null, hint: null, message: permission denied for function get_current_user_role}",
+        "Failed to load batches: Error: Failed to retrieve authoritative remote batches: permission denied for function get_current_user_role\n    at getBatches (webpack-internal:///(app-pages-browser)/./lib/services/academics-service.ts:758:19)\n    at async loadBatches (webpack-internal:///(app-pages-browser)/./app/(dashboard)/academics/batches/page.tsx:82:34)",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/academics/attendance",
+      "finalPath": "/academics/attendance",
+      "httpStatus": 200,
+      "elapsedMs": 12840,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/academics/assignments",
+      "finalPath": "/academics/assignments",
+      "httpStatus": 200,
+      "elapsedMs": 10652,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.",
+        "Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.",
+        "Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.",
+        "Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render."
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/academics/assessments",
+      "finalPath": "/academics/assessments",
+      "httpStatus": 200,
+      "elapsedMs": 5980,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/academics/sap-servers",
+      "finalPath": "/academics/sap-servers",
+      "httpStatus": 200,
+      "elapsedMs": 6027,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/approvals",
+      "finalPath": "/accounts/approvals",
+      "httpStatus": 200,
+      "elapsedMs": 11067,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/dues",
+      "finalPath": "/accounts/dues",
+      "httpStatus": 200,
+      "elapsedMs": 9193,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/fees",
+      "finalPath": "/accounts/fees",
+      "httpStatus": 200,
+      "elapsedMs": 7804,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/installments",
+      "finalPath": "/accounts/installments",
+      "httpStatus": 200,
+      "elapsedMs": 8539,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/payments",
+      "finalPath": "/accounts/payments",
+      "httpStatus": 200,
+      "elapsedMs": 8452,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/receipts",
+      "finalPath": "/accounts/receipts",
+      "httpStatus": 200,
+      "elapsedMs": 9461,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/expenses",
+      "finalPath": "/accounts/expenses",
+      "httpStatus": 200,
+      "elapsedMs": 8383,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/vendors",
+      "finalPath": "/accounts/vendors",
+      "httpStatus": 200,
+      "elapsedMs": 8405,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/accounts/reports",
+      "finalPath": "/accounts/reports",
+      "httpStatus": 200,
+      "elapsedMs": 9923,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/placement",
+      "finalPath": "/placement",
+      "httpStatus": 200,
+      "elapsedMs": 10032,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/placement/enrollments",
+      "finalPath": "/placement/enrollments",
+      "httpStatus": 200,
+      "elapsedMs": 10036,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/support",
+      "finalPath": "/support",
+      "httpStatus": 200,
+      "elapsedMs": 5602,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "[placement-service] Supabase placement enrollments query error: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "[placement-service] Supabase placement enrollments query error: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "[doubt-service] Supabase doubts direct query failed: permission denied for function get_current_user_role"
+      ],
+      "pageErrors": [
+        "Failed to retrieve authoritative placement enrollments: permission denied for function get_current_user_role",
+        "Failed to retrieve authoritative placement enrollments: permission denied for function get_current_user_role",
+        "Failed to retrieve authoritative doubts: permission denied for function get_current_user_role"
+      ],
+      "failedRequests": [],
+      "textLength": 1065
+    },
+    {
+      "route": "/certificates",
+      "finalPath": "/certificates",
+      "httpStatus": 200,
+      "elapsedMs": 7683,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 ()",
+        "[doubt-service] Supabase doubts direct query failed: permission denied for function get_current_user_role",
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [
+        "Failed to retrieve authoritative doubts: permission denied for function get_current_user_role"
+      ],
+      "failedRequests": [],
+      "textLength": 1167
+    },
+    {
+      "route": "/users",
+      "finalPath": "/users",
+      "httpStatus": 200,
+      "elapsedMs": 4827,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/audit-logs",
+      "finalPath": "/audit-logs",
+      "httpStatus": 200,
+      "elapsedMs": 9362,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/audit",
+      "finalPath": "/audit",
+      "httpStatus": 200,
+      "elapsedMs": 9298,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 1300
+    },
+    {
+      "route": "/settings",
+      "finalPath": "/settings",
+      "httpStatus": 200,
+      "elapsedMs": 8581,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        "500 http://localhost:3000/api/audit-logs"
+      ],
+      "textLength": 6089
+    },
+    {
+      "route": "/settings/audit",
+      "finalPath": "/settings/audit",
+      "httpStatus": 200,
+      "elapsedMs": 8309,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 23
+    },
+    {
+      "route": "/portal",
+      "finalPath": "/portal",
+      "httpStatus": 200,
+      "elapsedMs": 13990,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        "500 http://localhost:3000/api/audit-logs"
+      ],
+      "textLength": 26
+    },
+    {
+      "route": "/todos",
+      "finalPath": "/todos",
+      "httpStatus": 200,
+      "elapsedMs": 6212,
+      "redirected": false,
+      "hasCrash": false,
+      "overflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "textLength": 951
+    }
+  ],
+  "responsiveTests": [
+    {
+      "viewport": "tablet",
+      "route": "/dashboard",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/crm/leads",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/accounts/payments",
+      "overflow": false
+    },
+    {
+      "viewport": "tablet",
+      "route": "/students",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/dashboard",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/crm/leads",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/accounts/payments",
+      "overflow": false
+    },
+    {
+      "viewport": "mobile",
+      "route": "/students",
+      "overflow": false
+    }
+  ],
+  "apiRbacTests": [
+    {
+      "endpoint": "/api/dashboard/metrics",
+      "method": "GET",
+      "status": 403,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/crm/leads",
+      "method": "GET",
+      "status": 403,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/crm/summary",
+      "method": "GET",
+      "status": 403,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/crm/history",
+      "method": "GET",
+      "status": 403,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/admissions",
+      "method": "GET",
+      "status": 403,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/students",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/counsellors",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/fees/dues",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/fees/upcoming-dues",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/fees/payments",
+      "method": "GET",
+      "status": 400,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/fees/receipts",
+      "method": "GET",
+      "status": 401,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/fees/reconcile",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/vendors",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/onboarding/cases",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/onboarding/analytics",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/placement/jobs",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/placement/enrollments",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/placement/applications",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/users",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/audit-logs",
+      "method": "GET",
+      "status": 500,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/settings",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/settings/bank-accounts",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/admin/integrity-monitor",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/database/health",
+      "method": "GET",
+      "status": 200,
+      "ok": true
+    }
+  ]
+}

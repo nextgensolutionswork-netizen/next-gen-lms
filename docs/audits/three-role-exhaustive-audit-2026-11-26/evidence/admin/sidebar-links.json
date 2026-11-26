@@ -1,0 +1,114 @@
+[
+  {
+    "text": "Dashboard",
+    "href": "/dashboard"
+  },
+  {
+    "text": "Student OnboardingOperations",
+    "href": "/onboarding"
+  },
+  {
+    "text": "Courses & Modules",
+    "href": "/academics/courses"
+  },
+  {
+    "text": "Batches & Transfers",
+    "href": "/academics/batches"
+  },
+  {
+    "text": "Timetable & Sessions",
+    "href": "/academics/schedule"
+  },
+  {
+    "text": "Mark Attendance",
+    "href": "/academics/attendance"
+  },
+  {
+    "text": "Assignments & Grading",
+    "href": "/academics/assignments"
+  },
+  {
+    "text": "Quizzes & Exams",
+    "href": "/academics/assessments"
+  },
+  {
+    "text": "SAP Lab Servers",
+    "href": "/academics/sap-servers"
+  },
+  {
+    "text": "Academic SupportHelpdesk",
+    "href": "/support"
+  },
+  {
+    "text": "Certificates",
+    "href": "/certificates"
+  },
+  {
+    "text": "Student LMS PortalLive",
+    "href": "/portal"
+  },
+  {
+    "text": "Staff & Roles",
+    "href": "/users"
+  },
+  {
+    "text": "Institute Settings",
+    "href": "/settings"
+  },
+  {
+    "text": "Dashboard",
+    "href": "/dashboard"
+  },
+  {
+    "text": "Student OnboardingOperations",
+    "href": "/onboarding"
+  },
+  {
+    "text": "Courses & Modules",
+    "href": "/academics/courses"
+  },
+  {
+    "text": "Batches & Transfers",
+    "href": "/academics/batches"
+  },
+  {
+    "text": "Timetable & Sessions",
+    "href": "/academics/schedule"
+  },
+  {
+    "text": "Mark Attendance",
+    "href": "/academics/attendance"
+  },
+  {
+    "text": "Assignments & Grading",
+    "href": "/academics/assignments"
+  },
+  {
+    "text": "Quizzes & Exams",
+    "href": "/academics/assessments"
+  },
+  {
+    "text": "SAP Lab Servers",
+    "href": "/academics/sap-servers"
+  },
+  {
+    "text": "Academic SupportHelpdesk",
+    "href": "/support"
+  },
+  {
+    "text": "Certificates",
+    "href": "/certificates"
+  },
+  {
+    "text": "Student LMS PortalLive",
+    "href": "/portal"
+  },
+  {
+    "text": "Staff & Roles",
+    "href": "/users"
+  },
+  {
+    "text": "Institute Settings",
+    "href": "/settings"
+  }
+]
