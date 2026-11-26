@@ -58,7 +58,7 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
             const [admsRes, studsRes, paysRes, rcptsRes] = await Promise.all([
               db.from('admissions').select('id, course_id, status').eq('tenant_id', tenant),
               db.from('students').select('id, total_fee, paid_amount, outstanding_amount').eq('tenant_id', tenant),
-              db.from('payments').select('id, amount, receipt_number').eq('tenant_id', tenant),
+              db.from('payments').select('id, external_payment_id, amount, receipt_number').eq('tenant_id', tenant),
               db.from('receipts').select('id, payment_id, receipt_number, amount').eq('tenant_id', tenant),
             ]);
 
@@ -92,7 +92,11 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
                 });
             }
             if (!paysRes.error && Array.isArray(paysRes.data)) {
-              const livePayMap = new Map(paysRes.data.map((r: any) => [r.id, r]));
+              const livePayMap = new Map<string, any>();
+              for (const r of paysRes.data as any[]) {
+                livePayMap.set(r.id, r);
+                if (r.external_payment_id) livePayMap.set(r.external_payment_id, r);
+              }
               store.payments = store.payments
                 .filter((p) => tenantId(p) !== tenant || livePayMap.has(p.id))
                 .map((p) => {
