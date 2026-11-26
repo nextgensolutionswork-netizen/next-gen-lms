@@ -217,3 +217,13 @@ Read-only SQL verification against Supabase project `tgohtdzwehhjfahtgovq`:
 
 - **Status:** **COMPLETED AND VERIFIED**
 - **Recommendation:** **GO** for TASK-03 production release.
+
+
+---
+
+## Final QA & Production Verification Addendum (2026-11-26)
+- **Production Commit:** `8c4a38d` (`main`)
+- **Production DB (`tgohtdzwehhjfahtgovq`):** Verified `commit_fee_workflow` & `settle_expense_atomic` deployed; `ADM-2026-0025` (`NGERP-2026-00001`, `spr-1795607574382-67k9`, `Pending Approval`, `bank-acc-14` / `T Usha`, `Vineethaa`) and new live `ADM-2026-0026` (`NGERP-2026-00002`, `spr-1795674104453-kjw5`, `Pending Approval`, `bank-acc-05` / `My Erp Hub`, `Vineethaa`) both persisted atomically (`admissions=2, students=2, payments=2, receipts=0, workflow_rev=39`).
+- **Isolated Staging (`mzkrvvnmmjcjygwllabn`):** 20/20 PostgreSQL integration assertions + 500-student / 1,500-payment workload + expense settlement failure-injection passed.
+- **Automated Suites:** 310/310 passed across all 7 TASK-01/02/03 test files; `tsc --noEmit` (0 errors), `npm run lint` (0 errors, 121 warnings), `npm run build` (52/52 routes).
+- **Live Browser Verification:** `BLOCKED (AUTH_REQUIRED)` on `/accounts/approvals`; see [task-03-final-qa-acceptance-report.md](task-03-final-qa-acceptance-report.md).
