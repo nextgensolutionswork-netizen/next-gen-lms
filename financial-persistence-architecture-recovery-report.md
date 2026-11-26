@@ -114,3 +114,10 @@ ON CONFLICT (id) DO NOTHING;
 
 ## TASK-03 Revalidation on `95f392b` (2026-11-26)
 - Verified `ADM-2026-0025` (`NGERP-2026-00001`) and `ADM-2026-0026` (`NGERP-2026-00002`) remain intact (`₹43,000` combined pending, `receipts=0`, `wf_rev=39`) with `0` discrepancies on `tgohtdzwehhjfahtgovq`.
+
+
+---
+
+## TASK-03 Final Closure Verification (2026-11-26)
+- **Production DB (`tgohtdzwehhjfahtgovq`):** `ADM-2026-0025` (`NGERP-2026-00001`) and `ADM-2026-0026` (`NGERP-2026-00002`) remain intact (`₹43,000` combined pending, `receipts=0`, `expenses=0`, `wf_rev=39`).
+- **Closure Suite & Full Regression:** `tests/task-03-final-closure-risks.test.ts` (`4/4`), full Vitest (`2,132/2,139` passed across `124/130` files, `0` financial failures). See [task-03-final-qa-acceptance-report.md](task-03-final-qa-acceptance-report.md).
