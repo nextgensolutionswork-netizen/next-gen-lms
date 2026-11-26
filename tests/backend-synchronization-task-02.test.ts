@@ -36,7 +36,7 @@ describe('TASK-02: Backend Synchronization & Multi-User Data Consistency', () =>
   };
 
   const counsellorActorA: UserProfile = {
-    id: 'usr-counsellor-a',
+    id: '22222222-2222-4222-8222-222222222201',
     email: 'counsellor.a@next-generpsolutions.com',
     full_name: 'Counsellor A',
     role: 'counsellor',
@@ -47,7 +47,7 @@ describe('TASK-02: Backend Synchronization & Multi-User Data Consistency', () =>
   };
 
   const counsellorActorB: UserProfile = {
-    id: 'usr-counsellor-b',
+    id: '22222222-2222-4222-8222-222222222202',
     email: 'counsellor.b@next-generpsolutions.com',
     full_name: 'Counsellor B',
     role: 'counsellor',
@@ -502,7 +502,7 @@ describe('TASK-02: Backend Synchronization & Multi-User Data Consistency', () =>
 
     it('SYNC-024: Simultaneous independent updates persist correctly', async () => {
       const lead1 = await createLead(validLead({ full_name: 'Lead 1', phone: '9888877724', email: 'lead1@example.com' }), counsellorActorA);
-      const lead2 = await createLead(validLead({ full_name: 'Lead 2', phone: '9888877725', email: 'lead2@example.com' }), counsellorActorB);
+      const lead2 = await createLead(validLead({ full_name: 'Lead 2', phone: '9888877725', email: 'lead2@example.com', counsellor_id: counsellorActorB.id }), counsellorActorB);
 
       const [res1, res2] = await Promise.all([
         updateLeadDetails(lead1.id, { notes: 'Note 1' }, counsellorActorA.id, counsellorActorA),

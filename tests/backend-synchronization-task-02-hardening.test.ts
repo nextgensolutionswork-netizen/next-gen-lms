@@ -48,7 +48,7 @@ describe('TASK-02: Final Acceptance Verification & Production Hardening', () => 
   };
 
   const counsellorActorA: UserProfile = {
-    id: 'usr-counsellor-a-h',
+    id: '11111111-1111-4111-8111-111111111101',
     email: 'counsellor.a@next-generpsolutions.com',
     full_name: 'Counsellor A Hardened',
     role: 'counsellor',
@@ -59,7 +59,7 @@ describe('TASK-02: Final Acceptance Verification & Production Hardening', () => 
   };
 
   const counsellorActorB: UserProfile = {
-    id: 'usr-counsellor-b-h',
+    id: '11111111-1111-4111-8111-111111111102',
     email: 'counsellor.b@next-generpsolutions.com',
     full_name: 'Counsellor B Hardened',
     role: 'counsellor',

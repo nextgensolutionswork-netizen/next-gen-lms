@@ -623,6 +623,12 @@ export async function updateLeadDetails(
   if (scope.actor.role === 'counsellor' && updates.counsellor_id !== undefined && updates.counsellor_id !== lead.counsellor_id) {
     throw new Error('Forbidden: Counsellors cannot reassign leads.');
   }
+  if (updates.counsellor_id !== undefined && updates.counsellor_id && updates.counsellor_id.trim() !== '') {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updates.counsellor_id.trim());
+    if (!isUUID) {
+      throw new Error('Invalid counsellor ID format. Must be a valid UUID or empty.');
+    }
+  }
   await validateLeadAssignment(updates.counsellor_id, scope.actor);
 
   const country_code = updates.country_code || lead.country_code || '+91';
