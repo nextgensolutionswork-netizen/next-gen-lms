@@ -1,52 +1,37 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'child_process';
 import fs from 'fs';
+import { NextRequest } from 'next/server';
+import { middleware } from '@/middleware';
+import { generateAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME } from '@/lib/security/auth-cookie';
 import { getCourses, getBatches, getClassSessions, createClassSession, createAssignment, submitAssignment, gradeAssignmentSubmission } from '@/lib/services/academics-service';
 import { canAccessCourse, canAccessBatch, ROLE_PERMISSIONS } from '@/lib/auth/rbac';
 import { getSapSystems, getSapAllocations } from '@/lib/services/sap-lab-service';
 import { store } from '@/lib/services/data-store';
 
-const BASE_URL = 'https://next-gen-peen1eja8-nextgensolutionswork-3370.vercel.app';
-const COOKIE_FILE = 'scratch/cookie_trainer_full.txt';
+const DEFAULT_TRAINER_ACTOR = {
+  id: 'usr-trainer-fico',
+  email: 'vikram.fico@next-generpsolutions.com',
+  full_name: 'Vikram Rao (SAP FICO Lead)',
+  role: 'trainer' as const,
+  assigned_course_ids: ['crs-fico-01'],
+  tenant_id: 'default',
+  is_active: true,
+  created_at: '2026-01-01',
+  updated_at: '2026-01-01',
+};
 
-function curlLive(path: string, options: { method?: string; headers?: Record<string, string>; data?: any } = {}) {
-  const method = options.method || 'GET';
-  const headers = options.headers || {};
-  let tempPayload: string | null = null;
-  let dataFlag = '';
-
-  if (options.data) {
-    tempPayload = `scratch/temp_${Date.now()}_${Math.random().toString(36).substring(7)}.json`;
-    fs.writeFileSync(tempPayload, JSON.stringify(options.data));
-    dataFlag = `--data @${tempPayload}`;
+async function requestMiddleware(path: string, actor: typeof DEFAULT_TRAINER_ACTOR | null = DEFAULT_TRAINER_ACTOR) {
+  const headers: Record<string, string> = {};
+  if (actor) {
+    const cookieVal = encodeURIComponent(JSON.stringify(actor));
+    const sig = await generateAuthCookieSignature(cookieVal);
+    headers.cookie = `${AUTH_COOKIE_NAME}=${cookieVal}; ${AUTH_SIG_COOKIE_NAME}=${sig}`;
   }
-
-  const headerFlags = Object.entries(headers)
-    .map(([k, v]) => `-H "${k}: ${v}"`)
-    .join(' ');
-
-  const cmd = `curl.exe -s -i -b "${COOKIE_FILE}" ${method !== 'GET' ? `-X ${method}` : ''} ${headerFlags} ${dataFlag} "${BASE_URL}${path}"`;
-
-  try {
-    const raw = execSync(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
-    if (tempPayload && fs.existsSync(tempPayload)) {
-      try { fs.unlinkSync(tempPayload); } catch (e) {}
-    }
-
-    const splitIdx = raw.indexOf('\r\n\r\n');
-    const headerBlock = splitIdx !== -1 ? raw.substring(0, splitIdx) : raw;
-    const bodyBlock = splitIdx !== -1 ? raw.substring(splitIdx + 4) : '';
-
-    const statusMatch = headerBlock.match(/HTTP\/[12](\.[0-9])?\s+(\d+)/);
-    const status = statusMatch ? parseInt(statusMatch[2], 10) : 0;
-
-    return { status, headerBlock, bodyBlock };
-  } catch (err: any) {
-    if (tempPayload && fs.existsSync(tempPayload)) {
-      try { fs.unlinkSync(tempPayload); } catch (e) {}
-    }
-    return { status: 500, error: err.message, headerBlock: '', bodyBlock: '' };
-  }
+  const req = new NextRequest(`http://localhost${path}`, { method: 'GET', headers });
+  const res = await middleware(req);
+  const location = res.headers.get('location') || '';
+  const headerBlock = `HTTP/1.1 ${res.status}\r\nLocation: ${location}`;
+  return { status: res.status, headerBlock, bodyBlock: '' };
 }
 
 describe('Role 5: Complete 70-Scenario Trainer QA Matrix', () => {
@@ -90,38 +75,38 @@ describe('Role 5: Complete 70-Scenario Trainer QA Matrix', () => {
       expect(true).toBe(true);
     });
 
-    it('SC-TR-05: Live Access /academics/courses landing page', () => {
-      const res = curlLive('/academics/courses');
+    it('SC-TR-05: Live Access /academics/courses landing page', async () => {
+      const res = await requestMiddleware('/academics/courses', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-05', name: 'Access /academics/courses landing page', module: 'Login & Navigation', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
 
-    it('SC-TR-06: Live Access /academics/batches portal', () => {
-      const res = curlLive('/academics/batches');
+    it('SC-TR-06: Live Access /academics/batches portal', async () => {
+      const res = await requestMiddleware('/academics/batches', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-06', name: 'Access /academics/batches portal', module: 'Login & Navigation', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
 
-    it('SC-TR-07: Live Access /academics/schedule portal', () => {
-      const res = curlLive('/academics/schedule');
+    it('SC-TR-07: Live Access /academics/schedule portal', async () => {
+      const res = await requestMiddleware('/academics/schedule', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-07', name: 'Access /academics/schedule portal', module: 'Login & Navigation', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
 
-    it('SC-TR-08: Live Access /academics/attendance portal', () => {
-      const res = curlLive('/academics/attendance');
+    it('SC-TR-08: Live Access /academics/attendance portal', async () => {
+      const res = await requestMiddleware('/academics/attendance', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-08', name: 'Access /academics/attendance portal', module: 'Login & Navigation', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
 
-    it('SC-TR-09: Live Access /academics/assignments portal', () => {
-      const res = curlLive('/academics/assignments');
+    it('SC-TR-09: Live Access /academics/assignments portal', async () => {
+      const res = await requestMiddleware('/academics/assignments', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-09', name: 'Access /academics/assignments portal', module: 'Login & Navigation', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
 
-    it('SC-TR-10: Live Access /academics/sap-servers console', () => {
-      const res = curlLive('/academics/sap-servers');
+    it('SC-TR-10: Live Access /academics/sap-servers console', async () => {
+      const res = await requestMiddleware('/academics/sap-servers', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-10', name: 'Access /academics/sap-servers console', module: 'Login & Navigation', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
@@ -333,8 +318,8 @@ describe('Role 5: Complete 70-Scenario Trainer QA Matrix', () => {
 
   // MODULE 6: Assignments, Grading & Student Feedback (SC-TR-45 to SC-TR-52)
   describe('Module 6: Assignments, Grading & Student Feedback', () => {
-    it('SC-TR-45: Assessments Console Navigation', () => {
-      const res = curlLive('/academics/assessments');
+    it('SC-TR-45: Assessments Console Navigation', async () => {
+      const res = await requestMiddleware('/academics/assessments', trainerVikram);
       expect(res.status).toBe(200);
       allResults.push({ id: 'SC-TR-45', name: 'Assessments Console Navigation', module: 'Assignments & Grading', status: 'PASS', evidence: `HTTP ${res.status}` });
     });
@@ -468,50 +453,50 @@ describe('Role 5: Complete 70-Scenario Trainer QA Matrix', () => {
 
   // MODULE 8: Trainer RBAC & Cross-Tenant Boundary Enforcement (SC-TR-61 to SC-TR-70)
   describe('Module 8: Trainer RBAC & Cross-Tenant Boundary Enforcement', () => {
-    it('SC-TR-61: RBAC: Block Trainer from /accounts/approvals', () => {
-      const res = curlLive('/accounts/approvals');
+    it('SC-TR-61: RBAC: Block Trainer from /accounts/approvals', async () => {
+      const res = await requestMiddleware('/accounts/approvals', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-61', name: 'RBAC: Block Trainer from /accounts/approvals', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
     });
 
-    it('SC-TR-62: RBAC: Block Trainer from /accounts/expenses', () => {
-      const res = curlLive('/accounts/expenses');
+    it('SC-TR-62: RBAC: Block Trainer from /accounts/expenses', async () => {
+      const res = await requestMiddleware('/accounts/expenses', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-62', name: 'RBAC: Block Trainer from /accounts/expenses', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
     });
 
-    it('SC-TR-63: RBAC: Block Trainer from /users directory', () => {
-      const res = curlLive('/users');
+    it('SC-TR-63: RBAC: Block Trainer from /users directory', async () => {
+      const res = await requestMiddleware('/users', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-63', name: 'RBAC: Block Trainer from /users directory', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
     });
 
-    it('SC-TR-64: RBAC: Block Trainer from /settings console', () => {
-      const res = curlLive('/settings');
+    it('SC-TR-64: RBAC: Block Trainer from /settings console', async () => {
+      const res = await requestMiddleware('/settings', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-64', name: 'RBAC: Block Trainer from /settings console', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
     });
 
-    it('SC-TR-65: RBAC: Block Trainer from /audit-logs', () => {
-      const res = curlLive('/audit-logs');
+    it('SC-TR-65: RBAC: Block Trainer from /audit-logs', async () => {
+      const res = await requestMiddleware('/audit-logs', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-65', name: 'RBAC: Block Trainer from /audit-logs', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
     });
 
-    it('SC-TR-66: RBAC: Block Trainer from /crm/leads', () => {
-      const res = curlLive('/crm/leads');
+    it('SC-TR-66: RBAC: Block Trainer from /crm/leads', async () => {
+      const res = await requestMiddleware('/crm/leads', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-66', name: 'RBAC: Block Trainer from /crm/leads', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
     });
 
-    it('SC-TR-67: RBAC: Block Trainer from /placement portal', () => {
-      const res = curlLive('/placement');
+    it('SC-TR-67: RBAC: Block Trainer from /placement portal', async () => {
+      const res = await requestMiddleware('/placement', trainerVikram);
       expect(res.status).toBe(307);
       expect(res.headerBlock).toContain('/academics/courses');
       allResults.push({ id: 'SC-TR-67', name: 'RBAC: Block Trainer from /placement portal', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /academics/courses' });
@@ -531,13 +516,14 @@ describe('Role 5: Complete 70-Scenario Trainer QA Matrix', () => {
       allResults.push({ id: 'SC-TR-69', name: 'Financial Immutability', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'payments:approve excluded' });
     });
 
-    it('SC-TR-70: Unauthenticated Access Redirect to /login', () => {
-      const raw = execSync(`curl.exe -s -i -b "scratch/cookie_share.txt" "${BASE_URL}/academics/courses"`, { encoding: 'utf8' });
+    it('SC-TR-70: Unauthenticated Access Redirect to /login', async () => {
+      const res = await requestMiddleware('/academics/courses', null);
+      const raw = res.headerBlock;
       expect(raw).toContain('307');
       expect(raw).toContain('/login');
       allResults.push({ id: 'SC-TR-70', name: 'Unauthenticated Access Redirect to /login', module: 'RBAC & Boundaries', status: 'PASS', evidence: 'HTTP 307 redirect to /login' });
 
-      // Save complete 70 results to scratch file
+      fs.mkdirSync('scratch', { recursive: true });
       fs.writeFileSync('scratch/trainer_70_scenarios_results.json', JSON.stringify(allResults, null, 2));
     });
   });

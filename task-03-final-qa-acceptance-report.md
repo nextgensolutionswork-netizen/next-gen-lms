@@ -40,3 +40,20 @@ Live authenticated role-wise browser testing on `https://next-gen-lms-omega.verc
 - **Backend, Database Atomicity & Reconciliation:** **GO (PASS)**
 - **Live Authenticated UI Sign-Off (`/accounts/approvals`):** **BLOCKED (`AUTH_REQUIRED`)** — awaiting authenticated Accountant browser sign-off on `https://next-gen-lms-omega.vercel.app/accounts/approvals` before formal closure.
 - **TASK-04 Status:** Not started (awaiting review of this report).
+
+
+---
+
+## Conditional Acceptance Decision (2026-11-26)
+- **Status:** `BACKEND ACCEPTED — AUTHENTICATED UI SIGN-OFF PENDING`
+- **Accepted Commit:** `a8dbc8a` (`main`)
+- **Preserved Production Records:** `ADM-2026-0025` / `NGERP-2026-00001` (`₹10,000` Pending Approval) and `ADM-2026-0026` / `NGERP-2026-00002` (`₹33,000` Pending Approval) — combined pending total `₹43,000`; 18 historical cleaned records remain excluded.
+- **Carried Forward (to TASK-11 / TASK-12 unless completed earlier):**
+  1. Authenticated Accountant Approval Desk verification (`/accounts/approvals`).
+  2. Student phone number, account holder, counsellor, and LMS ID display verification.
+  3. Complete authenticated role-wise browser verification.
+  4. Actual 20 concurrent staff and 50 concurrent student session testing.
+  5. Workload response-time and P95 latency measurements.
+  6. Latest complete application regression results.
+  7. Active Vercel deployment ID verification.
+  8. External bank statement reconciliation (subject to statement availability).
