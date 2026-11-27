@@ -40,12 +40,12 @@ describe('TASK-04: Role Authorization Matrix & Authentication Security', () => {
     const allowedCases: Array<[UserRole, string[]]> = [
       ['super_admin', ['/crm/leads', '/crm/followups', '/admissions', '/academics/courses', '/accounts/approvals', '/accounts/fees', '/accounts/expenses', '/placement', '/onboarding', '/users', '/settings']],
       ['admin', ['/crm/leads', '/crm/followups', '/admissions', '/academics/courses', '/accounts/approvals', '/accounts/fees', '/accounts/expenses', '/placement', '/onboarding', '/users', '/settings']],
-      ['counsellor_lead', ['/crm/leads', '/crm/followups', '/admissions', '/academics/courses']],
+      ['counsellor_lead', ['/crm/leads', '/crm/followups', '/admissions']],
       ['counsellor', ['/crm/leads', '/crm/followups', '/admissions', '/accounts/fees']],
-      ['accountant', ['/accounts/approvals', '/accounts/fees', '/accounts/expenses', '/academics/courses']],
+      ['accountant', ['/accounts/approvals', '/accounts/fees', '/accounts/expenses']],
       ['trainer', ['/academics/courses']],
       ['student', ['/portal']],
-      ['placement_coordinator', ['/placement', '/academics/courses']],
+      ['placement_coordinator', ['/placement']],
       ['onboarding_team', ['/onboarding']],
     ];
 
@@ -59,12 +59,12 @@ describe('TASK-04: Role Authorization Matrix & Authentication Security', () => {
 
     const deniedCases: Array<[UserRole, string[], number]> = [
       ['counsellor', ['/accounts/approvals', '/accounts/expenses'], 403],
-      ['counsellor', ['/users', '/settings', '/placement', '/onboarding'], 307],
-      ['counsellor_lead', ['/accounts/approvals', '/accounts/expenses', '/placement', '/users', '/settings'], 307],
-      ['accountant', ['/crm/leads', '/admissions', '/placement', '/onboarding', '/users', '/settings'], 307],
+      ['counsellor', ['/users', '/settings', '/placement', '/onboarding', '/academics/courses'], 307],
+      ['counsellor_lead', ['/accounts/approvals', '/accounts/expenses', '/placement', '/users', '/settings', '/academics/courses'], 307],
+      ['accountant', ['/crm/leads', '/admissions', '/placement', '/onboarding', '/users', '/settings', '/academics/courses'], 307],
       ['trainer', ['/crm/leads', '/admissions', '/accounts/approvals', '/accounts/fees', '/accounts/expenses', '/placement', '/users', '/settings'], 307],
       ['student', ['/crm/leads', '/admissions', '/academics/courses', '/accounts/approvals', '/accounts/fees', '/accounts/expenses', '/placement', '/users'], 307],
-      ['placement_coordinator', ['/crm/leads', '/admissions', '/accounts/approvals', '/accounts/expenses', '/users', '/settings'], 307],
+      ['placement_coordinator', ['/crm/leads', '/admissions', '/accounts/approvals', '/accounts/expenses', '/users', '/settings', '/academics/courses'], 307],
       ['onboarding_team', ['/crm/leads', '/admissions', '/accounts/approvals', '/accounts/fees', '/placement', '/users'], 307],
     ];
 

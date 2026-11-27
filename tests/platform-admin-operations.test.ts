@@ -668,7 +668,13 @@ describe('Platform, Operations, Support & Admin Test Suite (Modules 22-35)', () 
       expect(postData.settings.authorized_signatory_name).toBe(updatePayload.authorized_signatory_name);
 
       // Verify that re-reading via GET /api/settings re-hydrates from persistent disk storage
-      const getRes = await GET();
+      const getReq = new NextRequest('http://localhost:3000/api/settings', {
+        method: 'GET',
+        headers: {
+          cookie: `next_gen_auth_user=${adminCookie}; next_gen_auth_user_sig=${adminSig}`,
+        },
+      });
+      const getRes = await GET(getReq);
       expect(getRes.status).toBe(200);
       const getData = await getRes.json();
       expect(getData.success).toBe(true);

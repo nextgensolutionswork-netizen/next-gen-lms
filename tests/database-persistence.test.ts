@@ -261,7 +261,16 @@ describe('13. Data Persistence & Database Layer Tests', () => {
   // ==========================================
   describe('Database API Routes', () => {
     it('GET /api/database/health returns health report with 200 OK', async () => {
-      const res = await healthRoute();
+      const { generateAuthCookieSignatureSync } = await import('@/lib/security/auth-cookie');
+      const superAdminCookie = encodeURIComponent(JSON.stringify({ role: 'super_admin', id: 'usr-superadmin', is_active: true }));
+      const superAdminSig = generateAuthCookieSignatureSync(superAdminCookie);
+      const req = new NextRequest('http://localhost:3000/api/database/health', {
+        method: 'GET',
+        headers: {
+          cookie: `next_gen_auth_user=${superAdminCookie}; next_gen_auth_user_sig=${superAdminSig}`,
+        },
+      });
+      const res = await healthRoute(req);
       expect(res.status).toBe(200);
 
       const json = await res.json();
