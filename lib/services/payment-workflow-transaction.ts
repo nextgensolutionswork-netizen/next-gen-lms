@@ -194,6 +194,12 @@ export function paymentTransaction<T>(actor: UserProfile, operation: () => Promi
             if (pgCode === '40001' || pgMsg.includes('Conflict: workflow revision changed')) {
               throw new Error('Conflict: This payment was updated by another user. Review the latest payment details before continuing.');
             }
+            if (pgCode === '22023' || pgMsg.includes('Receipt issuer identity')) {
+              throw new Error('Database failure: Receipt issuer identity is missing or invalid. Please sign in again and retry.');
+            }
+            if (pgCode === '42501' || pgMsg.includes('Unauthorized or inactive receipt issuer')) {
+              throw new Error('Forbidden: Receipt issuer is unauthorized, inactive, or belongs to a different tenant.');
+            }
             if (pgCode === '23505') {
               if (pgMsg.includes('transaction_reference')) {
                 throw new Error('Conflict: This transaction reference is already associated with another payment.');

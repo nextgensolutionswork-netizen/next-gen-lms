@@ -251,8 +251,16 @@ BEGIN
       AND public.payments.verification_status NOT IN ('Verified', 'Rejected');
   END LOOP;
 
-  -- 3G. Upsert affected normalized receipts (safe UUID resolution for issued_by vs display name authorized_by)
+  -- 3G. Upsert affected normalized receipts (only for verified payments; immutable once issued)
   FOR rcpt IN SELECT value FROM jsonb_array_elements(COALESCE(p_snapshot->'receipts', '[]'::jsonb)) LOOP
+    -- Preserve existing historical receipts without altering or re-validating legacy issuer rows
+    IF EXISTS (
+      SELECT 1 FROM public.receipts r
+      WHERE r.receipt_number = rcpt->>'receipt_number'
+    ) THEN
+      CONTINUE;
+    END IF;
+
     v_rcpt_uuid := CASE
       WHEN (rcpt->>'id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         THEN (rcpt->>'id')::uuid
@@ -270,6 +278,20 @@ BEGIN
         THEN (rcpt->>'authorized_by')::uuid
       ELSE NULL
     END;
+
+    IF v_issued_by IS NULL THEN
+      RAISE EXCEPTION 'Receipt issuer identity is required and must be a valid UUID' USING ERRCODE = '22023';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = v_issued_by
+        AND p.tenant_id = p_tenant
+        AND p.is_active = true
+        AND p.role IN ('accountant', 'admin', 'super_admin')
+    ) THEN
+      RAISE EXCEPTION 'Unauthorized or inactive receipt issuer for tenant' USING ERRCODE = '42501';
+    END IF;
     INSERT INTO public.receipts(
       id, receipt_number, payment_id, student_id, student_name, student_code,
       course_name, amount, amount_in_words, payment_mode, transaction_reference,
