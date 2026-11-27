@@ -38,7 +38,7 @@ export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
   },
   resumes: {
     name: 'resumes',
-    public: true,
+    public: false,
     maxSizeBytes: 10 * 1024 * 1024, // 10MB
     allowedMimes: [
       'application/pdf',
@@ -80,7 +80,7 @@ export const STORAGE_BUCKETS: Record<StorageBucket, BucketConfig> = {
   },
   receipts: {
     name: 'receipts',
-    public: true,
+    public: false,
     maxSizeBytes: 10 * 1024 * 1024, // 10MB
     allowedMimes: [
       'application/pdf',
