@@ -338,9 +338,11 @@ function initializeOnboardingCase(
   return newCase;
 }
 
-/** A cleared partial payment is sufficient to enter onboarding, never to activate LMS access. */
-export function forwardApprovedPaymentToOnboarding(payment: StudentPaymentRecord, actor: UserProfile): OnboardingCase | undefined {
-  if (payment.verification_status !== 'Verified') return;
+function resolveAndEnsureOnboardingCase(
+  payment: StudentPaymentRecord,
+  actor: UserProfile,
+  assignmentAuditNote: string
+): { caseRecord: OnboardingCase; student: (typeof store.students)[number]; staff: UserProfile[] } | undefined {
   const student = store.students.find((s) => s.id === payment.student_id && tenantId(s) === tenantId(actor));
   const admission = store.admissions.find(
     (a) =>
@@ -353,14 +355,59 @@ export function forwardApprovedPaymentToOnboarding(payment: StudentPaymentRecord
       tenantId(a) === tenantId(actor)
   );
   const isAdmissionApproved = admission && (admission.status === 'Confirmed' || admission.status === 'Active' || (admission as any).status === 'Approved');
-  if (!student || !admission || !isAdmissionApproved) return;
+  if (!student || !admission || !isAdmissionApproved) return undefined;
+
   const caseRecord = initializeOnboardingCase(admission.id, actor.id);
   assertSameTenant(actor, caseRecord);
+
+  const staff = store.users.filter((u) => u.role === 'onboarding_team' && u.is_active && tenantId(u) === tenantId(actor));
+  if (!caseRecord.assigned_staff_id && staff.length) {
+    staff.sort((a, b) => store.onboardingCases.filter((c) => c.assigned_staff_id === a.id && c.status !== 'completed').length - store.onboardingCases.filter((c) => c.assigned_staff_id === b.id && c.status !== 'completed').length || a.id.localeCompare(b.id));
+    caseRecord.assigned_staff_id = staff[0].id;
+    caseRecord.assigned_staff_name = staff[0].full_name;
+    caseRecord.assigned_at = new Date().toISOString();
+    recordAuditEvent(caseRecord.id, 'STAFF_ASSIGNED', actor, `Automatically assigned to ${staff[0].full_name} ${assignmentAuditNote}.`);
+  }
+
+  return { caseRecord, student, staff };
+}
+
+/** Starts onboarding in parallel when a payment is submitted, keeping financial clearance pending Finance approval. */
+export function forwardSubmittedPaymentToOnboarding(payment: StudentPaymentRecord, actor: UserProfile): OnboardingCase | undefined {
+  const resolved = resolveAndEnsureOnboardingCase(payment, actor, 'upon payment submission for parallel onboarding');
+  if (!resolved) return undefined;
+
+  const { caseRecord, student, staff } = resolved;
+  const item = caseRecord.checklist.fee_clearance_verification;
+  if (!item.completed) {
+    item.notes = `Payment of ₹${payment.amount_paid} (${payment.payment_mode}) submitted; pending Finance verification. Non-financial onboarding steps can proceed in parallel.`;
+  }
+  caseRecord.updated_at = new Date().toISOString();
+
+  const recipients = staff.length ? staff : store.users.filter((u) => ['admin', 'super_admin'].includes(u.role) && u.is_active && tenantId(u) === tenantId(actor));
+  recipients.forEach((u) => paymentNotification(
+    u,
+    'Student ready for parallel onboarding',
+    `${student.full_name}: payment submitted (pending Finance verification). Onboarding can begin in parallel.${staff.length ? '' : ' Assign an onboarding staff member.'}`,
+    '/onboarding',
+    `onboarding-parallel:${caseRecord.id}`
+  ));
+  return caseRecord;
+}
+
+/** A cleared partial payment is sufficient to enter onboarding, never to activate LMS access. */
+export function forwardApprovedPaymentToOnboarding(payment: StudentPaymentRecord, actor: UserProfile): OnboardingCase | undefined {
+  if (payment.verification_status !== 'Verified') return;
+  const resolved = resolveAndEnsureOnboardingCase(payment, actor, 'after Accounts approval');
+  if (!resolved) return undefined;
+
+  const { caseRecord, student, staff } = resolved;
+  const admissionId = caseRecord.admission_id;
   // B03: Evaluate financial clearance against configured policy threshold
   const fee = (store.studentFees || []).find(
-    (f) => (f.enrollment_id === admission.id || f.student_id === student.id) && tenantId(f) === tenantId(actor)
+    (f) => (f.enrollment_id === admissionId || f.student_id === student.id) && tenantId(f) === tenantId(actor)
   );
-  const finalPayable = fee ? fee.final_payable : admission.net_payable ?? 0;
+  const finalPayable = fee ? fee.final_payable : (store.admissions.find((a) => a.id === admissionId)?.net_payable ?? 0);
   const totalVerifiedPaid = (store.studentPayments || [])
     .filter(
       (p) =>
@@ -368,7 +415,7 @@ export function forwardApprovedPaymentToOnboarding(payment: StudentPaymentRecord
         tenantId(p) === tenantId(actor) &&
         p.verification_status === 'Verified' &&
         p.status !== 'Voided' &&
-        (!p.enrollment_id || p.enrollment_id === admission.id)
+        (!p.enrollment_id || p.enrollment_id === admissionId)
     )
     .reduce((sum, p) => sum + p.amount_paid, 0);
 
@@ -386,14 +433,6 @@ export function forwardApprovedPaymentToOnboarding(payment: StudentPaymentRecord
   } else {
     item.completed = false;
     item.notes = `Partial payment of ₹${payment.amount_paid} recorded (Total verified: ₹${totalVerifiedPaid}/${finalPayable}). Required clearance threshold is ₹${minRequiredClearance} (${minThresholdPct}%). Financial clearance pending.`;
-  }
-  const staff = store.users.filter((u) => u.role === 'onboarding_team' && u.is_active && tenantId(u) === tenantId(actor));
-  if (!caseRecord.assigned_staff_id && staff.length) {
-    staff.sort((a, b) => store.onboardingCases.filter((c) => c.assigned_staff_id === a.id && c.status !== 'completed').length - store.onboardingCases.filter((c) => c.assigned_staff_id === b.id && c.status !== 'completed').length || a.id.localeCompare(b.id));
-    caseRecord.assigned_staff_id = staff[0].id;
-    caseRecord.assigned_staff_name = staff[0].full_name;
-    caseRecord.assigned_at = new Date().toISOString();
-    recordAuditEvent(caseRecord.id, 'STAFF_ASSIGNED', actor, `Automatically assigned to ${staff[0].full_name} after Accounts approval.`);
   }
   caseRecord.updated_at = new Date().toISOString();
   const recipients = staff.length ? staff : store.users.filter((u) => ['admin', 'super_admin'].includes(u.role) && u.is_active && tenantId(u) === tenantId(actor));

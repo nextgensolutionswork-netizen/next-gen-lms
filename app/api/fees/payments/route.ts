@@ -12,6 +12,7 @@ import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
 import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
 import { idempotencyService, IdempotencyConflictError } from '@/lib/services/idempotency-service';
 import { emitSyncEvent } from '@/lib/services/sync-events';
+import { sendPaymentConfirmationEmail } from '@/lib/services/notification-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -205,6 +206,9 @@ export async function POST(request: NextRequest) {
         tenant_id: targetTenant,
         actor_id: actor.id,
       });
+      await sendPaymentConfirmationEmail(result.payment).catch((emailErr) =>
+        console.warn('[FeesPaymentsAPI] Payment confirmation email dispatch failed:', emailErr)
+      );
     } else if (body.action === 'reject') {
       if (body.idempotency_key) {
         await idempotencyService.completeAsync(body.idempotency_key, actor.id, targetTenant, responsePayload, 'payment_reject');
