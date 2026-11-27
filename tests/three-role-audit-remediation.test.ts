@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
 import { ROLE_PERMISSIONS } from '@/lib/auth/rbac';
-import { generateAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME, AUTH_COOKIE_SECRET } from '@/lib/security/auth-cookie';
+import { generateAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME, getAuthCookieSecret } from '@/lib/security/auth-cookie';
 import { middleware } from '@/middleware';
 import { GET as getDbHealth } from '@/app/api/database/health/route';
 import { GET as getSettings } from '@/app/api/settings/route';
@@ -10,7 +10,7 @@ import { store } from '@/lib/services/data-store';
 
 async function makeSignedHeaders(user: Record<string, unknown>) {
   const payload = encodeURIComponent(JSON.stringify(user));
-  const sig = await generateAuthCookieSignature(payload, AUTH_COOKIE_SECRET);
+  const sig = await generateAuthCookieSignature(payload, getAuthCookieSecret());
   return {
     cookie: `${AUTH_COOKIE_NAME}=${payload}; ${AUTH_SIG_COOKIE_NAME}=${sig}`,
   };

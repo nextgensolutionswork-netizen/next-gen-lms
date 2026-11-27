@@ -10,7 +10,6 @@ import {
   verifyAuthCookieSignatureSync,
   AUTH_COOKIE_NAME,
   AUTH_SIG_COOKIE_NAME,
-  AUTH_COOKIE_SECRET,
 } from '@/lib/security/auth-cookie';
 import {
   checkRateLimit,

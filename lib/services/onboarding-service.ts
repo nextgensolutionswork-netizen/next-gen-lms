@@ -354,7 +354,7 @@ function resolveAndEnsureOnboardingCase(
         (student?.id && a.student_id === student.id)) &&
       tenantId(a) === tenantId(actor)
   );
-  const isAdmissionApproved = admission && (admission.status === 'Confirmed' || admission.status === 'Active' || (admission as any).status === 'Approved');
+  const isAdmissionApproved = admission && admission.status === 'Confirmed';
   if (!student || !admission || !isAdmissionApproved) return undefined;
 
   const caseRecord = initializeOnboardingCase(admission.id, actor.id);

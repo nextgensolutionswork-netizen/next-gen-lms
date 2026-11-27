@@ -5,7 +5,7 @@
 
 export const AUTH_COOKIE_NAME = 'next_gen_auth_user';
 export const AUTH_SIG_COOKIE_NAME = 'next_gen_auth_user_sig';
-export const AUTH_COOKIE_SECRET = (() => {
+export function getAuthCookieSecret(): string {
   const secret = process.env.AUTH_COOKIE_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === 'test') {
@@ -15,14 +15,14 @@ export const AUTH_COOKIE_SECRET = (() => {
     throw new Error('AUTH_COOKIE_SECRET environment variable is required for authentication security.');
   }
   return secret;
-})();
+}
 
 /**
  * Computes an HMAC-SHA256 hex signature for an auth cookie value using Web Crypto / Node crypto.
  */
 export async function generateAuthCookieSignature(
   cookieValue: string,
-  secret: string = AUTH_COOKIE_SECRET
+  secret: string = getAuthCookieSecret()
 ): Promise<string> {
   if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
     const enc = new TextEncoder();
@@ -49,7 +49,7 @@ export async function generateAuthCookieSignature(
  */
 export function generateAuthCookieSignatureSync(
   cookieValue: string,
-  secret: string = AUTH_COOKIE_SECRET
+  secret: string = getAuthCookieSecret()
 ): string {
   const nodeCrypto = require('crypto');
   return nodeCrypto.createHmac('sha256', secret).update(cookieValue).digest('hex');
@@ -61,7 +61,7 @@ export function generateAuthCookieSignatureSync(
 export async function verifyAuthCookieSignature(
   cookieValue: string,
   signature: string,
-  secret: string = AUTH_COOKIE_SECRET
+  secret: string = getAuthCookieSecret()
 ): Promise<boolean> {
   if (!cookieValue || !signature) return false;
   try {
@@ -83,7 +83,7 @@ export async function verifyAuthCookieSignature(
 export function verifyAuthCookieSignatureSync(
   cookieValue: string,
   signature: string,
-  secret: string = AUTH_COOKIE_SECRET
+  secret: string = getAuthCookieSecret()
 ): boolean {
   if (!cookieValue || !signature) return false;
   try {

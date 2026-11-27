@@ -4,7 +4,7 @@ import { getSafeRedirectUrl } from '@/lib/auth/rbac';
 import {
   AUTH_COOKIE_NAME,
   AUTH_SIG_COOKIE_NAME,
-  AUTH_COOKIE_SECRET,
+  getAuthCookieSecret,
   generateAuthCookieSignature,
 } from '@/lib/security/auth-cookie';
 import { validateCsrfOrigin } from '@/lib/security/rate-limiter';
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     })
   );
 
-  const cookieSignature = await generateAuthCookieSignature(cookiePayload, AUTH_COOKIE_SECRET);
+  const cookieSignature = await generateAuthCookieSignature(cookiePayload, getAuthCookieSecret());
   const destination = getSafeRedirectUrl(user.role, redirectTo);
 
   // 5. Construct Secure Response with HTTP-Only Cookies

@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { POST as loginPostHandler } from '@/app/api/auth/login/route';
 import { POST as logoutPostHandler, GET as logoutGetHandler } from '@/app/api/auth/logout/route';
 import { middleware } from '@/middleware';
-import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME, AUTH_COOKIE_SECRET } from '@/lib/security/auth-cookie';
+import { verifyAuthCookieSignature, AUTH_COOKIE_NAME, AUTH_SIG_COOKIE_NAME, getAuthCookieSecret } from '@/lib/security/auth-cookie';
 import { store } from '@/lib/services/data-store';
 import { verifyUserCredentials } from '@/lib/auth/credentials';
 
@@ -129,7 +129,7 @@ describe('Login Security & Credential Protection Tests', () => {
       expect(authCookie).toBeDefined();
       expect(sigCookie).toBeDefined();
 
-      const isValidSig = await verifyAuthCookieSignature(authCookie!.value, sigCookie!.value, AUTH_COOKIE_SECRET);
+      const isValidSig = await verifyAuthCookieSignature(authCookie!.value, sigCookie!.value, getAuthCookieSecret());
       expect(isValidSig).toBe(true);
     });
 
