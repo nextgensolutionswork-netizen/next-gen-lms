@@ -426,7 +426,7 @@ export function exportReceiptsToExcel(receipts: Receipt[]): void {
 // ==========================================
 
 export function generateCollectionsExcelXml(payments?: Payment[]): string {
-  store.reconcileDualLedgers();
+  // Read-only export: zero financial ledger mutation
   const list = payments || store.payments.filter((p) => p.status !== 'Failed');
 
   const columns: ExcelColumn[] = [

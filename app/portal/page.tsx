@@ -574,7 +574,7 @@ export default function StudentPortalPage() {
         'student'
       );
 
-      store.reconcileDualLedgers();
+      // Store persistence without render-time dual-ledger reconciliation
       store.persist();
 
       setPaymentsList([...(store.payments || []).filter((p) => p.student_id === student.id)]);
