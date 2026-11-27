@@ -1,0 +1,40 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "typecheck": {
+      "tags": ["ci"],
+      "outputs": []
+    },
+    "lint": {
+      "tags": ["ci"],
+      "outputs": []
+    },
+    "test": {
+      "tags": ["ci"],
+      "outputs": []
+    },
+    "build": {
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_INSTITUTE_NAME",
+        "NEXT_PUBLIC_DEFAULT_CURRENCY",
+        "NEXT_PUBLIC_DEFAULT_TIMEZONE",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "ZOOM_WEBHOOK_SECRET_TOKEN",
+        "GOOGLE_MEET_WEBHOOK_TOKEN",
+        "RAZORPAY_KEY_SECRET",
+        "RAZORPAY_WEBHOOK_SECRET",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "NODE_ENV"
+      ]
+    }
+  }
+}

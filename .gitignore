@@ -56,3 +56,5 @@ browser_evidence/
 .vercel
 .env*
 .env.staging
+.turbo
+
