@@ -4,7 +4,7 @@ import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
 import { store } from './data-store';
 import { assertSameTenant, isAccountsUser, tenantId } from '@/lib/auth/tenant';
 import { paymentAudit, paymentNotification } from './payment-events';
-import { forwardApprovedPaymentToOnboarding } from './onboarding-service';
+import { forwardApprovedPaymentToOnboarding, forwardSubmittedPaymentToOnboarding } from './onboarding-service';
 import { receiptAmounts } from './receipt-amounts';
 import { isPaymentPending } from '@/lib/utils/dashboard-metrics';
 import {
@@ -1053,6 +1053,7 @@ export class FeeWorkflowService {
     paymentAudit('PAYMENT_SUBMITTED', paymentRecord, recorder);
     store.users.filter((u) => isAccountsUser(u) && tenantId(u) === tenantId(recorder)).forEach((u) =>
       paymentNotification(u, 'Payment awaiting approval', `${fee.student_name}: ${amountPaid} submitted by ${recorder.full_name}.`, '/accounts/approvals?desk=payments', `payment-submitted:${paymentId}`));
+    forwardSubmittedPaymentToOnboarding(paymentRecord, recorder);
 
     store.reconcileDualLedgers();
     store.persist();

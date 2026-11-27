@@ -56,7 +56,9 @@ describe('Automated payment approval', () => {
     expect(payment.enrollment_id).toBe(store.admissions[0].id);
     expect(fee.paid_amount).toBe(0);
     expect(store.receipts).toHaveLength(0);
-    expect(store.onboardingCases).toHaveLength(0);
+    expect(store.onboardingCases).toHaveLength(1);
+    expect(store.onboardingCases[0].checklist.fee_clearance_verification.completed).toBe(false);
+    expect(store.onboardingCases[0].lms_account_created).toBe(false);
     expect(store.users.find((u) => u.id === store.students[0].user_id)?.is_active).toBe(false);
     expect(store.notifications.some((n) => n.user_id === accountant.id)).toBe(true);
   });
@@ -155,8 +157,8 @@ describe('Automated payment approval', () => {
   });
 
   it('does not forward an unapproved admission and gates LMS provisioning', async () => {
-    const payment = fees.recordPayment(input(), counsellor.id);
     store.admissions[0].status = 'Pending';
+    const payment = fees.recordPayment(input(), counsellor.id);
     fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
     expect(store.onboardingCases).toHaveLength(0);
     store.admissions[0].status = 'Confirmed';
@@ -173,7 +175,8 @@ describe('Automated payment approval', () => {
     expect(store.studentPayments[0].status).toBe('Pending Approval');
     expect(store.studentFees[0].paid_amount).toBe(0);
     expect(store.receipts).toHaveLength(0);
-    expect(store.onboardingCases).toHaveLength(0);
+    expect(store.onboardingCases).toHaveLength(1);
+    expect(store.onboardingCases[0].checklist.fee_clearance_verification.completed).toBe(false);
     expect(store.auditLogs.some((a) => a.action === 'PAYMENT_APPROVED')).toBe(false);
   });
 

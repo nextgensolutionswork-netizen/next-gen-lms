@@ -6,16 +6,25 @@ import {
 import { store } from './data-store';
 import { publishRealtimeEvent } from './realtime-service';
 import { isLiveSupabaseEnabled, getDb } from '@/lib/supabase/db';
+import { generateReceiptPdfBuffer } from './pdf-service';
+import { resolveInstituteAddress, resolveReceiptTerms } from '@/lib/constants/branding';
 
 /**
  * Resend Email Delivery Engine
  */
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
+}
+
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
   html: string;
   text?: string;
   from?: string;
+  attachments?: EmailAttachment[];
 }
 
 export async function sendResendEmail(options: SendEmailOptions): Promise<{
@@ -33,8 +42,9 @@ export async function sendResendEmail(options: SendEmailOptions): Promise<{
   const toList = Array.isArray(options.to) ? options.to : [options.to];
 
   if (!apiKey) {
+    const attachNote = options.attachments?.length ? ` | Attachments: ${options.attachments.length}` : '';
     console.log(
-      `[Resend Email Mock] (To: ${toList.join(', ')} | Subject: "${options.subject}")`
+      `[Resend Email Mock] (To: ${toList.join(', ')} | Subject: "${options.subject}"${attachNote})`
     );
     return {
       success: true,
@@ -56,6 +66,15 @@ export async function sendResendEmail(options: SendEmailOptions): Promise<{
         subject: options.subject,
         html: options.html,
         text: options.text,
+        ...(options.attachments?.length
+          ? {
+              attachments: options.attachments.map((att) => ({
+                filename: att.filename,
+                content: att.content,
+                ...(att.contentType ? { content_type: att.contentType } : {}),
+              })),
+            }
+          : {}),
       }),
     });
 
@@ -469,4 +488,85 @@ export async function markNotificationAsRead(notificationId: string): Promise<bo
   if (!notif) return false;
   notif.is_read = true;
   return true;
+}
+
+/**
+ * Send a payment confirmation email with the official PDF receipt attached
+ * and a portal download link when a staff-verified payment is approved.
+ */
+export async function sendPaymentConfirmationEmail(payment?: {
+  id: string;
+  fee_id: string;
+  student_id: string;
+  student_name: string;
+  receipt_number?: string;
+  amount_paid: number;
+}): Promise<{ success: boolean; skipped?: string; error?: string; simulated?: boolean; id?: string }> {
+  if (!payment) return { success: false, skipped: 'missing_payment' };
+
+  const student = (store.students || []).find((s) => s.id === payment.student_id);
+  const recipientEmail = student?.email?.trim();
+  if (!recipientEmail) {
+    console.warn(`[PaymentConfirmationEmail] Skipping email for payment ${payment.id}: student ${payment.student_id} has no email.`);
+    return { success: false, skipped: 'missing_student_email' };
+  }
+
+  const receipt = (store.receipts || []).find(
+    (r) =>
+      r.payment_id === payment.id ||
+      r.payment_id === `pay-${payment.id}` ||
+      (payment.receipt_number && r.receipt_number === payment.receipt_number)
+  );
+  const fee = (store.studentFees || []).find((f) => f.id === payment.fee_id);
+
+  const studentName = student?.full_name || payment.student_name;
+  const receiptNumber = receipt?.receipt_number || payment.receipt_number || payment.id;
+  const amount = receipt?.payment_amount ?? payment.amount_paid;
+  const remainingBalance = receipt?.remaining_balance ?? fee?.outstanding_amount ?? 0;
+  const courseName = receipt?.course_name || fee?.course_name || fee?.fee_category || 'Course Fee';
+
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://lms.next-generpsolutions.com').replace(/\/$/, '');
+  const pdfUrl = receipt
+    ? `${baseUrl}/api/receipts/${receipt.id}/pdf?download=true`
+    : `${baseUrl}/accounts/fees`;
+
+  let attachments: EmailAttachment[] | undefined;
+  if (receipt) {
+    try {
+      const pdfBuffer = await generateReceiptPdfBuffer({
+        ...receipt,
+        institute_address: resolveInstituteAddress(receipt.institute_address || store.settings?.address),
+        terms_and_conditions: resolveReceiptTerms(receipt.terms_and_conditions),
+        payment_amount: receipt.payment_amount ?? payment.amount_paid,
+      });
+      attachments = [
+        {
+          filename: `receipt-${receipt.receipt_number}.pdf`,
+          content: pdfBuffer.toString('base64'),
+          contentType: 'application/pdf',
+        },
+      ];
+    } catch (pdfErr) {
+      console.warn('[PaymentConfirmationEmail] Could not attach PDF receipt, sending link only:', pdfErr);
+    }
+  }
+
+  const html = buildReceiptEmailHtml({
+    studentName,
+    receiptNumber,
+    amount,
+    remainingBalance,
+    courseName,
+    pdfUrl,
+  });
+
+  const text = `Dear ${studentName}, your payment of INR ${amount.toLocaleString('en-IN')} for ${courseName} has been confirmed. Receipt Number: ${receiptNumber}. Remaining balance: INR ${remainingBalance.toLocaleString('en-IN')}. Download receipt: ${pdfUrl}`;
+
+  return sendResendEmail({
+    to: recipientEmail,
+    subject: `Payment Confirmed - Receipt ${receiptNumber}`,
+    html,
+    text,
+    attachments,
+  });
 }
