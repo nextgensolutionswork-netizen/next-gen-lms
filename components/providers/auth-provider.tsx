@@ -121,6 +121,14 @@ export function getAvatarUrl(user: UserProfile | null): string {
 
 export async function setAuthCookie(user: UserProfile) {
   if (!user) return;
+  // Production cookies belong to the server. Rewriting the payload here would
+  // invalidate its HttpOnly HMAC signature during hydration or auth events.
+  if (process.env.NODE_ENV === 'production') {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(user));
+    }
+    return;
+  }
   const val = encodeURIComponent(
     JSON.stringify({
       id: user.id,
@@ -354,6 +362,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
 
     try {
+      if (process.env.NODE_ENV === 'production') {
+        const target = redirectTo || new URLSearchParams(window.location.search).get('redirectTo');
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password, redirectTo: target }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.user) {
+          throw new Error(result.error || 'Unable to sign in. Please try again.');
+        }
+        // Keep the Supabase browser session for database requests. The server
+        // response above is the only source of the signed application cookies.
+        if (isLiveSupabaseEnabled() && password) {
+          await getDb().auth.signInWithPassword({ email: email.trim(), password });
+        }
+        const profile = result.user as UserProfile;
+        resetLeadCache(profile.id);
+        store.leads = [];
+        setUser(profile);
+        setRole(profile.role);
+        await setAuthCookie(profile);
+        window.location.assign(getSafeRedirectUrl(profile.role, result.redirectTo));
+        return true;
+      }
       // 1. If Supabase is live, attempt genuine login
       if (isLiveSupabaseEnabled() && password) {
         try {
@@ -434,6 +468,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
+      if (process.env.NODE_ENV === 'production') {
+        await fetch('/api/auth/logout', {
+          method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' },
+        });
+      }
       if (isLiveSupabaseEnabled()) {
         const db = getDb();
         await db.auth.signOut();
