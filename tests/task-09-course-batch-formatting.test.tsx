@@ -13,6 +13,8 @@ import {
   type BatchDisplayInput,
 } from '@/lib/utils/course-batch-display';
 import { filterAdmissions } from '@/lib/services/admissions-loading-state';
+import { feeWorkflowService } from '@/lib/services/fee-workflow-service';
+import { store } from '@/lib/services/data-store';
 import type { Course, Batch } from '@/types';
 
 describe('TASK-09: Course & Batch Display Formatting & Master Data Consistency', () => {
@@ -357,6 +359,204 @@ describe('TASK-09: Course & Batch Display Formatting & Master Data Consistency',
     it('CBF-025: returns empty set for non-matching queries without errors or state corruption', () => {
       const results = filterAdmissions(mockAdmissions as any, { search: 'NonExistentCourse', statusFilter: 'All' });
       expect(results.length).toBe(0);
+    });
+  });
+
+  // --- CBF-026 - CBF-040: Cross-Module Consistency, Edge Cases, Accessibility, Viewports & Onboarding Eligibility ---
+  describe('CBF-026 - CBF-040: Cross-Module Consistency, Edge Cases, Accessibility & Onboarding Preservation', () => {
+    it('CBF-026: preserves authoritative course ID, code, and fee without mutating master course objects', () => {
+      const course: Course = {
+        id: 'c1000000-0000-4000-a000-000000000101',
+        course_code: 'SAP FICO 101',
+        course_name: 'SAP FICO PERSONAL TRAINING',
+        description: '1-on-1 SAP S/4HANA Finance & Controlling Training',
+        category: 'SAP Functional',
+        duration_weeks: 12,
+        price: 35000,
+        status: 'Published',
+        created_at: '2026-11-25T00:00:00Z',
+        updated_at: '2026-11-25T00:00:00Z',
+      };
+      const snapshot = JSON.stringify(course);
+      const formatted = formatCourseDisplay(course);
+      expect(formatted.baseCourseName).toBe('SAP FICO');
+      expect(formatted.authoritativeCourseName).toBe('SAP FICO PERSONAL TRAINING');
+      expect(formatted.isPersonalTraining).toBe(true);
+      expect(JSON.stringify(course)).toBe(snapshot);
+    });
+
+    it('CBF-027: preserves authoritative batch ID, code, capacity, and timing without mutating master batch objects', () => {
+      const batch: Batch = {
+        id: 'b-auth-01',
+        batch_code: 'FICO-MORN-01',
+        batch_name: 'SAP FICO Morning Cohort',
+        course_id: 'c1000000-0000-4000-a000-000000000101',
+        trainer_id: 't-01',
+        training_mode: 'Online',
+        start_date: '2026-11-01',
+        end_date: '2027-01-31',
+        start_time: '08:00',
+        end_time: '10:00',
+        days: ['Mon', 'Wed', 'Fri'],
+        maximum_capacity: 25,
+        current_enrolled: 10,
+        status: 'Active',
+        created_at: '2026-11-01T00:00:00Z',
+        updated_at: '2026-11-01T00:00:00Z',
+      };
+      const snapshot = JSON.stringify(batch);
+      const formatted = formatBatchDisplay(batch, 'SAP FICO PERSONAL TRAINING');
+      expect(formatted.displayName).toBe('Morning Cohort');
+      expect(formatted.timingAndModeLabel).toBe('Morning · Online');
+      expect(JSON.stringify(batch)).toBe(snapshot);
+    });
+
+    it('CBF-028: produces consistent base course and batch labels across Admissions, Students, Batches, and CRM contexts', () => {
+      const courseInput: CourseDisplayInput = { course_name: 'SAP MM NORMAL TRAINING', course_code: 'SAP-MM-01' };
+      const batchInput: BatchDisplayInput = { batch_name: 'SAP MM Evening Live', training_mode: 'Online', start_time: '19:00', days: ['Tue', 'Thu'] };
+      const combined = formatCourseBatchCombined(courseInput, batchInput);
+      expect(combined.course.baseCourseName).toBe('SAP MM');
+      expect(combined.course.trainingTypeBadge).toBe('Normal Training');
+      expect(combined.batch.displayName).toBe('Evening Live');
+      expect(combined.compactLabel).toBe('SAP MM (Normal Training) [Evening · Online]');
+    });
+
+    it('CBF-029: disambiguates 1:1 and 1-on-1 cues as Personal Training without duplicate badge text', () => {
+      const formatted = formatCourseDisplay({ course_name: 'SAP S/4HANA 1:1 Personal Training' });
+      expect(formatted.isPersonalTraining).toBe(true);
+      expect(formatted.isNormalTraining).toBe(false);
+      expect(formatted.trainingTypeBadge).toBe('Personal Training');
+    });
+
+    it('CBF-030: disambiguates Cohort / Group / Regular cues as Normal Training', () => {
+      const formatted = formatCourseDisplay({ course_name: 'SAP ABAP Cohort', training_category: 'Normal Training' });
+      expect(formatted.isNormalTraining).toBe(true);
+      expect(formatted.isPersonalTraining).toBe(false);
+      expect(formatted.trainingTypeBadge).toBe('Normal Training');
+    });
+
+    it('CBF-031: eliminates duplicate course name prefixes case-insensitively in batch titles', () => {
+      const batch = formatBatchDisplay({ batch_name: 'sap fico - Weekend Fast Track', training_mode: 'Hybrid', days: ['Sat', 'Sun'] }, 'SAP FICO PERSONAL TRAINING');
+      expect(batch.displayName).toBe('Weekend Fast Track');
+      expect(batch.timingAndModeLabel).toBe('Weekend · Hybrid');
+    });
+
+    it('CBF-032: handles missing historical course gracefully with honest fallback', () => {
+      const missing = formatCourseDisplay(null);
+      expect(missing.baseCourseName).toBe('Course unavailable');
+      expect(missing.isPersonalTraining).toBe(false);
+      expect(missing.isNormalTraining).toBe(false);
+    });
+
+    it('CBF-033: handles missing historical batch and missing schedule gracefully', () => {
+      const missingBatch = formatBatchDisplay(undefined, 'SAP FICO');
+      expect(missingBatch.displayName).toBe('Batch not assigned');
+      expect(missingBatch.timingAndModeLabel).toBe('Schedule unavailable');
+      expect(resolveBatchTimingPeriod(undefined, undefined, undefined)).toBeUndefined();
+    });
+
+    it('CBF-034: handles batch with valid name but missing training_mode without synthesizing Online', () => {
+      const partialBatch = formatBatchDisplay({ batch_name: 'Evening Batch', start_time: '18:30', training_mode: null }, 'SAP SD');
+      expect(partialBatch.displayName).toBe('Evening Batch');
+      expect(partialBatch.timingAndModeLabel).toBe('Evening');
+    });
+
+    it('CBF-035: sorts and filters admissions deterministically using course_name and batch_name', () => {
+      const rows = [
+        { id: '2', student_name: 'B', course_name: 'SAP SD', batch_name: 'Morning', status: 'Confirmed' },
+        { id: '1', student_name: 'A', course_name: 'SAP FICO PERSONAL TRAINING', batch_name: 'Evening', status: 'Confirmed' },
+      ];
+      const sorted = [...rows].sort((a, b) => formatCourseDisplay({ course_name: a.course_name }).baseCourseName.localeCompare(formatCourseDisplay({ course_name: b.course_name }).baseCourseName));
+      expect(sorted[0].id).toBe('1');
+      expect(filterAdmissions(rows as any, { search: 'SD', statusFilter: 'All' }).map((r) => r.id)).toEqual(['2']);
+    });
+
+    it('CBF-036: formats course option label with code and INR price', () => {
+      const label = formatCourseOptionLabel({
+        id: 'c1',
+        course_code: 'FICO-101',
+        course_name: 'SAP FICO PERSONAL TRAINING',
+        description: '1-on-1 SAP FICO Training',
+        category: 'SAP Functional',
+        duration_weeks: 12,
+        price: 35000,
+        status: 'Published',
+        created_at: '',
+        updated_at: '',
+      });
+      expect(label).toContain('SAP FICO PERSONAL TRAINING');
+      expect(label).toContain('FICO-101');
+      expect(label).toContain('35,000');
+    });
+
+    it('CBF-037: formats batch option label with seat availability when seats remain', () => {
+      const label = formatBatchOptionLabel({
+        id: 'b1',
+        batch_code: 'B-01',
+        batch_name: 'SAP FICO Morning',
+        course_id: 'c1',
+        trainer_id: 't1',
+        training_mode: 'Online',
+        start_date: '2026-11-01',
+        end_date: '2027-01-31',
+        start_time: '08:00',
+        end_time: '10:00',
+        days: ['Mon'],
+        maximum_capacity: 20,
+        current_enrolled: 5,
+        status: 'Active',
+        created_at: '',
+        updated_at: '',
+      }, 'SAP FICO PERSONAL TRAINING');
+      expect(label).toContain('B-01');
+      expect(label).toContain('Morning');
+      expect(label).not.toContain('FULL');
+    });
+
+    it('CBF-038: produces non-duplicated accessible summary text suitable for screen readers', () => {
+      const combined = formatCourseBatchCombined(
+        { course_name: 'SAP FICO PERSONAL TRAINING' },
+        { batch_name: 'SAP FICO Morning Batch', training_mode: 'Online', start_time: '08:00' }
+      );
+      expect(combined.compactLabel).not.toMatch(/SAP FICO.*SAP FICO/);
+      expect(combined.compactLabel).not.toMatch(/Personal Training.*Personal Training/i);
+    });
+
+    it('CBF-039: fits formatted compact labels within 7-viewport character budgets', () => {
+      const viewports = [360, 375, 414, 768, 1024, 1440, 1920];
+      const combined = formatCourseBatchCombined(
+        { course_name: 'SAP FICO PERSONAL TRAINING' },
+        { batch_name: 'Morning Batch', training_mode: 'Online', start_time: '08:00' }
+      );
+      for (const width of viewports) {
+        if (width >= 768) {
+          expect(combined.compactLabel.length).toBeLessThanOrEqual(Math.floor(width / 8));
+        }
+        expect(combined.shortLabel.length).toBeLessThanOrEqual(45);
+      }
+    });
+
+    it('CBF-040: preserves onboarding eligibility so additional payments on Active admissions succeed without duplicate cases', () => {
+      store.hydrateFromDisk();
+      const studentFee = store.studentFees[0];
+      const recorder = store.users.find((u) => u.role === 'counsellor' && u.is_active !== false);
+      expect(studentFee).toBeDefined();
+      expect(recorder).toBeDefined();
+      const beforeCases = store.onboardingCases.length;
+      const payment = feeWorkflowService.recordPayment(
+        {
+          fee_id: studentFee.id,
+          amount_paid: 1000,
+          payment_mode: 'UPI',
+          payment_date: '2026-11-27',
+          transaction_reference: `CBF040-UTR-${Date.now()}`,
+          idempotency_key: `cbf040-idem-${Date.now()}`,
+        },
+        recorder!.id,
+        recorder!.role
+      );
+      expect(payment.status).toBe('Pending Approval');
+      expect(store.onboardingCases.length).toBe(beforeCases);
     });
   });
 });
