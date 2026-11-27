@@ -11,11 +11,11 @@ describe('SEC-BUG-02: Authentication Security & Fallback Credentials Hardening',
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    (process.env as any).NODE_ENV = originalEnv;
   });
 
   it('1. denies production login when attempting fallback demo credentials in production', async () => {
-    process.env.NODE_ENV = 'production';
+    (process.env as any).NODE_ENV = 'production';
 
     const result = await verifyUserCredentials(
       'superadmin@next-generpsolutions.com',
