@@ -57,15 +57,24 @@ export function generateAuthCookieSignatureSync(
 
 /**
  * Verifies an HMAC-SHA256 signature against a cookie value in constant time.
+ * Returns false if verification fails or if secret is missing/unavailable.
  */
 export async function verifyAuthCookieSignature(
   cookieValue: string,
   signature: string,
-  secret: string = getAuthCookieSecret()
+  secret?: string
 ): Promise<boolean> {
   if (!cookieValue || !signature) return false;
   try {
-    const expected = await generateAuthCookieSignature(cookieValue, secret);
+    let activeSecret = secret;
+    if (!activeSecret) {
+      try {
+        activeSecret = getAuthCookieSecret();
+      } catch {
+        return false;
+      }
+    }
+    const expected = await generateAuthCookieSignature(cookieValue, activeSecret);
     if (expected.length !== signature.length) return false;
     let mismatch = 0;
     for (let i = 0; i < expected.length; i++) {
@@ -79,16 +88,25 @@ export async function verifyAuthCookieSignature(
 
 /**
  * Synchronous verification variant.
+ * Returns false if verification fails or if secret is missing/unavailable.
  */
 export function verifyAuthCookieSignatureSync(
   cookieValue: string,
   signature: string,
-  secret: string = getAuthCookieSecret()
+  secret?: string
 ): boolean {
   if (!cookieValue || !signature) return false;
   try {
+    let activeSecret = secret;
+    if (!activeSecret) {
+      try {
+        activeSecret = getAuthCookieSecret();
+      } catch {
+        return false;
+      }
+    }
     const nodeCrypto = require('crypto');
-    const expected = nodeCrypto.createHmac('sha256', secret).update(cookieValue).digest('hex');
+    const expected = nodeCrypto.createHmac('sha256', activeSecret).update(cookieValue).digest('hex');
     const a = Buffer.from(expected, 'hex');
     const b = Buffer.from(signature, 'hex');
     if (a.length !== b.length) return false;

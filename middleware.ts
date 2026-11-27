@@ -131,13 +131,18 @@ export async function middleware(request: NextRequest) {
     if (authCookie) {
       let isSignatureValid = false;
       if (sigCookie) {
-        if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
-          isSignatureValid = true;
-        } else if (await verifyAuthCookieSignature(authCookie, sigCookie)) {
-          isSignatureValid = true;
-        } else if (await verifyAuthCookieSignature(encodeURIComponent(authCookie), sigCookie)) {
-          isSignatureValid = true;
-        } else {
+        try {
+          if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
+            isSignatureValid = true;
+          } else if (await verifyAuthCookieSignature(authCookie, sigCookie)) {
+            isSignatureValid = true;
+          } else if (await verifyAuthCookieSignature(encodeURIComponent(authCookie), sigCookie)) {
+            isSignatureValid = true;
+          } else {
+            isSignatureValid = false;
+          }
+        } catch (cookieSigErr) {
+          console.error('[Middleware] Auth cookie signature verification failed safely:', cookieSigErr);
           isSignatureValid = false;
         }
       }
