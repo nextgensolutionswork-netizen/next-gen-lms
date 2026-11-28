@@ -346,6 +346,9 @@ export default function LeadsPage() {
 
   const [editEmail, setEditEmail] = React.useState('');
   const [editEmailError, setEditEmailError] = React.useState('');
+  const [editInstituteId, setEditInstituteId] = React.useState('');
+  const [editInstituteError, setEditInstituteError] = React.useState('');
+  const [editInstituteReviewConfirmed, setEditInstituteReviewConfirmed] = React.useState(false);
   const [editCourseId, setEditCourseId] = React.useState('');
   const [editCounsellorId, setEditCounsellorId] = React.useState('');
   const [editCurrentStatus, setEditCurrentStatus] = React.useState<LeadCurrentStatus>('Working Professional');
@@ -506,6 +509,13 @@ export default function LeadsPage() {
     setEditWaError('');
 
     setEditEmail(lead.email || '');
+    const matchedEditInst =
+      lead.institute_id ||
+      activeInstitutes.find((i) => i.name.trim().toLowerCase() === (lead.institute_name || '').trim().toLowerCase())?.id ||
+      '';
+    setEditInstituteId(matchedEditInst);
+    setEditInstituteError('');
+    setEditInstituteReviewConfirmed(false);
     setEditCourseId(lead.interested_course_id || '');
     setEditCounsellorId(lead.counsellor_id || '');
     setEditCurrentStatus((lead.current_status as LeadCurrentStatus) || 'Working Professional');
@@ -817,6 +827,15 @@ export default function LeadsPage() {
     }
     setEditEmailError('');
 
+    if (!editInstituteId) {
+      setEditInstituteError('Please select a valid active Institute / Brand.');
+      setSaveDetailsError('Please select a valid active Institute / Brand.');
+      return;
+    }
+    setEditInstituteError('');
+
+    const chosenEditInst = activeInstitutes.find((i) => i.id === editInstituteId);
+
     setIsSavingDetails(true);
     try {
       const updatedLead = await updateLeadDetails(
@@ -828,6 +847,9 @@ export default function LeadsPage() {
           whatsapp_country_code: finalWaCountry,
           whatsapp_number: finalWaNumber.trim(),
           email: editEmail.trim(),
+          institute_id: editInstituteId,
+          institute_name: chosenEditInst?.name,
+          confirm_financial_institute_change: editInstituteReviewConfirmed,
           interested_course_id: editCourseId || undefined,
           current_status: editCurrentStatus,
           training_preference: editTrainingPref,
@@ -849,6 +871,7 @@ export default function LeadsPage() {
       }));
 
       setSelectedLead(null);
+      void refreshLeads();
     } catch (err: any) {
       setSaveDetailsError(err?.message || 'Failed to update lead details');
     } finally {
@@ -2136,6 +2159,52 @@ export default function LeadsPage() {
                     </select>
                   </div>
 
+                  {/* Institute / Brand */}
+                  <div className="col-span-2">
+                    <label
+                      htmlFor="edit-lead-institute"
+                      className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1"
+                    >
+                      Institute / Brand *
+                    </label>
+                    <select
+                      id="edit-lead-institute"
+                      value={editInstituteId}
+                      onChange={(e) => {
+                        setEditInstituteId(e.target.value);
+                        if (editInstituteError) setEditInstituteError('');
+                        setEditInstituteReviewConfirmed(false);
+                      }}
+                      required
+                      className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
+                    >
+                      <option value="">Select Institute</option>
+                      {activeInstitutes.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name}
+                        </option>
+                      ))}
+                    </select>
+                    {editInstituteError && (
+                      <p className="text-xs text-rose-500 font-medium mt-1">{editInstituteError}</p>
+                    )}
+                    {isLeadConverted(selectedLead, store.admissions) &&
+                      editInstituteId &&
+                      editInstituteId !== (selectedLead.institute_id || '') && (
+                        <label className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editInstituteReviewConfirmed}
+                            onChange={(e) => setEditInstituteReviewConfirmed(e.target.checked)}
+                            className="mt-0.5 rounded border-amber-400"
+                          />
+                          <span>
+                            Authorized review: Confirm updating institute attribution on this converted lead and linked admission/student records (verified financial transactions remain unchanged).
+                          </span>
+                        </label>
+                      )}
+                  </div>
+
                   {/* Course */}
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
@@ -2227,7 +2296,7 @@ export default function LeadsPage() {
                     variant="sap"
                     size="sm"
                     onClick={handleSaveLeadDetails}
-                    disabled={isSavingDetails || Boolean(editPhoneError || editWaError)}
+                    disabled={isSavingDetails || Boolean(editPhoneError || editWaError || !editInstituteId)}
                   >
                     {isSavingDetails ? (
                       <>

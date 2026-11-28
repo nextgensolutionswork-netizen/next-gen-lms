@@ -368,4 +368,112 @@ describe('Institute / Brand Selection & Lifecycle Synchronization', () => {
     expect(importValidation.previewRows[1].isValid).toBe(false);
     expect(importValidation.previewRows[1].errors[0]).toMatch(/Invalid or inactive institute/i);
   });
+
+  it('enforces Edit Lead institute validation, converted lead sync, financial safeguard, and audit trail', async () => {
+    const lead = await createLead(
+      {
+        full_name: 'Edit Lead Candidate',
+        phone: '9876543219',
+        email: 'editlead@example.test',
+        experience: 'Fresher',
+        stage: 'Interested',
+        institute_id: 'inst-myerp-hub',
+        require_institute: true,
+        counsellor_id: counsellorUser.id,
+      } as any,
+      counsellorUser
+    );
+
+    // Reject empty or invalid institute on update
+    await expect(
+      updateLeadDetails(lead.id, { institute_id: '' }, counsellorUser.id, counsellorUser)
+    ).rejects.toThrow(/active Institute/i);
+
+    await expect(
+      updateLeadDetails(lead.id, { institute_id: 'non-existent' }, counsellorUser.id, counsellorUser)
+    ).rejects.toThrow(/active Institute/i);
+
+    // Convert lead with payment
+    const admRes = await createAdmissionWorkflow(
+      {
+        student_name: lead.full_name,
+        phone: lead.phone,
+        email: lead.email,
+        dob: '2000-01-01',
+        gender: 'Male',
+        address: 'Hyderabad',
+        city: 'Hyderabad',
+        education: 'Graduate',
+        experience_years: 0,
+        current_employment_status: 'Student',
+        course_id: store.courses[0].id,
+        training_mode: 'Online',
+        admission_date: '2026-11-28',
+        course_fee: 30000,
+        discount: 0,
+        payment_plan: 'Full Payment',
+        counsellor_id: counsellorUser.id,
+        lead_id: lead.id,
+      },
+      counsellorUser.id,
+      true
+    );
+    lead.stage = 'Converted';
+
+    const payment = feeWorkflowService.recordPayment(
+      {
+        fee_id: admRes.studentFee!.id,
+        student_id: admRes.student.id,
+        amount_paid: 30000,
+        payment_mode: 'UPI',
+        payment_date: '2026-11-28',
+        next_due_date: null,
+        transaction_reference: '77889',
+      },
+      counsellorUser.id
+    );
+    feeWorkflowService.verifyPayment(payment.id, accountantUser.id, 'Verified', {
+      reference: '77889',
+      amount: '30000',
+      payment_date: '2026-11-28',
+    });
+
+    // Changing institute on converted lead with financial records requires authorized review
+    await expect(
+      updateLeadDetails(lead.id, { institute_id: 'inst-tecopad' }, adminUser.id, adminUser)
+    ).rejects.toThrow(/Authorized review required/i);
+
+    await expect(
+      updateLeadDetails(
+        lead.id,
+        { institute_id: 'inst-tecopad', confirm_financial_institute_change: true } as any,
+        counsellorUser.id,
+        counsellorUser
+      )
+    ).rejects.toThrow(/Authorized review required/i);
+
+    // Authorized admin with review confirmation updates lead, admission, and student without mutating payment/receipt
+    const updatedConverted = await updateLeadDetails(
+      lead.id,
+      { institute_id: 'inst-tecopad', confirm_financial_institute_change: true } as any,
+      adminUser.id,
+      adminUser
+    );
+    expect(updatedConverted.stage).toBe('Converted');
+    expect(updatedConverted.institute_id).toBe('inst-tecopad');
+    expect(updatedConverted.institute_name).toBe('Tecopad');
+    expect(admRes.admission.institute_id).toBe('inst-tecopad');
+    expect(admRes.student.institute_id).toBe('inst-tecopad');
+    expect(payment.institute_id).toBe('inst-myerp-hub'); // Verified payment record preserved untouched
+    expect(store.receipts[0].institute_id).toBe('inst-myerp-hub'); // Receipt preserved untouched
+
+    const instAudit = store.auditLogs.find(
+      (l) => l.action === 'LEAD_INSTITUTE_UPDATED' && l.record_id === lead.id
+    );
+    expect(instAudit).toBeDefined();
+    expect(instAudit?.old_value).toEqual({ institute_id: 'inst-myerp-hub', institute_name: 'MyERP Hub' });
+    expect(instAudit?.new_value).toEqual({ institute_id: 'inst-tecopad', institute_name: 'Tecopad' });
+    expect(instAudit?.user_id).toBe(adminUser.id);
+    expect(instAudit?.created_at).toBeTruthy();
+  });
 });

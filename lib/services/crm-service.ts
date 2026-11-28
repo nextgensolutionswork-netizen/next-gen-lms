@@ -5,7 +5,8 @@ import { Lead, LeadStage, Admission, UserProfile } from '@/types';
 import { assertLeadAccess, leadScope, canAccessLead, requireCrmActor } from '@/lib/auth/lead-access';
 import { leadFields } from './lead-input';
 import { authorizedLead, resolveLeadScope, scopeLeadQuery, validateLeadAssignment, teamCreators } from './lead-security';
-import { matchesCourseId } from '@/lib/services/academics-service';
+import { matchesCourseId, resolveCanonicalCourseUuid } from '@/lib/services/academics-service';
+import { formatInstituteLabel } from '@/lib/constants/institutes';
 import { idempotencyService } from './idempotency-service';
 import { concurrencyGuard, RecordConflictError } from './concurrency-guard';
 import { emitSyncEvent } from './sync-events';
@@ -218,6 +219,66 @@ import { CreateAdmissionInput } from './admission-service';
 import { validatePhoneNumber, findDuplicateLeadByPhone, normalizePhoneForStorage, getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
 import { validateEmailAddress } from '@/lib/utils/email-validation';
 
+export interface LeadCourseAuditRow {
+  lead_id: string;
+  lead_code: string;
+  candidate_name: string;
+  existing_course_id: string | null;
+  course_mapping_status: 'Valid' | 'Missing' | 'Invalid';
+  resolved_course_name: string;
+  lead_source: string;
+  institute: string;
+  required_corrective_action: string;
+}
+
+export function resolveLeadCourseFromMaster(
+  courseId?: string | null,
+  coursesList?: typeof store.courses
+) {
+  const courses = coursesList || store.courses || [];
+  const raw = (courseId ?? '').trim();
+  if (!raw) {
+    return { status: 'Missing' as const, course: undefined, course_id: null, course_name: 'Not Assigned' };
+  }
+  const matched = courses.find(
+    (c) =>
+      c.id === raw ||
+      matchesCourseId(c.id, raw) ||
+      c.course_code?.trim().toLowerCase() === raw.toLowerCase()
+  );
+  if (!matched) {
+    return { status: 'Invalid' as const, course: undefined, course_id: raw, course_name: 'Invalid Course Reference' };
+  }
+  return { status: 'Valid' as const, course: matched, course_id: matched.id, course_name: matched.course_name };
+}
+
+export function auditLeadCourseMappings(
+  leadsList?: Lead[],
+  coursesList?: typeof store.courses
+): LeadCourseAuditRow[] {
+  const leads = leadsList || store.leads || [];
+  const courses = coursesList || store.courses || [];
+  return leads.map((lead) => {
+    const resolved = resolveLeadCourseFromMaster(lead.interested_course_id, courses);
+    return {
+      lead_id: lead.id,
+      lead_code: lead.lead_code,
+      candidate_name: lead.full_name,
+      existing_course_id: lead.interested_course_id || null,
+      course_mapping_status: resolved.status,
+      resolved_course_name: resolved.course_name,
+      lead_source: lead.lead_source || 'Unknown',
+      institute: formatInstituteLabel(lead.institute_name),
+      required_corrective_action:
+        resolved.status === 'Valid'
+          ? 'None'
+          : resolved.status === 'Missing'
+          ? 'Assign valid course in Edit Lead'
+          : `Replace invalid course reference (${lead.interested_course_id}) with a valid Course Master ID`,
+    };
+  });
+}
+
 export interface LeadFilters {
   stage?: LeadStage | 'All'; counsellor_id?: string; course_id?: string; search?: string;
   created_by?: string; from?: string; to?: string; team_id?: string; training_preference?: string; lead_source?: string;
@@ -250,13 +311,25 @@ export async function getLeads(filters: LeadFilters = {}, actor?: UserProfile): 
       if (!result.data || result.data.length < 1000) break;
     }
   } else leads = store.leads.filter(l => canAccessLead(scope, l));
+  store.reconcileAuthoritativeCourses();
   leads = reconcileLeadsWithAdmissions(leads.map(l => ({ ...l })), store.admissions.filter(a => (a.tenant_id || 'default') === scope.actor.tenant_id));
+  for (const lead of leads) {
+    const resolved = resolveLeadCourseFromMaster(lead.interested_course_id, store.courses);
+    if (resolved.status === 'Valid') {
+      lead.interested_course_id = resolved.course_id!;
+      lead.interested_course_name = resolved.course_name;
+    } else if (resolved.status === 'Missing') {
+      lead.interested_course_name = undefined;
+    } else {
+      lead.interested_course_name = undefined;
+    }
+  }
   return leads.filter(l => (!teamIds || Boolean(l.created_by && teamIds.includes(l.created_by))) && (!filters.stage || filters.stage === 'All' || l.stage === filters.stage)
     && (!filters.training_preference || l.training_preference === filters.training_preference)
     && (!filters.lead_source || l.lead_source === filters.lead_source)
     && (!filters.counsellor_id || l.counsellor_id === filters.counsellor_id)
     && (!filters.created_by || l.created_by === filters.created_by)
-    && (!filters.course_id || l.interested_course_id === filters.course_id)
+    && (!filters.course_id || l.interested_course_id === filters.course_id || matchesCourseId(l.interested_course_id, filters.course_id))
     && (!(filters as any).institute_id || (filters as any).institute_id === 'All' || ((filters as any).institute_id === 'unassigned' ? (!l.institute_id && !l.institute_name) : (l.institute_id === (filters as any).institute_id || l.institute_name === (filters as any).institute_id)))
     && (!filters.from || l.created_at.slice(0, 10) >= filters.from)
     && (!filters.to || l.created_at.slice(0, 10) <= filters.to)
@@ -493,6 +566,7 @@ export async function createLead(
       id,
       lead_code,
       notes: payload.notes || '',
+      interested_course_id: course?.id ?? (payload.interested_course_id || undefined),
       interested_course_name: course?.course_name,
       counsellor_name: counsellor?.full_name,
       created_at: new Date().toISOString(),
@@ -514,7 +588,9 @@ export async function createLead(
           country_code: newLead.country_code || '+91',
           whatsapp_country_code: newLead.whatsapp_country_code || '+91',
           whatsapp_number: newLead.whatsapp_number,
-          interested_course_id: isUUID(newLead.interested_course_id) ? newLead.interested_course_id : null,
+          interested_course_id: isUUID(resolveCanonicalCourseUuid(newLead.interested_course_id) || newLead.interested_course_id)
+            ? (resolveCanonicalCourseUuid(newLead.interested_course_id) || newLead.interested_course_id)
+            : null,
           current_status: newLead.current_status,
           experience_years: newLead.experience_years,
           training_preference: newLead.training_preference,
@@ -598,6 +674,7 @@ export async function updateLeadDetails(
   leadId: string,
   updates: Partial<Omit<Lead, 'id' | 'lead_code' | 'created_at'>> & {
     rejectOnDuplicate?: boolean;
+    confirm_financial_institute_change?: boolean;
   },
   actorId: string,
   actor?: UserProfile
@@ -693,6 +770,8 @@ export async function updateLeadDetails(
     training_preference: lead.training_preference,
     lead_source: lead.lead_source,
     stage: lead.stage,
+    institute_id: lead.institute_id ?? null,
+    institute_name: lead.institute_name ?? 'Not Assigned',
   };
 
   if (updates.full_name !== undefined) lead.full_name = updates.full_name;
@@ -713,22 +792,71 @@ export async function updateLeadDetails(
   }
   if (updates.interested_course_id !== undefined) {
     if (updates.interested_course_id && updates.interested_course_id.trim() !== '') {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updates.interested_course_id.trim());
-      if (!isUUID) {
-        throw new Error('Invalid course ID format. Must be a valid UUID or empty.');
+      const resolvedCourse = resolveLeadCourseFromMaster(updates.interested_course_id, store.courses);
+      if (resolvedCourse.status !== 'Valid' || !resolvedCourse.course) {
+        throw new Error('Selected course is invalid or not found in Course Master.');
       }
-      lead.interested_course_id = updates.interested_course_id.trim();
+      lead.interested_course_id = resolvedCourse.course.id;
+      lead.interested_course_name = resolvedCourse.course.course_name;
     } else {
       lead.interested_course_id = '';
+      lead.interested_course_name = undefined;
     }
-    const course = (store.courses || []).find((c) => c.id === lead.interested_course_id || matchesCourseId(c.id, lead.interested_course_id));
-    lead.interested_course_name = course?.course_name;
   }
   if (updates.current_status !== undefined) lead.current_status = updates.current_status;
   if (updates.training_preference !== undefined) lead.training_preference = updates.training_preference;
   if (updates.lead_source !== undefined) lead.lead_source = updates.lead_source;
   if (updates.institute_id !== undefined) lead.institute_id = updates.institute_id;
   if (updates.institute_name !== undefined) lead.institute_name = updates.institute_name;
+
+  const instituteChanged =
+    (updates.institute_id !== undefined && updates.institute_id !== oldValues.institute_id) ||
+    (updates.institute_name !== undefined && updates.institute_name !== (oldValues.institute_name === 'Not Assigned' ? null : oldValues.institute_name));
+
+  if (instituteChanged) {
+    const linkedAdmission = getLeadAdmission(lead, store.admissions);
+    const linkedStudent = linkedAdmission
+      ? (store.students || []).find((s) => s.id === linkedAdmission.student_id || s.admission_id === linkedAdmission.id)
+      : (store.students || []).find((s) => s.lead_id === lead.id);
+
+    if (linkedAdmission || linkedStudent) {
+      const hasFinancialRecords =
+        (store.studentPayments || []).some(
+          (p) =>
+            (linkedStudent && p.student_id === linkedStudent.id) ||
+            (linkedAdmission && p.enrollment_id === linkedAdmission.id)
+        ) ||
+        (store.receipts || []).some((r) => linkedStudent && r.student_id === linkedStudent.id);
+
+      if (hasFinancialRecords) {
+        const isAuthorizedReviewer = ['super_admin', 'admin', 'accountant'].includes(scope.actor.role);
+        if (!isAuthorizedReviewer || !(updates as any).confirm_financial_institute_change) {
+          throw new Error(
+            'Authorized review required: Financial records exist for this converted lead. Confirm authorized review before changing institute attribution.'
+          );
+        }
+      }
+
+      if (linkedAdmission) {
+        linkedAdmission.institute_id = lead.institute_id ?? null;
+        linkedAdmission.institute_name = lead.institute_name ?? null;
+        linkedAdmission.updated_at = new Date().toISOString();
+      }
+      if (linkedStudent) {
+        linkedStudent.institute_id = lead.institute_id ?? null;
+        linkedStudent.institute_name = lead.institute_name ?? null;
+        linkedStudent.updated_at = new Date().toISOString();
+      }
+      const linkedOnboarding = (store.onboardingCases || []).find(
+        (c) => (linkedStudent && c.student_id === linkedStudent.id) || (linkedAdmission && c.admission_id === linkedAdmission.id)
+      );
+      if (linkedOnboarding) {
+        linkedOnboarding.institute_id = lead.institute_id ?? null;
+        linkedOnboarding.institute_name = lead.institute_name ?? null;
+        linkedOnboarding.updated_at = new Date().toISOString();
+      }
+    }
+  }
   if (updates.counsellor_id !== undefined) {
     if (updates.counsellor_id && updates.counsellor_id.trim() !== '') {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updates.counsellor_id.trim());
@@ -909,8 +1037,29 @@ export async function updateLeadDetails(
       training_preference: lead.training_preference,
       lead_source: lead.lead_source,
       stage: lead.stage,
+      institute_id: lead.institute_id ?? null,
+      institute_name: lead.institute_name ?? 'Not Assigned',
     },
   });
+
+  if (instituteChanged) {
+    await recordAuditLog({
+      user_id: actorId,
+      user_name: actor?.full_name || 'Staff',
+      user_role: (actor?.role as any) || 'counsellor',
+      action: 'LEAD_INSTITUTE_UPDATED',
+      module: 'CRM',
+      record_id: leadId,
+      old_value: {
+        institute_id: oldValues.institute_id,
+        institute_name: oldValues.institute_name,
+      },
+      new_value: {
+        institute_id: lead.institute_id ?? null,
+        institute_name: lead.institute_name ?? 'Not Assigned',
+      },
+    });
+  }
 
   emitSyncEvent('leads', 'updated', {
     entity_id: leadId,
