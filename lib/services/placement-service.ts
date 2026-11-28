@@ -1218,6 +1218,9 @@ export async function createPlacementEnrollment(
     : prereqAudit.unmet_criteria;
 
   const newEnrollment: PlacementEnrollment = {
+    tenant_id: student.tenant_id,
+    institute_id: student.institute_id ?? null,
+    institute_name: student.institute_name ?? null,
     id: enrollmentId,
     student_id: student.id,
     student_name: student.full_name,

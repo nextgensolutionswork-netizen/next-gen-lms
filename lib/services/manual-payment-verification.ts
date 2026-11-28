@@ -1,5 +1,10 @@
 import type { StudentPaymentRecord } from '@/types';
-import { validPaymentDate } from './payment-entry-rules';
+import {
+  doesVerificationReferenceMatch,
+  isValidPaymentReference,
+  PAYMENT_REFERENCE_ERROR,
+  validPaymentDate,
+} from './payment-entry-rules';
 import { getAuthorizedBankAccounts, findOriginalReceivingAccount } from '@/lib/utils/bank-autofill';
 
 export interface ManualPaymentVerification {
@@ -33,12 +38,23 @@ export function validateManualPaymentVerification(
   // 1. Reference / UTR validation
   if (payment.payment_mode !== 'Cash') {
     const stored = payment.transaction_reference?.trim() || payment.bank_upi_reference?.trim();
-    if (!input?.reference?.trim()) {
-      errors.reference = 'UTR / Transaction Reference is required.';
+    const entered = input?.reference?.trim() || '';
+    if (!entered) {
+      errors.reference = PAYMENT_REFERENCE_ERROR;
     } else if (!stored) {
       errors.reference = 'Stored payment reference is missing. Return this payment for correction.';
-    } else if (reference(input.reference) !== reference(stored)) {
-      errors.reference = 'UTR / Transaction Reference does not match this payment.';
+    } else if (isValidPaymentReference(stored)) {
+      if (!isValidPaymentReference(entered)) {
+        errors.reference = PAYMENT_REFERENCE_ERROR;
+      } else if (!doesVerificationReferenceMatch(entered, stored)) {
+        errors.reference = 'UTR / Transaction Reference does not match this payment.';
+      }
+    } else if (!doesVerificationReferenceMatch(entered, stored)) {
+      const hasHistorical5Digits = /\d{5}$/.test(stored.replace(/\D/g, ''));
+      errors.reference =
+        hasHistorical5Digits && !isValidPaymentReference(entered)
+          ? PAYMENT_REFERENCE_ERROR
+          : 'UTR / Transaction Reference does not match this payment.';
     }
   }
 

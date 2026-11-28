@@ -33,6 +33,7 @@ import { formatINR, formatDate, exportToCSV } from '@/lib/utils/formatters';
 import { getCanonicalPhoneDigits } from '@/lib/utils/phone-validation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { useRecordLoad } from '@/lib/hooks/use-record-load';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
 import { getStudents } from '@/lib/services/student-service';
 
 export default function StudentsListPage() {
@@ -59,6 +60,7 @@ export default function StudentsListPage() {
   const [search, setSearch] = React.useState('');
   const [courseFilter, setCourseFilter] = React.useState('All');
   const [statusFilter, setStatusFilter] = React.useState('All');
+  const [instituteFilter, setInstituteFilter] = React.useState('All');
   const [batchFilter, setBatchFilter] = React.useState('All');
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
 
@@ -82,6 +84,9 @@ export default function StudentsListPage() {
     }
     if (statusFilter !== 'All') {
       list = list.filter((s) => s.status === statusFilter);
+    }
+    if (instituteFilter !== 'All') {
+      list = list.filter((s) => matchesInstituteFilter(s, instituteFilter));
     }
 
     if (search.trim()) {
@@ -118,7 +123,7 @@ export default function StudentsListPage() {
     }
 
     return list;
-  }, [allStudents, courseFilter, batchFilter, statusFilter, search]);
+  }, [allStudents, courseFilter, batchFilter, statusFilter, instituteFilter, search]);
 
   // Reset page to 1 when filters change
   React.useEffect(() => {
@@ -270,6 +275,7 @@ export default function StudentsListPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <InstituteFilterDropdown value={instituteFilter} onChange={setInstituteFilter} />
             {/* Course Filter */}
             <div>
               <select

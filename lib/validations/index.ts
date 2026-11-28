@@ -68,6 +68,17 @@ export const paymentSchema = z.object({
   ]),
   transaction_reference: z.string().optional(),
   notes: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.payment_mode !== 'Cash') {
+    const ref = (data.transaction_reference ?? '').trim();
+    if (!/^[0-9]{5}$/.test(ref)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['transaction_reference'],
+        message: 'Please enter exactly 5 digits.',
+      });
+    }
+  }
 });
 
 export const courseSchema = z.object({

@@ -304,6 +304,8 @@ function initializeOnboardingCase(
     case_number: caseNumber,
     admission_id: admission.id,
     admission_number: admission.admission_number,
+    institute_id: admission.institute_id ?? student.institute_id ?? null,
+    institute_name: admission.institute_name ?? student.institute_name ?? null,
     student_id: student.id,
     student_name: student.full_name,
     student_email: student.email,

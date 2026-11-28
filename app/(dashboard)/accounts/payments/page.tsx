@@ -3,6 +3,18 @@
 import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
+import { PaymentReferenceField } from '@/components/ui/payment-reference-input';
+import {
+  actualPaymentDate,
+  doesVerificationReferenceMatch,
+  findPotentialDuplicatePayments,
+  formatDateDDMMYYYY,
+  isValidPaymentReference,
+  NEXT_DUE_DATE_ORDER_ERROR,
+  PAYMENT_REFERENCE_ERROR,
+  validateNextDueDate,
+} from '@/lib/services/payment-entry-rules';
 import { FileUpload } from '@/components/ui/file-upload';
 import Link from 'next/link';
 import {
@@ -59,6 +71,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = React.useState<Payment[]>([]);
   const [studentPayments, setStudentPayments] = React.useState<StudentPaymentRecord[]>([]);
   const [search, setSearch] = React.useState('');
+  const [instituteFilter, setInstituteFilter] = React.useState('All');
   const [isCollectModalOpen, setIsCollectModalOpen] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [successReceiptId, setSuccessReceiptId] = React.useState<string | null>(null);
@@ -88,6 +101,7 @@ export default function PaymentsPage() {
   const [verificationNotes, setVerificationNotes] = React.useState('');
   const [manualVerification, setManualVerification] = React.useState({ reference: '', amount: '', payment_date: '' });
   const [verificationBusy, setVerificationBusy] = React.useState(false);
+  const [verifyDuplicateAcknowledged, setVerifyDuplicateAcknowledged] = React.useState(false);
   const [rejectReason, setRejectReason] = React.useState('');
 
   // Update payment modal state (Sales / Staff)
@@ -108,7 +122,9 @@ export default function PaymentsPage() {
   const [selectedFeeId, setSelectedFeeId] = React.useState(approvedFees[0]?.id || '');
   const [amount, setAmount] = React.useState(15000);
   const [paymentMode, setPaymentMode] = React.useState<PaymentMethod>('UPI');
-  const [date, setDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = React.useState(actualPaymentDate());
+  const [nextDueDate, setNextDueDate] = React.useState('');
+  const [nextDueDateError, setNextDueDateError] = React.useState<string | null>(null);
   const [txnRef, setTxnRef] = React.useState('');
   const [bankUpiRef, setBankUpiRef] = React.useState('');
   const [notes, setNotes] = React.useState('');
@@ -128,6 +144,11 @@ export default function PaymentsPage() {
   const [bankPreset, setBankPreset] = React.useState<string>(initialAccount?.id || 'custom');
 
   const selectedFee = (store.studentFees || []).find((f) => f.id === selectedFeeId);
+  const totalNetPayable = selectedFee?.final_payable ?? 0;
+  const previouslyVerifiedPayments = selectedFee?.paid_amount ?? 0;
+  const currentOutstanding = selectedFee?.outstanding_amount ?? Math.max(0, totalNetPayable - previouslyVerifiedPayments);
+  const remainingOutstandingAfterPayment = Math.max(0, Number((currentOutstanding - safeAmount(amount)).toFixed(2)));
+  const isFullPayment = Boolean(selectedFee) && remainingOutstandingAfterPayment <= 0;
 
   const loadData = async () => {
     try { await paymentWorkflowClient.refresh(); } catch (error: any) { setErrorMessage(error.message); return; }
@@ -240,9 +261,10 @@ export default function PaymentsPage() {
   }, [selectedFeeId, selectedFee]);
 
   const filteredPayments = React.useMemo(() => {
-    if (!search.trim()) return payments;
+    const base = payments.filter((p) => matchesInstituteFilter(p, instituteFilter));
+    if (!search.trim()) return base;
     const q = search.toLowerCase();
-    return payments.filter(
+    return base.filter(
       (p) =>
         p.receipt_number?.toLowerCase().includes(q) ||
         p.student_name?.toLowerCase().includes(q) ||
@@ -250,12 +272,13 @@ export default function PaymentsPage() {
         p.course_name?.toLowerCase().includes(q) ||
         p.collected_by_name?.toLowerCase().includes(q)
     );
-  }, [payments, search]);
+  }, [payments, search, instituteFilter]);
 
   const filteredStudentPayments = React.useMemo(() => {
-    if (!search.trim()) return studentPayments;
+    const base = studentPayments.filter((p) => matchesInstituteFilter(p, instituteFilter));
+    if (!search.trim()) return base;
     const q = search.toLowerCase();
-    return studentPayments.filter(
+    return base.filter(
       (p) =>
         p.student_name?.toLowerCase().includes(q) ||
         p.admission_number?.toLowerCase().includes(q) ||
@@ -265,7 +288,7 @@ export default function PaymentsPage() {
         p.bank_upi_reference?.toLowerCase().includes(q) ||
         p.recorded_by_name?.toLowerCase().includes(q)
     );
-  }, [studentPayments, search]);
+  }, [studentPayments, search, instituteFilter]);
 
   // Handle Record Payment via centralized FeeWorkflowService
   const handleRecordFeePayment = async (e: React.FormEvent) => {
@@ -283,6 +306,26 @@ export default function PaymentsPage() {
       return;
     }
 
+    if (paymentMode !== 'Cash' && !isValidPaymentReference(txnRef)) {
+      setErrorMessage(PAYMENT_REFERENCE_ERROR);
+      return;
+    }
+
+    let validatedNextDueDate: string | null = null;
+    try {
+      validatedNextDueDate = validateNextDueDate({
+        nextDueDate: isFullPayment ? null : nextDueDate,
+        paymentDate: date,
+        remainingOutstanding: remainingOutstandingAfterPayment,
+      });
+      setNextDueDateError(null);
+    } catch (dueErr: any) {
+      const msg = dueErr?.message || 'Invalid Next Payment Due Date.';
+      setNextDueDateError(msg);
+      setErrorMessage(msg);
+      return;
+    }
+
     try {
       const paymentRec = await paymentWorkflowClient.recordPayment(
         {
@@ -292,6 +335,7 @@ export default function PaymentsPage() {
           amount_paid: amount,
           payment_mode: paymentMode,
           payment_date: date,
+          next_due_date: validatedNextDueDate,
           transaction_reference: txnRef,
           bank_upi_reference: bankUpiRef,
           payment_proof_url: proofUrl,
@@ -311,6 +355,8 @@ export default function PaymentsPage() {
 
       setIsCollectModalOpen(false);
       setTxnRef('');
+      setNextDueDate('');
+      setNextDueDateError(null);
       setProofUrl('');
       setBankUpiRef('');
       setNotes('');
@@ -343,6 +389,34 @@ export default function PaymentsPage() {
       return;
     }
     setErrorMessage(null);
+
+    if (selectedPayment.payment_mode !== 'Cash' && !isValidPaymentReference(manualVerification.reference)) {
+      setErrorMessage(PAYMENT_REFERENCE_ERROR);
+      return;
+    }
+
+    const storedRef = selectedPayment.transaction_reference || selectedPayment.bank_upi_reference;
+    if (selectedPayment.payment_mode !== 'Cash' && !doesVerificationReferenceMatch(manualVerification.reference, storedRef)) {
+      setErrorMessage('UTR / Transaction Reference does not match this payment.');
+      return;
+    }
+
+    const dupMatches = selectedPayment.payment_mode !== 'Cash'
+      ? findPotentialDuplicatePayments(store.studentPayments || [], {
+          reference: manualVerification.reference,
+          amount: manualVerification.amount || selectedPayment.amount_paid,
+          paymentDate: manualVerification.payment_date || selectedPayment.payment_date,
+          receivingBankAccount:
+            selectedPayment.our_bank_profile_id ||
+            selectedPayment.our_bank_account_id ||
+            selectedPayment.our_bank_name,
+          excludePaymentId: selectedPayment.id,
+        })
+      : [];
+    if (dupMatches.length > 0 && !verifyDuplicateAcknowledged) {
+      setErrorMessage('Please review and confirm the potential duplicate payment warning before proceeding.');
+      return;
+    }
 
     try {
       setVerificationBusy(true);
@@ -396,6 +470,11 @@ export default function PaymentsPage() {
     if (proofUploading) return;
     if (!updatingPayment || !user) return;
     setErrorMessage(null);
+
+    if (editPaymentMode !== 'Cash' && !isValidPaymentReference(editTxnRef)) {
+      setErrorMessage(PAYMENT_REFERENCE_ERROR);
+      return;
+    }
 
     try {
       await paymentWorkflowClient.updatePayment(
@@ -590,15 +669,18 @@ export default function PaymentsPage() {
 
       {/* Shared Search Toolbar */}
       <Card className="p-4 shadow-xs">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by student name, code, receipt #, or txn reference..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
-          />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative w-full sm:w-96">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by student name, code, receipt #, or txn reference..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+            />
+          </div>
+          <InstituteFilterDropdown value={instituteFilter} onChange={setInstituteFilter} />
         </div>
       </Card>
 
@@ -776,6 +858,7 @@ export default function PaymentsPage() {
                                         setSelectedPayment(p);
                                         setManualVerification({ reference: '', amount: '', payment_date: '' });
                                         setVerificationNotes('');
+                                        setVerifyDuplicateAcknowledged(false);
                                         setErrorMessage(null);
                                         setVerifyModalOpen(true);
                                       }}
@@ -980,7 +1063,15 @@ export default function PaymentsPage() {
             </label>
             <select
               value={selectedFeeId}
-              onChange={(e) => setSelectedFeeId(e.target.value)}
+              onChange={(e) => {
+                const newFeeId = e.target.value;
+                setSelectedFeeId(newFeeId);
+                const newFee = (store.studentFees || []).find((f) => f.id === newFeeId);
+                if (newFee && safeAmount(amount) >= newFee.outstanding_amount) {
+                  setNextDueDate('');
+                  setNextDueDateError(null);
+                }
+              }}
               className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold"
             >
               {approvedFees.length === 0 ? (
@@ -998,7 +1089,7 @@ export default function PaymentsPage() {
           </div>
 
           {selectedFee && (
-            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg space-y-1">
+            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-slate-500">Student & LMS ID:</span>
                 <span className="font-semibold text-slate-800">{selectedFee.student_name} ({selectedFee.student_code})</span>
@@ -1009,11 +1100,31 @@ export default function PaymentsPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Total Net Payable:</span>
-                <span className="font-bold text-slate-800">{formatINR(selectedFee.final_payable)}</span>
+                <span className="font-bold text-slate-800">{formatINR(totalNetPayable)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Previously Verified Payments:</span>
+                <span className="font-bold text-emerald-700">{formatINR(previouslyVerifiedPayments)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Current Outstanding:</span>
-                <span className="font-bold text-amber-700">{formatINR(selectedFee.outstanding_amount)}</span>
+                <span className="font-bold text-amber-700">{formatINR(currentOutstanding)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Current Payment Amount:</span>
+                <span className="font-bold text-[#0A6ED1]">{formatINR(safeAmount(amount))}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-blue-200/70">
+                <span className="font-semibold text-slate-700">Remaining Outstanding After Payment:</span>
+                <span className={`font-bold ${isFullPayment ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {formatINR(remainingOutstandingAfterPayment)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Next Payment Due Date:</span>
+                <span className="font-semibold text-slate-800">
+                  {isFullPayment ? 'N/A (Paid in Full)' : nextDueDate ? formatDateDDMMYYYY(nextDueDate) : 'Not selected'}
+                </span>
               </div>
             </div>
           )}
@@ -1025,7 +1136,14 @@ export default function PaymentsPage() {
               min={1}
               max={selectedFee?.outstanding_amount || 100000}
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              onChange={(e) => {
+                const nextAmt = Number(e.target.value);
+                setAmount(nextAmt);
+                if (selectedFee && nextAmt >= currentOutstanding) {
+                  setNextDueDate('');
+                  setNextDueDateError(null);
+                }
+              }}
               required
             />
             <div>
@@ -1051,16 +1169,76 @@ export default function PaymentsPage() {
               label="Payment Date *"
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                const nextPayDate = e.target.value;
+                setDate(nextPayDate);
+                if (nextDueDate && nextPayDate && nextDueDate <= nextPayDate) {
+                  setNextDueDateError(NEXT_DUE_DATE_ORDER_ERROR);
+                } else {
+                  setNextDueDateError(null);
+                }
+              }}
               required
             />
-            <Input
-              label="Transaction Reference / UTR Number"
-              placeholder="e.g. UPI/260301/992812 or NEFT-..."
-              value={txnRef}
-              onChange={(e) => setTxnRef(e.target.value)}
-            />
+            <div className="w-full space-y-1">
+              <label
+                htmlFor="payments-next-due-date"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
+              >
+                Next Payment Due Date {!isFullPayment ? '*' : ''}
+              </label>
+              <input
+                id="payments-next-due-date"
+                type="date"
+                disabled={isFullPayment}
+                required={!isFullPayment}
+                value={isFullPayment ? '' : nextDueDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNextDueDate(val);
+                  if (!isFullPayment && val && date && val <= date) {
+                    setNextDueDateError(NEXT_DUE_DATE_ORDER_ERROR);
+                  } else {
+                    setNextDueDateError(null);
+                  }
+                }}
+                aria-invalid={!!nextDueDateError}
+                className={`flex h-10 w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 transition-colors ${
+                  nextDueDateError
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-slate-300 focus:ring-[#0A6ED1] focus:border-transparent'
+                }`}
+              />
+              {!isFullPayment && nextDueDate && !nextDueDateError && (
+                <p className="text-[11px] text-slate-500">Format: {formatDateDDMMYYYY(nextDueDate)} (DD-MM-YYYY)</p>
+              )}
+              {isFullPayment && (
+                <p className="text-[11px] text-emerald-700">Disabled — full payment clears outstanding balance.</p>
+              )}
+              {nextDueDateError && (
+                <p role="alert" className="text-xs text-red-600 font-medium">{nextDueDateError}</p>
+              )}
+            </div>
           </div>
+
+          {paymentMode !== 'Cash' && (
+            <PaymentReferenceField
+              id="payments-collect-ref"
+              label="Transaction / UTR Ref – Last 5 Digits"
+              value={txnRef}
+              onChange={setTxnRef}
+              required
+              duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                reference: txnRef,
+                amount,
+                paymentDate: date,
+                receivingBankAccount:
+                  selectedBankAccountId !== 'custom'
+                    ? selectedBankAccountId
+                    : ourBankAccountId || ourBankName,
+              })}
+            />
+          )}
 
           {paymentMode !== 'Cash' && (
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
@@ -1251,36 +1429,95 @@ export default function PaymentsPage() {
             </div>
 
             {errorMessage && <p role="alert" className="text-red-600">{errorMessage}</p>}
-            {(['reference', 'amount', 'payment_date'] as const).filter((field) => field !== 'reference' || selectedPayment.payment_mode !== 'Cash').map((field) => (
-              <Input key={field} label={field === 'reference' ? 'UTR / Transaction Reference' : field === 'amount' ? 'Amount Received' : 'Actual Payment Date'} type={field === 'amount' ? 'number' : field === 'payment_date' ? 'date' : 'text'} required step={field === 'amount' ? '0.01' : undefined} value={manualVerification[field]} onChange={(e) => setManualVerification((v) => ({ ...v, [field]: e.target.value }))} />
-            ))}
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">
-                Accountant Verification Notes:
-              </label>
-              <textarea
-                rows={2}
-                value={verificationNotes}
-                onChange={(e) => setVerificationNotes(e.target.value)}
-                placeholder="e.g. Bank statement credit verified on HDFC account #4019."
-                className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
-              />
-            </div>
+            {(() => {
+              const storedVerifyRef = selectedPayment.transaction_reference || selectedPayment.bank_upi_reference;
+              const isNonCash = selectedPayment.payment_mode !== 'Cash';
+              const refValidFormat = !isNonCash || isValidPaymentReference(manualVerification.reference);
+              const refMatched = !isNonCash || (refValidFormat && doesVerificationReferenceMatch(manualVerification.reference, storedVerifyRef));
+              const refMismatchError =
+                isNonCash && isValidPaymentReference(manualVerification.reference) && !refMatched
+                  ? 'UTR / Transaction Reference does not match this payment.'
+                  : null;
+              const verifyDuplicates = isNonCash
+                ? findPotentialDuplicatePayments(store.studentPayments || [], {
+                    reference: manualVerification.reference,
+                    amount: manualVerification.amount || selectedPayment.amount_paid,
+                    paymentDate: manualVerification.payment_date || selectedPayment.payment_date,
+                    receivingBankAccount:
+                      selectedPayment.our_bank_profile_id ||
+                      selectedPayment.our_bank_account_id ||
+                      selectedPayment.our_bank_name,
+                    excludePaymentId: selectedPayment.id,
+                  })
+                : [];
+              const canSubmitVerify = !verificationBusy && refMatched && (verifyDuplicates.length === 0 || verifyDuplicateAcknowledged);
 
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => setVerifyModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="sap"
-                size="sm"
-                onClick={handleVerifyPayment}
-                disabled={verificationBusy}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Confirm Verification & Issue Receipt
-              </Button>
-            </div>
+              return (
+                <>
+                  {isNonCash && (
+                    <div className="space-y-2">
+                      <PaymentReferenceField
+                        id="payments-verify-ref"
+                        label="UTR / Transaction Reference – Last 5 Digits"
+                        value={manualVerification.reference}
+                        onChange={(val) => {
+                          setManualVerification((v) => ({ ...v, reference: val }));
+                          setVerifyDuplicateAcknowledged(false);
+                        }}
+                        required
+                        disabled={verificationBusy}
+                        error={refMismatchError}
+                        successMessage={refMatched ? 'Reference matches recorded transaction.' : null}
+                        duplicatePayments={verifyDuplicates}
+                      />
+                      {verifyDuplicates.length > 0 && (
+                        <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50/70 p-2 text-[11px] text-amber-900 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={verifyDuplicateAcknowledged}
+                            onChange={(e) => setVerifyDuplicateAcknowledged(e.target.checked)}
+                            className="mt-0.5 rounded border-amber-400"
+                          />
+                          <span>
+                            I have reviewed the potential duplicate payment(s) above and confirm this is a distinct transaction.
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  {(['amount', 'payment_date'] as const).map((field) => (
+                    <Input key={field} label={field === 'amount' ? 'Amount Received' : 'Actual Payment Date'} type={field === 'amount' ? 'number' : 'date'} required step={field === 'amount' ? '0.01' : undefined} value={manualVerification[field]} onChange={(e) => setManualVerification((v) => ({ ...v, [field]: e.target.value }))} />
+                  ))}
+                  <div>
+                    <label className="block text-slate-700 font-medium mb-1">
+                      Accountant Verification Notes:
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={verificationNotes}
+                      onChange={(e) => setVerificationNotes(e.target.value)}
+                      placeholder="e.g. Bank statement credit verified on HDFC account #4019."
+                      className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <Button variant="outline" size="sm" onClick={() => setVerifyModalOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="sap"
+                      size="sm"
+                      onClick={handleVerifyPayment}
+                      disabled={!canSubmitVerify}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      Confirm Verification & Issue Receipt
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </Modal>
@@ -1394,12 +1631,20 @@ export default function PaymentsPage() {
                 onChange={(e) => setEditDate(e.target.value)}
                 required
               />
-              <Input
-                label="Transaction Reference / UTR Number"
-                placeholder="e.g. UPI/260301/992812 or NEFT-..."
-                value={editTxnRef}
-                onChange={(e) => setEditTxnRef(e.target.value)}
-              />
+              {editPaymentMode !== 'Cash' && (
+                <PaymentReferenceField
+                  id="payments-edit-ref"
+                  value={editTxnRef}
+                  onChange={setEditTxnRef}
+                  required
+                  duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                    reference: editTxnRef,
+                    amount: editAmount,
+                    paymentDate: editDate,
+                    excludePaymentId: updatingPayment?.id,
+                  })}
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

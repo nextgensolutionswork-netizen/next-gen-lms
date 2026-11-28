@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
 import { store } from '@/lib/services/data-store';
 import { useAuth } from '@/components/providers/auth-provider';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
 import { getLeads } from '@/lib/services/crm-service';
 import { CRM_ROLES } from '@/lib/auth/lead-access';
 import { Payment, Lead, UpcomingPaymentDueItem } from '@/types';
@@ -60,18 +61,25 @@ function safeAmount(val: unknown): number {
 
 export default function DashboardPage() {
   const { role, user } = useAuth();
+  const [filterPeriod, setFilterPeriod] = React.useState<DashboardPeriod>('month');
+  const [customDateRange, setCustomDateRange] = React.useState<DateRange | null>(null);
+  const [isCustomPickerOpen, setIsCustomPickerOpen] = React.useState<boolean>(false);
+  const [filterCourse, setFilterCourse] = React.useState<string>('All');
+  const [filterInstitute, setFilterInstitute] = React.useState<string>('All');
+  const [refreshTick, setRefreshTick] = React.useState(0);
   const [leadSnapshot, setLeadSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
-  const authorizedLeads = React.useMemo(() => (leadSnapshot.owner === user?.id ? leadSnapshot.rows : []), [leadSnapshot, user?.id]);
+  const authorizedLeads = React.useMemo(
+    () =>
+      (leadSnapshot.owner === user?.id ? leadSnapshot.rows : []).filter((l) =>
+        matchesInstituteFilter(l, filterInstitute)
+      ),
+    [leadSnapshot, user?.id, filterInstitute]
+  );
   React.useEffect(() => {
     let active = true;
     if (CRM_ROLES.includes(role)) getLeads().then(rows => { if (active) setLeadSnapshot({ owner: user?.id, rows }); }).catch(() => { if (active) setLeadSnapshot({ owner: user?.id, rows: [] }); });
     return () => { active = false; };
   }, [user?.id, role]);
-  const [filterPeriod, setFilterPeriod] = React.useState<DashboardPeriod>('month');
-  const [customDateRange, setCustomDateRange] = React.useState<DateRange | null>(null);
-  const [isCustomPickerOpen, setIsCustomPickerOpen] = React.useState<boolean>(false);
-  const [filterCourse, setFilterCourse] = React.useState<string>('All');
-  const [refreshTick, setRefreshTick] = React.useState(0);
 
   React.useEffect(() => {
     paymentWorkflowClient
@@ -120,10 +128,16 @@ export default function DashboardPage() {
     return allUnifiedPayments.filter((p) => {
       const inPeriod = isDateInSelectedPeriod(p.payment_date || p.created_at);
       if (!inPeriod) return false;
+      if (filterInstitute !== 'All') {
+        const studentRec = (store.students || []).find((s) => s.id === p.student_id);
+        if (!matchesInstituteFilter((p as any).institute_id || (p as any).institute_name ? (p as any) : studentRec, filterInstitute)) {
+          return false;
+        }
+      }
       if (filterCourse === 'All') return true;
       return paymentCourseBucket(p, courseIds, store.feeAccounts || [], store.students || []) === filterCourse;
     });
-  }, [allUnifiedPayments, isDateInSelectedPeriod, filterCourse, courseIds]);
+  }, [allUnifiedPayments, isDateInSelectedPeriod, filterCourse, filterInstitute, courseIds]);
 
   // Expenses list dynamically driven by filterPeriod
   const periodExpensesList = React.useMemo(() => {
@@ -411,6 +425,9 @@ export default function DashboardPage() {
               ))}
             </select>
           </div>
+
+          <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+          <InstituteFilterDropdown value={filterInstitute} onChange={setFilterInstitute} />
         </div>
       </div>
 

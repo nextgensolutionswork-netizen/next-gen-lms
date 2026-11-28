@@ -1,4 +1,9 @@
-import { normalizePaymentFields } from '@/lib/services/payment-entry-rules';
+import {
+  isValidPaymentReference,
+  normalizePaymentFields,
+  PAYMENT_REFERENCE_ERROR,
+  requiresTransactionReference,
+} from '@/lib/services/payment-entry-rules';
 import { PaymentVerificationError } from '@/lib/services/manual-payment-verification';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -20,6 +25,7 @@ const details = z.object({
   amount_paid: z.number().finite().positive(),
   payment_mode: z.enum(['Cash', 'UPI', 'Card', 'Other', 'Payment Gateway', 'Credit Card', 'Debit Card', 'Net Banking', 'Bank Transfer', 'Cheque']),
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v, 'Invalid payment date'),
+  next_due_date: z.string().trim().max(40).nullable().optional(),
   transaction_reference: z.string().trim().max(200).nullable().optional(),
   bank_upi_reference: z.string().trim().max(200).optional(),
   payment_proof_url: z.string().max(4096).refine((v) => !v || v.startsWith('/api/fees/proof?path=') || /^https:\/\//i.test(v), 'Attach valid payment proof').optional(),
@@ -171,7 +177,9 @@ export async function POST(request: NextRequest) {
           }
         }
       }
-      if ('input' in body && body.input.payment_mode !== 'Cash' && !body.input.transaction_reference?.trim() && !body.input.bank_upi_reference?.trim()) throw new Error('Transaction reference is required for non-cash payments.');
+      if ('input' in body && requiresTransactionReference(body.input.payment_mode) && !isValidPaymentReference(body.input.transaction_reference)) {
+        throw new Error(PAYMENT_REFERENCE_ERROR);
+      }
       const payment = body.action === 'record' ? feeWorkflowService.recordPayment(body.input, actor.id, actor.role)
         : body.action === 'update' ? feeWorkflowService.updatePayment(body.paymentId, body.input, actor.id, actor.role)
         : body.action === 'approve' ? feeWorkflowService.verifyPayment(body.paymentId, actor.id, body.notes, body.verification)

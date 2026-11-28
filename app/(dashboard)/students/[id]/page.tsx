@@ -1,5 +1,11 @@
 'use client';
 import Image from 'next/image';
+import { PaymentReferenceField } from '@/components/ui/payment-reference-input';
+import {
+  findPotentialDuplicatePayments,
+  isValidPaymentReference,
+  PAYMENT_REFERENCE_ERROR,
+} from '@/lib/services/payment-entry-rules';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -394,8 +400,8 @@ export default function StudentDetailsPage() {
       setPayError('Payment proof (deposit slip or transaction screenshot) is required for non-cash payments.');
       return;
     }
-    if (payMode !== 'Cash' && !payTxnRef.trim() && !payBankUpiRef.trim()) {
-      setPayError('Please enter a transaction reference or UTR number.');
+    if (payMode !== 'Cash' && !isValidPaymentReference(payTxnRef)) {
+      setPayError(PAYMENT_REFERENCE_ERROR);
       return;
     }
 
@@ -2359,16 +2365,22 @@ export default function StudentDetailsPage() {
               />
             </div>
 
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Transaction Ref / UTR / Cheque #</label>
-              <Input
-                type="text"
-                value={payTxnRef}
-                onChange={(e) => setPayTxnRef(e.target.value)}
-                placeholder="e.g. UTR192837482"
-                className="text-xs"
-              />
-            </div>
+            {payMode !== 'Cash' && (
+              <div>
+                <PaymentReferenceField
+                  id="student-record-payment-ref"
+                  value={payTxnRef}
+                  onChange={setPayTxnRef}
+                  required
+                  className="text-xs"
+                  duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                    reference: payTxnRef,
+                    amount: payAmount,
+                    paymentDate: payDate,
+                  })}
+                />
+              </div>
+            )}
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1">Bank / UPI App Reference</label>

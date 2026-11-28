@@ -3,6 +3,13 @@
 import { getRoleLabel } from '@/lib/utils/role-labels';
 import * as React from 'react';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
+import { PaymentReferenceField } from '@/components/ui/payment-reference-input';
+import {
+  doesVerificationReferenceMatch,
+  findPotentialDuplicatePayments,
+  isValidPaymentReference,
+  PAYMENT_REFERENCE_ERROR,
+} from '@/lib/services/payment-entry-rules';
 import { useDataSync } from '@/lib/hooks/use-data-sync';
 import { FileUpload } from '@/components/ui/file-upload';
 import Link from 'next/link';
@@ -468,6 +475,9 @@ export default function FeeApprovalsPage() {
     // Client-side pre-validation for Receiving Bank Account
     const localErrors: Record<string, string> = {};
     if (selectedPayment.payment_mode !== 'Cash') {
+      if (!isValidPaymentReference(manualVerification.reference)) {
+        localErrors.reference = PAYMENT_REFERENCE_ERROR;
+      }
       if (!selectedVerifiedBankAccountId) {
         localErrors.receiving_bank_profile_id = 'Receiving bank account is required for non-cash payment verification.';
       } else if (isBankDiscrepancy && !bankDiscrepancyReason.trim()) {
@@ -592,6 +602,11 @@ export default function FeeApprovalsPage() {
       return;
     }
 
+    if (editPaymentMode !== 'Cash' && !isValidPaymentReference(editTxnRef)) {
+      setActionError(PAYMENT_REFERENCE_ERROR);
+      return;
+    }
+
     if (editPaymentMode !== 'Cash' && !editBankProfileId && !editBankAccountName) {
       setActionError('Please select an authorized receiving bank account for non-cash payment.');
       return;
@@ -654,6 +669,10 @@ export default function FeeApprovalsPage() {
     if (!user) return;
     if (!recFeeId) {
       setActionError('Please select a student fee account.');
+      return;
+    }
+    if (recMode !== 'Cash' && !isValidPaymentReference(recTxnRef)) {
+      setActionError(PAYMENT_REFERENCE_ERROR);
       return;
     }
     if (recMode !== 'Cash' && !recBankProfileId && !recBankAccountName) {
@@ -2755,11 +2774,40 @@ export default function FeeApprovalsPage() {
 
             <div className="space-y-3">
               <p>Manually enter the received payment details for this payment record.</p>
+              {selectedPayment.payment_mode !== 'Cash' && (() => {
+                const storedRef = selectedPayment.transaction_reference || selectedPayment.bank_upi_reference;
+                const refValid = isValidPaymentReference(manualVerification.reference);
+                const refMatched = refValid && doesVerificationReferenceMatch(manualVerification.reference, storedRef);
+                const mismatchErr =
+                  refValid && !refMatched ? 'UTR / Transaction Reference does not match this payment.' : null;
+                return (
+                  <PaymentReferenceField
+                    id="verify-reference"
+                    label="UTR / Transaction Reference – Last 5 Digits"
+                    value={manualVerification.reference}
+                    onChange={(val) => setManualVerification((previous) => ({ ...previous, reference: val }))}
+                    required
+                    disabled={verificationBusy}
+                    error={verificationErrors.reference || mismatchErr}
+                    successMessage={refMatched ? 'Reference matches recorded transaction.' : null}
+                    duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                      reference: manualVerification.reference,
+                      amount: manualVerification.amount || selectedPayment.amount_paid,
+                      paymentDate: manualVerification.payment_date || selectedPayment.payment_date,
+                      receivingBankAccount:
+                        selectedVerifiedBankAccountId ||
+                        selectedPayment.our_bank_profile_id ||
+                        selectedPayment.our_bank_account_id ||
+                        selectedPayment.our_bank_name,
+                      excludePaymentId: selectedPayment.id,
+                    })}
+                  />
+                );
+              })()}
               {([
-                ['reference', 'UTR / Transaction Reference', 'text'],
                 ['amount', 'Amount Received', 'number'],
                 ['payment_date', 'Actual Payment Date', 'date'],
-              ] as const).filter(([field]) => field !== 'reference' || selectedPayment.payment_mode !== 'Cash').map(([field, label, type]) => (
+              ] as const).map(([field, label, type]) => (
                 <div key={field}>
                   <label htmlFor={'verify-' + field} className="block text-slate-700 font-medium mb-1">{label} *</label>
                   <input id={'verify-' + field} type={type} required autoComplete="off"
@@ -2971,7 +3019,16 @@ export default function FeeApprovalsPage() {
                 <Button
                   variant="sap"
                   size="sm"
-                  disabled={verificationBusy || isOwnRecordedPayment(selectedPayment)}
+                  disabled={
+                    verificationBusy ||
+                    isOwnRecordedPayment(selectedPayment) ||
+                    (selectedPayment.payment_mode !== 'Cash' &&
+                      (!isValidPaymentReference(manualVerification.reference) ||
+                        !doesVerificationReferenceMatch(
+                          manualVerification.reference,
+                          selectedPayment.transaction_reference || selectedPayment.bank_upi_reference
+                        )))
+                  }
                   onClick={handleVerifyPayment}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
@@ -3107,18 +3164,22 @@ export default function FeeApprovalsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-700 font-medium mb-1">
-                  Transaction Reference / UTR Number
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. UPI/260202/882194 or NEFT-HDFC-998877"
-                  value={editTxnRef}
-                  onChange={(e) => setEditTxnRef(e.target.value)}
-                  className="w-full text-xs p-2 border border-slate-300 rounded-lg font-mono"
-                />
-              </div>
+              {editPaymentMode !== 'Cash' && (
+                <div>
+                  <PaymentReferenceField
+                    id="approvals-edit-ref"
+                    value={editTxnRef}
+                    onChange={setEditTxnRef}
+                    required
+                    duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                      reference: editTxnRef,
+                      amount: editAmount,
+                      paymentDate: editDate,
+                      excludePaymentId: updatingPayment?.id,
+                    })}
+                  />
+                </div>
+              )}
 
               {editPaymentMode !== 'Cash' && (
                 <div className="md:col-span-2">
@@ -3354,18 +3415,21 @@ export default function FeeApprovalsPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-slate-700 font-medium mb-1">
-                Transaction Reference / UTR
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. UPI/260202/882194"
-                value={recTxnRef}
-                onChange={(e) => setRecTxnRef(e.target.value)}
-                className="w-full text-xs p-2 border border-slate-300 rounded-lg font-mono"
-              />
-            </div>
+            {recMode !== 'Cash' && (
+              <div>
+                <PaymentReferenceField
+                  id="approvals-record-ref"
+                  value={recTxnRef}
+                  onChange={setRecTxnRef}
+                  required
+                  duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                    reference: recTxnRef,
+                    amount: recAmount,
+                    paymentDate: recDate,
+                  })}
+                />
+              </div>
+            )}
 
             {recMode !== 'Cash' && (
               <div className="md:col-span-2">

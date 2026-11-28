@@ -147,8 +147,8 @@ export async function POST(request: NextRequest) {
       }
       if (input.initial_payment_amount && input.initial_payment_amount > 0) {
         const mode = input.payment_mode || 'UPI';
-        if (mode !== 'Cash' && !input.transaction_reference?.trim() && !input.bank_upi_reference?.trim()) {
-          throw new Error('Transaction reference is required for non-cash initial payments.');
+        if (mode !== 'Cash' && !/^[0-9]{5}$/.test((input.transaction_reference ?? '').trim())) {
+          throw new Error('Please enter exactly 5 digits.');
         }
       }
 

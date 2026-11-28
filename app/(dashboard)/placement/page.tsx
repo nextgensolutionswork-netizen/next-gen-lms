@@ -47,6 +47,7 @@ import {
 } from '@/lib/services/placement-service';
 import { formatDate } from '@/lib/utils/formatters';
 import { useAuth } from '@/components/providers/auth-provider';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
 
 export default function PlacementPage() {
   const { user, role, hasPermission } = useAuth();
@@ -115,6 +116,7 @@ export default function PlacementPage() {
   const [jobStatusFilter, setJobStatusFilter] = React.useState<'All' | 'Open' | 'Closed'>('All');
   const [profileSearch, setProfileSearch] = React.useState('');
   const [profileStageFilter, setProfileStageFilter] = React.useState<string>('All');
+  const [instituteFilter, setInstituteFilter] = React.useState<string>('All');
 
   const loadData = React.useCallback(async () => {
     setIsLoading(true);
@@ -184,9 +186,11 @@ export default function PlacementPage() {
         p.resume_status?.toLowerCase().includes(q) ||
         p.placement_status?.toLowerCase().includes(q);
       const matchesStage = profileStageFilter === 'All' || p.placement_status === profileStageFilter;
-      return matchesSearch && matchesStage;
+      const studentRec = (store.students || []).find((s) => s.id === p.student_id);
+      const matchesInst = matchesInstituteFilter(studentRec, instituteFilter);
+      return matchesSearch && matchesStage && matchesInst;
     });
-  }, [profiles, profileSearch, profileStageFilter]);
+  }, [profiles, profileSearch, profileStageFilter, instituteFilter]);
 
   // Derived application counts for current modal
   const allDriveApplicants = React.useMemo(() => {
@@ -629,8 +633,10 @@ export default function PlacementPage() {
                 />
               </div>
 
-              <select
-                value={profileStageFilter}
+              <div className="flex flex-wrap items-center gap-2">
+                <InstituteFilterDropdown value={instituteFilter} onChange={setInstituteFilter} />
+                <select
+                  value={profileStageFilter}
                 onChange={(e) => setProfileStageFilter(e.target.value)}
                 className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-[#0A6ED1]"
               >
@@ -641,6 +647,7 @@ export default function PlacementPage() {
                 <option value="Interview Scheduled">Interview Scheduled</option>
                 <option value="Placed">Placed</option>
               </select>
+              </div>
             </div>
           </div>
         </CardHeader>

@@ -265,6 +265,8 @@ export interface CreateAdmissionInput {
   counsellor_name?: string;
   training_category?: 'Normal Training' | 'Personal Training';
   lead_id?: string; // Optional: if converted from CRM
+  institute_id?: string | null;
+  institute_name?: string | null;
   initial_payment_amount?: number;
   collect_initial_payment?: boolean;
   payment_mode?: PaymentMethod;
@@ -502,8 +504,8 @@ export async function createAdmissionWorkflow(
       );
     }
     const mode = input.payment_mode || 'UPI';
-    if (mode !== 'Cash' && !input.transaction_reference?.trim()) {
-      throw new Error('Transaction reference is required for non-cash initial payments.');
+    if (mode !== 'Cash' && !/^[0-9]{5}$/.test((input.transaction_reference ?? '').trim())) {
+      throw new Error('Please enter exactly 5 digits.');
     }
     if (input.payment_date) {
       const parsedPaymentDate = new Date(`${input.payment_date}T00:00:00.000Z`);
@@ -561,10 +563,22 @@ export async function createAdmissionWorkflow(
   const stateVal = input.state || (input.city?.toLowerCase().includes('pune') || input.city?.toLowerCase().includes('mumbai') ? 'Maharashtra' : input.city?.toLowerCase().includes('bengaluru') || input.city?.toLowerCase().includes('bangalore') ? 'Karnataka' : 'Telangana');
   const stateCodeVal = input.state_code || (stateVal === 'Maharashtra' ? '27' : stateVal === 'Karnataka' ? '29' : '36');
 
+  const linkedLead = input.lead_id
+    ? (store.leads || []).find((l) => l.id === input.lead_id)
+    : undefined;
+  const resolvedInstituteId = input.institute_id || linkedLead?.institute_id || null;
+  const resolvedInstituteObj = resolvedInstituteId
+    ? (store.institutes || []).find((i) => i.id === resolvedInstituteId)
+    : undefined;
+  const resolvedInstituteName =
+    input.institute_name || linkedLead?.institute_name || resolvedInstituteObj?.name || null;
+
   // 1. Create Admission Record with RFC-4122 UUID
   const newAdmissionId = crypto.randomUUID();
   const newAdmission: Admission = {
     tenant_id: admissionTenant,
+    institute_id: resolvedInstituteId,
+    institute_name: resolvedInstituteName,
     id: newAdmissionId,
     admission_number,
     student_unique_id: studentUniqueId,
@@ -655,6 +669,8 @@ export async function createAdmissionWorkflow(
     course_name: course?.course_name,
     batch_id: input.batch_id,
     batch_name: batch?.batch_name,
+    institute_id: resolvedInstituteId,
+    institute_name: resolvedInstituteName,
     trainer_id: trainer?.id,
     trainer_name: trainer?.full_name,
     counsellor_id: counsellor?.id,
@@ -678,6 +694,8 @@ export async function createAdmissionWorkflow(
   const newFeeAccountId = crypto.randomUUID();
   const newFeeAccount: StudentFeeAccount = {
     tenant_id: admissionTenant,
+    institute_id: resolvedInstituteId,
+    institute_name: resolvedInstituteName,
     id: newFeeAccountId,
     student_id: newStudent.id,
     student_name: newStudent.full_name,
@@ -734,6 +752,8 @@ export async function createAdmissionWorkflow(
     course_name: course?.course_name,
     batch_id: input.batch_id,
     batch_name: store.batches.find((b) => b.id === input.batch_id)?.batch_name,
+    institute_id: resolvedInstituteId,
+    institute_name: resolvedInstituteName,
     sap_module: course?.category || 'SAP',
     standard_fee: courseFee,
     proposed_fee: courseFee,

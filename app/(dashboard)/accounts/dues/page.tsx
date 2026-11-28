@@ -25,6 +25,7 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
 import { formatINR, formatDate } from '@/lib/utils/formatters';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
 import type {
   UpcomingPaymentDueItem,
   AllPaymentDuesSummary,
@@ -70,6 +71,7 @@ export default function StudentPaymentDueDatesPage() {
   const [debouncedSearch, setDebouncedSearch] = React.useState<string>('');
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'overdue' | 'today' | 'next3days' | 'upcoming'>('all');
   const [courseFilter, setCourseFilter] = React.useState<string>('All');
+  const [instituteFilter, setInstituteFilter] = React.useState<string>('All');
   const [startDate, setStartDate] = React.useState<string>('');
   const [endDate, setEndDate] = React.useState<string>('');
   const [page, setPage] = React.useState<number>(1);
@@ -307,6 +309,8 @@ export default function StudentPaymentDueDatesPage() {
               />
             </div>
 
+            <InstituteFilterDropdown value={instituteFilter} onChange={setInstituteFilter} />
+
             {/* Course Filter Dropdown */}
             <div className="w-full md:w-56 shrink-0">
               <select
@@ -450,7 +454,13 @@ export default function StudentPaymentDueDatesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {dues.map((item) => {
+                  {dues
+                    .filter((item) => {
+                      if (instituteFilter === 'All') return true;
+                      const st = (store.students || []).find((s) => s.id === item.student_id);
+                      return matchesInstituteFilter(st, instituteFilter);
+                    })
+                    .map((item) => {
                     const isDueToday = item.due_status === 'Due Today';
                     const isOverdue = item.due_status === 'Overdue';
                     const isDueTomorrow = item.due_status === 'Due Tomorrow';

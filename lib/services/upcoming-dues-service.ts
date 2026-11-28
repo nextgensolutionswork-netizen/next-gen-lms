@@ -280,7 +280,12 @@ export function getAllPaymentDues(
   for (const fa of feeAccounts) {
     if (tenantId(fa) !== tenantId(actor)) continue;
     const faAny = fa as any;
-    const invoiceDueDate = typeof faAny.due_date === 'string' ? faAny.due_date.trim() : undefined;
+    const invoiceDueDate =
+      typeof faAny.next_due_date === 'string' && faAny.next_due_date.trim()
+        ? faAny.next_due_date.trim()
+        : typeof faAny.due_date === 'string'
+        ? faAny.due_date.trim()
+        : undefined;
     if (!invoiceDueDate || !/^\d{4}-\d{2}-\d{2}$/.test(invoiceDueDate)) continue;
 
     const faStatus = (fa.status as unknown as string) || '';

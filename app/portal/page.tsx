@@ -2,6 +2,12 @@
 
 import * as React from 'react';
 import Image from 'next/image';
+import { PaymentReferenceField } from '@/components/ui/payment-reference-input';
+import {
+  findPotentialDuplicatePayments,
+  isValidPaymentReference,
+  PAYMENT_REFERENCE_ERROR,
+} from '@/lib/services/payment-entry-rules';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -548,6 +554,10 @@ export default function StudentPortalPage() {
   const handleOfflinePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!student || payAmount <= 0) return;
+    if (!isValidPaymentReference(offlineTxnRef)) {
+      alert(PAYMENT_REFERENCE_ERROR);
+      return;
+    }
     setIsProcessing(true);
     try {
       const targetFee =
@@ -2170,12 +2180,16 @@ export default function StudentPortalPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <Input
-                      label="UTR / Transaction Reference *"
-                      placeholder="e.g. UPI/429188291012 or NEFT-..."
+                    <PaymentReferenceField
+                      id="portal-offline-ref"
                       value={offlineTxnRef}
-                      onChange={(e) => setOfflineTxnRef(e.target.value)}
+                      onChange={setOfflineTxnRef}
                       required
+                      duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                        reference: offlineTxnRef,
+                        amount: payAmount,
+                        paymentDate: offlineDate,
+                      })}
                     />
                     <Input
                       label="Transfer Date *"

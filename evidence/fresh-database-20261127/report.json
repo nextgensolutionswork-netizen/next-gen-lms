@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-27",
+  "project": "tgohtdzwehhjfahtgovq",
+  "authorization": "User selected Initialize a fresh database after being informed only profiles existed.",
+  "applied": [
+    "initialize_fresh_business_schema",
+    "isolate_rls_lookup_helpers"
+  ],
+  "result": {
+    "publicTables": 49,
+    "tablesWithoutRls": 0,
+    "preservedProfiles": 8,
+    "authUsers": 8,
+    "originalProfileFieldsFingerprintBeforeAndAfter": "eed0597f2e0f532e5936323372e1a570",
+    "profileChange": "Added tenant_id with default institute membership; existing fields unchanged.",
+    "courses": 4,
+    "students": 0,
+    "payments": 0,
+    "demoAccountsSeeded": false,
+    "bankAccountsSeeded": false,
+    "workflowSnapshot": "Explicit empty arrays to prevent legacy demo state from being imported"
+  },
+  "verification": {
+    "liveCoursesRestStatus": 200,
+    "liveCourseCodes": ["SAP FICO 101", "SAP FICO 102", "SAP MM 103", "SAP ABAP 104"],
+    "notificationDatabaseDependencies": "PASS: service_role can read tenant profile roster, workflow snapshot, admissions, students, payments and receipts",
+    "signedInProductionNotificationsHttp": "Not tested: browser session unavailable",
+    "isolatedPostgres": "PASS: schema execution, RPC insert-column compatibility, RLS on every table, anonymous course reads, private profile protection, server-only workflow commits and stale revision conflict",
+    "courseTests": "28 passed across course-management and bug-15-course-registry-sync",
+    "existingProfileDataPreserved": true
+  },
+  "advisors": {
+    "newWarnings": 0,
+    "intentionalInfo": "admission_sequences and fee_workflow_state have RLS and no client policies; service role only",
+    "preExistingWarning": "Leaked Password Protection Disabled",
+    "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+  },
+  "limitations": [
+    "No complete signed-in browser workflow was exercised.",
+    "Institute contact, tax and bank details need configuration for a fresh installation.",
+    "Legacy migration directory includes overlapping initial schemas and demo seeds. Do not blindly replay the entire directory; the prepared bootstrap is for the profiles-only installation inspected in this task."
+  ],
+  "applicationDeployment": "Not required for the database repair; no deployment performed."
+}

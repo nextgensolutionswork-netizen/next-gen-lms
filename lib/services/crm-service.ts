@@ -1,5 +1,6 @@
 import { cacheLeads, cachedLeads, leadCacheToken } from './lead-cache';
 import { store } from './data-store';
+import { resolveActiveInstitute } from './institute-service';
 import { Lead, LeadStage, Admission, UserProfile } from '@/types';
 import { assertLeadAccess, leadScope, canAccessLead, requireCrmActor } from '@/lib/auth/lead-access';
 import { leadFields } from './lead-input';
@@ -256,6 +257,7 @@ export async function getLeads(filters: LeadFilters = {}, actor?: UserProfile): 
     && (!filters.counsellor_id || l.counsellor_id === filters.counsellor_id)
     && (!filters.created_by || l.created_by === filters.created_by)
     && (!filters.course_id || l.interested_course_id === filters.course_id)
+    && (!(filters as any).institute_id || (filters as any).institute_id === 'All' || ((filters as any).institute_id === 'unassigned' ? (!l.institute_id && !l.institute_name) : (l.institute_id === (filters as any).institute_id || l.institute_name === (filters as any).institute_id)))
     && (!filters.from || l.created_at.slice(0, 10) >= filters.from)
     && (!filters.to || l.created_at.slice(0, 10) <= filters.to)
     && (!filters.search || [l.full_name, l.email, l.phone, l.lead_code].some(v => (v || '').toLowerCase().includes(filters.search!.toLowerCase()))))
@@ -277,6 +279,7 @@ export async function createLead(
     allowDuplicate?: boolean;
     idempotency_key?: string;
     external_lead_id?: string;
+    require_institute?: boolean;
   },
   actor?: UserProfile
 ): Promise<Lead> {
@@ -291,6 +294,13 @@ export async function createLead(
     if (data.created_by !== undefined && data.created_by !== actor.id) throw new Error('Forbidden: Cannot impersonate a creator.');
     if (data.tenant_id !== undefined && data.tenant_id !== actor.tenant_id) throw new Error('Forbidden: Tenant mismatch.');
     data = leadFields.parse(data);
+    if ((data as any).require_institute || data.institute_id !== undefined || data.institute_name !== undefined) {
+      const resolvedInst = resolveActiveInstitute({
+        institute_id: data.institute_id,
+        institute_name: data.institute_name,
+      });
+      data = { ...data, institute_id: resolvedInst.institute_id, institute_name: resolvedInst.institute_name };
+    }
     if (data.experience !== undefined && data.experience.trim() === '') {
       throw new Error('Experience is required and cannot be empty.');
     }
@@ -618,6 +628,13 @@ export async function updateLeadDetails(
   }
   const expectedUpdatedAt = (updates as any).expected_updated_at;
   updates = leadFields.partial().parse(updates);
+  if (updates.institute_id !== undefined || updates.institute_name !== undefined) {
+    const resolvedInst = resolveActiveInstitute({
+      institute_id: updates.institute_id,
+      institute_name: updates.institute_name,
+    });
+    updates = { ...updates, institute_id: resolvedInst.institute_id, institute_name: resolvedInst.institute_name };
+  }
   const lead = await authorizedLead(leadId, actor);
   if (expectedUpdatedAt !== undefined) {
     concurrencyGuard.assertVersionMatch(lead, expectedUpdatedAt);
@@ -710,6 +727,8 @@ export async function updateLeadDetails(
   if (updates.current_status !== undefined) lead.current_status = updates.current_status;
   if (updates.training_preference !== undefined) lead.training_preference = updates.training_preference;
   if (updates.lead_source !== undefined) lead.lead_source = updates.lead_source;
+  if (updates.institute_id !== undefined) lead.institute_id = updates.institute_id;
+  if (updates.institute_name !== undefined) lead.institute_name = updates.institute_name;
   if (updates.counsellor_id !== undefined) {
     if (updates.counsellor_id && updates.counsellor_id.trim() !== '') {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updates.counsellor_id.trim());

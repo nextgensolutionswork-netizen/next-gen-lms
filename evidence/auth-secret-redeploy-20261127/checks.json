@@ -1,0 +1,183 @@
+{
+  "checks": [
+    {
+      "name": "Public login loads",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Anonymous protected route /dashboard",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Anonymous protected route /admissions",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fadmissions",
+      "passed": true
+    },
+    {
+      "name": "Anonymous protected route /crm/leads",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fcrm%2Fleads",
+      "passed": true
+    },
+    {
+      "name": "Anonymous protected route /portal",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fportal",
+      "passed": true
+    },
+    {
+      "name": "Anonymous protected route /users",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fusers",
+      "passed": true
+    },
+    {
+      "name": "Anonymous protected route /accounts/payments",
+      "status": 307,
+      "location": "/login?redirectTo=%2Faccounts%2Fpayments",
+      "passed": true
+    },
+    {
+      "name": "Forged super_admin session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid super_admin cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged admin session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid admin cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged accountant session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid accountant cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged counsellor session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid counsellor cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged counsellor_lead session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid counsellor_lead cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged trainer session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid trainer cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged placement_coordinator session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid placement_coordinator cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged support session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid support cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged onboarding_team session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid onboarding_team cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Forged student session denied",
+      "status": 307,
+      "location": "/login?redirectTo=%2Fdashboard",
+      "passed": true
+    },
+    {
+      "name": "Invalid student cookie does not crash login",
+      "status": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Anonymous admissions API denied",
+      "status": 401,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "Browser login form renders",
+      "passed": true
+    },
+    {
+      "name": "Browser login runtime errors",
+      "passed": true,
+      "errors": []
+    }
+  ],
+  "passed": 30,
+  "failed": 0
+}

@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
       team_id: request.nextUrl.searchParams.get('team_id') || undefined,
       training_preference: request.nextUrl.searchParams.get('training_preference') || undefined,
       lead_source: request.nextUrl.searchParams.get('lead_source') || undefined,
-    }, actor);
+      institute_id: request.nextUrl.searchParams.get('institute_id') || undefined,
+    } as any, actor);
     return NextResponse.json({ success: true, leads }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (err: any) {
     return failure(err);

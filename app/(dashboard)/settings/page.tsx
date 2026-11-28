@@ -24,7 +24,8 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { validatePhoneNumber, parseStoredPhone } from '@/lib/utils/phone-validation';
 import { store } from '@/lib/services/data-store';
-import { SystemSettings, AuthorizedBankAccount } from '@/types';
+import { SystemSettings, AuthorizedBankAccount, InstituteBrand } from '@/types';
+import { getInstitutes } from '@/lib/services/institute-service';
 import { isLiveSupabaseEnabled } from '@/lib/supabase/db';
 import { syncStoreToSupabase, SeedSyncResult } from '@/lib/supabase/seeder';
 import { syncPostgresToLocal } from '@/lib/supabase/sync-service';
@@ -105,6 +106,112 @@ export default function SettingsPage() {
   const [selectedPresetId, setSelectedPresetId] = React.useState<string>('bank-acc-01');
   const [bankActionMsg, setBankActionMsg] = React.useState<string | null>(null);
   const [isBankActionLoading, setIsBankActionLoading] = React.useState(false);
+
+  // Institute Master State
+  const [institutes, setInstitutes] = React.useState<InstituteBrand[]>(() => getInstitutes());
+  const [newInstituteName, setNewInstituteName] = React.useState('');
+  const [newInstituteCode, setNewInstituteCode] = React.useState('');
+  const [newInstituteTagline, setNewInstituteTagline] = React.useState('');
+  const [editingInstituteId, setEditingInstituteId] = React.useState<string | null>(null);
+  const [editingInstituteName, setEditingInstituteName] = React.useState('');
+  const [editingInstituteTagline, setEditingInstituteTagline] = React.useState('');
+  const [instituteMsg, setInstituteMsg] = React.useState<string | null>(null);
+  const [isInstituteBusy, setIsInstituteBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    fetch('/api/settings/institutes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (active && data.success && Array.isArray(data.institutes)) {
+          setInstitutes(data.institutes);
+        }
+      })
+      .catch(() => {
+        if (active) setInstitutes(getInstitutes());
+      });
+    return () => { active = false; };
+  }, []);
+
+  const handleAddInstitute = async () => {
+    if (!newInstituteName.trim()) return;
+    setIsInstituteBusy(true);
+    setInstituteMsg(null);
+    try {
+      const res = await fetch('/api/settings/institutes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          name: newInstituteName.trim(),
+          code: newInstituteCode.trim() || undefined,
+          tagline: newInstituteTagline.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to add institute.');
+      setInstitutes(data.institutes || []);
+      setNewInstituteName('');
+      setNewInstituteCode('');
+      setNewInstituteTagline('');
+      setInstituteMsg(`Added institute "${data.institute.name}".`);
+    } catch (err: any) {
+      setInstituteMsg(err.message || 'Failed to add institute.');
+    } finally {
+      setIsInstituteBusy(false);
+    }
+  };
+
+  const handleSaveInstituteEdit = async (id: string) => {
+    if (!editingInstituteName.trim()) return;
+    setIsInstituteBusy(true);
+    setInstituteMsg(null);
+    try {
+      const res = await fetch('/api/settings/institutes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          id,
+          name: editingInstituteName.trim(),
+          tagline: editingInstituteTagline.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update institute.');
+      setInstitutes(data.institutes || []);
+      setEditingInstituteId(null);
+      setInstituteMsg(`Updated institute "${data.institute.name}".`);
+    } catch (err: any) {
+      setInstituteMsg(err.message || 'Failed to update institute.');
+    } finally {
+      setIsInstituteBusy(false);
+    }
+  };
+
+  const handleToggleInstituteActive = async (inst: InstituteBrand) => {
+    setIsInstituteBusy(true);
+    setInstituteMsg(null);
+    try {
+      const res = await fetch('/api/settings/institutes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_status',
+          id: inst.id,
+          is_active: !inst.is_active,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update status.');
+      setInstitutes(data.institutes || []);
+      setInstituteMsg(`${data.institute.name} is now ${data.institute.is_active ? 'Active' : 'Inactive'}.`);
+    } catch (err: any) {
+      setInstituteMsg(err.message || 'Failed to update status.');
+    } finally {
+      setIsInstituteBusy(false);
+    }
+  };
 
   const reloadBankAccounts = React.useCallback(async () => {
     try {
@@ -984,6 +1091,150 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Institute Master Configuration */}
+        <Card className="shadow-xs">
+          <CardHeader className="pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Building className="h-4 w-4 text-[#0A6ED1]" />
+                <CardTitle className="text-sm">Institute Master (Brands &amp; Divisions)</CardTitle>
+              </div>
+              <Badge variant="outline" className="text-[10px]">
+                {institutes.filter((i) => i.is_active !== false).length} Active
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-4 text-xs">
+            <p className="text-slate-500 text-[11px]">
+              Configure active institutes/brands available in Lead Management and synchronized across Admissions, Onboarding, Students, Accounts, and Placement.
+            </p>
+            {instituteMsg && (
+              <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-medium">
+                {instituteMsg}
+              </div>
+            )}
+
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+              {institutes.map((inst) => (
+                <div key={inst.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white">
+                  {editingInstituteId === inst.id ? (
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input
+                        value={editingInstituteName}
+                        onChange={(e) => setEditingInstituteName(e.target.value)}
+                        placeholder="Institute Name"
+                      />
+                      <Input
+                        value={editingInstituteTagline}
+                        onChange={(e) => setEditingInstituteTagline(e.target.value)}
+                        placeholder="Tagline / Description"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900">{inst.name}</span>
+                        {inst.code && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                            {inst.code}
+                          </span>
+                        )}
+                        <Badge variant={inst.is_active !== false ? 'success' : 'secondary'} className="text-[10px]">
+                          {inst.is_active !== false ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      {inst.tagline && <p className="text-[11px] text-slate-500 mt-0.5">{inst.tagline}</p>}
+                    </div>
+                  )}
+
+                  {canManageSettings && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {editingInstituteId === inst.id ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="sap"
+                            size="sm"
+                            disabled={isInstituteBusy}
+                            onClick={() => handleSaveInstituteEdit(inst.id)}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingInstituteId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingInstituteId(inst.id);
+                              setEditingInstituteName(inst.name);
+                              setEditingInstituteTagline(inst.tagline || '');
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isInstituteBusy}
+                            onClick={() => handleToggleInstituteActive(inst)}
+                            className={inst.is_active !== false ? 'text-amber-700 border-amber-300' : 'text-emerald-700 border-emerald-300'}
+                          >
+                            {inst.is_active !== false ? 'Deactivate' : 'Activate'}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {canManageSettings && (
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 items-end">
+                <Input
+                  label="New Institute Name"
+                  placeholder="e.g. SAP Global"
+                  value={newInstituteName}
+                  onChange={(e) => setNewInstituteName(e.target.value)}
+                />
+                <Input
+                  label="Code (Optional)"
+                  placeholder="e.g. SAPGLB"
+                  value={newInstituteCode}
+                  onChange={(e) => setNewInstituteCode(e.target.value)}
+                />
+                <Input
+                  label="Tagline / Details"
+                  placeholder="Optional description"
+                  value={newInstituteTagline}
+                  onChange={(e) => setNewInstituteTagline(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="sap"
+                  size="sm"
+                  disabled={isInstituteBusy || !newInstituteName.trim()}
+                  onClick={handleAddInstitute}
+                >
+                  Add Institute
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

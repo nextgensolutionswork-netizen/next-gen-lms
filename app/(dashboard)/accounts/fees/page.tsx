@@ -29,6 +29,19 @@ import { exportFeeLedgerToExcel } from '@/lib/utils/excel-export';
 import { useAuth } from '@/components/providers/auth-provider';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import { adjustDiscontinuedStudentFee } from '@/lib/services/finance-service';
+import { computePaymentDueStatus, formatDateDDMMYYYY } from '@/lib/services/payment-entry-rules';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
+
+function getEffectiveFeeStatus(fa: StudentFeeAccount): string {
+  if (fa.status === 'Discontinued / Adjusted' || (fa.status as string) === 'Waived' || fa.discontinuation_record) {
+    return fa.status;
+  }
+  return computePaymentDueStatus({
+    outstandingAmount: fa.outstanding_amount,
+    paidAmount: fa.paid_amount,
+    nextDueDate: fa.next_due_date || fa.due_date,
+  });
+}
 
 function safeAmount(val: unknown): number {
   if (typeof val === 'number') {
@@ -64,6 +77,7 @@ export default function StudentFeesPage() {
     return '';
   });
   const [statusFilter, setStatusFilter] = React.useState('All');
+  const [instituteFilter, setInstituteFilter] = React.useState('All');
 
   // Discontinued Student Adjustment Modal State
   const [selectedFeeForDiscontinue, setSelectedFeeForDiscontinue] = React.useState<StudentFeeAccount | null>(null);
@@ -77,7 +91,10 @@ export default function StudentFeesPage() {
     store.reconcileDualLedgers();
     let list = [...(store.feeAccounts || [])];
     if (statusFilter !== 'All') {
-      list = list.filter((f) => f.status === statusFilter);
+      list = list.filter((f) => getEffectiveFeeStatus(f) === statusFilter || f.status === statusFilter);
+    }
+    if (instituteFilter !== 'All') {
+      list = list.filter((f) => matchesInstituteFilter(f, instituteFilter));
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -89,7 +106,7 @@ export default function StudentFeesPage() {
       );
     }
     setFeeAccounts(list);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, instituteFilter]);
 
   const handleOpenDiscontinue = (fa: StudentFeeAccount) => {
     setSelectedFeeForDiscontinue(fa);
@@ -273,9 +290,10 @@ export default function StudentFeesPage() {
             />
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <InstituteFilterDropdown value={instituteFilter} onChange={setInstituteFilter} />
             <span className="text-xs text-slate-500 font-medium">Status:</span>
-            {['All', 'Paid', 'Partially Paid', 'Unpaid', 'Overdue', 'Discontinued / Adjusted'].map((st) => (
+            {['All', 'Paid', 'Partially Paid', 'Due Today', 'Upcoming', 'Overdue', 'Unpaid', 'Discontinued / Adjusted'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -306,6 +324,7 @@ export default function StudentFeesPage() {
                   <th className="px-3.5 py-2.5">Net Payable</th>
                   <th className="px-3.5 py-2.5">Paid Amount</th>
                   <th className="px-3.5 py-2.5">Outstanding</th>
+                  <th className="px-3.5 py-2.5">Next Due Date</th>
                   <th className="px-3.5 py-2.5">Status</th>
                   <th className="px-3.5 py-2.5 text-right">Action</th>
                 </tr>
@@ -315,14 +334,17 @@ export default function StudentFeesPage() {
                   <TableSkeleton columns={9} rows={6} />
                 ) : feeAccounts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-3.5 py-8 text-center text-slate-400">
+                    <td colSpan={10} className="px-3.5 py-8 text-center text-slate-400">
                       <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-40 text-slate-400" />
                       <p className="font-semibold text-slate-600">No student fee accounts found</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">Try adjusting your search query or status filter.</p>
                     </td>
                   </tr>
                 ) : (
-                  feeAccounts.map((fa) => (
+                  feeAccounts.map((fa) => {
+                    const effectiveStatus = getEffectiveFeeStatus(fa);
+                    const dueDateStr = fa.outstanding_amount > 0 ? (fa.next_due_date || fa.due_date) : null;
+                    return (
                     <tr key={fa.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <Link
@@ -341,20 +363,25 @@ export default function StudentFeesPage() {
                       <td className="px-3.5 py-2.5 font-bold text-slate-900 whitespace-nowrap">{formatINR(safeAmount(fa.net_payable))}</td>
                       <td className="px-3.5 py-2.5 font-bold text-emerald-600 whitespace-nowrap">{formatINR(safeAmount(fa.paid_amount))}</td>
                       <td className="px-3.5 py-2.5 font-bold text-amber-600 whitespace-nowrap">{formatINR(safeAmount(fa.outstanding_amount))}</td>
+                      <td className="px-3.5 py-2.5 text-slate-700 whitespace-nowrap font-mono">
+                        {dueDateStr ? formatDateDDMMYYYY(dueDateStr) : '—'}
+                      </td>
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <Badge
                           variant={
-                            fa.status === 'Paid'
+                            effectiveStatus === 'Paid'
                               ? 'success'
-                              : fa.status === 'Discontinued / Adjusted'
+                              : effectiveStatus === 'Overdue'
+                              ? 'danger'
+                              : effectiveStatus === 'Discontinued / Adjusted'
                               ? 'outline'
                               : 'warning'
                           }
                           className={`whitespace-nowrap font-medium text-[11px] ${
-                            fa.status === 'Discontinued / Adjusted' ? 'border-amber-400 bg-amber-50 text-amber-800' : ''
+                            effectiveStatus === 'Discontinued / Adjusted' ? 'border-amber-400 bg-amber-50 text-amber-800' : ''
                           }`}
                         >
-                          {fa.status}
+                          {effectiveStatus}
                         </Badge>
                       </td>
                       <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
@@ -395,7 +422,8 @@ export default function StudentFeesPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
             </table>

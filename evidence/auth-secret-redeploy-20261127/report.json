@@ -1,0 +1,148 @@
+{
+  "date": "2026-11-27",
+  "deploymentId": "dpl_13b8b26ez5o3yg5j86ETZZwEEkLB",
+  "previousDeploymentId": "dpl_9wxdh3qD2izQM16KPwgrBuLDYyFX",
+  "commit": "3253efe650cdbbc3d2b420e5fb8d9e9464a95b57",
+  "source": "redeploy",
+  "target": "production",
+  "state": "READY",
+  "productionUrl": "https://next-gen-lms-omega.vercel.app",
+  "sameCommitVerified": true,
+  "build": {
+    "compile": "passed",
+    "typeScript": "passed",
+    "staticPages": "52/52",
+    "warning": "Webpack cache large-string serialization performance warning"
+  },
+  "changes": {
+    "applicationCode": 0,
+    "productionDatabaseOperations": 0,
+    "environmentVariableEdits": 0,
+    "additionalDeployments": 0,
+    "secretReadOrPrinted": false,
+    "paymentSubmissions": 0,
+    "emailsTriggered": 0,
+    "whatsAppTriggered": 0
+  },
+  "verification": {
+    "liveSmokePassed": 30,
+    "liveSmokeFailed": 0,
+    "authenticatedRoleTests": "PENDING",
+    "runtimeLogs": {
+      "deploymentScoped": true,
+      "level": [
+        "error",
+        "fatal"
+      ],
+      "queryTimeUTC": "2026-11-27T11:18:01.791Z",
+      "result": "No matching error/fatal logs"
+    },
+    "browserRuntimeErrors": 0
+  },
+  "roleMatrix": [
+    {
+      "role": "super_admin",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "admin",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "accountant",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "counsellor",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "counsellor_lead",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "trainer",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "placement_coordinator",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "support",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "onboarding_team",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    },
+    {
+      "role": "student",
+      "forgedCookieDenied": "PASS",
+      "invalidCookieLoginDoesNotCrash": "PASS",
+      "realLogin": "PENDING: approved production QA account required",
+      "logout": "PENDING",
+      "sessionPersistence": "PENDING",
+      "authorizedAndForbiddenRoleRoutes": "PENDING"
+    }
+  ],
+  "admissions": {
+    "anonymousPageDenied": "PASS",
+    "anonymousApiDenied": "PASS",
+    "studentAdmissionForm": "PENDING: QA session required",
+    "salesCounsellorDropdown": "PENDING: QA session required",
+    "submission": "NOT RUN: no production records may be changed"
+  },
+  "pendingIssues": [
+    "Approved existing production QA accounts and secure credential source are not identified; local credential list is not marked QA",
+    "Successful signed-session issuance, logout, session persistence and complete role authorization remain unverified",
+    "Admission form rendering and Sales counsellor dropdown remain unverified"
+  ],
+  "verdict": "Redeployment successful; verification incomplete pending QA access",
+  "safety": "No further deployments, environment edits or database changes made"
+}

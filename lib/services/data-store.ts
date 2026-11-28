@@ -60,6 +60,8 @@ import {
   OFFICIAL_INSTITUTE_PHONE,
   OFFICIAL_LOGO_PATH,
 } from '@/lib/constants/branding';
+import { DEFAULT_INSTITUTES } from '@/lib/constants/institutes';
+import type { InstituteBrand } from '@/types';
 
 // Default standard expense categories as per institutional requirements
 export const DEFAULT_EXPENSE_CATEGORIES: string[] = [
@@ -251,6 +253,7 @@ class InstituteDataStore {
         if (snapshot.studentRefunds?.length) this.studentRefunds = snapshot.studentRefunds;
         if (snapshot.studentFinancialLedgers?.length) this.studentFinancialLedgers = snapshot.studentFinancialLedgers;
         if (snapshot.financeSettings) this.financeSettings = snapshot.financeSettings;
+        if (Array.isArray((snapshot as any).institutes) && (snapshot as any).institutes.length > 0) this.institutes = (snapshot as any).institutes;
         if (snapshot.onboardingCases?.length) this.onboardingCases = snapshot.onboardingCases;
         if (snapshot.onboardingAuditLogs?.length) this.onboardingAuditLogs = snapshot.onboardingAuditLogs;
         this.reconcileAdmissionsAndStudents();
@@ -394,6 +397,8 @@ class InstituteDataStore {
           outstanding_amount: sf.outstanding_amount,
           payment_plan: sf.payment_plan,
           status: sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid'),
+          next_due_date: sf.next_due_date,
+          due_date: sf.next_due_date ?? undefined,
           created_at: sf.created_at,
           updated_at: sf.updated_at,
         };
@@ -413,6 +418,10 @@ class InstituteDataStore {
           !fa.discontinuation_record
         ) {
           fa.status = sf.outstanding_amount === 0 ? 'Paid' : (sf.paid_amount > 0 ? 'Partially Paid' : 'Unpaid');
+        }
+        if (sf.next_due_date !== undefined) {
+          fa.next_due_date = sf.next_due_date;
+          fa.due_date = sf.next_due_date;
         }
         fa.updated_at = sf.updated_at || new Date().toISOString();
       }
@@ -787,6 +796,7 @@ class InstituteDataStore {
   public persistSync(): boolean {
     return persistentStorage.saveState(this);
   }
+  public institutes: InstituteBrand[] = DEFAULT_INSTITUTES.map((i) => ({ ...i }));
   public settings: SystemSettings = {
     id: 'sys-01',
     institute_name: 'Next-Gen ERP Solutions',

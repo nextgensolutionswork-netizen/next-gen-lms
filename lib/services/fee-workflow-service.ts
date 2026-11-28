@@ -1,4 +1,9 @@
-import { actualPaymentDate, normalizePaymentFields, validatePaymentEntry } from './payment-entry-rules';
+import {
+  actualPaymentDate,
+  normalizePaymentFields,
+  validateNextDueDate,
+  validatePaymentEntry,
+} from './payment-entry-rules';
 import { validateManualPaymentVerification, type ManualPaymentVerification } from './manual-payment-verification';
 import { getAuthorizedBankAccounts } from '@/lib/utils/bank-autofill';
 import { store } from './data-store';
@@ -919,6 +924,7 @@ export class FeeWorkflowService {
       amount_paid: number;
       payment_mode: PaymentMethod;
       payment_date?: string;
+      next_due_date?: string | null;
       transaction_reference?: string | null;
       bank_upi_reference?: string;
       payment_proof_url?: string;
@@ -981,6 +987,15 @@ export class FeeWorkflowService {
     const recorderName = recorderUser?.full_name || 'Staff User';
     const now = new Date().toISOString();
     const paymentDate = input.payment_date || actualPaymentDate();
+    const remainingAfterPayment = Math.max(0, Number((fee.outstanding_amount - amountPaid).toFixed(2)));
+    const validatedNextDueDate =
+      'next_due_date' in input
+        ? validateNextDueDate({
+            nextDueDate: input.next_due_date,
+            paymentDate,
+            remainingOutstanding: remainingAfterPayment,
+          })
+        : undefined;
 
     // Manual entries are cleared only by a separate Accounts decision.
 
@@ -1014,6 +1029,8 @@ export class FeeWorkflowService {
 
     const paymentRecord: StudentPaymentRecord = {
       tenant_id: tenantId(recorder),
+      institute_id: fee.institute_id ?? student.institute_id ?? matchedAdmission?.institute_id ?? null,
+      institute_name: fee.institute_name ?? student.institute_name ?? matchedAdmission?.institute_name ?? null,
       status: 'Pending Approval',
       enrollment_id: enrollmentId,
       idempotency_key: input.idempotency_key,
@@ -1031,6 +1048,7 @@ export class FeeWorkflowService {
       fee_category: fee.fee_category,
       amount_paid: amountPaid,
       payment_date: paymentDate,
+      ...(validatedNextDueDate !== undefined ? { next_due_date: validatedNextDueDate } : {}),
       payment_mode: input.payment_mode,
       transaction_reference: input.transaction_reference,
       bank_upi_reference: input.bank_upi_reference,
@@ -1071,6 +1089,7 @@ export class FeeWorkflowService {
       amount_paid?: number;
       payment_mode?: PaymentMethod;
       payment_date?: string;
+      next_due_date?: string | null;
       transaction_reference?: string | null;
       bank_upi_reference?: string;
       payment_proof_url?: string;
@@ -1129,6 +1148,14 @@ export class FeeWorkflowService {
     }
     if (updates.payment_date) {
       payment.payment_date = updates.payment_date;
+    }
+    if ('next_due_date' in updates) {
+      const remainingAfterUpdate = Math.max(0, Number((fee.outstanding_amount - payment.amount_paid).toFixed(2)));
+      payment.next_due_date = validateNextDueDate({
+        nextDueDate: updates.next_due_date,
+        paymentDate: payment.payment_date,
+        remainingOutstanding: remainingAfterUpdate,
+      });
     }
     if (updates.transaction_reference !== undefined) {
       payment.transaction_reference = updates.transaction_reference;
@@ -1460,6 +1487,66 @@ export class FeeWorkflowService {
       student.updated_at = now;
     }
 
+    // 1e. Synchronize Next Payment Due Date & Audit Trail
+    const previousDueDate = fee.next_due_date || fee.first_due_date || null;
+    payment.previous_due_date = previousDueDate;
+    const linkedAdmission = (store.admissions || []).find(
+      (a) =>
+        a.id === fee.enrollment_id ||
+        (student?.admission_id && a.id === student.admission_id) ||
+        (fee.admission_number && a.admission_number === fee.admission_number)
+    );
+    if (fee.outstanding_amount <= 0) {
+      fee.next_due_date = null;
+      if (feeAccount) {
+        feeAccount.next_due_date = null;
+        feeAccount.due_date = null;
+      }
+      if (linkedAdmission) {
+        linkedAdmission.fee_due_date = undefined;
+      }
+      if (previousDueDate) {
+        if (!store.auditLogs) store.auditLogs = [];
+        store.auditLogs.unshift({
+          id: `audit-due-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          tenant_id: tenantId(fee),
+          user_id: verifierUserId,
+          user_name: verifierName,
+          user_role: 'accountant',
+          action: 'PAYMENT_DUE_DATE_UPDATED',
+          module: 'Finance',
+          record_id: fee.id,
+          old_value: { next_due_date: previousDueDate },
+          new_value: { next_due_date: null, payment_id: payment.id, reason: 'Paid in full' },
+          created_at: now,
+        });
+      }
+    } else if (payment.next_due_date) {
+      fee.next_due_date = payment.next_due_date;
+      fee.first_due_date = payment.next_due_date;
+      if (feeAccount) {
+        feeAccount.next_due_date = payment.next_due_date;
+        feeAccount.due_date = payment.next_due_date;
+      }
+      if (linkedAdmission) {
+        linkedAdmission.fee_due_date = payment.next_due_date;
+      }
+      if (!store.auditLogs) store.auditLogs = [];
+      store.auditLogs.unshift({
+        id: `audit-due-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        tenant_id: tenantId(fee),
+        user_id: verifierUserId,
+        user_name: verifierName,
+        user_role: 'accountant',
+        action: 'PAYMENT_DUE_DATE_UPDATED',
+        module: 'Finance',
+        record_id: fee.id,
+        old_value: { next_due_date: previousDueDate },
+        new_value: { next_due_date: payment.next_due_date, payment_id: payment.id },
+        created_at: now,
+      });
+    }
+
     // 2. Generate Official Receipt with monotonic collision-proof sequence (B10)
     const receiptYear = new Date().getFullYear();
     const receiptPrefix = `REC-${receiptYear}-`;
@@ -1484,6 +1571,7 @@ export class FeeWorkflowService {
 
     const receipt = {
       tenant_id: tenantId(fee),
+      institute_id: payment.institute_id ?? fee.institute_id ?? student?.institute_id ?? null,
       id: `rcpt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       receipt_number: receiptNumber,
       payment_id: payment.id,
@@ -2020,6 +2108,39 @@ export class FeeWorkflowService {
       student.paid_amount = Math.max(0, Number(((student.paid_amount || 0) - reverseAmount).toFixed(2)));
       student.outstanding_amount = Number(((student.outstanding_amount || 0) + reverseAmount).toFixed(2));
       student.updated_at = now;
+    }
+
+    if (fee && fee.outstanding_amount > 0 && studentPayment?.previous_due_date) {
+      const priorDue = fee.next_due_date ?? null;
+      fee.next_due_date = studentPayment.previous_due_date;
+      fee.first_due_date = studentPayment.previous_due_date;
+      if (feeAccount) {
+        feeAccount.next_due_date = studentPayment.previous_due_date;
+        feeAccount.due_date = studentPayment.previous_due_date;
+      }
+      const linkedAdmission = (store.admissions || []).find(
+        (a) =>
+          a.id === fee.enrollment_id ||
+          (student?.admission_id && a.id === student.admission_id) ||
+          (fee.admission_number && a.admission_number === fee.admission_number)
+      );
+      if (linkedAdmission) {
+        linkedAdmission.fee_due_date = studentPayment.previous_due_date;
+      }
+      if (!store.auditLogs) store.auditLogs = [];
+      store.auditLogs.unshift({
+        id: `audit-due-rev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        tenant_id: tenantId(fee),
+        user_id: accountantUserId,
+        user_name: accountantName,
+        user_role: 'accountant',
+        action: 'PAYMENT_DUE_DATE_UPDATED',
+        module: 'Finance',
+        record_id: fee.id,
+        old_value: { next_due_date: priorDue },
+        new_value: { next_due_date: studentPayment.previous_due_date, credit_note: creditNoteNumber, reason: 'Payment reversed' },
+        created_at: now,
+      });
     }
 
     // 3. Reconcile Linked Installment (G06 fix)

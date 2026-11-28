@@ -54,6 +54,9 @@ import {
   EligibleCounsellorOption,
 } from '@/lib/services/counsellor-service';
 import { tenantId } from '@/lib/auth/tenant';
+import { getInstitutes } from '@/lib/services/institute-service';
+import { formatInstituteLabel } from '@/lib/constants/institutes';
+import type { InstituteBrand } from '@/types';
 import { formatDate, exportToCSV } from '@/lib/utils/formatters';
 import {
   validatePhoneNumber,
@@ -111,6 +114,25 @@ export default function LeadsPage() {
   const [selectedStage, setSelectedStage] = React.useState<string>('All');
   const [selectedTrainingMode, setSelectedTrainingMode] = React.useState<string>('All');
   const [selectedSource, setSelectedSource] = React.useState<string>('All');
+  const [selectedInstituteFilter, setSelectedInstituteFilter] = React.useState<string>('All');
+  const [activeInstitutes, setActiveInstitutes] = React.useState<InstituteBrand[]>(() => getInstitutes({ activeOnly: true }));
+  const [instituteId, setInstituteId] = React.useState<string>('');
+  const [instituteError, setInstituteError] = React.useState<string>('');
+
+  React.useEffect(() => {
+    let active = true;
+    fetch('/api/settings/institutes?active_only=true')
+      .then((r) => r.json())
+      .then((d) => {
+        if (active && d?.success && Array.isArray(d.institutes)) {
+          setActiveInstitutes(d.institutes);
+        }
+      })
+      .catch(() => {
+        if (active) setActiveInstitutes(getInstitutes({ activeOnly: true }));
+      });
+    return () => { active = false; };
+  }, []);
   const [summary, setSummary] = React.useState<any>(null);
   const visibleSummary = summary?.owner === user?.id ? summary : null;
 
@@ -121,6 +143,7 @@ export default function LeadsPage() {
       stage: selectedStage,
       training_preference: selectedTrainingMode === 'All' ? '' : selectedTrainingMode,
       lead_source: selectedSource === 'All' ? '' : selectedSource,
+      institute_id: selectedInstituteFilter === 'All' ? '' : selectedInstituteFilter,
       created_by: creatorFilter,
       counsellor_id: salespersonFilter,
       course_id: courseFilter,
@@ -156,6 +179,7 @@ export default function LeadsPage() {
     selectedStage,
     selectedTrainingMode,
     selectedSource,
+    selectedInstituteFilter,
   ]);
   const scopeLabel = role === 'counsellor' ? 'My' : role === 'counsellor_lead' ? 'My Team' : 'All';
   const [isLoading, setIsLoading] = React.useState(true);
@@ -236,6 +260,7 @@ export default function LeadsPage() {
     const exportData = leads.map((l) => ({
       'Lead Code': l.lead_code,
       'Full Name': l.full_name,
+      'Institute': formatInstituteLabel(l.institute_name),
       'Country Code': l.country_code || '+91',
       'Phone': l.phone,
       'WhatsApp Country Code': l.whatsapp_country_code || l.country_code || '+91',
@@ -516,7 +541,11 @@ export default function LeadsPage() {
         rows: fetched.filter(
           (l) =>
             (selectedTrainingMode === 'All' || l.training_preference === selectedTrainingMode) &&
-            (selectedSource === 'All' || l.lead_source === selectedSource)
+            (selectedSource === 'All' || l.lead_source === selectedSource) &&
+            (selectedInstituteFilter === 'All' ||
+              (selectedInstituteFilter === 'unassigned'
+                ? !l.institute_id && !l.institute_name
+                : l.institute_id === selectedInstituteFilter || l.institute_name === selectedInstituteFilter))
         ),
       });
     } catch {
@@ -529,6 +558,7 @@ export default function LeadsPage() {
     selectedStage,
     selectedTrainingMode,
     selectedSource,
+    selectedInstituteFilter,
     user,
     creatorFilter,
     salespersonFilter,
@@ -661,6 +691,12 @@ export default function LeadsPage() {
       return;
     }
 
+    if (!instituteId) {
+      setInstituteError('Please select a valid active Institute / Brand.');
+      return;
+    }
+    setInstituteError('');
+
     if (!experience || !experience.trim()) {
       setExperienceError('Experience is required.');
       return;
@@ -668,6 +704,7 @@ export default function LeadsPage() {
     setExperienceError('');
 
     const expYears = experience === 'Fresher' ? 0 : experience === '0–2 Years' ? 1 : experience === '2–5 Years' ? 3 : 5;
+    const chosenInstitute = activeInstitutes.find((inst) => inst.id === instituteId);
 
     try {
       await createLead({
@@ -677,6 +714,9 @@ export default function LeadsPage() {
         whatsapp_country_code: finalWaCountry,
         whatsapp_number: finalWaNumber.trim(),
         email: email.trim(),
+        institute_id: instituteId,
+        institute_name: chosenInstitute?.name,
+        require_institute: true,
         interested_course_id: courseId,
         current_status: currentStatus,
         experience: experience.trim(),
@@ -691,6 +731,8 @@ export default function LeadsPage() {
       });
 
       setIsAddModalOpen(false);
+      setInstituteId('');
+      setInstituteError('');
       setFullName('');
       setPhone('');
       setPhoneError('');
@@ -982,6 +1024,8 @@ export default function LeadsPage() {
         payment_plan: 'Full Payment',
         counsellor_id: assignedCounsellorId,
         lead_id: selectedLead.id,
+        institute_id: selectedLead.institute_id || undefined,
+        institute_name: selectedLead.institute_name || undefined,
       });
 
       setIsConvertModalOpen(false);
@@ -1169,6 +1213,45 @@ export default function LeadsPage() {
                 ))}
               </select>
             </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500 font-medium">Institute:</span>
+              <select
+                value={selectedInstituteFilter}
+                onChange={(e) => setSelectedInstituteFilter(e.target.value)}
+                className="text-xs bg-white border border-slate-200 rounded px-2 py-1 text-slate-700"
+              >
+                <option value="All">All Institutes</option>
+                {activeInstitutes.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.name}
+                  </option>
+                ))}
+                <option value="unassigned">{formatInstituteLabel(null)}</option>
+              </select>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearch('');
+                setSelectedStage('All');
+                setSelectedTrainingMode('All');
+                setSelectedSource('All');
+                setSelectedInstituteFilter('All');
+                setCreatorFilter('');
+                setSalespersonFilter('');
+                setCourseFilter('');
+                setTeamFilter('');
+                setDateFrom('');
+                setDateTo('');
+              }}
+              className="text-xs h-7 px-2.5"
+            >
+              Reset Filters
+            </Button>
           </div>
         </div>
       </Card>
@@ -1259,6 +1342,7 @@ export default function LeadsPage() {
                     />
                   </th>
                   <th className="px-3.5 py-2.5">Candidate</th>
+                  <th className="px-3.5 py-2.5">Institute</th>
                   <th className="px-3.5 py-2.5">Contact</th>
                   <th className="px-3.5 py-2.5">Interested Course</th>
                   <th className="px-3.5 py-2.5">Mode & Source</th>
@@ -1269,10 +1353,10 @@ export default function LeadsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
-                  <TableSkeleton columns={8} rows={6} />
+                  <TableSkeleton columns={9} rows={6} />
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3.5 py-8 text-center text-slate-400">
+                    <td colSpan={9} className="px-3.5 py-8 text-center text-slate-400">
                       <p className="font-semibold text-slate-600">No leads found</p>
                       <p className="text-xs text-slate-400 mt-1">
                         {search || selectedStage !== 'All'
@@ -1307,6 +1391,14 @@ export default function LeadsPage() {
                           <p className="text-[11px] text-slate-500 mt-0.5">
                             {lead.current_status || 'Working Professional'}
                           </p>
+                        </td>
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                          <Badge
+                            variant={lead.institute_name ? 'outline' : 'secondary'}
+                            className="text-[11px] font-medium"
+                          >
+                            {formatInstituteLabel(lead.institute_name)}
+                          </Badge>
                         </td>
                         <td className="px-3.5 py-2.5 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 text-xs">
@@ -1486,7 +1578,22 @@ export default function LeadsPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" form="create-lead-form" variant="sap" size="sm" disabled={Boolean(phoneError || whatsappError)}>
+            <Button
+              type="submit"
+              form="create-lead-form"
+              variant="sap"
+              size="sm"
+              disabled={Boolean(
+                phoneError ||
+                  whatsappError ||
+                  !instituteId ||
+                  !fullName.trim() ||
+                  !phone.trim() ||
+                  !email.trim() ||
+                  !courseId ||
+                  !experience
+              )}
+            >
               Create Lead
             </Button>
           </div>
@@ -1567,6 +1674,33 @@ export default function LeadsPage() {
               required
             />
             {emailError && <p className="text-xs text-rose-500 font-medium mt-1">{emailError}</p>}
+          </div>
+
+          <div>
+            <label
+              htmlFor="create-lead-institute"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1"
+            >
+              Institute / Brand *
+            </label>
+            <select
+              id="create-lead-institute"
+              value={instituteId}
+              onChange={(e) => {
+                setInstituteId(e.target.value);
+                if (instituteError) setInstituteError('');
+              }}
+              required
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-[#0A6ED1] focus:outline-none"
+            >
+              <option value="">Select Institute</option>
+              {activeInstitutes.map((inst) => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.name}
+                </option>
+              ))}
+            </select>
+            {instituteError && <p className="text-xs text-rose-500 font-medium mt-1">{instituteError}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

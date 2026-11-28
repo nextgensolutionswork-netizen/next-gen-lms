@@ -114,10 +114,25 @@ export type LeadCurrentStatus =
   | 'Working Professional'
   | 'Experienced + Career Gap';
 
+export interface InstituteBrand {
+  id: string;
+  name: string;
+  code?: string;
+  is_active: boolean;
+  tagline?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Lead {
   id: string;
   created_by?: string | null;
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   lead_code: string;
   full_name: string;
   country_code?: string;
@@ -169,6 +184,8 @@ export type AdmissionStatus =
 
 export interface Admission {
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   admission_number: string;
   student_unique_id?: string;
@@ -219,6 +236,8 @@ export interface Admission {
 export interface Student {
   onboarding_required?: boolean;
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   user_id: string;
   admission_id: string;
@@ -529,6 +548,8 @@ export interface FeeDiscontinuationRecord {
 
 export interface StudentFeeAccount {
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   student_id: string;
   student_name?: string;
@@ -543,6 +564,8 @@ export interface StudentFeeAccount {
   outstanding_amount: number;
   payment_plan: string;
   status: FeeStatus;
+  next_due_date?: string | null;
+  due_date?: string | null;
   discontinuation_record?: FeeDiscontinuationRecord;
   created_at: string;
   updated_at: string;
@@ -641,6 +664,8 @@ export type PaymentMethod =
 
 export interface Payment {
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   receipt_number: string;
   student_id: string;
@@ -672,6 +697,7 @@ export interface Payment {
 
 export interface Receipt {
   tenant_id?: string;
+  institute_id?: string | null;
   id: string;
   receipt_number: string;
   payment_id: string;
@@ -861,6 +887,8 @@ export type JobApplicationStatus =
   | 'Withdrawn';
 
 export interface JobApplication {
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   job_id: string;
   job_title?: string;
@@ -1183,6 +1211,9 @@ export interface PlacementDeclaration {
 }
 
 export interface PlacementEnrollment {
+  tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   student_id: string;
   student_name: string;
@@ -1380,6 +1411,8 @@ export interface StudentFee {
   invoice_approved_amount?: number;
   enrollment_id?: string;
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   student_id: string;
   student_name: string;
@@ -1411,6 +1444,7 @@ export interface StudentFee {
   payment_plan: 'Full Payment' | '2 Installments' | '3 Installments' | 'Custom';
   number_of_installments: number;
   first_due_date: string;
+  next_due_date?: string | null;
 
   counsellor_id: string;
   counsellor_name: string;
@@ -1496,6 +1530,8 @@ export interface StudentPaymentRecord {
   rejected_by?: string;
   rejected_at?: string;
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   fee_id: string;
   installment_id?: string;
@@ -1510,6 +1546,8 @@ export interface StudentPaymentRecord {
   fee_category: string;
   amount_paid: number;
   payment_date: string;
+  next_due_date?: string | null;
+  previous_due_date?: string | null;
   payment_mode: PaymentMethod;
   transaction_reference?: string | null;
   bank_upi_reference?: string;
@@ -1680,6 +1718,8 @@ export interface OnboardingAuditEvent {
 
 export interface OnboardingCase {
   tenant_id?: string;
+  institute_id?: string | null;
+  institute_name?: string | null;
   id: string;
   case_number: string;
   admission_id: string;

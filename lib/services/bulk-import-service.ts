@@ -1,4 +1,5 @@
 import { cachedLeads } from './lead-cache';
+import { getInstitutes } from './institute-service';
 import { createLead } from './crm-service';
 import { store } from './data-store';
 import {
@@ -503,6 +504,29 @@ export function validateLeadRows(
     ) || (store.courses && store.courses.length > 0 ? store.courses[0] : undefined);
 
     const expYears = parseInt(experienceRaw, 10) || 0;
+
+    // 5. Institute validation (if provided in CSV)
+    const rawInstitute = (data.institute || data.institute_name || data.brand || '').trim();
+    let matchedInstituteId: string | undefined;
+    let matchedInstituteName: string | undefined;
+    if (rawInstitute) {
+      const activeInstitutes = getInstitutes({ activeOnly: true });
+      const instMatch = activeInstitutes.find(
+        (i) =>
+          i.id.toLowerCase() === rawInstitute.toLowerCase() ||
+          i.name.trim().toLowerCase() === rawInstitute.toLowerCase() ||
+          (i.code && i.code.trim().toLowerCase() === rawInstitute.toLowerCase())
+      );
+      if (!instMatch) {
+        rowErrors.push(
+          `Invalid or inactive institute "${rawInstitute}". Active options: ${activeInstitutes.map((i) => i.name).join(', ')}`
+        );
+      } else {
+        matchedInstituteId = instMatch.id;
+        matchedInstituteName = instMatch.name;
+      }
+    }
+
     const isValid = rowErrors.length === 0;
 
     previewRows.push({
@@ -511,6 +535,8 @@ export function validateLeadRows(
         full_name: fullName,
         email,
         phone,
+        institute_id: matchedInstituteId,
+        institute_name: matchedInstituteName,
         interested_course_id: course?.id,
         interested_course_name: course?.course_name,
         lead_source: leadSource,
@@ -868,6 +894,8 @@ export async function executeBulkImport(
         full_name: d.full_name,
         phone: d.phone,
         email: d.email,
+        institute_id: d.institute_id,
+        institute_name: d.institute_name,
         interested_course_id: d.interested_course_id,
         interested_course_name: d.interested_course_name,
         current_status: 'Imported Prospect',
@@ -976,9 +1004,9 @@ export function generateCsvTemplate(entityType: BulkImportEntityType): string {
 
     case 'leads':
       return [
-        'full_name,email,phone,course_code,lead_source,stage,experience_years,notes',
-        'Manish Mehta,manish.m@gmail.com,+91 98888 11111,crs-fico-01,Google Ads,New,3,"Interested in weekend SAP FICO fast-track batch"',
-        'Pooja Nair,pooja.nair@yahoo.com,+91 98888 22222,crs-mm-01,Meta Ads,Contacted,1,"Working in procurement, wants S/4HANA upgrade"',
+        'full_name,email,phone,institute,course_code,lead_source,stage,experience_years,notes',
+        'Manish Mehta,manish.m@gmail.com,+91 98888 11111,MyERP Hub,crs-fico-01,Google Ads,New,3,"Interested in weekend SAP FICO fast-track batch"',
+        'Pooja Nair,pooja.nair@yahoo.com,+91 98888 22222,NextGen,crs-mm-01,Meta Ads,Contacted,1,"Working in procurement, wants S/4HANA upgrade"',
       ].join('\n');
 
     case 'attendance':

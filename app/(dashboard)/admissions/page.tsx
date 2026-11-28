@@ -1,5 +1,11 @@
 'use client';
 import Image from 'next/image';
+import { PaymentReferenceField } from '@/components/ui/payment-reference-input';
+import {
+  findPotentialDuplicatePayments,
+  isValidPaymentReference,
+  PAYMENT_REFERENCE_ERROR,
+} from '@/lib/services/payment-entry-rules';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -37,6 +43,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Modal } from '@/components/ui/modal';
+import { InstituteFilterDropdown, matchesInstituteFilter } from '@/components/ui/institute-filter-dropdown';
 import { store } from '@/lib/services/data-store';
 import { Admission, AdmissionStatus, PaymentMethod, Receipt, Course } from '@/types';
 import { createAdmissionWorkflow, getAdmissions, validateFeeDueDate } from '@/lib/services/admission-service';
@@ -89,6 +96,7 @@ export default function AdmissionsPage() {
   const [loadError, setLoadError] = React.useState<AdmissionsErrorInfo | null>(null);
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('All');
+  const [instituteFilter, setInstituteFilter] = React.useState<string>('All');
   const [isNewModalOpen, setIsNewModalOpen] = React.useState(false);
 
   const requestGenerationRef = React.useRef(0);
@@ -108,8 +116,11 @@ export default function AdmissionsPage() {
   }, []);
 
   const admissions = React.useMemo(
-    () => filterAdmissions(allAdmissions, { search, statusFilter }),
-    [allAdmissions, search, statusFilter]
+    () =>
+      filterAdmissions(allAdmissions, { search, statusFilter }).filter((a) =>
+        matchesInstituteFilter(a, instituteFilter)
+      ),
+    [allAdmissions, search, statusFilter, instituteFilter]
   );
   const hasActiveFilters = Boolean(search.trim() || statusFilter !== 'All');
 
@@ -654,6 +665,12 @@ export default function AdmissionsPage() {
     }
     setCounsellorError('');
 
+    if (collectInitialPayment && initialPaymentAmount > 0 && initialPaymentMode !== 'Cash' && !isValidPaymentReference(initialPaymentRef)) {
+      alert(PAYMENT_REFERENCE_ERROR);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const result = await paymentWorkflowClient.createAdmission({
         student_name: name,
@@ -916,6 +933,7 @@ export default function AdmissionsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 max-w-full">
+            <InstituteFilterDropdown value={instituteFilter} onChange={setInstituteFilter} />
             <span className="text-xs text-slate-500 font-medium">Status:</span>
             {['All', 'Confirmed', 'Active', 'Completed', 'On Hold'].map((st) => (
               <button
@@ -1704,13 +1722,19 @@ export default function AdmissionsPage() {
                     </div>
 
                     <Input label="Actual Payment Date *" type="date" value={initialPaymentDate} onChange={(e) => setInitialPaymentDate(e.target.value)} required={collectInitialPayment} />
-                    {initialPaymentMode !== 'Cash' && <Input
-                      required={collectInitialPayment}
-                      label="Transaction / Cheque / UTR Ref #"
-                      placeholder="e.g. UTR-9823419082 or Cheque #123456"
-                      value={initialPaymentRef}
-                      onChange={(e) => setInitialPaymentRef(e.target.value)}
-                    />}
+                    {initialPaymentMode !== 'Cash' && (
+                      <PaymentReferenceField
+                        id="admission-initial-payment-ref"
+                        required={collectInitialPayment}
+                        value={initialPaymentRef}
+                        onChange={setInitialPaymentRef}
+                        duplicatePayments={findPotentialDuplicatePayments(store.studentPayments || [], {
+                          reference: initialPaymentRef,
+                          amount: initialPaymentAmount,
+                          paymentDate: initialPaymentDate,
+                        })}
+                      />
+                    )}
                   </div>
 
                   {initialPaymentMode !== 'Cash' && (
