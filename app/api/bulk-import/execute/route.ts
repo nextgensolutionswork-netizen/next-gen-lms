@@ -4,6 +4,7 @@ import {
   BulkImportEntityType,
 } from '@/lib/services/bulk-import-service';
 import { authenticateApiRequest } from '@/lib/auth/server-session';
+import { store } from '@/lib/services/data-store';
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    store.hydrateFromDisk();
     const result = await executeBulkImport(entityType, csvContent, userId, userName, {
       skipInvalidRows,
     }, auth.user);

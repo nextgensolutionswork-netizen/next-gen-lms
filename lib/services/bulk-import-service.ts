@@ -509,30 +509,32 @@ export function validateLeadRows(
           c.course_name.toLowerCase().includes(cleanCourseRef.toLowerCase())
       );
       if (!course) {
-        rowErrors.push(
-          `Invalid course "${cleanCourseRef}". Course must match an active course in Course Master.`
-        );
+        const msg = `Invalid course "${cleanCourseRef}". Course must match an active course in Course Master.`;
+        rowErrors.push(msg);
+        errors.push({ rowNumber, field: 'course_code', message: msg, value: cleanCourseRef, severity: 'error' });
       }
     }
 
     const expYears = parseInt(experienceRaw, 10) || 0;
 
     // 5. Institute validation (if provided in CSV)
-    const rawInstitute = (data.institute || data.institute_name || data.brand || '').trim();
+    const rawInstitute = (data.institute || data.institute_name || data.institute_id || data.brand || '').trim();
     let matchedInstituteId: string | undefined;
     let matchedInstituteName: string | undefined;
     if (rawInstitute) {
       const activeInstitutes = getInstitutes({ activeOnly: true });
+      const normalizeInst = (v: string) => v.trim().toLowerCase().replace(/\s+/g, '');
+      const normalizedRawInst = normalizeInst(rawInstitute);
       const instMatch = activeInstitutes.find(
         (i) =>
           i.id.toLowerCase() === rawInstitute.toLowerCase() ||
-          i.name.trim().toLowerCase() === rawInstitute.toLowerCase() ||
-          (i.code && i.code.trim().toLowerCase() === rawInstitute.toLowerCase())
+          normalizeInst(i.name) === normalizedRawInst ||
+          (i.code && normalizeInst(i.code) === normalizedRawInst)
       );
       if (!instMatch) {
-        rowErrors.push(
-          `Invalid or inactive institute "${rawInstitute}". Active options: ${activeInstitutes.map((i) => i.name).join(', ')}`
-        );
+        const msg = `Invalid or inactive institute "${rawInstitute}". Active options: ${activeInstitutes.map((i) => i.name).join(', ')}`;
+        rowErrors.push(msg);
+        errors.push({ rowNumber, field: 'institute', message: msg, value: rawInstitute, severity: 'error' });
       } else {
         matchedInstituteId = instMatch.id;
         matchedInstituteName = instMatch.name;

@@ -3,6 +3,7 @@ import {
   previewBulkImport,
   BulkImportEntityType,
 } from '@/lib/services/bulk-import-service';
+import { store } from '@/lib/services/data-store';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    store.hydrateFromDisk();
     const preview = previewBulkImport(entityType, csvContent);
 
     return NextResponse.json({

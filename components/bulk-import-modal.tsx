@@ -403,13 +403,47 @@ export function BulkImportModal({
                           </span>
                         )}
                       </td>
-                      {Object.values(r.data)
-                        .slice(0, 5)
-                        .map((val, idx) => (
+                      {previewResult.sampleHeaders.slice(0, 5).map((header, idx) => {
+                        const key = header
+                          .replace(/^[\uFEFF\xA0]+/, '')
+                          .trim()
+                          .toLowerCase()
+                          .replace(/[\s\-\/\.]+/g, '_')
+                          .replace(/[^a-z0-9_]/g, '');
+                        let val: unknown = r.data[key];
+                        if (val === undefined) {
+                          if (key === 'institute' || key === 'institute_name' || key === 'brand') {
+                            val = r.data.institute_name ?? r.data.institute_id;
+                          } else if (
+                            key === 'course_code' ||
+                            key === 'course' ||
+                            key === 'course_name' ||
+                            key === 'sap_module' ||
+                            key === 'interested_course'
+                          ) {
+                            val =
+                              r.data.interested_course_name ??
+                              r.data.course_name ??
+                              r.data.interested_course_id ??
+                              r.data.course_id;
+                          } else if (key === 'batch_code' || key === 'batch' || key === 'batch_name') {
+                            val = r.data.batch_name ?? r.data.batch_id;
+                          } else if (key === 'mobile' || key === 'phone_number' || key === 'user_phone') {
+                            val = r.data.phone;
+                          } else if (key === 'user_email' || key === 'email_address') {
+                            val = r.data.email;
+                          } else if (key === 'lead_name' || key === 'student_name' || key === 'name') {
+                            val = r.data.full_name ?? r.data.student_name;
+                          } else if (key === 'source') {
+                            val = r.data.lead_source;
+                          }
+                        }
+                        return (
                           <td key={idx} className="px-3 py-1 text-slate-700 truncate max-w-[120px]">
-                            {String(val || '—')}
+                            {String(val ?? '—') || '—'}
                           </td>
-                        ))}
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
