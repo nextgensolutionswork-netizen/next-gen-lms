@@ -476,4 +476,130 @@ describe('Institute / Brand Selection & Lifecycle Synchronization', () => {
     expect(instAudit?.user_id).toBe(adminUser.id);
     expect(instAudit?.created_at).toBeTruthy();
   });
+
+  it('persists institute_id and institute_name in Supabase insert/update payloads and preserves institute on unrelated edits', async () => {
+    // Verify all 3 institutes resolve cleanly (including 'My ERP Hub' spacing variant)
+    expect(resolveActiveInstitute({ institute_name: 'My ERP Hub' })).toEqual({
+      institute_id: 'inst-myerp-hub',
+      institute_name: 'MyERP Hub',
+    });
+    expect(resolveActiveInstitute({ institute_id: 'inst-nextgen' })).toEqual({
+      institute_id: 'inst-nextgen',
+      institute_name: 'NextGen',
+    });
+    expect(resolveActiveInstitute({ institute_id: 'inst-tecopad' })).toEqual({
+      institute_id: 'inst-tecopad',
+      institute_name: 'Tecopad',
+    });
+
+    const dbMod = await import('@/lib/supabase/db');
+    const adminMod = await import('@/lib/supabase/admin');
+    const insertedPayloads: Record<string, any>[] = [];
+    const updatedPayloads: Record<string, any>[] = [];
+
+    vi.spyOn(dbMod, 'isLiveSupabaseEnabled').mockReturnValue(true);
+    vi.spyOn(adminMod, 'createAdminClient').mockReturnValue({
+      from: (table: string) => {
+        if (table === 'profiles') {
+          const profileChain: any = {
+            eq: () => profileChain,
+            single: async () => ({ data: counsellorUser, error: null }),
+            maybeSingle: async () => ({ data: counsellorUser, error: null }),
+          };
+          return {
+            select: () => profileChain,
+          };
+        }
+        if (table === 'leads') {
+          const makeSelectChain = () => {
+            const chain: any = {
+              eq: () => chain,
+              or: () => chain,
+              order: () => chain,
+              range: async () => ({ data: store.leads, error: null }),
+              maybeSingle: async () => ({ data: store.leads[0] || null, error: null }),
+              single: async () => ({ data: store.leads[0] || null, error: null }),
+            };
+            return chain;
+          };
+          const makeUpdateChain = () => {
+            const chain: any = {
+              eq: () => chain,
+              or: () => chain,
+              select: async () => ({
+                data: [{ id: store.leads[0]?.id, updated_at: new Date().toISOString() }],
+                error: null,
+              }),
+            };
+            return chain;
+          };
+          return {
+            select: () => makeSelectChain(),
+            insert: async (payload: Record<string, any>) => {
+              insertedPayloads.push(payload);
+              return { error: null };
+            },
+            update: (payload: Record<string, any>) => {
+              updatedPayloads.push(payload);
+              return makeUpdateChain();
+            },
+          };
+        }
+        const emptyChain: any = {
+          eq: () => emptyChain,
+          or: () => emptyChain,
+          maybeSingle: async () => ({ data: null, error: null }),
+          single: async () => ({ data: null, error: null }),
+        };
+        return {
+          select: () => emptyChain,
+        };
+      },
+    } as any);
+
+    const created = await createLead(
+      {
+        full_name: 'Supabase Persist Lead',
+        phone: '9876500111',
+        email: 'supabase-inst@example.test',
+        interested_course_id: store.courses[0].id,
+        stage: 'New',
+        lead_source: 'Website',
+        training_preference: 'Online',
+        institute_id: 'inst-myerp-hub',
+        institute_name: 'MyERP Hub',
+        require_institute: true,
+        counsellor_id: counsellorUser.id,
+      } as any,
+      counsellorUser
+    );
+
+    expect(insertedPayloads).toHaveLength(1);
+    expect(insertedPayloads[0].institute_id).toBe('inst-myerp-hub');
+    expect(insertedPayloads[0].institute_name).toBe('MyERP Hub');
+
+    // Updating an unrelated field (notes) must preserve institute_id and institute_name in Supabase update payload
+    const editedUnrelated = await updateLeadDetails(
+      created.id,
+      { notes: 'Updated notes only' },
+      counsellorUser.id,
+      counsellorUser
+    );
+    expect(editedUnrelated.institute_id).toBe('inst-myerp-hub');
+    expect(editedUnrelated.institute_name).toBe('MyERP Hub');
+    expect(updatedPayloads[0].institute_id).toBe('inst-myerp-hub');
+    expect(updatedPayloads[0].institute_name).toBe('MyERP Hub');
+
+    // Changing institute to NextGen updates both fields in Supabase payload
+    const changedInst = await updateLeadDetails(
+      created.id,
+      { institute_id: 'inst-nextgen', institute_name: 'NextGen' },
+      counsellorUser.id,
+      counsellorUser
+    );
+    expect(changedInst.institute_id).toBe('inst-nextgen');
+    expect(changedInst.institute_name).toBe('NextGen');
+    expect(updatedPayloads[1].institute_id).toBe('inst-nextgen');
+    expect(updatedPayloads[1].institute_name).toBe('NextGen');
+  });
 });

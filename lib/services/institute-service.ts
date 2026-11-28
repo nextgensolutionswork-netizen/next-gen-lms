@@ -26,10 +26,12 @@ export function resolveActiveInstitute(input: {
   const id = (input.institute_id ?? '').trim();
   const name = (input.institute_name ?? '').trim();
 
+  const normalizeName = (v: string) => v.trim().toLowerCase().replace(/\s+/g, '');
+
   const match = institutes.find(
     (inst) =>
       (id && inst.id === id) ||
-      (name && inst.name.trim().toLowerCase() === name.toLowerCase())
+      (name && normalizeName(inst.name) === normalizeName(name))
   );
 
   if (!match) {

@@ -510,9 +510,11 @@ export default function LeadsPage() {
     setEditWaError('');
 
     setEditEmail(lead.email || '');
+    const normalizeInstName = (v?: string | null) => (v || '').trim().toLowerCase().replace(/\s+/g, '');
     const matchedEditInst =
+      (lead.institute_id && activeInstitutes.some((i) => i.id === lead.institute_id) ? lead.institute_id : '') ||
+      activeInstitutes.find((i) => normalizeInstName(i.name) === normalizeInstName(lead.institute_name))?.id ||
       lead.institute_id ||
-      activeInstitutes.find((i) => i.name.trim().toLowerCase() === (lead.institute_name || '').trim().toLowerCase())?.id ||
       '';
     setEditInstituteId(matchedEditInst);
     setEditInstituteError('');
