@@ -38,9 +38,8 @@ export async function GET(request: NextRequest) {
 
         if (!error && profiles && profiles.length > 0) {
           userCandidates = profiles as UserProfile[];
-          // Update store users with live profiles
+          // Keep store.users synchronized with authoritative Supabase profiles without overwriting UUIDs
           store.users = profiles as UserProfile[];
-          store.reconcileAuthoritativeStaffProfiles();
         }
       } catch (err: any) {
         console.warn('[Counsellors API] Live Supabase query error, using local store:', err?.message);

@@ -187,6 +187,8 @@ export default function LeadsPage() {
 
 
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [addLeadError, setAddLeadError] = React.useState('');
+  const [isSubmittingLead, setIsSubmittingLead] = React.useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = React.useState(false);
   const [isConverting, setIsConverting] = React.useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
@@ -669,9 +671,10 @@ export default function LeadsPage() {
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddLeadError('');
     if (!fullName || !phone || !email) return;
     if (!user) {
-      alert('Authentication required: Please sign in to create leads.');
+      setAddLeadError('Authentication required: Please sign in to create leads.');
       return;
     }
 
@@ -701,7 +704,7 @@ export default function LeadsPage() {
 
     const assignedCounsellorId = counsellorId || user.id || availableCounsellors[0]?.id;
     if (!assignedCounsellorId) {
-      alert('Please select an assigned counsellor.');
+      setAddLeadError('Please select an assigned counsellor.');
       return;
     }
 
@@ -720,6 +723,7 @@ export default function LeadsPage() {
     const expYears = experience === 'Fresher' ? 0 : experience === '0–2 Years' ? 1 : experience === '2–5 Years' ? 3 : 5;
     const chosenInstitute = activeInstitutes.find((inst) => inst.id === instituteId);
 
+    setIsSubmittingLead(true);
     try {
       await createLead({
         full_name: fullName.trim(),
@@ -763,7 +767,9 @@ export default function LeadsPage() {
       setAddress('');
       void refreshLeads();
     } catch (err: any) {
-      alert(err?.message || 'Failed to create lead');
+      setAddLeadError(err?.message || 'Failed to create lead. Please review your details and try again.');
+    } finally {
+      setIsSubmittingLead(false);
     }
   };
 
@@ -1614,12 +1620,23 @@ export default function LeadsPage() {
       {/* Create Lead Modal */}
       <Modal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setAddLeadError('');
+        }}
         title="Add New Prospective Lead"
         description="Record prospective student inquiry for SAP training."
         footer={
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setAddLeadError('');
+              }}
+            >
               Cancel
             </Button>
             <Button
@@ -1628,7 +1645,8 @@ export default function LeadsPage() {
               variant="sap"
               size="sm"
               disabled={Boolean(
-                phoneError ||
+                isSubmittingLead ||
+                  phoneError ||
                   whatsappError ||
                   !instituteId ||
                   !fullName.trim() ||
@@ -1638,12 +1656,20 @@ export default function LeadsPage() {
                   !experience
               )}
             >
-              Create Lead
+              {isSubmittingLead ? 'Creating...' : 'Create Lead'}
             </Button>
           </div>
         }
       >
         <form id="create-lead-form" onSubmit={handleCreateLead} className="space-y-4 text-xs">
+          {addLeadError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+            >
+              {addLeadError}
+            </div>
+          )}
           <p className="text-slate-600">Created by: {user?.full_name} (your signed-in account)</p>
           <Input
             label="Full Name *"

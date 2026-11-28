@@ -81,8 +81,20 @@ export async function POST(req: NextRequest) {
     }
     const normalizedEmail = emailCheck.normalized!;
 
-    // Check duplicate email
-    if (store.users?.some((u) => u.email.toLowerCase() === normalizedEmail)) {
+    // Check duplicate email (authoritative Supabase profiles when live, otherwise local store)
+    if (isLiveSupabaseEnabled()) {
+      const { data: existingProfile } = await createAdminClient()
+        .from('profiles')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+      if (existingProfile) {
+        return NextResponse.json(
+          { success: false, error: 'A user account with this email address already exists.' },
+          { status: 409 }
+        );
+      }
+    } else if (store.users?.some((u) => u.email.toLowerCase() === normalizedEmail)) {
       return NextResponse.json(
         { success: false, error: 'A user account with this email address already exists.' },
         { status: 409 }
@@ -126,15 +138,23 @@ export async function POST(req: NextRequest) {
 
         if (created?.user) {
           authUserId = created.user.id;
-          await adminClient.from('profiles').upsert({
+          const { error: profileUpsertError } = await adminClient.from('profiles').upsert({
             id: authUserId,
             email: email.trim().toLowerCase(),
             full_name: full_name.trim(),
             role: role || 'trainer',
             phone: normalizedPhone || null,
+            tenant_id: auth.user.tenant_id || 'default',
+            assigned_course_ids: assigned_course_ids || [],
             is_active: true,
             updated_at: new Date().toISOString(),
           });
+          if (profileUpsertError) {
+            return NextResponse.json(
+              { success: false, error: `Failed to provision user profile: ${profileUpsertError.message}` },
+              { status: 500 }
+            );
+          }
         }
       } catch (err: any) {
         console.error('[Users API] Supabase provision exception:', err);

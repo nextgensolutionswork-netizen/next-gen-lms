@@ -44,21 +44,24 @@ export async function authenticatePaymentRequest(request: NextRequest): Promise<
     const targetPayload = decoded.payload || decoded;
     const targetId = targetPayload.id;
     const targetEmail = targetPayload.email;
-    let matchedUser = store.users.find((u) => u.id === targetId || (targetEmail && u.email?.toLowerCase() === targetEmail.toLowerCase()));
-    if (!matchedUser && isLiveSupabaseEnabled()) {
-      try {
-        const adminClient = createAdminClient();
-        let query = adminClient.from('profiles').select('*');
-        if (targetId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)) {
-          query = query.eq('id', targetId);
-        } else if (targetEmail) {
-          query = query.eq('email', targetEmail.toLowerCase());
+    let matchedUser: UserProfile | undefined;
+    if (isLiveSupabaseEnabled()) {
+      const adminClient = createAdminClient();
+      const isUuid = Boolean(targetId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId));
+      if (isUuid) {
+        const { data: profileById } = await adminClient.from('profiles').select('*').eq('id', targetId).maybeSingle();
+        if (profileById) {
+          matchedUser = profileById as UserProfile;
         }
-        const { data: profile } = await query.maybeSingle();
-        if (profile) {
-          matchedUser = profile as UserProfile;
+      }
+      if (!matchedUser && targetEmail) {
+        const { data: profileByEmail } = await adminClient.from('profiles').select('*').eq('email', targetEmail.toLowerCase()).maybeSingle();
+        if (profileByEmail) {
+          matchedUser = profileByEmail as UserProfile;
         }
-      } catch {}
+      }
+    } else {
+      matchedUser = store.users.find((u) => u.id === targetId || (targetEmail && u.email?.toLowerCase() === targetEmail.toLowerCase()));
     }
     if (!matchedUser) {
       throw new Error('Unauthorized: Unknown or unverified user profile.');
