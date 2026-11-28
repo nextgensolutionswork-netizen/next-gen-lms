@@ -426,7 +426,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
             amount_paid: 5000,
             payment_mode: 'UPI',
             payment_date: new Date().toISOString().slice(0, 10),
-            transaction_reference: `UPI-TEST-${Date.now()}`,
+            transaction_reference: String(10000 + (Date.now() % 89999)),
             idempotency_key: `idem-${Date.now()}`,
           },
         }
@@ -509,7 +509,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error).toContain('Transaction reference is required');
+      expect(json.error).toContain('Please enter exactly 5 digits.');
     });
 
     it('rejects payment with invalid timestamp format instead of YYYY-MM-DD (HTTP 400 Bad Request)', async () => {
@@ -525,7 +525,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
             amount_paid: 1000,
             payment_mode: 'UPI',
             payment_date: '2026-11-27T10:00:00.000Z', // Invalid datetime string
-            transaction_reference: `UPI-INVALID-DATE-${Date.now()}`,
+            transaction_reference: String(10000 + (Date.now() % 89999)),
             idempotency_key: `idem-invalid-date-${Date.now()}`,
           },
         }
@@ -554,7 +554,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
             amount_paid: excessiveAmount,
             payment_mode: 'UPI',
             payment_date: new Date().toISOString().slice(0, 10),
-            transaction_reference: `UPI-OVERPAY-${Date.now()}`,
+            transaction_reference: String(10000 + (Date.now() % 89999)),
             idempotency_key: `idem-overpay-${Date.now()}`,
           },
         }
@@ -569,7 +569,7 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
 
     it('rejects duplicate transaction reference in same tenant (HTTP 400 Bad Request)', async () => {
       const studentFee = store.studentFees[0];
-      const duplicateRef = `UPI-DUP-REF-${Date.now()}`;
+      const duplicateRef = String(30000 + (Date.now() % 59999));
 
       // First payment
       const req1 = createMockAuthRequest(

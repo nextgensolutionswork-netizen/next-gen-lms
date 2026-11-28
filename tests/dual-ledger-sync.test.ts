@@ -123,7 +123,7 @@ describe('Dual-Ledger Bi-Directional Financial Synchronization Suite', () => {
           fee_id: approvedFee.id,
           amount_paid: payAmount,
           payment_mode: 'UPI',
-          transaction_reference: `UPI-SYNC-${Date.now()}`,
+          transaction_reference: String(10000 + (Date.now() % 89999)),
         },
         counsellorId,
         'counsellor'
@@ -180,7 +180,7 @@ describe('Dual-Ledger Bi-Directional Financial Synchronization Suite', () => {
       const studentId = adm.student.id;
       const feeAccountId = adm.feeAccount.id;
       const payAmount = 20000;
-      const txnRef = `TXN-ATOMIC-${Date.now()}`;
+      const txnRef = String(30000 + (Date.now() % 59999));
 
       // 2. Execute recordPaymentAtomic
       const payResult = await recordPaymentAtomic(

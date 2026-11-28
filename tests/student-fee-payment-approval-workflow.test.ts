@@ -104,7 +104,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           amount_paid: 15000,
           payment_mode: 'UPI',
           payment_date: '2026-10-16',
-          transaction_reference: 'UPI/20261016/987654321',
+          transaction_reference: '10001',
           bank_upi_reference: 'HDFC UPI',
           payment_proof_url: 'https://storage.next-gen.com/proofs/rahul-upi-slip.png',
           notes: 'Installment 1 collected via Google Pay',
@@ -118,7 +118,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
       expect(payment.enrollment_id).toBe(testAdmission.id);
       expect(payment.amount_paid).toBe(15000);
       expect(payment.payment_mode).toBe('UPI');
-      expect(payment.transaction_reference).toBe('UPI/20261016/987654321');
+      expect(payment.transaction_reference).toBe('10001');
       expect(payment.bank_upi_reference).toBe('HDFC UPI');
       expect(payment.payment_proof_url).toBe('https://storage.next-gen.com/proofs/rahul-upi-slip.png');
       expect(payment.payment_date).toBe('2026-10-16');
@@ -170,7 +170,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           student_id: testStudent.id,
           amount_paid: 10000,
           payment_mode: 'UPI',
-          transaction_reference: 'UNIQUE-UTR-999',
+          transaction_reference: '10002',
         },
         counsellor.id,
         'counsellor'
@@ -184,7 +184,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
             student_id: testStudent.id,
             amount_paid: 10000,
             payment_mode: 'UPI',
-            transaction_reference: 'unique-utr-999',
+            transaction_reference: '10002',
           },
           counsellor.id,
           'counsellor'
@@ -205,7 +205,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-VERIFY-001',
+          transaction_reference: '10003',
         },
         counsellor.id,
         'counsellor'
@@ -237,7 +237,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'Bank Transfer',
-          transaction_reference: 'NEFT-BOUNCED-001',
+          transaction_reference: '10004',
         },
         counsellor.id,
         'counsellor'
@@ -272,7 +272,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
       const updated = feeWorkflowService.updatePayment(
         payment.id,
         {
-          transaction_reference: 'NEFT-CORRECT-002',
+          transaction_reference: '10005',
           notes: 'Corrected transaction reference as verified with student bank slip',
         },
         counsellor.id,
@@ -281,7 +281,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
 
       expect(updated.status).toBe('Pending Approval');
       expect(updated.verification_status).toBe('Pending Verification');
-      expect(updated.transaction_reference).toBe('NEFT-CORRECT-002');
+      expect(updated.transaction_reference).toBe('10005');
 
       // Notification sent to accounts about updated payment
       expect(
@@ -304,7 +304,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 20000,
           payment_mode: 'UPI',
-          transaction_reference: 'UPI/APPROVED/2026/01',
+          transaction_reference: '10006',
           payment_proof_url: 'https://storage.next-gen.com/proofs/valid.png',
         },
         counsellor.id,
@@ -382,7 +382,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-PARTIAL-1',
+          transaction_reference: '10007',
         },
         counsellor.id
       );
@@ -399,7 +399,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'Bank Transfer',
-          transaction_reference: 'UTR-PARTIAL-2',
+          transaction_reference: '10008',
         },
         counsellor.id
       );
@@ -462,7 +462,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-ONBOARDING-01',
+          transaction_reference: '10009',
         },
         counsellor.id,
         'counsellor'
@@ -505,7 +505,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-LMS-GATE-01',
+          transaction_reference: '10010',
         },
         counsellor.id,
         'counsellor'
@@ -546,7 +546,7 @@ describe('Automated Student Fee Payment Approval Workflow (Steps 1–4)', () => 
           enrollment_id: testAdmission.id,
           amount_paid: 15000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-UNAPPROVED-ADM',
+          transaction_reference: '10011',
         },
         counsellor.id,
         'counsellor'

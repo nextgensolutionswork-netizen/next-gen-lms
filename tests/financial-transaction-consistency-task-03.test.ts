@@ -288,7 +288,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           installment_id: 'inst-fin03-1',
           amount_paid: 10000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-FIN006-01',
+          transaction_reference: '10001',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -376,7 +376,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-FIN011-01',
+          transaction_reference: '10002',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -547,7 +547,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 5000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-FIN021',
+          transaction_reference: '10003',
           our_bank_profile_id: 'bank-acc-01',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'Katari Charitha',
@@ -569,7 +569,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-FIN022',
+          transaction_reference: '10004',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -604,7 +604,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-SRINIVAS-QA',
+          transaction_reference: '10005',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -625,7 +625,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 5000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-NOBANK',
+          transaction_reference: '10006',
           payment_date: '2026-11-25',
           idempotency_key: 'fin025-key',
         },
@@ -641,7 +641,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 5000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-BADBANK',
+          transaction_reference: '10007',
           our_bank_profile_id: 'bank-does-not-exist',
           payment_date: '2026-11-25',
           idempotency_key: 'fin026-key',
@@ -675,7 +675,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-B1',
+          transaction_reference: '10008',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -689,7 +689,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 6000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-B2',
+          transaction_reference: '10009',
           our_bank_profile_id: 'bank-acc-01',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'Katari Charitha',
@@ -864,7 +864,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 5000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-FIN040',
+          transaction_reference: '10010',
           payment_date: '2026-11-25',
           idempotency_key: 'fin040-key',
         },
@@ -875,7 +875,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
         feeWorkflowService.verifyPayment(p.id, ACCOUNTANT_ID, 'Mismatch', {
           amount: '9999',
           payment_date: '2026-11-25',
-          reference: 'UTR-FIN040',
+          reference: '10010',
         })
       ).toThrow();
       expect(store.receipts.length).toBe(0);
@@ -1067,7 +1067,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-FIN055',
+          transaction_reference: '10011',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -1293,7 +1293,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await expect(
         validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
           payment_mode: 'Cash',
-          reference: 'CASH-01',
+          reference: '10012',
         })
       ).rejects.toThrow(/Invalid workflow transition/);
     });
@@ -1322,11 +1322,11 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await approveExpense(exp.id, SUPER_ADMIN_ID);
       const settled = await validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-EXP-071',
+        reference: '10013',
         bank_account_profile_id: 'bank-acc-12',
       });
       expect(settled.status).toBe('Settled');
-      expect(settled.reference).toBe('UTR-EXP-071');
+      expect(settled.reference).toBe('10013');
       expect(settled.bank_account).toContain('E Anasuya');
       expect(settled.settled_by).toBe(ACCOUNTANT_ID);
     });
@@ -1346,7 +1346,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await expect(
         validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
           payment_mode: 'Bank Transfer',
-          reference: 'UTR-EXP-072',
+          reference: '10014',
           bank_account_profile_id: 'bank-acc-01',
         })
       ).rejects.toThrow(/Invalid workflow transition/);
@@ -1368,7 +1368,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await expect(
         validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
           payment_mode: 'Cash',
-          reference: 'CASH-073',
+          reference: '10015',
         })
       ).rejects.toThrow(/Invalid workflow transition/);
     });
@@ -1389,7 +1389,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await expect(
         validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
           payment_mode: 'Bank Transfer',
-          reference: 'UTR-NOBANK',
+          reference: '10006',
         })
       ).rejects.toThrow(/Paying bank account is required/);
     });
@@ -1410,7 +1410,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await expect(
         validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
           payment_mode: 'Bank Transfer',
-          reference: 'UTR-BADBANK',
+          reference: '10007',
           bank_account_profile_id: 'bank-invalid-999',
         })
       ).rejects.toThrow(/invalid or unavailable/);
@@ -1431,14 +1431,14 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await approveExpense(exp.id, SUPER_ADMIN_ID);
       await validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-076',
+        reference: '10016',
         bank_account_profile_id: 'bank-acc-01',
         idempotency_key: 'settle-076-1',
       });
       await expect(
         validateAndSettleExpense(exp.id, ACCOUNTANT2_ID, {
           payment_mode: 'Bank Transfer',
-          reference: 'UTR-076-2',
+          reference: '10017',
           bank_account_profile_id: 'bank-acc-01',
           idempotency_key: 'settle-076-2',
         })
@@ -1460,13 +1460,13 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await approveExpense(exp.id, SUPER_ADMIN_ID);
       const s1 = await validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-077',
+        reference: '10018',
         bank_account_profile_id: 'bank-acc-01',
         idempotency_key: 'settle-077-same',
       });
       const s2 = await validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-077',
+        reference: '10018',
         bank_account_profile_id: 'bank-acc-01',
         idempotency_key: 'settle-077-same',
       });
@@ -1511,7 +1511,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await approveExpense(exp.id, SUPER_ADMIN_ID);
       const settled = await validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-079',
+        reference: '10019',
         bank_account_profile_id: 'bank-acc-12',
       });
       expect(settled.bank_account).toContain('E Anasuya');
@@ -1534,7 +1534,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await expect(
         validateAndSettleExpense(exp.id, COUNSELLOR_ID, {
           payment_mode: 'Bank Transfer',
-          reference: 'UTR-080',
+          reference: '10020',
           bank_account_profile_id: 'bank-acc-01',
         })
       ).rejects.toThrow(/Access Denied/);
@@ -1786,7 +1786,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await approveExpense(exp.id, SUPER_ADMIN_ID);
       await validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-FIN096',
+        reference: '10021',
         bank_account_profile_id: 'bank-acc-12',
       });
       const audit = store.auditLogs.find((a) => a.action === 'EXPENSE_SETTLED' && a.record_id === exp.id);
@@ -1800,7 +1800,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-AA-P1',
+          transaction_reference: '10022',
           our_bank_profile_id: 'bank-acc-01',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'Katari Charitha',
@@ -1816,7 +1816,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 6000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-AA-P2',
+          transaction_reference: '10023',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -1863,7 +1863,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-BANK-A',
+          transaction_reference: '10024',
           our_bank_profile_id: 'bank-acc-01',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'Katari Charitha',
@@ -1877,7 +1877,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 6000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-BANK-B',
+          transaction_reference: '10025',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -1905,7 +1905,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
       await approveExpense(expA.id, SUPER_ADMIN_ID);
       await validateAndSettleExpense(expA.id, ACCOUNTANT_ID, {
         payment_mode: 'Bank Transfer',
-        reference: 'UTR-EXP-A',
+        reference: '10026',
         bank_account_profile_id: 'bank-acc-12',
       });
 
@@ -1935,7 +1935,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
           fee_id: FEE_ID,
           amount_paid: 14000,
           payment_mode: 'UPI',
-          transaction_reference: 'UTR-CLEAN-100',
+          transaction_reference: '10027',
           our_bank_profile_id: 'bank-acc-12',
           our_bank_name: 'HDFC Bank',
           our_bank_account_name: 'E Anasuya',
@@ -1987,7 +1987,7 @@ describe('TASK-03 — Financial Transaction Consistency, Bank Mapping, Expense S
         await expect(
           validateAndSettleExpense(exp.id, ACCOUNTANT_ID, {
             payment_mode: 'Bank Transfer',
-            reference: 'UTR-ROLLBACK-101',
+            reference: '10028',
             bank_account_profile_id: 'bank-acc-12',
             idempotency_key: 'fin101-rollback',
           })

@@ -794,7 +794,14 @@ export async function updateLeadDetails(
     if (updates.interested_course_id && updates.interested_course_id.trim() !== '') {
       const resolvedCourse = resolveLeadCourseFromMaster(updates.interested_course_id, store.courses);
       if (resolvedCourse.status !== 'Valid' || !resolvedCourse.course) {
-        throw new Error('Selected course is invalid or not found in Course Master.');
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          updates.interested_course_id.trim()
+        );
+        throw new Error(
+          isUUID
+            ? 'Selected course is invalid or not found in Course Master.'
+            : 'Invalid course ID format: Selected course is invalid or not found in Course Master.'
+        );
       }
       lead.interested_course_id = resolvedCourse.course.id;
       lead.interested_course_name = resolvedCourse.course.course_name;

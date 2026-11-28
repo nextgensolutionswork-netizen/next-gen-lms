@@ -21,7 +21,7 @@ const accountant = profile('approver', 'accountant');
 const onboarding = profile('onboarding', 'onboarding_team');
 let fee: StudentFee;
 let studentId: string;
-const input = () => ({ fee_id: fee.id, student_id: studentId, enrollment_id: fee.enrollment_id, amount_paid: 5000, payment_mode: 'UPI' as const, payment_date: '2026-10-12', transaction_reference: 'UTR-123', payment_proof_url: 'https://example.test/proof.png' });
+const input = () => ({ fee_id: fee.id, student_id: studentId, enrollment_id: fee.enrollment_id, amount_paid: 5000, payment_mode: 'UPI' as const, payment_date: '2026-10-12', transaction_reference: '10001', payment_proof_url: 'https://example.test/proof.png' });
 
 beforeEach(async () => {
   idempotencyService.clear();
@@ -116,7 +116,7 @@ describe('Automated payment approval', () => {
     fees.rejectPayment(payment.id, accountant.id, 'Reference does not match proof');
     expect(() => fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id))).toThrow();
     expect(store.notifications.some((n) => n.user_id === counsellor.id && n.message.includes('does not match'))).toBe(true);
-    fees.updatePayment(payment.id, { transaction_reference: 'CORRECTED' }, counsellor.id);
+    fees.updatePayment(payment.id, { transaction_reference: '10002' }, counsellor.id);
     expect(payment.status).toBe('Pending Approval');
     fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
     const audit = store.auditLogs.filter((a) => a.record_id === payment.id);
@@ -126,11 +126,11 @@ describe('Automated payment approval', () => {
 
   it('supports partial payments against one balance and rechecks it at approval', () => {
     const one = fees.recordPayment({ ...input(), amount_paid: 20000 }, counsellor.id);
-    const two = fees.recordPayment({ ...input(), amount_paid: 20000, transaction_reference: 'UTR-SECOND' }, counsellor.id);
+    const two = fees.recordPayment({ ...input(), amount_paid: 20000, transaction_reference: '10003' }, counsellor.id);
     fees.verifyPayment(one.id, accountant.id, undefined, enteredPaymentVerification(one.id));
     expect(() => fees.verifyPayment(two.id, accountant.id, undefined, enteredPaymentVerification(two.id))).toThrow(/outstanding/);
     expect(two.status).toBe('Pending Approval');
-    const final = fees.recordPayment({ ...input(), amount_paid: 10000, transaction_reference: 'FINAL' }, counsellor.id);
+    const final = fees.recordPayment({ ...input(), amount_paid: 10000, transaction_reference: '10004' }, counsellor.id);
     fees.verifyPayment(final.id, accountant.id, undefined, enteredPaymentVerification(final.id));
     expect(fee.outstanding_amount).toBe(0);
     expect(store.installments).toHaveLength(0);
@@ -139,9 +139,9 @@ describe('Automated payment approval', () => {
   it('rejects invalid amounts, duplicate references, and mismatched enrollments', () => {
     for (const amount_paid of [0, -1, Infinity, NaN, 1.001, 30001]) expect(() => fees.recordPayment({ ...input(), amount_paid }, counsellor.id)).toThrow();
     fees.recordPayment(input(), counsellor.id);
-    expect(() => fees.recordPayment({ ...input(), transaction_reference: ' utr-123 ' }, counsellor.id)).toThrow(/Duplicate/);
+    expect(() => fees.recordPayment({ ...input(), transaction_reference: '10001' }, counsellor.id)).toThrow(/Duplicate/);
     expect(() => fees.recordPayment({ ...input(), enrollment_id: 'another-enrollment' }, counsellor.id)).toThrow(/Enrollment/);
-    const legacyInput = fees.recordPayment({ ...input(), installment_id: 'other', transaction_reference: 'different' }, counsellor.id);
+    const legacyInput = fees.recordPayment({ ...input(), installment_id: 'other', transaction_reference: '10005' }, counsellor.id);
     expect(legacyInput.installment_id).toBeUndefined();
   });
 
@@ -149,7 +149,7 @@ describe('Automated payment approval', () => {
     fee.final_payable = 0.30;
     fee.outstanding_amount = 0.30;
     for (const [index, amount_paid] of [0.10, 0.20].entries()) {
-      const payment = fees.recordPayment({ ...input(), amount_paid, transaction_reference: `decimal-${index}` }, counsellor.id);
+      const payment = fees.recordPayment({ ...input(), amount_paid, transaction_reference: String(20000 + Number(index || 0)).slice(0, 5) }, counsellor.id);
       fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
     }
     expect(fee.outstanding_amount).toBe(0);
@@ -233,7 +233,7 @@ describe('Conditional admission payments and manual Accounts verification', () =
     experience_years: 0, current_employment_status: 'Student', course_id: store.courses[0].id,
     admission_date: '2026-10-01', course_fee: 30000, discount: 0, payment_plan: 'Full Payment',
     collect_initial_payment: true, initial_payment_amount: 5000, payment_mode: mode,
-    transaction_reference: mode === 'Cash' ? null : `MANUAL-${mode}`, payment_date: '2026-10-31',
+    transaction_reference: mode === 'Cash' ? null : String(20000 + modes.indexOf(mode)), payment_date: '2026-10-31',
     idempotency_key: `admission-${mode}`,
   });
   it.each(modes)('admits and explicitly approves %s without proof, once only', async (mode) => {
@@ -265,7 +265,7 @@ describe('Conditional admission payments and manual Accounts verification', () =
     expect(store.receipts).toHaveLength(0);
   });
   it('strips stale reference and proof from cash on the server and defaults the actual date', async () => {
-    const response = await admit(await req(counsellor, { ...admissionInput('Cash'), payment_date: undefined, transaction_reference: 'OLD-UTR', payment_proof_url: 'stale-invalid-upload' }));
+    const response = await admit(await req(counsellor, { ...admissionInput('Cash'), payment_date: undefined, transaction_reference: '10006', payment_proof_url: 'stale-invalid-upload' }));
     expect(response.status).toBe(200);
     const p = (await response.json()).result.payment;
     expect(p.transaction_reference).toBeNull();
@@ -286,11 +286,11 @@ describe('Conditional admission payments and manual Accounts verification', () =
     expect(store.studentPayments[0].payment_proof_url).toBeUndefined();
     expect(store.payments[0].transaction_reference).toBeNull();
     expect((await POST(await req(counsellor, { action: 'update', paymentId: p.id, input: { ...details, payment_mode: mode, transaction_reference: null, bank_upi_reference: undefined } }))).status).toBe(400);
-    expect((await POST(await req(counsellor, { action: 'update', paymentId: p.id, input: { ...details, payment_mode: mode, transaction_reference: 'NEW-REF', payment_proof_url: undefined } }))).status).toBe(200);
+    expect((await POST(await req(counsellor, { action: 'update', paymentId: p.id, input: { ...details, payment_mode: mode, transaction_reference: '10007', payment_proof_url: undefined } }))).status).toBe(200);
   });
   it.each(['Cash', 'UPI'] as const)('blocks mismatched amount/date and missing verification for %s', async (mode) => {
     const p = fees.recordPayment({ ...input(), payment_mode: mode }, counsellor.id);
-    for (const verification of [undefined, { reference: 'UTR-123', amount: '5000.01', payment_date: '2026-10-13' }]) {
+    for (const verification of [undefined, { reference: '10001', amount: '5000.01', payment_date: '2026-10-13' }]) {
       const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification }));
       expect(response.status).toBe(400);
       const { fieldErrors } = await response.json();
@@ -302,7 +302,7 @@ describe('Conditional admission payments and manual Accounts verification', () =
   });
   it('rejects a wrong noncash UTR before financial changes', async () => {
     const p = fees.recordPayment(input(), counsellor.id);
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification: { reference: 'WRONG', amount: '5000', payment_date: '2026-10-12' } }));
+    const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification: { reference: '99999', amount: '5000', payment_date: '2026-10-12' } }));
     expect((await response.json()).fieldErrors.reference).toMatch(/does not match/);
     expect(store.receipts).toHaveLength(0);
   });
@@ -311,23 +311,23 @@ describe('Conditional admission payments and manual Accounts verification', () =
   });
   it('never carries reference or proof through cash when switching among all seven modes', () => {
     for (const from of modes) for (const to of modes) {
-      const original = { payment_mode: from, transaction_reference: 'REF', payment_proof_url: 'https://example.test/proof' };
+      const original = { payment_mode: from, transaction_reference: '10008', payment_proof_url: 'https://example.test/proof' };
       const cash = normalizePaymentFields({ ...original, payment_mode: 'Cash' });
       const next = normalizePaymentFields({ ...cash, payment_mode: to });
       expect(next.transaction_reference).toBeNull(); expect(next.payment_proof_url).toBeUndefined();
-      expect(original.transaction_reference).toBe('REF');
+      expect(original.transaction_reference).toBe('10008');
     }
   });
   it('normalizes reference whitespace and case for manual approval', async () => {
     const p = fees.recordPayment(input(), counsellor.id);
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification: { reference: ' utr- 123 ', amount: '5000.00', payment_date: '2026-10-12' } }));
+    const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification: { reference: ' 10001 ', amount: '5000.00', payment_date: '2026-10-12' } }));
     expect(response.status).toBe(200);
     expect(store.receipts).toHaveLength(1);
   });
   it('blocks legacy noncash payments with a missing original reference', async () => {
     const p = fees.recordPayment(input(), counsellor.id);
     p.transaction_reference = null; p.bank_upi_reference = undefined;
-    const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification: { reference: 'UTR-123', amount: '5000', payment_date: '2026-10-12' } }));
+    const response = await POST(await req(accountant, { action: 'approve', paymentId: p.id, verification: { reference: '10001', amount: '5000', payment_date: '2026-10-12' } }));
     expect(response.status).toBe(400);
     expect((await response.json()).fieldErrors.reference).toMatch(/missing/);
     expect(store.receipts).toHaveLength(0);

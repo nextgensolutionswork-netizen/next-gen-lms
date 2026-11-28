@@ -1,5 +1,6 @@
 import { cachedLeads } from './lead-cache';
 import { getInstitutes } from './institute-service';
+import { matchesCourseId } from './academics-service';
 import { createLead } from './crm-service';
 import { store } from './data-store';
 import {
@@ -495,13 +496,24 @@ export function validateLeadRows(
       (s) => s.toLowerCase() === stageInput.toLowerCase()
     ) || 'New';
 
-    // 4. Course lookup
-    const course = (store.courses || []).find(
-      (c) =>
-        c.id.toLowerCase() === courseIdentifier.toLowerCase() ||
-        c.course_code.toLowerCase() === courseIdentifier.toLowerCase() ||
-        c.course_name.toLowerCase().includes(courseIdentifier.toLowerCase())
-    ) || (store.courses && store.courses.length > 0 ? store.courses[0] : undefined);
+    // 4. Course lookup (authoritative Course Master — never silently fall back to courses[0])
+    const cleanCourseRef = (courseIdentifier || '').trim();
+    let course: (typeof store.courses)[number] | undefined;
+    if (cleanCourseRef) {
+      course = (store.courses || []).find(
+        (c) =>
+          c.id.toLowerCase() === cleanCourseRef.toLowerCase() ||
+          matchesCourseId(c.id, cleanCourseRef) ||
+          c.course_code.toLowerCase() === cleanCourseRef.toLowerCase() ||
+          c.course_name.toLowerCase() === cleanCourseRef.toLowerCase() ||
+          c.course_name.toLowerCase().includes(cleanCourseRef.toLowerCase())
+      );
+      if (!course) {
+        rowErrors.push(
+          `Invalid course "${cleanCourseRef}". Course must match an active course in Course Master.`
+        );
+      }
+    }
 
     const expYears = parseInt(experienceRaw, 10) || 0;
 

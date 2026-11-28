@@ -103,7 +103,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
         collect_initial_payment: true,
         initial_payment_amount: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-PDF-P1',
+        transaction_reference: '10001',
         our_bank_profile_id: 'bank-acc-14',
       },
       counsellor.id,
@@ -113,7 +113,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
     const fee = store.studentFees.find((f) => f.student_id === sid)!;
     const p1 = store.studentPayments.find((p) => p.student_id === sid)!;
     feeWorkflowService.verifyPayment(p1.id, accountant.id, 'Verified P1', {
-      reference: 'UTR-PDF-P1',
+      reference: '10001',
       amount: '14000',
       payment_date: p1.payment_date || '2026-11-26',
       receiving_bank_profile_id: 'bank-acc-14',
@@ -125,6 +125,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
         student_id: sid,
         amount_paid: 6000,
         payment_mode: 'UPI',
+        transaction_reference: '10002',
         bank_upi_reference: 'UTR-PDF-P2',
         payment_date: '2026-11-26',
         our_bank_profile_id: 'bank-acc-05',
@@ -138,6 +139,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
         student_id: sid,
         amount_paid: 2000,
         payment_mode: 'UPI',
+        transaction_reference: '10003',
         bank_upi_reference: 'UTR-PDF-P3',
         payment_date: '2026-11-26',
         our_bank_profile_id: 'bank-acc-14',
@@ -171,7 +173,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
 
     // Approve P2 (6,000): 20,000 verified, 10,000 outstanding, 2 receipts
     feeWorkflowService.verifyPayment(p2.id, accountant.id, 'Verified P2', {
-      reference: 'UTR-PDF-P2',
+      reference: '10002',
       amount: '6000',
       payment_date: '2026-11-26',
       receiving_bank_profile_id: 'bank-acc-05',
@@ -196,7 +198,7 @@ describe('TASK-05: PDF Branding, Financial Accuracy, Layout & Security QA', () =
       amount: 1000,
       receipt_number: `REC-2026-0${100 + idx}`,
       payment_mode: 'UPI',
-      reference: `UTR-MULTI-${idx}`,
+      reference: String(20000 + Number(idx || 0)).slice(0, 5),
     }));
     const invPdf = await generateInvoicePdfBuffer({
       id: 'inv-multi-qa',

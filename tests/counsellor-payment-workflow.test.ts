@@ -61,7 +61,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         fee_id: approvedFee.id,
         amount_paid: 15000,
         payment_mode: 'UPI',
-        transaction_reference: 'UPI/INITIAL/12345',
+        transaction_reference: '10001',
         notes: 'Initial fee collection by counsellor',
       },
       counsellorId,
@@ -86,7 +86,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         fee_id: approvedFee.id,
         amount_paid: 15000,
         payment_mode: 'UPI',
-        transaction_reference: 'UPI/OLD/11111',
+        transaction_reference: '10002',
         notes: 'Entered with initial slip',
       },
       counsellorId,
@@ -100,7 +100,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         amount_paid: 20000,
         payment_mode: 'Bank Transfer',
         payment_date: '2026-10-12',
-        transaction_reference: 'NEFT-HDFC-998877',
+        transaction_reference: '10003',
         bank_upi_reference: 'HDFC Corporate Account #4019',
         payment_proof_url: 'https://cdn.example.com/slips/neft-998877.pdf',
         notes: 'Student updated transfer with NEFT receipt confirmation',
@@ -113,7 +113,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
     expect(updated.amount_paid).toBe(20000);
     expect(updated.payment_mode).toBe('Bank Transfer');
     expect(updated.payment_date).toBe('2026-10-12');
-    expect(updated.transaction_reference).toBe('NEFT-HDFC-998877');
+    expect(updated.transaction_reference).toBe('10003');
     expect(updated.bank_upi_reference).toBe('HDFC Corporate Account #4019');
     expect(updated.payment_proof_url).toBe('https://cdn.example.com/slips/neft-998877.pdf');
     expect(updated.notes).toBe('Student updated transfer with NEFT receipt confirmation');
@@ -127,7 +127,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
     // Store record matches updated details
     const storedRecord = store.studentPayments.find((p) => p.id === payment.id);
     expect(storedRecord?.amount_paid).toBe(20000);
-    expect(storedRecord?.transaction_reference).toBe('NEFT-HDFC-998877');
+    expect(storedRecord?.transaction_reference).toBe('10003');
 
     // Outstanding amount is still untouched because verification is pending
     const feeCheck = feeWorkflowService.getStudentFeeById(approvedFee.id);
@@ -141,7 +141,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         fee_id: approvedFee.id,
         amount_paid: 20000,
         payment_mode: 'UPI',
-        transaction_reference: 'TEST-1',
+        transaction_reference: '10004',
       },
       counsellorId,
       'counsellor'
@@ -158,7 +158,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         fee_id: approvedFee.id,
         amount_paid: 20000,
         payment_mode: 'UPI',
-        transaction_reference: 'TEST-2',
+        transaction_reference: '10005',
       },
       counsellorId,
       'counsellor'
@@ -181,7 +181,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         fee_id: approvedFee.id,
         amount_paid: 15000,
         payment_mode: 'UPI',
-        transaction_reference: 'TEST-3',
+        transaction_reference: '10006',
       },
       counsellorId,
       'counsellor'
@@ -192,7 +192,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
       payment.id,
       {
         amount_paid: 25000,
-        transaction_reference: 'UPI/VERIFIED/25000',
+        transaction_reference: '10007',
         notes: 'Adjusted to full 1st installment amount',
       },
       counsellorId,
@@ -262,7 +262,7 @@ describe('Counsellor Payment Update & Accountant Verification Workflow', () => {
         fee_id: approvedFee.id,
         amount_paid: 10000,
         payment_mode: 'Cheque',
-        transaction_reference: 'CHQ-889900',
+        transaction_reference: '10008',
       },
       counsellorId,
       'counsellor'

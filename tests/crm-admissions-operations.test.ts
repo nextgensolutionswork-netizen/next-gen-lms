@@ -291,7 +291,7 @@ describe('CRM, Admissions & Student 360 Operations Suite', () => {
           counsellor_id: counsellorId,
           initial_payment_amount: downpaymentAmount,
           payment_mode: 'UPI',
-          transaction_reference: `UPI-ADM-${Date.now()}`,
+          transaction_reference: String(10000 + (Date.now() % 89999)),
           initial_payment_notes: 'Initial admission installment paid via UPI QR',
           payment_proof_url: 'https://example.com/admission-payment.png',
         },

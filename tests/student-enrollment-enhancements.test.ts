@@ -426,7 +426,7 @@ describe('Student Enrollment Enhancements Test Suite', () => {
           collect_initial_payment: true,
           initial_payment_amount: 45000,
           payment_mode: 'UPI',
-          transaction_reference: 'UPI-9823419082',
+          transaction_reference: '10001',
           ...bankDetails,
         },
         'usr-counsellor'
@@ -512,7 +512,7 @@ describe('Student Enrollment Enhancements Test Suite', () => {
           amount_paid: 20000,
           payment_mode: 'Bank Transfer',
           payment_date: '2026-11-03',
-          transaction_reference: 'NEFT-99887766',
+          transaction_reference: '10002',
           ...bankDetails,
         },
         'usr-accounts',

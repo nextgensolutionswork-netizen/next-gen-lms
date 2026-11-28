@@ -38,7 +38,7 @@ const input = () => ({
   amount_paid: 5000,
   payment_mode: 'UPI' as const,
   payment_date: '2026-10-12',
-  transaction_reference: 'UTR-123',
+  transaction_reference: '10001',
   payment_proof_url: 'https://example.test/proof.png',
 });
 

@@ -290,7 +290,7 @@ describe('Domain 4: Student 360 Profile & Operations Suite', () => {
           amount_paid: paymentAmount,
           payment_mode: 'UPI',
           payment_date: new Date().toISOString().slice(0, 10),
-          transaction_reference: `UTR-TEST-${Date.now()}`,
+          transaction_reference: String(10000 + (Date.now() % 89999)),
           notes: 'Test payment collection',
         },
         testStaffId,

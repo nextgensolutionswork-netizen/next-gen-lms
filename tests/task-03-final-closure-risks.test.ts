@@ -78,7 +78,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
         collect_initial_payment: true,
         initial_payment_amount: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-CRASH-1',
+        transaction_reference: '10001',
         our_bank_profile_id: 'bank-acc-14',
       },
       counsellor.id,
@@ -90,7 +90,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
 
     // Approve payment once
     const verif1 = {
-      reference: 'UTR-CRASH-1',
+      reference: '10001',
       amount: '14000',
       payment_date: pay.payment_date || '2026-11-26',
       receiving_bank_profile_id: 'bank-acc-14',
@@ -132,7 +132,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
         collect_initial_payment: true,
         initial_payment_amount: 10000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-FENCE-1',
+        transaction_reference: '10002',
         our_bank_profile_id: 'bank-acc-14',
       },
       counsellor.id,
@@ -149,7 +149,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
 
     // Worker B approves; stale Worker A cannot approve again
     const verifFence = {
-      reference: 'UTR-FENCE-1',
+      reference: '10002',
       amount: '10000',
       payment_date: pay.payment_date || '2026-11-26',
       receiving_bank_profile_id: 'bank-acc-14',
@@ -208,7 +208,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
     const settled = await validateAndSettleExpense('exp-r04-1', accountantA.id, {
       payment_mode: 'Bank Transfer',
       bank_account_profile_id: 'bank-acc-14',
-      reference: 'UTR-EXP-12345',
+      reference: '10003',
       idempotency_key: 'exp-key-1',
     });
     expect(settled.status).toBe('Settled');
@@ -217,7 +217,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
     await expect(
       validateAndSettleExpense('exp-r04-1', accountantB.id, {
         payment_mode: 'Cash',
-        reference: 'CASH-VOUCHER-02',
+        reference: '10004',
         idempotency_key: 'exp-key-2',
       })
     ).rejects.toThrow();
@@ -244,7 +244,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
         collect_initial_payment: true,
         initial_payment_amount: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-CALC-P1',
+        transaction_reference: '10005',
         our_bank_profile_id: 'bank-acc-14',
       },
       counsellor.id,
@@ -254,7 +254,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
     const fee = store.studentFees.find((f) => f.student_id === sid)!;
     const p1 = store.studentPayments.find((p) => p.student_id === sid)!;
     feeWorkflowService.verifyPayment(p1.id, accountantA.id, 'Verify P1', {
-      reference: 'UTR-CALC-P1',
+      reference: '10005',
       amount: '14000',
       payment_date: p1.payment_date || '2026-11-26',
       receiving_bank_profile_id: 'bank-acc-14',
@@ -267,6 +267,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
         student_id: sid,
         amount_paid: 6000,
         payment_mode: 'UPI',
+        transaction_reference: '10002',
         bank_upi_reference: 'UTR-CALC-P2',
         payment_date: '2026-11-26',
         our_bank_profile_id: 'bank-acc-14',
@@ -281,6 +282,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
         student_id: sid,
         amount_paid: 2000,
         payment_mode: 'UPI',
+        transaction_reference: '10003',
         bank_upi_reference: 'UTR-CALC-P3',
         payment_date: '2026-11-26',
         our_bank_profile_id: 'bank-acc-14',
@@ -311,7 +313,7 @@ describe('TASK-03 Final Closure Risks (FIN-R01, FIN-R02, FIN-R03, FIN-R04, FIN-R
 
     // Approve P2 (6,000)
     const verifP2 = {
-      reference: 'UTR-CALC-P2',
+      reference: '10002',
       amount: '6000',
       payment_date: '2026-11-26',
       receiving_bank_profile_id: 'bank-acc-14',

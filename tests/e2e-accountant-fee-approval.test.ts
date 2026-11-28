@@ -145,7 +145,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
         amount_paid: 20000,
         payment_mode: 'UPI' as const,
         payment_date: '2026-11-17',
-        transaction_reference: 'UTR-E2E-20000-XYZ',
+        transaction_reference: '10001',
         payment_proof_url: 'https://staging-storage.example.test/proofs/utr-20k.png',
         notes: 'Initial course fee instalment collected via QR code at Hyderabad campus desk.',
         our_bank_profile_id: primaryBank.id,
@@ -217,7 +217,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           amount_paid: 20000,
           payment_mode: 'UPI',
           payment_date: '2026-11-17',
-          transaction_reference: 'UTR-E2E-20000-XYZ',
+          transaction_reference: '10001',
           payment_proof_url: 'https://staging-storage.example.test/proofs/utr-20k.png',
           our_bank_profile_id: primaryBankId,
           our_bank_name: authorizedAccounts[0].bank_name,
@@ -233,7 +233,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
     it('displays original payment details correctly and resolves original bank account', () => {
       const payment = store.studentPayments.find((p) => p.id === pendingPaymentId)!;
       expect(payment.amount_paid).toBe(20000);
-      expect(payment.transaction_reference).toBe('UTR-E2E-20000-XYZ');
+      expect(payment.transaction_reference).toBe('10001');
       expect(payment.payment_date).toBe('2026-11-17');
 
       const accounts = getAuthorizedBankAccounts(undefined, { includePending: false });
@@ -251,7 +251,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: pendingPaymentId,
           verification: {
-            reference: 'UTR-WRONG-99999',
+            reference: '10002',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: primaryBankId,
@@ -269,7 +269,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: pendingPaymentId,
           verification: {
-            reference: 'UTR-E2E-20000-XYZ',
+            reference: '10001',
             amount: '19000', // incorrect amount
             payment_date: '2026-11-17',
             receiving_bank_profile_id: primaryBankId,
@@ -287,7 +287,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: pendingPaymentId,
           verification: {
-            reference: 'UTR-E2E-20000-XYZ',
+            reference: '10001',
             amount: '20000',
             payment_date: '2026-11-16', // incorrect date
             receiving_bank_profile_id: primaryBankId,
@@ -306,7 +306,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: pendingPaymentId,
           verification: {
-            reference: 'UTR-E2E-20000-XYZ',
+            reference: '10001',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: alternateBankId,
@@ -324,7 +324,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: pendingPaymentId,
           verification: {
-            reference: 'UTR-E2E-20000-XYZ',
+            reference: '10001',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: alternateBankId,
@@ -387,7 +387,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           amount_paid: 20000,
           payment_mode: 'UPI',
           payment_date: '2026-11-17',
-          transaction_reference: 'UTR-PHASE4-20000',
+          transaction_reference: '10003',
           our_bank_profile_id: bank.id,
           our_bank_name: bank.bank_name,
           our_bank_account_name: bank.account_holder_name,
@@ -406,7 +406,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           paymentId: payment.id,
           notes: 'Verified against bank transaction feed.',
           verification: {
-            reference: 'UTR-PHASE4-20000',
+            reference: '10003',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bank.id,
@@ -465,7 +465,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: payment.id,
           verification: {
-            reference: 'UTR-PHASE4-20000',
+            reference: '10003',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bank.id,
@@ -501,7 +501,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           amount_paid: 20000,
           payment_mode: 'UPI',
           payment_date: '2026-11-17',
-          transaction_reference: 'UTR-SEC-20000',
+          transaction_reference: '10004',
           our_bank_profile_id: bankProfileId,
         },
         counsellorUser.id
@@ -515,7 +515,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: testPaymentId,
           verification: {
-            reference: 'UTR-SEC-20000',
+            reference: '10004',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -535,7 +535,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           amount_paid: 10000,
           payment_mode: 'UPI',
           payment_date: '2026-11-17',
-          transaction_reference: 'UTR-SELF-10000',
+          transaction_reference: '10005',
           our_bank_profile_id: bankProfileId,
         },
         accountantUser.id,
@@ -548,7 +548,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: selfRecorded.id,
           verification: {
-            reference: 'UTR-SELF-10000',
+            reference: '10005',
             amount: '10000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -567,7 +567,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: testPaymentId,
           verification: {
-            reference: 'UTR-SEC-20000',
+            reference: '10004',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -583,7 +583,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: testPaymentId,
           verification: {
-            reference: 'UTR-SEC-20000',
+            reference: '10004',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -600,7 +600,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: testPaymentId,
           verification: {
-            reference: 'UTR-SEC-20000',
+            reference: '10004',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -614,7 +614,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: testPaymentId,
           verification: {
-            reference: 'UTR-SEC-20000',
+            reference: '10004',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -630,7 +630,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: testPaymentId,
           verification: {
-            reference: 'UTR-SEC-20000',
+            reference: '10004',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bankProfileId,
@@ -682,7 +682,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           amount_paid: 20000,
           payment_mode: 'UPI',
           payment_date: '2026-11-17',
-          transaction_reference: 'UTR-RECON-20000',
+          transaction_reference: '10006',
           our_bank_profile_id: bank.id,
           our_bank_name: bank.bank_name,
           our_bank_account_name: bank.account_holder_name,
@@ -698,7 +698,7 @@ describe('End-to-End Accountant Fee Approval Verification', () => {
           action: 'approve',
           paymentId: payment.id,
           verification: {
-            reference: 'UTR-RECON-20000',
+            reference: '10006',
             amount: '20000',
             payment_date: '2026-11-17',
             receiving_bank_profile_id: bank.id,

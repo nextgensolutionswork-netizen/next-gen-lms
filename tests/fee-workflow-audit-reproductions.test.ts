@@ -38,7 +38,7 @@ const input = () => ({
   amount_paid: 5000,
   payment_mode: 'UPI' as const,
   payment_date: '2026-10-12',
-  transaction_reference: 'UTR-123',
+  transaction_reference: '10001',
   payment_proof_url: 'https://example.test/proof.png',
 });
 
@@ -158,13 +158,13 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
   // B03: Financial Clearance Policy Threshold
   it('B03: nominal ₹1 partial payment does NOT grant financial clearance; payment meeting policy grants clearance', () => {
     // ₹1 on ₹30,000 (0.003% < 25%)
-    const payment = fees.recordPayment({ ...input(), amount_paid: 1, transaction_reference: 'UTR-B03-1' }, counsellor.id);
+    const payment = fees.recordPayment({ ...input(), amount_paid: 1, transaction_reference: '10002' }, counsellor.id);
     fees.verifyPayment(payment.id, accountant.id, undefined, enteredPaymentVerification(payment.id));
     expect(fee.outstanding_amount).toBe(29999);
     expect(store.onboardingCases[0].checklist.fee_clearance_verification.completed).toBe(false);
 
     // Additional ₹9,999 payment -> total verified = ₹10,000 on ₹30,000 (33.3% >= 25%)
-    const p2 = fees.recordPayment({ ...input(), amount_paid: 9999, transaction_reference: 'UTR-B03-2' }, counsellor.id);
+    const p2 = fees.recordPayment({ ...input(), amount_paid: 9999, transaction_reference: '10003' }, counsellor.id);
     fees.verifyPayment(p2.id, accountant.id, undefined, enteredPaymentVerification(p2.id));
     expect(fee.outstanding_amount).toBe(20000);
     expect(store.onboardingCases[0].checklist.fee_clearance_verification.completed).toBe(true);
@@ -206,7 +206,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
       status: 'Upcoming',
       due_date: '2026-11-15',
     });
-    const p2 = fees.recordPayment({ ...input(), transaction_reference: 'UTR-INST-REAL', installment_id: 'inst-test-01' }, counsellor.id);
+    const p2 = fees.recordPayment({ ...input(), transaction_reference: '10004', installment_id: 'inst-test-01' }, counsellor.id);
     expect(p2.installment_id).toBe('inst-test-01');
 
     fees.verifyPayment(p2.id, accountant.id, undefined, enteredPaymentVerification(p2.id));
@@ -243,7 +243,7 @@ describe('Remediated Audit Acceptance Tests (All 14 Findings)', () => {
         counsellor.id,
         true
       )
-    ).rejects.toThrow(/Transaction reference is required for non-cash initial payments/);
+    ).rejects.toThrow(/Please enter exactly 5 digits\./);
   });
 
   // B09: Admission Idempotency

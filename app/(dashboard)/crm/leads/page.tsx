@@ -45,6 +45,7 @@ import {
   getLeadHistoricalAdmissionNumber,
   classifyLeadConversion,
   isLeadConverted,
+  resolveLeadCourseFromMaster,
 } from '@/lib/services/crm-service';
 import { createAdmissionWorkflow } from '@/lib/services/admission-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
@@ -266,7 +267,7 @@ export default function LeadsPage() {
       'WhatsApp Country Code': l.whatsapp_country_code || l.country_code || '+91',
       'WhatsApp Number': l.whatsapp_number || l.phone,
       'Email': l.email,
-      'Interested Course': l.interested_course_name || 'Course unavailable',
+      'Interested Course': resolveLeadCourseFromMaster(l.interested_course_id, courses).course_name,
       'Training Preference': l.training_preference || 'Mode unavailable',
       'Lead Source': l.lead_source || 'Website',
       'Current Status': l.current_status || 'Working Professional',
@@ -516,7 +517,8 @@ export default function LeadsPage() {
     setEditInstituteId(matchedEditInst);
     setEditInstituteError('');
     setEditInstituteReviewConfirmed(false);
-    setEditCourseId(lead.interested_course_id || '');
+    const resolvedEditCourse = resolveLeadCourseFromMaster(lead.interested_course_id, courses);
+    setEditCourseId(resolvedEditCourse.status === 'Valid' && resolvedEditCourse.course_id ? resolvedEditCourse.course_id : '');
     setEditCounsellorId(lead.counsellor_id || '');
     setEditCurrentStatus((lead.current_status as LeadCurrentStatus) || 'Working Professional');
     setEditTrainingPref(
@@ -531,7 +533,7 @@ export default function LeadsPage() {
     setEditAddress(lead.address || '');
     setIsSavingDetails(false);
     setSaveDetailsError('');
-  }, []);
+  }, [activeInstitutes, courses]);
 
   const refreshLeads = React.useCallback(async () => {
     setIsLoading(true);
@@ -897,7 +899,7 @@ export default function LeadsPage() {
     } else {
       setConvertExperience(lead.experience_years ?? 0);
     }
-    const matchedCourse = publishedCourses.find((c) => c.id === lead.interested_course_id) || publishedCourses[0];
+    const matchedCourse = resolveLeadCourseFromMaster(lead.interested_course_id, publishedCourses).course;
     const initialCourseId = matchedCourse?.id || '';
     setConvertCourseId(initialCourseId);
     const matchedBatch = (store.batches || []).find((b) => b.course_id === initialCourseId);
@@ -1451,7 +1453,24 @@ export default function LeadsPage() {
                           )}
                         </td>
                         <td className="px-3.5 py-2.5 font-medium text-slate-800">
-                          {lead.interested_course_name || 'Course unavailable'}
+                          {(() => {
+                            const resolvedCourse = resolveLeadCourseFromMaster(lead.interested_course_id, courses);
+                            if (resolvedCourse.status === 'Missing') {
+                              return <span className="text-slate-400 italic">Not Assigned</span>;
+                            }
+                            if (resolvedCourse.status === 'Invalid') {
+                              return (
+                                <Badge
+                                  variant="danger"
+                                  className="text-[11px] font-medium"
+                                  title={`Invalid course ID: ${lead.interested_course_id}`}
+                                >
+                                  Invalid Course
+                                </Badge>
+                              );
+                            }
+                            return resolvedCourse.course_name;
+                          })()}
                         </td>
                         <td className="px-3.5 py-2.5">
                           <div className="flex flex-col gap-0.5">
@@ -2207,20 +2226,36 @@ export default function LeadsPage() {
 
                   {/* Course */}
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                    <label
+                      htmlFor="edit-lead-course"
+                      className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1"
+                    >
                       Interested Course
                     </label>
                     <select
+                      id="edit-lead-course"
                       value={editCourseId}
                       onChange={(e) => setEditCourseId(e.target.value)}
                       className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800"
                     >
+                      <option value="">Select Course</option>
                       {publishedCourses.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.course_name}
                         </option>
                       ))}
                     </select>
+                    {(() => {
+                      const existingCourseCheck = resolveLeadCourseFromMaster(selectedLead.interested_course_id, courses);
+                      if (existingCourseCheck.status === 'Invalid' && !editCourseId) {
+                        return (
+                          <p className="text-[11px] text-rose-600 font-medium mt-1">
+                            Existing course reference ({selectedLead.interested_course_id}) is invalid. Please select a valid course.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
 

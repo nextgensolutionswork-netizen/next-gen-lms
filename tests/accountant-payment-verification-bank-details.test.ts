@@ -39,7 +39,7 @@ const basePaymentInput = () => {
     amount_paid: 5000,
     payment_mode: 'UPI' as const,
     payment_date: '2026-10-12',
-    transaction_reference: 'UTR-VERIFY-123',
+    transaction_reference: '10001',
     payment_proof_url: 'https://example.test/proof.png',
     our_bank_profile_id: primaryAccount.id,
     our_bank_name: primaryAccount.bank_name,
@@ -158,7 +158,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: selectedAccount.id,
@@ -201,7 +201,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: differentAccount.id,
@@ -220,7 +220,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: differentAccount.id,
@@ -255,7 +255,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: 'non-existent-bank-id',
@@ -276,7 +276,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
           action: 'approve',
           paymentId: payment.id,
           verification: {
-            reference: 'UTR-VERIFY-123',
+            reference: '10001',
             amount: '5000',
             payment_date: '2026-10-12',
             receiving_bank_profile_id: pendingAccounts[0].id,
@@ -300,7 +300,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '4000', // original was 5000
           payment_date: '2026-10-12',
           receiving_bank_profile_id: selectedAccount.id,
@@ -316,7 +316,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-11', // original was 2026-10-12
           receiving_bank_profile_id: selectedAccount.id,
@@ -332,7 +332,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-DIFFERENT-999',
+          reference: '10002',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: selectedAccount.id,
@@ -379,7 +379,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
     const verifiedAccounts = getAuthorizedBankAccounts(undefined, { includePending: false });
     const selectedAccount = verifiedAccounts[0];
     const validVerification = {
-      reference: 'UTR-VERIFY-123',
+      reference: '10001',
       amount: '5000',
       payment_date: '2026-10-12',
       receiving_bank_profile_id: selectedAccount.id,
@@ -423,7 +423,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: '',
@@ -445,7 +445,7 @@ describe('Accountant Payment Verification with Bank Details', () => {
         action: 'approve',
         paymentId: payment.id,
         verification: {
-          reference: 'UTR-VERIFY-123',
+          reference: '10001',
           amount: '5000',
           payment_date: '2026-10-12',
           receiving_bank_profile_id: selectedAccount.id,

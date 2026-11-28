@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createLead, getLeads, updateLeadDetails, updateLeadStage } from '@/lib/services/crm-service';
+import { auditLeadCourseMappings, createLead, getLeads, updateLeadDetails, updateLeadStage } from '@/lib/services/crm-service';
 import { requireCrmActor } from '@/lib/auth/lead-access';
 import { authorizedLead } from '@/lib/services/lead-security';
 import { resolveLeadScope, scopeLeadQuery } from '@/lib/services/lead-security';
@@ -50,6 +50,12 @@ export async function GET(request: NextRequest) {
       lead_source: request.nextUrl.searchParams.get('lead_source') || undefined,
       institute_id: request.nextUrl.searchParams.get('institute_id') || undefined,
     } as any, actor);
+    if (request.nextUrl.searchParams.get('audit_courses') === 'true') {
+      return NextResponse.json(
+        { success: true, audit: auditLeadCourseMappings(leads, store.courses) },
+        { headers: { 'Cache-Control': 'private, no-store' } }
+      );
+    }
     return NextResponse.json({ success: true, leads }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (err: any) {
     return failure(err);

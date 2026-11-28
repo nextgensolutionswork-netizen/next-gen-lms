@@ -145,7 +145,7 @@ describe('QA-017 / BUG-04: Recent Verified Fee Collections', () => {
         amount_paid: 25000,
         payment_mode: 'UPI',
         payment_date: '2026-11-01',
-        transaction_reference: 'UPI-VER-01',
+        transaction_reference: '10001',
       },
       counsellorId,
       'counsellor'
@@ -164,7 +164,7 @@ describe('QA-017 / BUG-04: Recent Verified Fee Collections', () => {
         amount_paid: 20000,
         payment_mode: 'UPI',
         payment_date: '2026-11-02',
-        transaction_reference: 'UPI-PEND-02',
+        transaction_reference: '10002',
       },
       counsellorId,
       'counsellor'
@@ -177,7 +177,7 @@ describe('QA-017 / BUG-04: Recent Verified Fee Collections', () => {
         amount_paid: 15000,
         payment_mode: 'UPI',
         payment_date: '2026-11-03',
-        transaction_reference: 'UPI-REJ-03',
+        transaction_reference: '10003',
       },
       counsellorId,
       'counsellor'
@@ -231,7 +231,7 @@ describe('QA-017 / BUG-04: Recent Verified Fee Collections', () => {
         amount_paid: 30000,
         payment_mode: 'UPI',
         payment_date: '2026-11-06',
-        transaction_reference: 'UPI-VER-06',
+        transaction_reference: '10004',
       },
       counsellorId,
       'counsellor'
@@ -708,7 +708,7 @@ describe('QA-017 / BUG-04: Recent Verified Fee Collections', () => {
         amount_paid: 40000,
         payment_mode: 'UPI',
         payment_date: '2026-11-10',
-        transaction_reference: 'UPI-DYNAMIC-01',
+        transaction_reference: '10005',
       },
       counsellorId,
       'counsellor'

@@ -118,7 +118,7 @@ describe('P0 Regression — Authoritative Payment Record Visibility & Disappeara
         fee_id: FEE_ID,
         amount_paid: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-NORM-01',
+        transaction_reference: '10001',
         our_bank_profile_id: 'bank-acc-14',
         our_bank_name: 'Canara - Thenebanda',
         our_bank_account_name: 'T Usha',
@@ -333,7 +333,7 @@ describe('P0 Regression — Authoritative Payment Record Visibility & Disappeara
         fee_id: FEE_ID,
         amount_paid: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-C1',
+        transaction_reference: '10002',
         our_bank_profile_id: 'bank-acc-14',
         our_bank_name: 'Canara - Thenebanda',
         our_bank_account_name: 'T Usha',
@@ -345,7 +345,7 @@ describe('P0 Regression — Authoritative Payment Record Visibility & Disappeara
     feeWorkflowService.verifyPayment(p1.id, ACCOUNTANT_ID, 'Verified', {
       amount: '14000',
       payment_date: '2026-11-25',
-      reference: 'UTR-C1',
+      reference: '10002',
       receiving_bank_profile_id: 'bank-acc-14',
     });
     const p2 = feeWorkflowService.recordPayment(
@@ -375,7 +375,7 @@ describe('P0 Regression — Authoritative Payment Record Visibility & Disappeara
         fee_id: FEE_ID,
         amount_paid: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-MAP',
+        transaction_reference: '10003',
         our_bank_profile_id: 'bank-acc-14',
         our_bank_name: 'Canara - Thenebanda',
         our_bank_account_name: 'T Usha',
@@ -425,7 +425,7 @@ describe('P0 Regression — Authoritative Payment Record Visibility & Disappeara
         fee_id: FEE_ID,
         amount_paid: 14000,
         payment_mode: 'UPI',
-        transaction_reference: 'UTR-REC',
+        transaction_reference: '10004',
         our_bank_profile_id: 'bank-acc-14',
         our_bank_name: 'Canara - Thenebanda',
         our_bank_account_name: 'T Usha',
@@ -437,7 +437,7 @@ describe('P0 Regression — Authoritative Payment Record Visibility & Disappeara
     feeWorkflowService.verifyPayment(p.id, ACCOUNTANT_ID, 'Verified', {
       amount: '14000',
       payment_date: '2026-11-25',
-      reference: 'UTR-REC',
+      reference: '10004',
       receiving_bank_profile_id: 'bank-acc-14',
     });
     const report = runFinancialReconciliation(TENANT);

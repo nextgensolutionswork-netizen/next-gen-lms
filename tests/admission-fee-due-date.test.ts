@@ -136,7 +136,7 @@ describe('Admission Fee Due Date Validation & Institute Business Rules', () => {
         collect_initial_payment: true,
         initial_payment_amount: 45000,
         payment_mode: 'UPI',
-        transaction_reference: 'UPI-TXN-998811',
+        transaction_reference: '10001',
       },
       counsellorId
     );
@@ -182,7 +182,7 @@ describe('Admission Fee Due Date Validation & Institute Business Rules', () => {
         collect_initial_payment: true,
         initial_payment_amount: 45000,
         payment_mode: 'Bank Transfer',
-        transaction_reference: 'NEFT-554433',
+        transaction_reference: '10002',
       },
       counsellorId
     );
@@ -226,7 +226,7 @@ describe('Admission Fee Due Date Validation & Institute Business Rules', () => {
         collect_initial_payment: true,
         initial_payment_amount: 20000,
         payment_mode: 'Debit Card',
-        transaction_reference: 'POS-CARD-1122',
+        transaction_reference: '10003',
       },
       counsellorId
     );
@@ -442,7 +442,7 @@ describe('Admission Fee Due Date Validation & Institute Business Rules', () => {
         collect_initial_payment: true,
         initial_payment_amount: netPayable,
         payment_mode: 'Credit Card',
-        transaction_reference: 'CC-AUTH-8877',
+        transaction_reference: '10004',
       },
       counsellorId
     );
@@ -486,7 +486,7 @@ describe('Admission Fee Due Date Validation & Institute Business Rules', () => {
         collect_initial_payment: true,
         initial_payment_amount: 45000,
         payment_mode: 'UPI',
-        transaction_reference: 'UPI-TXN-KAVITA-01',
+        transaction_reference: '10005',
       },
       counsellorId
     );

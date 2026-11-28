@@ -289,7 +289,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
             fee_id: unapprovedFee.id,
             amount_paid: 3500,
             payment_mode: 'UPI',
-            transaction_reference: 'TEST-1',
+            transaction_reference: '10001',
           },
           counsellorId,
           'counsellor'
@@ -303,7 +303,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approvedFee.id,
           amount_paid: 20000,
           payment_mode: 'UPI',
-          transaction_reference: 'UPI/TEST/2026/01',
+          transaction_reference: '10002',
         },
         counsellorId,
         'counsellor'
@@ -324,7 +324,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approvedFee.id,
           amount_paid: 20000,
           payment_mode: 'Bank Transfer',
-          transaction_reference: 'TEST-2',
+          transaction_reference: '10003',
         },
         counsellorId,
         'counsellor'
@@ -347,7 +347,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approvedFee.id,
           amount_paid: 20000,
           payment_mode: 'UPI',
-          transaction_reference: 'UPI/VALID/2026/02',
+          transaction_reference: '10004',
         },
         counsellorId,
         'counsellor'
@@ -479,7 +479,7 @@ describe('Global LMS Fee Approval & Payment Management Workflow', () => {
           fee_id: approved.id,
           amount_paid: approved.final_payable,
           payment_mode: 'Bank Transfer',
-          transaction_reference: 'TEST-3',
+          transaction_reference: '10005',
         },
         accountantId,
         'accountant'

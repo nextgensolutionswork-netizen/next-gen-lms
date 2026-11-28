@@ -249,7 +249,7 @@ describe('12. Excel / CSV Bulk Data Imports & CI/CD Pipeline Tests', () => {
       expect(studentTpl).toContain('full_name,email,phone,course_code');
 
       const leadsTpl = generateCsvTemplate('leads');
-      expect(leadsTpl).toContain('full_name,email,phone,course_code,lead_source');
+      expect(leadsTpl).toContain('full_name,email,phone,institute,course_code,lead_source');
 
       const attTpl = generateCsvTemplate('attendance');
       expect(attTpl).toContain('student_code,attendance_date,status');

@@ -148,12 +148,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Match course by ID or name
-    let matchedCourseId = courseId;
+    // Match course against Course Master (never assign an arbitrary default course)
+    let matchedCourseId: string | undefined;
+    if (courseId) {
+      const byId = (store.courses || []).find(
+        (c) => c.id === courseId || c.course_code.toLowerCase() === String(courseId).toLowerCase()
+      );
+      if (byId) matchedCourseId = byId.id;
+    }
     if (!matchedCourseId && courseName) {
+      const q = String(courseName).trim().toLowerCase();
       const matched = (store.courses || []).find(
-        (c) => c.course_name.toLowerCase().includes(courseName.toLowerCase()) ||
-               c.course_code.toLowerCase() === courseName.toLowerCase()
+        (c) =>
+          c.course_name.toLowerCase() === q ||
+          c.course_code.toLowerCase() === q ||
+          c.course_name.toLowerCase().includes(q)
       );
       if (matched) matchedCourseId = matched.id;
     }
