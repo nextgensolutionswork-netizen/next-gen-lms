@@ -225,6 +225,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<UserProfile | null>(null);
   const [role, setRole] = React.useState<UserRole>('super_admin');
   const [isLoading, setIsLoading] = React.useState(true);
+  const currentUserIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    currentUserIdRef.current = user?.id ?? null;
+  }, [user?.id]);
 
   // Read supabase.auth.getUser() on mount and sync global auth state
   React.useEffect(() => {
@@ -242,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (isMounted) {
             if (profile) {
               syncManager.setRole(profile.role);
+              currentUserIdRef.current = profile.id;
               resetLeadCache(profile?.id ?? null); store.leads = []; setUser(profile);
               setRole(profile.role);
               setAuthCookie(profile);
@@ -249,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 localStorage.setItem(AUTH_COOKIE_NAME, JSON.stringify(profile));
               }
             } else {
+              currentUserIdRef.current = null;
               resetLeadCache(null); store.leads = []; setUser(null);
               clearAuthCookie();
             }
@@ -257,9 +264,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // If no active session from Supabase, fall back to cached user or null
           const cached = getStoredUser();
           if (cached && isMounted) {
+            currentUserIdRef.current = cached.id;
             resetLeadCache(cached?.id ?? null); store.leads = []; setUser(cached);
             setRole(cached.role);
           } else if (isMounted) {
+            currentUserIdRef.current = null;
             resetLeadCache(null); store.leads = []; setUser(null);
             setRole('super_admin');
           }
@@ -290,25 +299,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: authListener } = db.auth.onAuthStateChange(async (_event: string, session: any) => {
           if (session?.user) {
             const authUser = session.user;
+            // Supabase emits TOKEN_REFRESHED, INITIAL_SESSION, and sometimes SIGNED_IN
+            // when the browser window/tab regains focus. Avoid resetting caches or
+            // replacing `user` with a new object reference for the same active user.
+            if (
+              currentUserIdRef.current &&
+              currentUserIdRef.current === authUser.id &&
+              _event !== 'USER_UPDATED'
+            ) {
+              return;
+            }
             void loadApplicationProfile(db, authUser).then((profile) => {
               if (!isMounted) return;
               if (profile) {
+                currentUserIdRef.current = profile.id;
                 resetLeadCache(profile?.id ?? null); store.leads = []; setUser(profile);
                 setRole(profile.role);
                 setAuthCookie(profile);
               } else {
+                currentUserIdRef.current = null;
                 resetLeadCache(null); store.leads = []; setUser(null);
                 clearAuthCookie();
               }
             }).catch((err) => {
               console.warn('[AuthProvider] Unable to load application profile:', err);
               if (isMounted) {
+                currentUserIdRef.current = null;
                 resetLeadCache(null); store.leads = []; setUser(null);
                 clearAuthCookie();
               }
             });
           } else if (_event === 'SIGNED_OUT') {
             if (isMounted) {
+              currentUserIdRef.current = null;
               resetLeadCache(null); store.leads = []; setUser(null);
               setRole('super_admin');
               clearAuthCookie();
