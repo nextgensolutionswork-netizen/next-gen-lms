@@ -356,8 +356,11 @@ function resolveAndEnsureOnboardingCase(
         (student?.id && a.student_id === student.id)) &&
       tenantId(a) === tenantId(actor)
   );
-  const isAdmissionApproved = admission && admission.status === 'Confirmed';
-  if (!student || !admission || !isAdmissionApproved) return undefined;
+  if (!student || !admission) return undefined;
+  const existingCase = store.onboardingCases.find(
+    (c) => c.admission_id === admission.id && tenantId(c) === tenantId(actor)
+  );
+  if (!existingCase && admission.status !== 'Confirmed') return undefined;
 
   const caseRecord = initializeOnboardingCase(admission.id, actor.id);
   assertSameTenant(actor, caseRecord);
