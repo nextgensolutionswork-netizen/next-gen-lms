@@ -485,5 +485,134 @@ describe('ROLE 3 COUNSELLOR — DEFECT REMEDIATION & REGRESSION SUITE', () => {
       const res = await paymentsPost(req);
       expect(res.status).toBe(403);
     });
+
+    it('rejects UPI payment when transaction reference is missing (HTTP 400 Bad Request)', async () => {
+      const studentFee = store.studentFees[0];
+      const req = createMockAuthRequest(
+        'http://localhost:3000/api/fees/payments',
+        'POST',
+        'counsellor',
+        {
+          action: 'record',
+          input: {
+            fee_id: studentFee.id,
+            amount_paid: 1000,
+            payment_mode: 'UPI',
+            payment_date: new Date().toISOString().slice(0, 10),
+            idempotency_key: `idem-missing-ref-${Date.now()}`,
+            // transaction_reference intentionally omitted
+          },
+        }
+      );
+
+      const res = await paymentsPost(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain('Transaction reference is required');
+    });
+
+    it('rejects payment with invalid timestamp format instead of YYYY-MM-DD (HTTP 400 Bad Request)', async () => {
+      const studentFee = store.studentFees[0];
+      const req = createMockAuthRequest(
+        'http://localhost:3000/api/fees/payments',
+        'POST',
+        'counsellor',
+        {
+          action: 'record',
+          input: {
+            fee_id: studentFee.id,
+            amount_paid: 1000,
+            payment_mode: 'UPI',
+            payment_date: '2026-11-27T10:00:00.000Z', // Invalid datetime string
+            transaction_reference: `UPI-INVALID-DATE-${Date.now()}`,
+            idempotency_key: `idem-invalid-date-${Date.now()}`,
+          },
+        }
+      );
+
+      const res = await paymentsPost(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toMatch(/Invalid string: must match pattern|Invalid payment date|valid calendar date/i);
+    });
+
+    it('rejects payment exceeding the outstanding balance (HTTP 400 Bad Request)', async () => {
+      const studentFee = store.studentFees[0];
+      const outstandingDue = Number((studentFee.final_payable - studentFee.paid_amount).toFixed(2));
+      const excessiveAmount = outstandingDue + 10000;
+
+      const req = createMockAuthRequest(
+        'http://localhost:3000/api/fees/payments',
+        'POST',
+        'counsellor',
+        {
+          action: 'record',
+          input: {
+            fee_id: studentFee.id,
+            amount_paid: excessiveAmount,
+            payment_mode: 'UPI',
+            payment_date: new Date().toISOString().slice(0, 10),
+            transaction_reference: `UPI-OVERPAY-${Date.now()}`,
+            idempotency_key: `idem-overpay-${Date.now()}`,
+          },
+        }
+      );
+
+      const res = await paymentsPost(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain('Payment exceeds the outstanding fee balance');
+    });
+
+    it('rejects duplicate transaction reference in same tenant (HTTP 400 Bad Request)', async () => {
+      const studentFee = store.studentFees[0];
+      const duplicateRef = `UPI-DUP-REF-${Date.now()}`;
+
+      // First payment
+      const req1 = createMockAuthRequest(
+        'http://localhost:3000/api/fees/payments',
+        'POST',
+        'counsellor',
+        {
+          action: 'record',
+          input: {
+            fee_id: studentFee.id,
+            amount_paid: 500,
+            payment_mode: 'UPI',
+            payment_date: new Date().toISOString().slice(0, 10),
+            transaction_reference: duplicateRef,
+            idempotency_key: `idem-dup-1-${Date.now()}`,
+          },
+        }
+      );
+      const res1 = await paymentsPost(req1);
+      expect(res1.status).toBe(200);
+
+      // Replay with exact same transaction reference but different idempotency key
+      const req2 = createMockAuthRequest(
+        'http://localhost:3000/api/fees/payments',
+        'POST',
+        'counsellor',
+        {
+          action: 'record',
+          input: {
+            fee_id: studentFee.id,
+            amount_paid: 500,
+            payment_mode: 'UPI',
+            payment_date: new Date().toISOString().slice(0, 10),
+            transaction_reference: duplicateRef,
+            idempotency_key: `idem-dup-2-${Date.now()}`,
+          },
+        }
+      );
+      const res2 = await paymentsPost(req2);
+      expect(res2.status).toBe(400);
+      const json2 = await res2.json();
+      expect(json2.success).toBe(false);
+      expect(json2.error).toContain('Duplicate transaction reference');
+    });
   });
 });

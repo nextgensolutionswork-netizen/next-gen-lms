@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import {
   OFFICIAL_INSTITUTE_NAME,
   OFFICIAL_INSTITUTE_ADDRESS,
@@ -195,12 +196,18 @@ describe('BUG-18: Official Fee Receipt & Invoice Branding Update', () => {
       expect(pageMatches.length).toBe(1);
     });
 
-    it('4.4 writes verified official PDF sample to artifact directory', async () => {
+    it('4.4 writes verified official PDF sample to isolated portable temporary directory', async () => {
       const pdfBuffer = await generateReceiptPdfBuffer(sampleReceipt);
-      const artifactPath = path.resolve('C:/Users/THINKPAD T490/.gemini/antigravity/brain/e1d2277a-f120-47bd-b17e-cc0cbffd843c/sample-receipt-REC-2026-0001.pdf');
-      fs.writeFileSync(artifactPath, pdfBuffer);
-      expect(fs.existsSync(artifactPath)).toBe(true);
-      expect(fs.statSync(artifactPath).size).toBeGreaterThan(20000);
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'receipt-branding-'));
+      const artifactPath = path.join(tempDir, 'sample-receipt-REC-2026-0001.pdf');
+      try {
+        fs.writeFileSync(artifactPath, pdfBuffer);
+        expect(fs.existsSync(artifactPath)).toBe(true);
+        expect(fs.statSync(artifactPath).size).toBeGreaterThan(20000);
+      } finally {
+        if (fs.existsSync(artifactPath)) fs.unlinkSync(artifactPath);
+        if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
+      }
     });
   });
 });

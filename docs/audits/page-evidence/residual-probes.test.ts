@@ -22,10 +22,10 @@ it('G02 residual: known local actor is accepted after live session rejection',as
  const user=await authenticatePaymentRequest(new NextRequest('http://localhost/api/fees/payments',{headers:{cookie:`${AUTH_COOKIE_NAME}=${value}; ${AUTH_SIG_COOKIE_NAME}=${sig}`}}));
  expect(user.id).toBe('audit-admin');expect(mocks.getUser).toHaveBeenCalled();
 });
-it('G11 residual: production live rejection falls through to named demo password',async()=>{
+it('G11 regression: production live rejection strictly denies fallback to named demo password',async()=>{
  vi.stubEnv('NODE_ENV','production');
  const result=await verifyUserCredentials('admin@next-generpsolutions.com','AdminPass#2026');
- expect(mocks.signIn).toHaveBeenCalled();expect(result.success).toBe(true);
+ expect(mocks.signIn).toHaveBeenCalled();expect(result.success).toBe(false);
 });
 it('G14 residual: repeated successful quiz increases progress twice',()=>{
  store.students=[{id:'audit-student',course_progress:0} as any];store.quizAttempts=[];

@@ -15,23 +15,32 @@ export function validateLoginPreflight(user: Pick<UserProfile, 'role' | 'is_acti
 }
 
 /**
- * Standard preset passwords for demo, synthetic, and test accounts.
+ * Standard preset passwords for isolated test and synthetic fixture environments.
+ * SEC-BUG-02: Strictly blocked in production runtime (NODE_ENV === 'production').
  */
 export const DEMO_CREDENTIALS: Record<string, string[]> = {
-  'superadmin@next-generpsolutions.com': ['AdminPass#2026'],
-  'admin@next-generpsolutions.com': ['AdminPass#2026'],
-  'accounts@next-generpsolutions.com': ['AccountsPass#2026'],
-  'counsellor@next-generpsolutions.com': ['CounsellorPass#2026'],
-  'vikram.fico@next-generpsolutions.com': ['TrainerPass#2026'],
-  'neha.mm@next-generpsolutions.com': ['TrainerPass#2026'],
-  'placement@next-generpsolutions.com': ['PlacementPass#2026'],
-  'support@next-generpsolutions.com': ['SupportPass#2026'],
-  'onboarding@next-generpsolutions.com': ['OnboardingPass#2026', 'OnboardPass#2026'],
-  'amit.gupta@student.next-gen.com': ['StudentPass#2026'],
-  'sneha.k@student.next-gen.com': ['StudentPass#2026'],
+  'mock.superadmin@test-fixture.local': ['TestAdminPass#2026'],
+  'mock.admin@test-fixture.local': ['TestAdminPass#2026'],
   'student1@lms.internal': ['StudentPass#2026'],
   'student2@lms.internal': ['StudentPass#2026'],
 };
+
+// In test environment only, support legacy test suite role addresses
+if (process.env.NODE_ENV === 'test') {
+  Object.assign(DEMO_CREDENTIALS, {
+    'superadmin@next-generpsolutions.com': ['AdminPass#2026'],
+    'admin@next-generpsolutions.com': ['AdminPass#2026'],
+    'accounts@next-generpsolutions.com': ['AccountsPass#2026'],
+    'counsellor@next-generpsolutions.com': ['CounsellorPass#2026'],
+    'vikram.fico@next-generpsolutions.com': ['TrainerPass#2026'],
+    'neha.mm@next-generpsolutions.com': ['TrainerPass#2026'],
+    'placement@next-generpsolutions.com': ['PlacementPass#2026'],
+    'support@next-generpsolutions.com': ['SupportPass#2026'],
+    'onboarding@next-generpsolutions.com': ['OnboardingPass#2026', 'OnboardPass#2026'],
+    'amit.gupta@student.next-gen.com': ['StudentPass#2026'],
+    'sneha.k@student.next-gen.com': ['StudentPass#2026'],
+  });
+}
 
 export interface VerificationResult {
   success: boolean;
@@ -59,6 +68,9 @@ export async function verifyUserCredentials(
   }
 
   // 1. If Supabase is live, attempt genuine Supabase authentication
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isTestEnvironment = process.env.NODE_ENV === 'test';
+
   if (isLiveSupabaseEnabled()) {
     try {
       const db = getDb();
@@ -87,13 +99,44 @@ export async function verifyUserCredentials(
             };
           }
         }
+      } else if (error) {
+        // In production, invalid credentials from Supabase must not fall through to demo passwords
+        if (isProduction) {
+          return {
+            success: false,
+            error: 'Unable to sign in. Check your email and password and try again.',
+            errorCode: 'invalid_credentials',
+          };
+        }
       }
-    } catch {
-      // Fall through to local store verification on network/offline fallback
+    } catch (networkErr: any) {
+      if (isProduction) {
+        // Fail closed in production when auth provider is unreachable
+        return {
+          success: false,
+          error: 'Authentication service temporarily unavailable. Please try again later.',
+          errorCode: 'account_deactivated' as any,
+        };
+      }
     }
+  } else if (isProduction) {
+    // In production without live auth, fail securely (zero demo credential fallback)
+    return {
+      success: false,
+      error: 'Authentication service configuration error.',
+      errorCode: 'account_deactivated' as any,
+    };
   }
 
-  // 2. Local / Staging Store Verification
+  // 2. Local / Staging Store Verification (Strictly gated to test or non-production staging)
+  if (isProduction) {
+    return {
+      success: false,
+      error: 'Unable to sign in. Check your email and password and try again.',
+      errorCode: 'invalid_credentials',
+    };
+  }
+
   const user = store.users.find(
     (u) => u.email.toLowerCase() === cleanEmail.toLowerCase()
   );
@@ -106,10 +149,9 @@ export async function verifyUserCredentials(
     };
   }
 
-  // Verify password matches known demo, staging, or role pattern
+  // Verify password matches known demo, staging, or role pattern in non-production
   const acceptedPasswords = DEMO_CREDENTIALS[user.email.toLowerCase()] || [];
   const isStagingUser = user.email.includes('next-gen-staging.local');
-  const isTestEnvironment = process.env.NODE_ENV === 'test';
   const isGenericValid =
     acceptedPasswords.includes(cleanPassword) ||
     (isStagingUser && ['StagingPass#2026', 'AdminPass#2026', 'StudentPass#2026', 'AccountsPass#2026', 'TrainerPass#2026', 'CounsellorPass#2026', 'OnboardPass#2026'].includes(cleanPassword)) ||

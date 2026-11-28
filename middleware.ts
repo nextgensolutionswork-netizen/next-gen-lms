@@ -131,13 +131,18 @@ export async function middleware(request: NextRequest) {
     if (authCookie) {
       let isSignatureValid = false;
       if (sigCookie) {
-        if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
-          isSignatureValid = true;
-        } else if (await verifyAuthCookieSignature(authCookie, sigCookie)) {
-          isSignatureValid = true;
-        } else if (await verifyAuthCookieSignature(encodeURIComponent(authCookie), sigCookie)) {
-          isSignatureValid = true;
-        } else {
+        try {
+          if (rawHeaderCookie && await verifyAuthCookieSignature(rawHeaderCookie, sigCookie)) {
+            isSignatureValid = true;
+          } else if (await verifyAuthCookieSignature(authCookie, sigCookie)) {
+            isSignatureValid = true;
+          } else if (await verifyAuthCookieSignature(encodeURIComponent(authCookie), sigCookie)) {
+            isSignatureValid = true;
+          } else {
+            isSignatureValid = false;
+          }
+        } catch (cookieSigErr) {
+          console.error('[Middleware] Auth cookie signature verification failed safely:', cookieSigErr);
           isSignatureValid = false;
         }
       }
@@ -206,8 +211,27 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 6. Handle API routes (pass through with session cookies preserved, without HTML redirect)
+  // 6. API Route Security & Explicit Classification (ARCH-BUG-01)
   if (pathname.startsWith('/api')) {
+    // A. Explicitly Approved Public API Routes
+    const isPublicApi =
+      pathname === '/api/auth/login' ||
+      pathname === '/api/database/health' ||
+      (pathname.startsWith('/api/certificates/') && pathname.endsWith('/pdf')) ||
+      pathname.startsWith('/api/storage/signed');
+
+    // B. Signed / Authenticated External Webhooks (delegated to handler HMAC & token checks)
+    const isWebhookApi = pathname.startsWith('/api/webhooks/');
+
+    if (isPublicApi || isWebhookApi) {
+      return response;
+    }
+
+    // C. Protected API Routes: Require valid authenticated session
+    if (!isAuthenticated) {
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    }
+
     return response;
   }
 

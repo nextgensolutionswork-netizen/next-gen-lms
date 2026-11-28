@@ -171,8 +171,7 @@ export function getAllPaymentDues(
     throw new Error('Unauthorized: Access to payment dues is restricted.');
   }
 
-  store.reconcileDualLedgers();
-
+  // Pure read query: no render-time dual-ledger mutation
   const timeZone = options?.timeZone || getInstituteTimezone();
   const baseDate = options?.baseDate || defaultReferenceDate || new Date();
   const scope = options?.scope || 'all';
