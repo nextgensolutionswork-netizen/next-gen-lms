@@ -1,6 +1,6 @@
 /**
  * TASK-02: Client-Side Synchronization Manager
- * Orchestrates invalidation signals, connection recovery, window focus refresh,
+ * Orchestrates invalidation signals, connection recovery,
  * request generation tracking (to discard stale responses), and event debouncing.
  */
 
@@ -52,7 +52,7 @@ class SyncManager {
   }
 
   /**
-   * Attach window focus and online/offline event listeners.
+   * Attach online/offline connection recovery event listeners.
    */
   private attachWindowListeners(): void {
     if (this.listenersAttached || typeof window === 'undefined') return;
@@ -71,18 +71,6 @@ class SyncManager {
     window.addEventListener('offline', () => {
       this.isOnlineState = false;
       this.isReconnectingState = false;
-    });
-
-    window.addEventListener('focus', () => {
-      if (this.isOnlineState) {
-        this.revalidateAll();
-      }
-    });
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.isOnlineState) {
-        this.revalidateAll();
-      }
     });
   }
 

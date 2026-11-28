@@ -13,13 +13,20 @@ export async function GET(request: NextRequest) {
     let users = store.users.filter(u => u.tenant_id === scope.actor.tenant_id && (!scope.creatorIds || scope.creatorIds.includes(u.id)))
       .map(u => ({ id: u.id, full_name: u.full_name }));
     let teams: { id: string; name: string; memberIds: string[] }[] = [];
+    let admissions = store.admissions;
     if (isLiveSupabaseEnabled()) {
       const db = createAdminClient();
       let q = db.from('profiles').select('id,full_name').eq('tenant_id', scope.actor.tenant_id!);
       if (scope.creatorIds) q = q.in('id', scope.creatorIds);
-      const result = await q;
+      const [result, admResult] = await Promise.all([
+        q,
+        db.from('admissions').select('*'),
+      ]);
       if (result.error) throw new Error('CRM staff lookup unavailable.');
       users = result.data || [];
+      if (!admResult.error && Array.isArray(admResult.data)) {
+        admissions = admResult.data;
+      }
       if (scope.actor.role !== 'counsellor') {
         let tq = db.from('crm_teams').select('id,name,leader_id').eq('tenant_id', scope.actor.tenant_id!);
         if (scope.creatorIds) tq = tq.eq('leader_id', scope.actor.id);
@@ -32,7 +39,7 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-    const leadClassifications = leads.map(l => ({ lead: l, ...classifyLeadConversion(l, store.admissions) }));
+    const leadClassifications = leads.map(l => ({ lead: l, ...classifyLeadConversion(l, admissions) }));
     const converted = leads.filter(l => ['Converted', 'Enrolled'].includes(l.stage)).length;
     const activeConversions = leadClassifications.filter(c => c.status === 'active').length;
     const historicalConversions = leadClassifications.filter(c => c.status === 'historical').length;
@@ -40,7 +47,7 @@ export async function GET(request: NextRequest) {
     const integrityErrors = leadClassifications.filter(c => c.status === 'integrity_error').length;
     const performance = users.map(u => {
       const uLeads = leads.filter(l => l.counsellor_id === u.id || (l.created_by === u.id && !l.counsellor_id));
-      const uClassified = uLeads.map(l => ({ lead: l, ...classifyLeadConversion(l, store.admissions) }));
+      const uClassified = uLeads.map(l => ({ lead: l, ...classifyLeadConversion(l, admissions) }));
       const uConverted = uLeads.filter(l => ['Converted', 'Enrolled'].includes(l.stage)).length;
       const uActive = uClassified.filter(c => c.status === 'active').length;
       const uHistorical = uClassified.filter(c => c.status === 'historical').length;

@@ -31,7 +31,7 @@ import { PhoneInput } from '@/components/ui/phone-input';
 import { BulkImportModal } from '@/components/bulk-import-modal';
 import { useAuth } from '@/components/providers/auth-provider';
 import { store } from '@/lib/services/data-store';
-import { Lead, LeadStage, LeadCurrentStatus, LeadTrainingPreference, LeadSource, Course } from '@/types';
+import { Lead, LeadStage, LeadCurrentStatus, LeadTrainingPreference, LeadSource, Course, Admission } from '@/types';
 import { getCourses, createBatch } from '@/lib/services/academics-service';
 import { formatCourseOptionLabel, formatBatchOptionLabel } from '@/lib/utils/course-batch-display';
 import {
@@ -47,7 +47,7 @@ import {
   isLeadConverted,
   resolveLeadCourseFromMaster,
 } from '@/lib/services/crm-service';
-import { createAdmissionWorkflow } from '@/lib/services/admission-service';
+import { createAdmissionWorkflow, getAdmissions } from '@/lib/services/admission-service';
 import { paymentWorkflowClient } from '@/lib/services/payment-workflow-client';
 import {
   getEligibleAdmissionsCounsellors,
@@ -97,6 +97,7 @@ export default function LeadsPage() {
   const { user, role, hasPermission } = useAuth();
   const [leadSnapshot, setLeadSnapshot] = React.useState<{ owner?: string; rows: Lead[] }>({ rows: [] });
   const leads = leadSnapshot.owner === user?.id ? leadSnapshot.rows : [];
+  const [admissions, setAdmissions] = React.useState<Admission[]>(() => store.admissions || []);
   const [creatorFilter, setCreatorFilter] = React.useState('');
   const [salespersonFilter, setSalespersonFilter] = React.useState('');
   const [courseFilter, setCourseFilter] = React.useState('');
@@ -604,6 +605,19 @@ export default function LeadsPage() {
     }
   }, [user?.id, openEditModal]);
 
+  const refreshAdmissions = React.useCallback(async () => {
+    try {
+      const fetchedAdmissions = await getAdmissions(user ?? undefined);
+      setAdmissions(fetchedAdmissions);
+    } catch {
+      setAdmissions(store.admissions || []);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    void refreshAdmissions();
+  }, [refreshAdmissions]);
+
   React.useEffect(() => {
     void (async () => {
       await refreshLeads();
@@ -613,6 +627,11 @@ export default function LeadsPage() {
   useDataSync({
     domain: 'leads',
     onSync: refreshLeads,
+  });
+
+  useDataSync({
+    domain: 'admissions',
+    onSync: refreshAdmissions,
   });
 
   // Phone input handler for Create Lead
@@ -890,7 +909,7 @@ export default function LeadsPage() {
   };
 
   const handleOpenConvert = (lead: Lead) => {
-    if (isLeadConverted(lead, store.admissions)) {
+    if (isLeadConverted(lead, admissions)) {
       alert(`Lead ${lead.full_name} has already been converted to an admission.`);
       return;
     }
@@ -987,7 +1006,7 @@ export default function LeadsPage() {
       alert('Authentication required: Please sign in to convert leads.');
       return;
     }
-    if (isLeadConverted(selectedLead, store.admissions)) {
+    if (isLeadConverted(selectedLead, admissions)) {
       alert(`Lead ${selectedLead.full_name} has already been converted to an admission.`);
       setIsConvertModalOpen(false);
       setSelectedLead(null);
@@ -1400,7 +1419,7 @@ export default function LeadsPage() {
                   </tr>
                 ) : (
                   leads.map((lead) => {
-                    const conversionInfo = classifyLeadConversion(lead, store.admissions);
+                    const conversionInfo = classifyLeadConversion(lead, admissions);
                     const isSelected = selectedLeadIds.includes(lead.id);
                     const waCode = lead.whatsapp_country_code || lead.country_code || '+91';
                     const waNum = lead.whatsapp_number || lead.phone;
@@ -2235,7 +2254,7 @@ export default function LeadsPage() {
                     {editInstituteError && (
                       <p className="text-xs text-rose-500 font-medium mt-1">{editInstituteError}</p>
                     )}
-                    {isLeadConverted(selectedLead, store.admissions) &&
+                    {isLeadConverted(selectedLead, admissions) &&
                       editInstituteId &&
                       editInstituteId !== (selectedLead.institute_id || '') && (
                         <label className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 cursor-pointer">
